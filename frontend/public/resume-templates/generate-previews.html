@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume Template Preview Generator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .template-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 24px;
+            margin-top: 20px;
+        }
+        .template-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .template-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+        }
+        .template-preview {
+            width: 100%;
+            height: 500px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            position: relative;
+            overflow: hidden;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .template-name {
+            font-weight: 600;
+            font-size: 18px;
+            margin-bottom: 12px;
+            color: #111827;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            width: 100%;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        
+        /* Modern Template - Clean with subtle accent */
+        .modern-preview {
+            background: #ffffff;
+            color: #1f2937;
+            padding: 32px 28px;
+            font-size: 10px;
+            line-height: 1.5;
+        }
+        .modern-header {
+            border-bottom: 2px solid #3b82f6;
+            padding-bottom: 12px;
+            margin-bottom: 20px;
+        }
+        .modern-name {
+            font-size: 22px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 4px;
+            letter-spacing: -0.5px;
+        }
+        .modern-title {
+            font-size: 11px;
+            color: #6b7280;
+            font-weight: 400;
+        }
+        .modern-contact {
+            font-size: 9px;
+            color: #6b7280;
+            margin-top: 6px;
+        }
+        .modern-section {
+            margin-bottom: 16px;
+        }
+        .modern-section-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #3b82f6;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .modern-item {
+            font-size: 9.5px;
+            color: #374151;
+            margin-bottom: 6px;
+            line-height: 1.4;
+        }
+        .modern-item-title {
+            font-weight: 600;
+            color: #111827;
+        }
+        .modern-item-meta {
+            font-size: 8.5px;
+            color: #9ca3af;
+            margin-top: 2px;
+        }
+        
+        /* Professional Template - Classic two-column */
+        .professional-preview {
+            background: #ffffff;
+            color: #1f2937;
+            padding: 28px 24px;
+            font-size: 9.5px;
+            line-height: 1.5;
+        }
+        .professional-header {
+            text-align: center;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 14px;
+            margin-bottom: 18px;
+        }
+        .professional-name {
+            font-size: 20px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 4px;
+            letter-spacing: 0.5px;
+        }
+        .professional-title {
+            font-size: 10px;
+            color: #6b7280;
+            font-weight: 400;
+        }
+        .professional-contact {
+            font-size: 8.5px;
+            color: #9ca3af;
+            margin-top: 6px;
+        }
+        .professional-section {
+            margin-bottom: 14px;
+        }
+        .professional-section-title {
+            font-size: 10px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            border-left: 3px solid #3b82f6;
+            padding-left: 8px;
+        }
+        .professional-item {
+            font-size: 9px;
+            color: #4b5563;
+            margin-bottom: 5px;
+            line-height: 1.5;
+        }
+        .professional-item-title {
+            font-weight: 600;
+            color: #111827;
+        }
+        .professional-item-meta {
+            font-size: 8px;
+            color: #9ca3af;
+            margin-top: 2px;
+        }
+        
+        /* Creative Template - Bold with color blocks */
+        .creative-preview {
+            background: #ffffff;
+            color: #1f2937;
+            padding: 30px 26px;
+            font-size: 10px;
+            line-height: 1.5;
+        }
+        .creative-sidebar {
+            width: 80px;
+            background: linear-gradient(180deg, #8b5cf6 0%, #6366f1 100%);
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            padding: 24px 12px;
+        }
+        .creative-main {
+            margin-left: 80px;
+            padding-left: 20px;
+        }
+        .creative-header {
+            margin-bottom: 20px;
+        }
+        .creative-name {
+            font-size: 24px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 4px;
+        }
+        .creative-title {
+            font-size: 11px;
+            color: #6b7280;
+            font-weight: 400;
+        }
+        .creative-section {
+            margin-bottom: 16px;
+        }
+        .creative-section-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #8b5cf6;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .creative-item {
+            font-size: 9.5px;
+            color: #374151;
+            margin-bottom: 6px;
+            line-height: 1.4;
+        }
+        .creative-sidebar-section {
+            margin-bottom: 20px;
+        }
+        .creative-sidebar-title {
+            font-size: 9px;
+            font-weight: 700;
+            color: white;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        .creative-sidebar-item {
+            font-size: 8.5px;
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 4px;
+            line-height: 1.4;
+        }
+        
+        /* Minimal Template - Ultra clean */
+        .minimal-preview {
+            background: #ffffff;
+            color: #111827;
+            padding: 36px 32px;
+            font-size: 10px;
+            line-height: 1.6;
+        }
+        .minimal-header {
+            text-align: center;
+            margin-bottom: 28px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .minimal-name {
+            font-size: 18px;
+            font-weight: 300;
+            letter-spacing: 3px;
+            margin-bottom: 6px;
+            color: #111827;
+        }
+        .minimal-title {
+            font-size: 10px;
+            color: #6b7280;
+            font-weight: 300;
+            letter-spacing: 1px;
+        }
+        .minimal-section {
+            margin-bottom: 22px;
+        }
+        .minimal-section-title {
+            font-size: 9px;
+            font-weight: 400;
+            color: #9ca3af;
+            margin-bottom: 10px;
+            text-transform: lowercase;
+            letter-spacing: 2px;
+        }
+        .minimal-item {
+            font-size: 9.5px;
+            color: #374151;
+            margin-bottom: 8px;
+            line-height: 1.6;
+        }
+        .minimal-item-title {
+            font-weight: 500;
+            color: #111827;
+        }
+        
+        /* Executive Template - Sophisticated dark */
+        .executive-preview {
+            background: #1a1d29;
+            color: #f9fafb;
+            padding: 32px 28px;
+            font-size: 10px;
+            line-height: 1.5;
+        }
+        .executive-header {
+            border-left: 4px solid #fbbf24;
+            padding-left: 16px;
+            margin-bottom: 24px;
+        }
+        .executive-name {
+            font-size: 26px;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 6px;
+            letter-spacing: 0.5px;
+        }
+        .executive-title {
+            font-size: 11px;
+            color: #d1d5db;
+            font-weight: 400;
+        }
+        .executive-contact {
+            font-size: 9px;
+            color: #9ca3af;
+            margin-top: 8px;
+        }
+        .executive-section {
+            margin-bottom: 18px;
+        }
+        .executive-section-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #fbbf24;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+        }
+        .executive-item {
+            font-size: 9.5px;
+            color: #e5e7eb;
+            margin-bottom: 6px;
+            line-height: 1.5;
+        }
+        .executive-item-title {
+            font-weight: 600;
+            color: #ffffff;
+        }
+        .executive-item-meta {
+            font-size: 8.5px;
+            color: #9ca3af;
+            margin-top: 2px;
+        }
+        
+        /* ATS Friendly Template - Clean and structured */
+        .ats-preview {
+            background: #ffffff;
+            color: #111827;
+            padding: 28px 24px;
+            font-size: 10px;
+            line-height: 1.5;
+        }
+        .ats-header {
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 12px;
+            margin-bottom: 18px;
+        }
+        .ats-name {
+            font-size: 20px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 4px;
+        }
+        .ats-title {
+            font-size: 10px;
+            color: #6b7280;
+            font-weight: 400;
+        }
+        .ats-contact {
+            font-size: 9px;
+            color: #9ca3af;
+            margin-top: 6px;
+        }
+        .ats-section {
+            margin-bottom: 14px;
+        }
+        .ats-section-title {
+            font-size: 10px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 7px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+        .ats-item {
+            font-size: 9.5px;
+            color: #374151;
+            margin-bottom: 5px;
+            line-height: 1.5;
+        }
+        .ats-item-title {
+            font-weight: 600;
+            color: #111827;
+        }
+        .ats-item-meta {
+            font-size: 8.5px;
+            color: #9ca3af;
+            margin-top: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="font-size: 28px; font-weight: 700; margin-bottom: 8px; color: #111827;">Resume Template Preview Generator</h1>
+        <p style="color: #6b7280; margin-bottom: 24px;">Professional resume templates - Click "Download" to save as PNG</p>
+        
+        <div class="template-grid">
+            <!-- Modern Template -->
+            <div class="template-card">
+                <div class="template-name">Modern</div>
+                <div class="template-preview modern-preview" id="modern-preview">
+                    <div class="modern-header">
+                        <div class="modern-name">JOHN DOE</div>
+                        <div class="modern-title">Senior Software Engineer</div>
+                        <div class="modern-contact">john.doe@email.com • (555) 123-4567 • San Francisco, CA</div>
+                    </div>
+                    <div class="modern-section">
+                        <div class="modern-section-title">Professional Experience</div>
+                        <div class="modern-item">
+                            <div class="modern-item-title">Senior Software Engineer</div>
+                            <div class="modern-item-meta">Tech Corp • San Francisco, CA • 2020 - Present</div>
+                            <div style="margin-top: 4px;">Led development of scalable web applications using React and Node.js, improving performance by 40%.</div>
+                        </div>
+                        <div class="modern-item" style="margin-top: 8px;">
+                            <div class="modern-item-title">Software Engineer</div>
+                            <div class="modern-item-meta">Startup Inc • San Francisco, CA • 2018 - 2020</div>
+                            <div style="margin-top: 4px;">Built and maintained full-stack applications, collaborating with cross-functional teams.</div>
+                        </div>
+                    </div>
+                    <div class="modern-section">
+                        <div class="modern-section-title">Education</div>
+                        <div class="modern-item">
+                            <div class="modern-item-title">B.S. Computer Science</div>
+                            <div class="modern-item-meta">University of California • 2018</div>
+                        </div>
+                    </div>
+                    <div class="modern-section">
+                        <div class="modern-section-title">Technical Skills</div>
+                        <div class="modern-item">React, Node.js, TypeScript, AWS, Docker, Kubernetes, PostgreSQL</div>
+                    </div>
+                </div>
+                <button onclick="downloadTemplate('modern-preview', 'modern.png')">Download</button>
+            </div>
+            
+            <!-- Professional Template -->
+            <div class="template-card">
+                <div class="template-name">Professional</div>
+                <div class="template-preview professional-preview" id="professional-preview">
+                    <div class="professional-header">
+                        <div class="professional-name">John Doe</div>
+                        <div class="professional-title">Senior Software Engineer</div>
+                        <div class="professional-contact">john.doe@email.com | (555) 123-4567 | San Francisco, CA</div>
+                    </div>
+                    <div class="professional-section">
+                        <div class="professional-section-title">Professional Experience</div>
+                        <div class="professional-item">
+                            <div class="professional-item-title">Senior Software Engineer</div>
+                            <div class="professional-item-meta">Tech Corp | San Francisco, CA | 2020 - Present</div>
+                            <div style="margin-top: 3px;">Lead development of enterprise applications, mentor junior developers, and optimize system performance.</div>
+                        </div>
+                        <div class="professional-item" style="margin-top: 6px;">
+                            <div class="professional-item-title">Software Engineer</div>
+                            <div class="professional-item-meta">Startup Inc | San Francisco, CA | 2018 - 2020</div>
+                            <div style="margin-top: 3px;">Developed scalable web services and collaborated with product teams to deliver features.</div>
+                        </div>
+                    </div>
+                    <div class="professional-section">
+                        <div class="professional-section-title">Education</div>
+                        <div class="professional-item">
+                            <div class="professional-item-title">Bachelor of Science in Computer Science</div>
+                            <div class="professional-item-meta">University of California | 2018</div>
+                        </div>
+                    </div>
+                    <div class="professional-section">
+                        <div class="professional-section-title">Technical Skills</div>
+                        <div class="professional-item">React • Node.js • TypeScript • AWS • Docker • PostgreSQL • Git</div>
+                    </div>
+                </div>
+                <button onclick="downloadTemplate('professional-preview', 'professional.png')">Download</button>
+            </div>
+            
+            <!-- Creative Template -->
+            <div class="template-card">
+                <div class="template-name">Creative</div>
+                <div class="template-preview creative-preview" id="creative-preview" style="position: relative;">
+                    <div class="creative-sidebar">
+                        <div class="creative-sidebar-section">
+                            <div class="creative-sidebar-title">Contact</div>
+                            <div class="creative-sidebar-item">john.doe@email.com</div>
+                            <div class="creative-sidebar-item">(555) 123-4567</div>
+                            <div class="creative-sidebar-item">San Francisco, CA</div>
+                        </div>
+                        <div class="creative-sidebar-section">
+                            <div class="creative-sidebar-title">Skills</div>
+                            <div class="creative-sidebar-item">React</div>
+                            <div class="creative-sidebar-item">Node.js</div>
+                            <div class="creative-sidebar-item">TypeScript</div>
+                            <div class="creative-sidebar-item">AWS</div>
+                        </div>
+                    </div>
+                    <div class="creative-main">
+                        <div class="creative-header">
+                            <div class="creative-name">JOHN DOE</div>
+                            <div class="creative-title">Senior Software Engineer</div>
+                        </div>
+                        <div class="creative-section">
+                            <div class="creative-section-title">Experience</div>
+                            <div class="creative-item">
+                                <strong>Senior Software Engineer</strong> • Tech Corp • 2020 - Present<br>
+                                Leading development of scalable applications with React and Node.js.
+                            </div>
+                            <div class="creative-item" style="margin-top: 6px;">
+                                <strong>Software Engineer</strong> • Startup Inc • 2018 - 2020<br>
+                                Built full-stack applications and collaborated with cross-functional teams.
+                            </div>
+                        </div>
+                        <div class="creative-section">
+                            <div class="creative-section-title">Education</div>
+                            <div class="creative-item">
+                                <strong>B.S. Computer Science</strong> • University of California • 2018
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button onclick="downloadTemplate('creative-preview', 'creative.png')">Download</button>
+            </div>
+            
+            <!-- Minimal Template -->
+            <div class="template-card">
+                <div class="template-name">Minimal</div>
+                <div class="template-preview minimal-preview" id="minimal-preview">
+                    <div class="minimal-header">
+                        <div class="minimal-name">John Doe</div>
+                        <div class="minimal-title">Senior Software Engineer</div>
+                    </div>
+                    <div class="minimal-section">
+                        <div class="minimal-section-title">experience</div>
+                        <div class="minimal-item">
+                            <span class="minimal-item-title">Senior Software Engineer</span><br>
+                            Tech Corp, San Francisco, CA<br>
+                            2020 - Present<br><br>
+                            Lead development of scalable web applications using modern technologies. Improved system performance by 40% and mentored team of 5 engineers.
+                        </div>
+                        <div class="minimal-item" style="margin-top: 12px;">
+                            <span class="minimal-item-title">Software Engineer</span><br>
+                            Startup Inc, San Francisco, CA<br>
+                            2018 - 2020<br><br>
+                            Developed full-stack applications and collaborated with product teams to deliver features on time.
+                        </div>
+                    </div>
+                    <div class="minimal-section">
+                        <div class="minimal-section-title">education</div>
+                        <div class="minimal-item">
+                            <span class="minimal-item-title">B.S. Computer Science</span><br>
+                            University of California<br>
+                            2018
+                        </div>
+                    </div>
+                    <div class="minimal-section">
+                        <div class="minimal-section-title">skills</div>
+                        <div class="minimal-item">React, Node.js, TypeScript, AWS, Docker, Kubernetes, PostgreSQL</div>
+                    </div>
+                </div>
+                <button onclick="downloadTemplate('minimal-preview', 'minimal.png')">Download</button>
+            </div>
+            
+            <!-- Executive Template -->
+            <div class="template-card">
+                <div class="template-name">Executive</div>
+                <div class="template-preview executive-preview" id="executive-preview">
+                    <div class="executive-header">
+                        <div class="executive-name">JOHN DOE</div>
+                        <div class="executive-title">Senior Software Engineer</div>
+                        <div class="executive-contact">john.doe@email.com • (555) 123-4567 • San Francisco, CA</div>
+                    </div>
+                    <div class="executive-section">
+                        <div class="executive-section-title">Professional Experience</div>
+                        <div class="executive-item">
+                            <div class="executive-item-title">Senior Software Engineer</div>
+                            <div class="executive-item-meta">Tech Corp | San Francisco, CA | 2020 - Present</div>
+                            <div style="margin-top: 4px;">Lead development of enterprise-scale applications, driving technical strategy and mentoring engineering teams. Achieved 40% performance improvement through optimization initiatives.</div>
+                        </div>
+                        <div class="executive-item" style="margin-top: 8px;">
+                            <div class="executive-item-title">Software Engineer</div>
+                            <div class="executive-item-meta">Startup Inc | San Francisco, CA | 2018 - 2020</div>
+                            <div style="margin-top: 4px;">Developed scalable web services and collaborated with product teams to deliver high-quality features on schedule.</div>
+                        </div>
+                    </div>
+                    <div class="executive-section">
+                        <div class="executive-section-title">Education</div>
+                        <div class="executive-item">
+                            <div class="executive-item-title">Bachelor of Science in Computer Science</div>
+                            <div class="executive-item-meta">University of California | 2018</div>
+                        </div>
+                    </div>
+                    <div class="executive-section">
+                        <div class="executive-section-title">Core Competencies</div>
+                        <div class="executive-item">React • Node.js • TypeScript • AWS • Docker • Kubernetes • PostgreSQL • Leadership</div>
+                    </div>
+                </div>
+                <button onclick="downloadTemplate('executive-preview', 'executive.png')">Download</button>
+            </div>
+            
+            <!-- ATS Friendly Template -->
+            <div class="template-card">
+                <div class="template-name">ATS Friendly</div>
+                <div class="template-preview ats-preview" id="ats-friendly-preview">
+                    <div class="ats-header">
+                        <div class="ats-name">John Doe</div>
+                        <div class="ats-title">Senior Software Engineer</div>
+                        <div class="ats-contact">john.doe@email.com | (555) 123-4567 | San Francisco, CA</div>
+                    </div>
+                    <div class="ats-section">
+                        <div class="ats-section-title">PROFESSIONAL EXPERIENCE</div>
+                        <div class="ats-item">
+                            <div class="ats-item-title">Senior Software Engineer</div>
+                            <div class="ats-item-meta">Tech Corp, San Francisco, CA | January 2020 - Present</div>
+                            <div style="margin-top: 3px;">• Lead development of scalable web applications using React, Node.js, and TypeScript<br>
+                            • Improved system performance by 40% through optimization and refactoring<br>
+                            • Mentor team of 5 junior engineers and conduct code reviews</div>
+                        </div>
+                        <div class="ats-item" style="margin-top: 6px;">
+                            <div class="ats-item-title">Software Engineer</div>
+                            <div class="ats-item-meta">Startup Inc, San Francisco, CA | June 2018 - December 2019</div>
+                            <div style="margin-top: 3px;">• Developed full-stack applications using React and Node.js<br>
+                            • Collaborated with product teams to deliver features on schedule<br>
+                            • Implemented automated testing reducing bugs by 30%</div>
+                        </div>
+                    </div>
+                    <div class="ats-section">
+                        <div class="ats-section-title">EDUCATION</div>
+                        <div class="ats-item">
+                            <div class="ats-item-title">Bachelor of Science in Computer Science</div>
+                            <div class="ats-item-meta">University of California, Berkeley, CA | 2018</div>
+                        </div>
+                    </div>
+                    <div class="ats-section">
+                        <div class="ats-section-title">TECHNICAL SKILLS</div>
+                        <div class="ats-item">Programming Languages: JavaScript, TypeScript, Python<br>
+                        Frameworks: React, Node.js, Express.js<br>
+                        Cloud & Tools: AWS, Docker, Kubernetes, PostgreSQL, Git, CI/CD</div>
+                    </div>
+                </div>
+                <button onclick="downloadTemplate('ats-friendly-preview', 'ats-friendly.png')">Download</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script>
+        async function downloadTemplate(elementId, filename) {
+            const element = document.getElementById(elementId);
+            const button = event.target;
+            const originalText = button.textContent;
+            
+            button.textContent = 'Generating...';
+            button.disabled = true;
+            
+            try {
+                const canvas = await html2canvas(element, {
+                    backgroundColor: null,
+                    scale: 2,
+                    logging: false,
+                    useCORS: true,
+                    allowTaint: true
+                });
+                
+                canvas.toBlob(function(blob) {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    
+                    button.textContent = originalText;
+                    button.disabled = false;
+                }, 'image/png');
+            } catch (error) {
+                console.error('Error generating image:', error);
+                alert('Error generating image. Please try again.');
+                button.textContent = originalText;
+                button.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

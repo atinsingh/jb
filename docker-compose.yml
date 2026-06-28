@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: jobocate-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=jobocate
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - jobocate-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/jobocate --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: jobocate-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env.docker
+    environment:
+      # Override with your own API keys
+      - PORT=8000
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - EMERGENT_LLM_KEY=${EMERGENT_LLM_KEY:-}
+      - LINKEDIN_CLIENT_ID=${LINKEDIN_CLIENT_ID:-}
+      - LINKEDIN_CLIENT_SECRET=${LINKEDIN_CLIENT_SECRET:-}
+      # Internal URL for Puppeteer to access frontend within Docker network
+      - INTERNAL_FRONTEND_URL=http://frontend:3000
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - backend-uploads:/app/uploads
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - jobocate-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    command: npm run start
+
+  # Frontend React App
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: jobocate-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - REACT_APP_BACKEND_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - WATCHPACK_POLLING=true
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+    networks:
+      - jobocate-network
+    command: npm run dev
+
+networks:
+  jobocate-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+    driver: local
+  backend-uploads:
+    driver: local

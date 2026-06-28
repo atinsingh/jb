@@ -1,0 +1,380 @@
+{
+  "info": {
+    "name": "Jobocate API",
+    "description": "API collection for Jobocate SaaS platform",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000/api",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('accessToken', jsonData.accessToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"John Doe\",\n    \"email\": \"john@example.com\",\n    \"password\": \"Password123!\",\n    \"role\": \"ROLE_CANDIDATE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('accessToken', jsonData.accessToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"john@example.com\",\n    \"password\": \"Password123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "refresh"]
+            }
+          }
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "me"]
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "logout"]
+            }
+          }
+        },
+        {
+          "name": "Logout All",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout-all",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "logout-all"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Billing",
+      "item": [
+        {
+          "name": "Get Plans",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/billing/plans",
+              "host": ["{{baseUrl}}"],
+              "path": ["billing", "plans"]
+            }
+          }
+        },
+        {
+          "name": "Get Subscription",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/billing/subscription",
+              "host": ["{{baseUrl}}"],
+              "path": ["billing", "subscription"]
+            }
+          }
+        },
+        {
+          "name": "Create Checkout Session",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"planId\": \"PLAN_ID_HERE\",\n    \"billingCycle\": \"monthly\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/billing/checkout",
+              "host": ["{{baseUrl}}"],
+              "path": ["billing", "checkout"]
+            }
+          }
+        },
+        {
+          "name": "Create Portal Session",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"returnUrl\": \"http://localhost:3000/billing\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/billing/portal",
+              "host": ["{{baseUrl}}"],
+              "path": ["billing", "portal"]
+            }
+          }
+        },
+        {
+          "name": "Cancel Subscription",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"cancelAtPeriodEnd\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/billing/cancel",
+              "host": ["{{baseUrl}}"],
+              "path": ["billing", "cancel"]
+            }
+          }
+        },
+        {
+          "name": "Reactivate Subscription",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/billing/reactivate",
+              "host": ["{{baseUrl}}"],
+              "path": ["billing", "reactivate"]
+            }
+          }
+        },
+        {
+          "name": "Get Usage",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/billing/usage/ai_credits_per_month",
+              "host": ["{{baseUrl}}"],
+              "path": ["billing", "usage", "ai_credits_per_month"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Entitlements",
+      "item": [
+        {
+          "name": "Get User Entitlements",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/entitlements",
+              "host": ["{{baseUrl}}"],
+              "path": ["entitlements"]
+            }
+          }
+        },
+        {
+          "name": "Check Entitlement",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/entitlements/check/ai_resume_optimization",
+              "host": ["{{baseUrl}}"],
+              "path": ["entitlements", "check", "ai_resume_optimization"]
+            }
+          }
+        },
+        {
+          "name": "Get Plan Entitlements",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/entitlements/plans/PRO",
+              "host": ["{{baseUrl}}"],
+              "path": ["entitlements", "plans", "PRO"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            }
+          }
+        },
+        {
+          "name": "Metrics",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/metrics",
+              "host": ["{{baseUrl}}"],
+              "path": ["metrics"]
+            }
+          }
+        },
+        {
+          "name": "Readiness",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ready",
+              "host": ["{{baseUrl}}"],
+              "path": ["ready"]
+            }
+          }
+        },
+        {
+          "name": "Liveness",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/live",
+              "host": ["{{baseUrl}}"],
+              "path": ["live"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+

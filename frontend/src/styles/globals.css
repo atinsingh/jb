@@ -1,0 +1,447 @@
+/* Import Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
+@import url('https://api.fontshare.com/v2/css?f[]=clash-display@200,300,400,500,600,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+/* Tailwind v4 Theme Configuration */
+@theme {
+  --color-primary-50: #fff5f5;
+  --color-primary-100: #ffe3e3;
+  --color-primary-200: #ffc9c9;
+  --color-primary-300: #ffa8a8;
+  --color-primary-400: #ff8787;
+  --color-primary-500: #fa5252;
+  --color-primary-600: #f03e3e;
+  --color-primary-700: #e03131;
+  --color-primary-800: #c92a2a;
+  --color-primary-900: #a51d1d;
+  --color-primary-950: #8b1515;
+
+  --color-accent-50: #fff4e6;
+  --color-accent-100: #ffe8cc;
+  --color-accent-200: #ffd8a8;
+  --color-accent-300: #ffc078;
+  --color-accent-400: #ffa94d;
+  --color-accent-500: #ff922b;
+  --color-accent-600: #fd7e14;
+  --color-accent-700: #e8590c;
+  --color-accent-800: #d9480f;
+  --color-accent-900: #bf4000;
+}
+
+
+
+/* CSS Custom Properties - Light Theme */
+:root {
+  --color-primary: #fa5252;
+  --color-primary-dark: #e03131;
+  --color-primary-light: #ff8787;
+  --color-accent: #ff922b;
+  --color-bg: #ffffff;
+  --color-bg-secondary: #f8f9fa;
+  --color-bg-tertiary: #f1f3f5;
+  --color-text: #212529;
+  --color-text-secondary: #495057;
+  --color-text-muted: #868e96;
+  --color-border: #e9ecef;
+
+  --gradient-primary: linear-gradient(135deg, #fa5252 0%, #ff922b 100%);
+  --gradient-subtle: linear-gradient(135deg, rgba(250, 82, 82, 0.05) 0%, rgba(255, 146, 43, 0.05) 100%);
+
+  --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-display: 'Clash Display', 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+}
+
+* {
+  font-family: var(--font-sans);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Light theme body styles */
+html:not(.dark) body {
+  background-color: #ffffff;
+  color: #212529;
+}
+
+/* Ensure light theme is the default */
+html:not(.dark) {
+  color-scheme: light;
+}
+
+/* Dark theme body styles */
+html.dark body {
+  background-color: #0a0a0a;
+  color: #fafafa;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+/* Dark Theme */
+.dark {
+  --color-bg: #0a0a0a;
+  --color-bg-secondary: #18181b;
+  --color-bg-tertiary: #27272a;
+  --color-text: #fafafa;
+  --color-text-secondary: #d4d4d8;
+  --color-text-muted: #a1a1aa;
+  --color-border: #3f3f46;
+}
+
+.dark body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+}
+
+/* Ensure html element gets the dark class */
+html.dark {
+  color-scheme: dark;
+}
+
+html:not(.dark) {
+  color-scheme: light;
+}
+
+/* Custom scrollbar - Light theme */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f3f5;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #18181b;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #fa5252, #ff922b);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #e03131, #fd7e14);
+}
+
+/* Selection styling */
+::selection {
+  background-color: rgba(250, 82, 82, 0.2);
+  color: #212529;
+}
+
+/* Gradient text utility */
+.gradient-text {
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glass morphism - Light version */
+.glass {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.glass-dark {
+  background: rgba(33, 37, 41, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Card styles */
+.card {
+  background: white;
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+/* Button styles */
+.btn-primary {
+  background: var(--gradient-primary);
+  color: white;
+  font-weight: 600;
+  padding: 0.75rem 1.5rem;
+  border-radius: 9999px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 14px 0 rgba(250, 82, 82, 0.25);
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px 0 rgba(250, 82, 82, 0.35);
+}
+
+.btn-secondary {
+  background: white;
+  color: var(--color-text);
+  font-weight: 600;
+  padding: 0.75rem 1.5rem;
+  border-radius: 9999px;
+  border: 1px solid var(--color-border);
+  transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* Flyout menu animations */
+.flyout-menu {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px);
+  transition: all 0.2s ease;
+}
+
+.flyout-trigger:hover .flyout-menu,
+.flyout-menu:hover {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+/* Subtle gradient backgrounds */
+.bg-gradient-subtle {
+  background: linear-gradient(180deg, #ffffff 0%, #f8f9fa 100%);
+}
+
+.bg-gradient-hero {
+  background: linear-gradient(135deg, #fff5f5 0%, #fff7ed 50%, #ffffff 100%);
+}
+
+.bg-gradient-section {
+  background: linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%);
+}
+
+/* Dot pattern - Light */
+.dot-pattern {
+  background-image: radial-gradient(rgba(250, 82, 82, 0.1) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Grid pattern - Light */
+.grid-pattern {
+  background-image:
+    linear-gradient(rgba(250, 82, 82, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(250, 82, 82, 0.03) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* Blob animations */
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.4;
+  animation: blob 7s infinite;
+}
+
+@keyframes blob {
+
+  0%,
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+}
+
+/* Fade in animations */
+.fade-in-up {
+  animation: fadeInUp 0.6s ease-out forwards;
+  opacity: 0;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Stagger animations */
+.stagger-1 {
+  animation-delay: 0.1s;
+}
+
+.stagger-2 {
+  animation-delay: 0.2s;
+}
+
+.stagger-3 {
+  animation-delay: 0.3s;
+}
+
+.stagger-4 {
+  animation-delay: 0.4s;
+}
+
+.stagger-5 {
+  animation-delay: 0.5s;
+}
+
+/* Hover underline animation */
+.hover-underline {
+  position: relative;
+}
+
+.hover-underline::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: var(--gradient-primary);
+  transition: width 0.3s ease;
+}
+
+.hover-underline:hover::after {
+  width: 100%;
+}
+
+/* Focus styles */
+.focus-ring:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(250, 82, 82, 0.3);
+}
+
+/* Video container */
+.video-container {
+  position: relative;
+  padding-bottom: 56.25%;
+  height: 0;
+  overflow: hidden;
+  border-radius: 1rem;
+  box-shadow: var(--shadow-xl);
+}
+
+.video-container iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* Section spacing */
+.section {
+  padding: 6rem 0;
+}
+
+@media (max-width: 768px) {
+  .section {
+    padding: 4rem 0;
+  }
+}
+
+/* Fluid Layout Utilities */
+.fluid-container {
+  width: 100%;
+  max-width: 1920px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+@media (min-width: 640px) {
+  .fluid-container {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .fluid-container {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .fluid-container {
+    padding-left: 3rem;
+    padding-right: 3rem;
+  }
+}
+
+@media (min-width: 1536px) {
+  .fluid-container {
+    padding-left: 4rem;
+    padding-right: 4rem;
+  }
+}
+
+/* Magic UI-style animations */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(90deg,
+      transparent,
+      rgba(255, 255, 255, 0.1),
+      transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Smooth transitions for theme switching */
+/* Removed global transition to prevent layout jank */
+
+/* Prevent transitions on theme change for better performance */
+.theme-transition * {
+  transition: none !important;
+}
