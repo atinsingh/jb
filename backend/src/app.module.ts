@@ -25,6 +25,13 @@ import { JobTrackerModule } from './job-tracker/job-tracker.module';
 import { InterviewBuddyModule } from './interview-buddy/interview-buddy.module';
 import { MonitorsModule } from './monitors/monitors.module';
 import { ApplyRunnerModule } from './apply-runner/apply-runner.module';
+import { EmployerJobsModule } from './employer-jobs/employer-jobs.module';
+import { EmployerPipelineModule } from './employer-pipeline/employer-pipeline.module';
+import { EmployerInterviewsModule } from './employer-interviews/employer-interviews.module';
+import { EmployerOffersModule } from './employer-offers/employer-offers.module';
+import { EmployerOrgModule } from './employer-org/employer-org.module';
+import { EmployerBillingModule } from './employer-billing/employer-billing.module';
+import { AiRecruiterModule } from './ai-recruiter/ai-recruiter.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { HealthController } from './health/health.controller';
 import { LoggerModule } from './common/logger/logger.module';
@@ -105,6 +112,13 @@ function getEnvFilePath(): string {
     InterviewBuddyModule,
     MonitorsModule,
     ApplyRunnerModule,
+    EmployerJobsModule,
+    EmployerPipelineModule,
+    EmployerInterviewsModule,
+    EmployerOffersModule,
+    EmployerOrgModule,
+    EmployerBillingModule,
+    AiRecruiterModule,
   ],
   controllers: [HealthController],
   providers: [
