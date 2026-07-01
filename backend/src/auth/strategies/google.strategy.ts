@@ -54,10 +54,12 @@ Current values:
       clientSecret: finalClientSecret,
       callbackURL,
       scope: ['profile', 'email'],
+      passReqToCallback: true,
     });
   }
 
   async validate(
+    req: any,
     accessToken: string,
     refreshToken: string,
     profile: any,
@@ -84,16 +86,25 @@ Current values:
           await user.save();
           console.log('🟡 [Passport Strategy] Updated existing user');
         } else {
+          // Honor an intended role carried through OAuth `state` (set by an
+          // employer signup); default to candidate for organic sign-ups.
+          const intendedRole =
+            req?.query?.state === 'ROLE_EMPLOYER'
+              ? 'ROLE_EMPLOYER'
+              : 'ROLE_CANDIDATE';
           user = await this.userModel.create({
             googleId: profile.id,
             email: profile.emails[0].value,
             name: profile.displayName,
             picture: profile.photos[0]?.value,
             provider: 'google',
-            role: 'ROLE_CANDIDATE',
+            role: intendedRole,
             lastLogin: new Date(),
           });
-          console.log('🟡 [Passport Strategy] Created new user:', user._id);
+          console.log(
+            `🟡 [Passport Strategy] Created new user (${intendedRole}):`,
+            user._id,
+          );
         }
       } else {
         user.lastLogin = new Date();

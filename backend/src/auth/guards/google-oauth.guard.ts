@@ -14,10 +14,15 @@ export class GoogleOAuthGuard extends AuthGuard('google') {
       };
     }
 
+    // Carry the intended role (e.g. from an employer signup) through the OAuth
+    // round-trip as `state`; Google echoes it back on the callback so a new
+    // user can be created with the correct role.
+    const role = request.query?.role;
     return {
       scope: ['profile', 'email'],
       prompt: 'select_account',
       session: false,
+      ...(role ? { state: String(role) } : {}),
     };
   }
 }

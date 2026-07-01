@@ -100,14 +100,20 @@ export class AuthController {
   @ApiOperation({ summary: 'Initiate LinkedIn OAuth authentication' })
   @ApiResponse({ status: 302, description: 'Redirects to LinkedIn OAuth' })
   @ApiExcludeEndpoint()
-  async linkedinAuth(@Res() res: Response) {
+  async linkedinAuth(@Query('role') role: string, @Res() res: Response) {
     const linkedinAuthUrl = 'https://www.linkedin.com/oauth/v2/authorization';
+    // Carry the intended role (employer signup) through as `state`; LinkedIn
+    // echoes it back on the callback so a new user gets the right role.
+    const state =
+      role === 'ROLE_EMPLOYER'
+        ? 'ROLE_EMPLOYER'
+        : Math.random().toString(36).substring(7);
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: process.env.LINKEDIN_CLIENT_ID || '',
       redirect_uri: process.env.LINKEDIN_REDIRECT_URI || 'http://localhost:8000/api/auth/linkedin/callback',
       scope: 'openid profile email',
-      state: Math.random().toString(36).substring(7),
+      state,
     });
 
     res.redirect(`${linkedinAuthUrl}?${params.toString()}`);
@@ -118,16 +124,20 @@ export class AuthController {
   @ApiQuery({ name: 'code', required: false, description: 'Authorization code from LinkedIn' })
   @ApiResponse({ status: 302, description: 'Redirects to frontend with token' })
   @ApiExcludeEndpoint()
-  async linkedinCallback(@Query('code') code: string, @Res() res: Response) {
+  async linkedinCallback(
+    @Query('code') code: string,
+    @Query('state') state: string,
+    @Res() res: Response,
+  ) {
     this.logger.log('🔵 [LinkedIn Callback] Callback received');
-    
+
     if (!code) {
       this.logger.error('❌ [LinkedIn Callback] No authorization code received');
       return res.redirect(`${process.env.FRONTEND_URL}/login?error=linkedin_auth_failed`);
     }
 
     try {
-      const user = await this.authService.handleLinkedInCallback(code);
+      const user = await this.authService.handleLinkedInCallback(code, state);
       const token = this.authService.generateToken(user);
       
       const userData = {

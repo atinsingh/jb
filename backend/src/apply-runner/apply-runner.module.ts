@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ApplyRunnerService } from './apply-runner.service';
 import { Application, ApplicationSchema } from '../schemas/application.schema';
@@ -8,7 +8,7 @@ import { ApplicationsModule } from '../applications/applications.module';
 
 @Module({
   imports: [
-    ApplicationsModule,
+    forwardRef(() => ApplicationsModule),
     LoggerModule,
     MongooseModule.forFeature([{ name: Application.name, schema: ApplicationSchema }]),
   ],

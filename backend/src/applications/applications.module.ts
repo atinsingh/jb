@@ -13,6 +13,7 @@ import { JobMatch, JobMatchSchema } from '../schemas/job-match.schema';
 import { MatchingModule } from '../matching/matching.module';
 import { LoggerModule } from '../common/logger/logger.module';
 import { UsersModule } from '../users/users.module';
+import { ApplyRunnerModule } from '../apply-runner/apply-runner.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { UsersModule } from '../users/users.module';
       { name: ApplicationEvent.name, schema: ApplicationEventSchema },
     ]),
     forwardRef(() => MatchingModule),
+    forwardRef(() => ApplyRunnerModule),
     UsersModule,
     LoggerModule,
   ],

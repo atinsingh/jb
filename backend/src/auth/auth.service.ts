@@ -31,7 +31,8 @@ export class AuthService {
   }
 
   async validateUser(email: string, password: string): Promise<UserDocument | null> {
-    const user = await this.userModel.findOne({ email });
+    // password has `select: false` in the schema, so request it explicitly
+    const user = await this.userModel.findOne({ email }).select('+password');
     if (user && user.password && (await bcrypt.compare(password, user.password))) {
       return user;
     }
@@ -113,7 +114,10 @@ export class AuthService {
   }
 
 
-  async handleLinkedInCallback(code: string): Promise<UserDocument> {
+  async handleLinkedInCallback(
+    code: string,
+    intendedRole?: string,
+  ): Promise<UserDocument> {
     this.logger.log('🔵 [LinkedIn] Processing callback with authorization code');
     
     try {
@@ -168,14 +172,15 @@ export class AuthService {
           await user.save();
           this.logger.log(`🔵 [LinkedIn] Linked account to existing user: ${user.email}`);
         } else {
-          // Create new user
+          // Create new user, honoring an intended employer role carried
+          // through OAuth `state`; default to candidate for organic sign-ups.
           user = await this.userModel.create({
             linkedinId: profile.sub,
             email: profile.email,
             name: profile.name,
             picture: profile.picture,
             provider: 'linkedin',
-            role: 'ROLE_CANDIDATE',
+            role: intendedRole === 'ROLE_EMPLOYER' ? 'ROLE_EMPLOYER' : 'ROLE_CANDIDATE',
             lastLogin: new Date(),
           });
           this.logger.log(`🔵 [LinkedIn] Created new user: ${user.email}`);

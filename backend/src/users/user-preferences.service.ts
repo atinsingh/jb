@@ -12,12 +12,15 @@ export class UserPreferencesService {
   ) {}
 
   async getOrCreate(userId: string) {
-    const existing = await this.prefsModel.findOne({ userId });
-    if (existing) return existing;
-    const created = new this.prefsModel({
-      userId: new Types.ObjectId(userId),
-    });
-    return created.save();
+    // Atomic upsert avoids the check-then-insert race that triggered
+    // E11000 duplicate-key errors on the unique userId index under
+    // concurrent requests (e.g. dashboard firing parallel loads).
+    const _id = new Types.ObjectId(userId);
+    return this.prefsModel.findOneAndUpdate(
+      { userId: _id },
+      { $setOnInsert: { userId: _id } },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
   }
 
   async update(userId: string, dto: UpdatePreferencesDto) {
