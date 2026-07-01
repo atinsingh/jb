@@ -111,7 +111,7 @@ const AuthSuccess = () => {
           // Redirect to dashboard based on user role
           const redirectPath = fullUser?.role === 'ROLE_EMPLOYER' 
             ? '/employer/dashboard' 
-            : '/candidate/dashboard';
+            : '/app/dashboard';
           console.log('🔵 [Auth Success] Redirecting to dashboard...');
           router.replace(redirectPath);
         } catch (error) {
@@ -149,7 +149,7 @@ const AuthSuccess = () => {
             // Redirect to dashboard
             const redirectPath = user?.role === 'ROLE_EMPLOYER' 
               ? '/employer/dashboard' 
-              : '/candidate/dashboard';
+              : '/app/dashboard';
             console.log('🔵 [Auth Success] Redirecting to dashboard with existing token...');
             router.replace(redirectPath);
             return;

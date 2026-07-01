@@ -1,454 +1,564 @@
-import React, { useState, useEffect } from 'react';
+'use client';
+
+import { useState } from 'react';
 import Head from 'next/head';
-import { useRouter } from 'next/router';
-import { Navbar } from '../../components/navbar';
-import { Footer } from '../../components/footer';
 import Link from 'next/link';
-import { useAuth } from '@/context/AuthContext';
-import { API_URL } from '@/config/api';
+import SiteNav from '@/components/site/SiteNav';
+import SiteFooter from '@/components/site/SiteFooter';
+import { appRoute } from '@/components/app/appRoutes';
 
-const PricingPage = () => {
-  const [billingCycle, setBillingCycle] = useState('monthly');
-  const [plans, setPlans] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [processingPlan, setProcessingPlan] = useState(null);
-  const { user, token } = useAuth();
-  const router = useRouter();
+const FAQ_DATA = [
+  {
+    q: 'What counts as an auto-apply credit?',
+    a: 'One credit = one application submitted on your behalf to a verified company career page. Matching, resume building, and tracking never use credits.',
+  },
+  {
+    q: 'Can I switch plans or cancel anytime?',
+    a: 'Yes. Upgrade, downgrade, or cancel from your dashboard at any time. Changes take effect at the next billing cycle and unused annual time is prorated.',
+  },
+  {
+    q: 'Is there a student or new-grad discount?',
+    a: 'We offer 50% off Pro for verified students and recent grads in their first year out of school. Reach out from your school email to claim it.',
+  },
+  {
+    q: 'Do you offer refunds?',
+    a: 'If Jobocate is not a fit within your first 14 days on a paid plan, contact us for a full refund — no questions asked.',
+  },
+  {
+    q: 'How does Enterprise pricing work?',
+    a: 'Enterprise is priced per seat with volume tiers, and includes SSO, admin controls, and a dedicated success manager. Talk to sales for a quote tailored to your team size.',
+  },
+];
 
-  useEffect(() => {
-    fetchPlans();
-  }, []);
+const RAW_MATRIX = [
+  { group: 'Job search' },
+  { label: 'Smart job matching', free: '✓', pro: 'Unlimited', premium: 'Unlimited' },
+  { label: 'Verified-page targeting', free: '✓', pro: '✓', premium: '✓' },
+  { label: 'Saved searches & alerts', free: '3', pro: 'Unlimited', premium: 'Unlimited' },
+  { group: 'Applications' },
+  { label: 'Auto-apply credits / mo', free: '10', pro: '150', premium: 'Unlimited' },
+  { label: 'AI resume builder', free: '✓', pro: '✓', premium: '✓' },
+  { label: 'AI cover letters', free: '—', pro: '✓', premium: '✓' },
+  { label: 'Per-role personalization', free: '—', pro: '✓', premium: 'Advanced' },
+  { group: 'Prep & insight' },
+  { label: 'Interview prep', free: '—', pro: 'Basic', premium: 'Full + feedback' },
+  { label: 'Salary & offer insights', free: '—', pro: '—', premium: '✓' },
+  { label: 'Support', free: 'Community', pro: 'Priority email', premium: '1:1 onboarding' },
+];
 
-  const fetchPlans = async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/billing/plans`);
-      if (res.ok) {
-        const data = await res.json();
-        setPlans(data.plans || []);
-      }
-    } catch (error) {
-      console.error('Error fetching plans:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+export default function Pricing() {
+  const [annual, setAnnual] = useState(false);
+  const [open, setOpen] = useState(0);
 
-  const handleSubscribe = async (plan) => {
-    if (plan.type === 'FREE') {
-      router.push('/signup');
-      return;
-    }
+  const proPrice = annual ? '$19' : '$29';
+  const premPrice = annual ? '$39' : '$59';
 
-    if (!user || !token) {
-      router.push(`/signup?plan=${plan.type}&cycle=${billingCycle}`);
-      return;
-    }
-
-    try {
-      setProcessingPlan(plan._id);
-      const res = await fetch(`${API_URL}/api/billing/checkout`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          planId: plan._id,
-          billingCycle,
-        }),
-      });
-
-      if (res.ok) {
-        const { url } = await res.json();
-        window.location.href = url;
-      } else {
-        const error = await res.json();
-        alert(error.message || 'Failed to create checkout session');
-      }
-    } catch (error) {
-      console.error('Checkout error:', error);
-      alert('An error occurred. Please try again.');
-    } finally {
-      setProcessingPlan(null);
-    }
-  };
-
-  // Default plans for fallback
-  const defaultPlans = [
+  const baseTiers = [
     {
-      _id: 'free',
       name: 'Free',
-      type: 'FREE',
-      description: 'Start Your Job Search',
-      priceMonthly: 0,
-      priceYearly: 0,
-      features: [
-        'AI-Powered Resume Builder',
-        'Smart Resume Score Analyzer',
-        'Basic Cover Letter Generator',
-        '10 Auto Applications/month',
-        'Job Search Tools',
-        'Email Support'
-      ],
-      sortOrder: 0,
+      tagline: 'Everything to start your search the smart way.',
+      price: '$0',
+      per: '/mo',
+      billNote: 'free forever',
+      cta: 'Start free',
+      includesLabel: 'Includes',
+      features: ['AI resume builder', 'Smart job matching', '10 auto-apply credits / mo', 'Application tracker', 'Community support'],
+      popular: false,
     },
     {
-      _id: 'pro',
       name: 'Pro',
-      type: 'PRO',
-      description: 'Triple Your Interview Chances!',
-      priceMonthly: 29,
-      priceYearly: 264,
-      features: [
-        'Everything in Free',
-        '250 Auto Applications/month',
-        'AI-Optimized Resumes per Job',
-        'Tailored Cover Letters',
-        'Priority Job Matching',
-        'Interview Preparation Tools',
-        'Application Analytics',
-        'Priority Email Support'
-      ],
-      sortOrder: 1,
+      tagline: 'Put the busywork on autopilot.',
+      price: proPrice,
+      per: '/mo',
+      billNote: annual ? 'billed annually · save 33%' : '',
+      cta: 'Start Pro trial',
+      includesLabel: 'Everything in Free, plus',
+      features: ['Unlimited job matching', '150 auto-apply credits / mo', 'AI cover letters', 'Per-role personalization', 'Interview prep (basic)', 'Priority email support'],
+      popular: true,
     },
     {
-      _id: 'scale',
-      name: 'Scale',
-      type: 'ELITE',
-      description: 'Dominate Your Job Search!',
-      priceMonthly: 59,
-      priceYearly: 528,
-      features: [
-        'Everything in Pro',
-        '1000 Auto Applications/month',
-        'Advanced AI Optimization',
-        'Interview Buddy (Real-time)',
-        'Resume Translator',
-        'Career Coaching Sessions',
-        'Dedicated Account Manager',
-        '24/7 Priority Support'
-      ],
-      sortOrder: 2,
+      name: 'Premium',
+      tagline: 'Maximum volume, maximum signal.',
+      price: premPrice,
+      per: '/mo',
+      billNote: annual ? 'billed annually · save 33%' : '',
+      cta: 'Start Premium trial',
+      includesLabel: 'Everything in Pro, plus',
+      features: ['Unlimited auto-apply', 'Advanced personalization', 'Full AI interview prep', 'Salary & offer insights', 'Priority application routing', '1:1 onboarding'],
+      popular: false,
     },
   ];
 
-  const displayPlans = plans.length > 0 ? plans : defaultPlans;
+  const tiers = baseTiers.map((t) =>
+    t.popular
+      ? {
+          ...t,
+          cardBg: '#15140F',
+          fg: '#FBF8F1',
+          muted: '#9A9286',
+          featColor: '#E4DDCE',
+          border: '2px solid #1FA463',
+          shadow: '0 30px 60px -30px rgba(27,26,22,0.45)',
+          badgeShow: 'inline-block',
+          check: '#5BD08C',
+          ctaBg: '#1FA463',
+          ctaColor: '#0C2C1C',
+          ctaBorder: 'none',
+          billNoteColor: t.billNote ? '#5BD08C' : '#9A9286',
+        }
+      : {
+          ...t,
+          cardBg: '#FBF8F1',
+          fg: '#1B1A16',
+          muted: '#8A8378',
+          featColor: '#3B362F',
+          border: '1px solid #E1D9C9',
+          shadow: 'none',
+          badgeShow: 'none',
+          check: '#1FA463',
+          ctaBg: 'transparent',
+          ctaColor: '#1B1A16',
+          ctaBorder: '1px solid #1B1A16',
+          billNoteColor: t.billNote ? '#157A49' : '#8A8378',
+        }
+  );
 
-  const getPlanPrice = (plan) => {
-    if (billingCycle === 'annual') {
-      return plan.priceYearly / 12;
-    }
-    return plan.priceMonthly;
-  };
+  const matrix = RAW_MATRIX.map((m) =>
+    m.group
+      ? { isGroup: true, group: m.group }
+      : { isGroup: false, label: m.label, free: m.free, pro: m.pro, premium: m.premium }
+  );
 
-  const currentPlanType = user?.currentPlanType || 'FREE';
+  const monthlyBg = !annual ? '#FBF8F1' : 'transparent';
+  const monthlyColor = !annual ? '#1B1A16' : '#7A7367';
+  const annualBg = annual ? '#FBF8F1' : 'transparent';
+  const annualColor = annual ? '#1B1A16' : '#7A7367';
 
   return (
-    <div className="bg-white">
+    <>
       <Head>
-        <title>Pricing - Jobocate | AI-Powered Job Search Plans</title>
-        <meta name="description" content="Choose the perfect plan for your job search. From free tools to enterprise solutions." />
+        <title>Pricing — Jobocate</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+          rel="stylesheet"
+        />
       </Head>
 
-      <Navbar />
+      <style jsx global>{`
+        #jbpricing * {
+          box-sizing: border-box;
+        }
+        html {
+          scroll-behavior: smooth;
+        }
+        #jbpricing ::selection {
+          background: #1fa463;
+          color: #f7f3ea;
+        }
+      `}</style>
 
-      {/* Hero Section */}
-      <section className="py-20 bg-gradient-to-br from-orange-50 via-white to-purple-50">
-        <div className="container mx-auto px-4 text-center">
-          <h1 className="text-6xl font-bold text-gray-900 mb-6">
-            Simple, Transparent <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-600">Pricing</span>
-          </h1>
-          <p className="text-2xl text-gray-600 mb-12 max-w-3xl mx-auto">
-            Land Your Dream Job Faster - AI Powered Tools That Get You More Interviews, Guaranteed.
-          </p>
-
-          {user ? (
-            <>
-              {/* Billing Toggle */}
-              <div className="inline-flex items-center bg-gray-100 rounded-full p-1 mb-16">
-                <button
-                  onClick={() => setBillingCycle('monthly')}
-                  className={`px-8 py-3 rounded-full font-semibold transition-all duration-300 ${billingCycle === 'monthly'
-                    ? 'bg-white text-gray-900 shadow-lg'
-                    : 'text-gray-600'
-                    }`}
-                >
-                  Monthly
-                </button>
-                <button
-                  onClick={() => setBillingCycle('annual')}
-                  className={`px-8 py-3 rounded-full font-semibold transition-all duration-300 relative ${billingCycle === 'annual'
-                    ? 'bg-white text-gray-900 shadow-lg'
-                    : 'text-gray-600'
-                    }`}
-                >
-                  Annual
-                  <span className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
-                    Save 25%
-                  </span>
-                </button>
-              </div>
-
-              {/* Pricing Cards */}
-              <div className="grid md:grid-cols-3 gap-8 max-w-7xl mx-auto pt-12">
-                {displayPlans.filter(p => p.isActive !== false).sort((a, b) => a.sortOrder - b.sortOrder).map((plan) => {
-                  const isPro = plan.type === 'PRO';
-                  const isCurrentPlan = plan.type === currentPlanType;
-                  const price = getPlanPrice(plan);
-
-                  return (
-                    <div
-                      key={plan._id}
-                      className={`relative ${isPro ? 'transform md:scale-110 z-10' : ''}`}
-                    >
-                      {/* Popular Badge */}
-                      {isPro && (
-                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-gradient-to-r from-orange-500 to-red-600 text-white px-6 py-2 rounded-full text-sm font-bold shadow-lg z-20">
-                          ⚡ MOST POPULAR
-                        </div>
-                      )}
-
-                      {isPro && (
-                        <div className="absolute -inset-1 bg-gradient-to-r from-orange-500 to-red-600 rounded-3xl blur-lg opacity-50"></div>
-                      )}
-
-                      <div className={`relative bg-white p-8 rounded-3xl ${isPro ? '' : 'border-2 border-gray-200 hover:border-orange-300 transition-all duration-300 hover:shadow-2xl'
-                        }`}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="text-3xl font-bold text-gray-900">{plan.name}</h3>
-                          {plan.type === 'ELITE' && (
-                            <span className="bg-purple-100 text-purple-700 text-sm font-bold px-3 py-1 rounded-full">
-                              50% OFF
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-gray-600 mb-6">{plan.description}</p>
-
-                        <div className="mb-6">
-                          <span className="text-6xl font-bold text-gray-900">
-                            ${Math.round(price)}
-                          </span>
-                          <span className="text-gray-600 text-xl">/month</span>
-                          {billingCycle === 'monthly' && plan.priceMonthly > 0 && (
-                            <div className="mt-2">
-                              <span className="ml-2 text-sm font-semibold text-green-600">
-                                {plan.type === 'PRO' ? 'Save $6/month' : 'Save $36/month'}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        {plan.type !== 'FREE' && (
-                          <div className={`${isPro ? 'bg-orange-50 border-2 border-orange-200' : 'bg-purple-50 border-2 border-purple-200'} rounded-xl p-4 mb-8`}>
-                            <p className={`font-bold ${isPro ? 'text-orange-700' : 'text-purple-700'} flex items-center gap-2`}>
-                              <span className="text-2xl">{isPro ? '⚡' : '🚀'}</span>
-                              <span>{isPro ? '250' : '1000'} auto applies/month</span>
-                            </p>
-                            <p className={`text-sm ${isPro ? 'text-orange-600' : 'text-purple-600'} mt-1`}>
-                              Only ${isPro ? '0.12' : '0.06'} per application!
-                            </p>
-                          </div>
-                        )}
-
-                        <ul className="space-y-4 mb-8 text-left">
-                          {plan.features?.map((feature, i) => (
-                            <li key={i} className="flex items-start gap-3">
-                              <svg className={`w-6 h-6 ${isPro ? 'text-orange-500' : plan.type === 'ELITE' ? 'text-purple-500' : 'text-green-500'} flex-shrink-0 mt-0.5`} fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                              </svg>
-                              <span className="text-gray-700 font-medium">{feature}</span>
-                            </li>
-                          ))}
-                        </ul>
-
-                        {isCurrentPlan ? (
-                          <button
-                            disabled
-                            className="w-full py-4 bg-gray-100 text-gray-500 font-bold text-lg rounded-xl cursor-not-allowed"
-                          >
-                            Current Plan
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleSubscribe(plan)}
-                            disabled={processingPlan === plan._id}
-                            className={`w-full py-4 font-bold text-lg rounded-xl transition-all duration-300 ${isPro
-                              ? 'bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-xl hover:shadow-2xl hover:scale-105'
-                              : plan.type === 'ELITE'
-                                ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg hover:shadow-xl'
-                                : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
-                              }`}
-                          >
-                            {processingPlan === plan._id ? (
-                              <span className="flex items-center justify-center gap-2">
-                                <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                Processing...
-                              </span>
-                            ) : plan.type === 'FREE' ? (
-                              'Get Started Free'
-                            ) : (
-                              `Get Started with ${plan.name}`
-                            )}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Money-back Guarantee */}
-              <p className="text-center text-gray-600 mt-12 text-lg">
-                ✓ 7-day money-back guarantee · ✓ No credit card required for Free plan · ✓ Cancel anytime
-              </p>
-            </>
-          ) : (
-            <div className="max-w-xl mx-auto text-center py-12 bg-white rounded-3xl shadow-xl mt-12">
-              <h3 className="text-3xl font-bold mb-4 text-gray-900">Sign up to see plans</h3>
-              <p className="text-gray-600 mb-8 px-8">Create a free account to view our pricing plans and start your job search journey today.</p>
-              <Link href="/signup">
-                <button className="px-10 py-4 bg-gradient-to-r from-orange-500 to-red-600 text-white font-bold text-xl rounded-full shadow-lg hover:shadow-xl transition-all transform hover:scale-105">
-                  Create Free Account
-                </button>
-              </Link>
-            </div>
-          )}
+      <div
+        id="jbpricing"
+        style={{
+          background: '#F7F3EA',
+          color: '#1B1A16',
+          fontFamily: "'Hanken Grotesk',sans-serif",
+          WebkitFontSmoothing: 'antialiased',
+        }}
+      >
+        <div style={{ position: 'sticky', top: 0, zIndex: 50 }}>
+          <SiteNav />
         </div>
-      </section>
 
-      {/* Comparison Table */}
-      {user && (
-        <section className="py-20 bg-gray-50">
-          <div className="container mx-auto px-4">
-            <h2 className="text-4xl font-bold text-center text-gray-900 mb-12">
-              Compare Plans & Features
-            </h2>
-
-            <div className="max-w-6xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-gradient-to-r from-orange-500 to-red-600 text-white">
-                      <th className="py-6 px-6 text-left font-bold text-lg">Features</th>
-                      <th className="py-6 px-6 text-center font-bold text-lg">Free</th>
-                      <th className="py-6 px-6 text-center font-bold text-lg">Pro</th>
-                      <th className="py-6 px-6 text-center font-bold text-lg">Scale</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {[
-                      { feature: 'Auto Applications per Month', free: '10', pro: '250', scale: '1000' },
-                      { feature: 'AI Resume Builder', free: '✓', pro: '✓', scale: '✓' },
-                      { feature: 'AI Cover Letters', free: 'Basic', pro: 'Advanced', scale: 'Premium' },
-                      { feature: 'Smart Job Matching', free: '✓', pro: '✓', scale: '✓' },
-                      { feature: 'Resume Score Analyzer', free: '✓', pro: '✓', scale: '✓' },
-                      { feature: 'Interview Preparation', free: '-', pro: '✓', scale: '✓' },
-                      { feature: 'Interview Buddy (Real-time)', free: '-', pro: '-', scale: '✓' },
-                      { feature: 'Resume Translator', free: '-', pro: '-', scale: '✓' },
-                      { feature: 'Career Coaching', free: '-', pro: '-', scale: '✓' },
-                      { feature: 'Support', free: 'Email', pro: 'Priority', scale: '24/7' }
-                    ].map((row, index) => (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="py-5 px-6 font-medium text-gray-900">{row.feature}</td>
-                        <td className="py-5 px-6 text-center text-gray-700">{row.free}</td>
-                        <td className="py-5 px-6 text-center text-orange-600 font-semibold">{row.pro}</td>
-                        <td className="py-5 px-6 text-center text-purple-600 font-semibold">{row.scale}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+        {/* HERO */}
+        <section style={{ maxWidth: 1200, margin: '0 auto', padding: '64px 32px 36px', textAlign: 'center' }}>
+          <div
+            style={{
+              fontFamily: "'JetBrains Mono',monospace",
+              fontSize: 11.5,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              color: '#1FA463',
+              marginBottom: 18,
+            }}
+          >
+            — Pricing
+          </div>
+          <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 64, lineHeight: 1.02, margin: '0 0 18px' }}>
+            One interview pays for a{' '}
+            <span style={{ background: 'linear-gradient(transparent 56%, rgba(31,164,99,0.32) 56%)' }}>year.</span>
+          </h1>
+          <p style={{ fontSize: 18, lineHeight: 1.55, color: '#4B463E', maxWidth: 520, margin: '0 auto 30px' }}>
+            Start free, upgrade when you&apos;re ready to put the whole search on autopilot. No credit card to begin.
+          </p>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              background: '#F1ECE0',
+              border: '1px solid #E1D9C9',
+              borderRadius: 999,
+              padding: 5,
+            }}
+          >
+            <button
+              onClick={() => setAnnual(false)}
+              style={{
+                background: monthlyBg,
+                color: monthlyColor,
+                border: 'none',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                fontSize: 14,
+                fontWeight: 600,
+                padding: '9px 20px',
+                borderRadius: 999,
+                transition: 'all 0.2s',
+              }}
+            >
+              Monthly
+            </button>
+            <button
+              onClick={() => setAnnual(true)}
+              style={{
+                background: annualBg,
+                color: annualColor,
+                border: 'none',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                fontSize: 14,
+                fontWeight: 600,
+                padding: '9px 20px',
+                borderRadius: 999,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                transition: 'all 0.2s',
+              }}
+            >
+              Annual{' '}
+              <span
+                style={{
+                  fontFamily: "'JetBrains Mono',monospace",
+                  fontSize: 10,
+                  background: '#1FA463',
+                  color: '#0C2C1C',
+                  padding: '2px 7px',
+                  borderRadius: 999,
+                }}
+              >
+                -33%
+              </span>
+            </button>
           </div>
         </section>
-      )}
 
-      {/* FAQ Section */}
-      <section className="py-20 bg-white">
-        <div className="container mx-auto px-4">
-          <h2 className="text-5xl font-bold text-center text-gray-900 mb-16">
-            Frequently Asked <span className="text-orange-600">Questions</span>
-          </h2>
-
-          <div className="max-w-3xl mx-auto space-y-6">
-            {[
-              {
-                q: 'How does Jobocate work?',
-                a: 'Jobocate uses advanced AI to analyze your resume, match you with relevant jobs, customize your application materials for each role, and automatically apply on your behalf. You just upload your resume, set preferences, and let AI do the heavy lifting.'
-              },
-              {
-                q: 'How effective is Jobocate in getting interviews?',
-                a: 'Our users land interviews 17x faster than traditional job search methods. With AI-optimized resumes and cover letters tailored to each job, you significantly increase your chances of getting noticed by recruiters.'
-              },
-              {
-                q: 'Can I control which jobs Jobocate applies to?',
-                a: 'Absolutely! You set detailed preferences including job titles, industries, salary range, location, and required skills. Our AI only applies to jobs that match your criteria. You can also review and approve applications before they\'re sent (on Pro and Scale plans).'
-              },
-              {
-                q: 'Will recruiters know I\'m using Jobocate?',
-                a: 'No. Each resume and cover letter is uniquely customized to sound natural and authentic. Our AI writes in your voice, highlighting your real experience and skills. There\'s no indication that AI was used.'
-              },
-              {
-                q: 'How soon can I expect to see results?',
-                a: 'Most users start receiving interview invitations within 3-7 days of activating auto-apply. The key is volume and quality - our AI sends dozens of highly-targeted applications daily, dramatically increasing your odds.'
-              },
-              {
-                q: 'What happens if I want to stop auto-applying?',
-                a: 'You can pause or stop auto-apply anytime from your dashboard with a single click. All settings are under your full control.'
-              }
-            ].map((faq, index) => (
-              <div key={index} className="bg-gradient-to-br from-gray-50 to-white p-6 rounded-2xl border border-gray-200 hover:shadow-lg transition-all duration-300">
-                <h3 className="text-xl font-bold text-gray-900 mb-3">{faq.q}</h3>
-                <p className="text-gray-600 leading-relaxed">{faq.a}</p>
+        {/* TIERS */}
+        <section style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 32px 30px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20, alignItems: 'start' }}>
+            {tiers.map((t) => (
+              <div
+                key={t.name}
+                style={{
+                  background: t.cardBg,
+                  border: t.border,
+                  borderRadius: 20,
+                  padding: '32px 28px',
+                  position: 'relative',
+                  boxShadow: t.shadow,
+                }}
+              >
+                <div
+                  style={{
+                    display: t.badgeShow,
+                    position: 'absolute',
+                    top: -12,
+                    left: 28,
+                    background: '#1FA463',
+                    color: '#0C2C1C',
+                    fontFamily: "'JetBrains Mono',monospace",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    letterSpacing: '0.06em',
+                    padding: '5px 12px',
+                    borderRadius: 999,
+                  }}
+                >
+                  MOST POPULAR
+                </div>
+                <div style={{ fontWeight: 700, fontSize: 18, color: t.fg, marginBottom: 6 }}>{t.name}</div>
+                <div style={{ fontSize: 13.5, color: t.muted, marginBottom: 22, minHeight: 38 }}>{t.tagline}</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 4 }}>
+                  <span style={{ fontFamily: "'Instrument Serif',serif", fontSize: 54, lineHeight: 1, color: t.fg }}>{t.price}</span>
+                  <span style={{ fontSize: 14, color: t.muted }}>{t.per}</span>
+                </div>
+                <div
+                  style={{
+                    fontFamily: "'JetBrains Mono',monospace",
+                    fontSize: 11.5,
+                    color: t.billNoteColor,
+                    minHeight: 18,
+                    marginBottom: 24,
+                  }}
+                >
+                  {t.billNote}
+                </div>
+                <Link
+                  href={appRoute('App Login.dc.html')}
+                  style={{
+                    display: 'block',
+                    textAlign: 'center',
+                    background: t.ctaBg,
+                    color: t.ctaColor,
+                    border: t.ctaBorder,
+                    fontSize: 15,
+                    fontWeight: 600,
+                    padding: 13,
+                    borderRadius: 999,
+                    textDecoration: 'none',
+                    marginBottom: 26,
+                  }}
+                >
+                  {t.cta}
+                </Link>
+                <div
+                  style={{
+                    fontFamily: "'JetBrains Mono',monospace",
+                    fontSize: 10.5,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    color: t.muted,
+                    marginBottom: 14,
+                  }}
+                >
+                  {t.includesLabel}
+                </div>
+                {t.features.map((f) => (
+                  <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 11 }}>
+                    <span style={{ color: t.check, fontSize: 14, lineHeight: 1.4, flexShrink: 0 }}>✓</span>
+                    <span style={{ fontSize: 14, lineHeight: 1.4, color: t.featColor }}>{f}</span>
+                  </div>
+                ))}
               </div>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Final CTA */}
-      <section className="py-24 bg-gradient-to-r from-orange-500 via-red-500 to-purple-600 relative overflow-hidden">
-        <div className="absolute inset-0">
-          <div className="absolute top-10 left-10 w-96 h-96 bg-white rounded-full mix-blend-overlay filter blur-3xl opacity-20 animate-blob"></div>
-          <div className="absolute bottom-10 right-10 w-96 h-96 bg-yellow-300 rounded-full mix-blend-overlay filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
-        </div>
+        {/* ENTERPRISE BAND */}
+        <section style={{ maxWidth: 1200, margin: '0 auto', padding: '14px 32px 70px' }}>
+          <div
+            style={{
+              background: '#15140F',
+              borderRadius: 20,
+              padding: '40px 44px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 32,
+              flexWrap: 'wrap',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'radial-gradient(circle at 90% 50%, rgba(31,164,99,0.28), transparent 55%)',
+                pointerEvents: 'none',
+              }}
+            />
+            <div style={{ position: 'relative', maxWidth: 560 }}>
+              <div
+                style={{
+                  fontFamily: "'JetBrains Mono',monospace",
+                  fontSize: 11,
+                  letterSpacing: '0.12em',
+                  textTransform: 'uppercase',
+                  color: '#5BD08C',
+                  marginBottom: 12,
+                }}
+              >
+                — Enterprise & outplacement
+              </div>
+              <h2 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 34, lineHeight: 1.08, color: '#FBF8F1', margin: '0 0 10px' }}>
+                Helping a whole team land on their feet
+              </h2>
+              <p style={{ fontSize: 15, lineHeight: 1.55, color: '#B8B1A4', margin: 0 }}>
+                SSO, seat management, dedicated success manager, and bulk outplacement for workforce transitions. Custom pricing per seat.
+              </p>
+            </div>
+            <Link
+              href={appRoute('Enterprise.dc.html')}
+              style={{
+                position: 'relative',
+                flexShrink: 0,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 9,
+                background: '#1FA463',
+                color: '#0C2C1C',
+                fontSize: 16,
+                fontWeight: 700,
+                padding: '15px 28px',
+                borderRadius: 999,
+                textDecoration: 'none',
+              }}
+            >
+              Talk to sales <span style={{ fontSize: 18 }}>→</span>
+            </Link>
+          </div>
+        </section>
 
-        <div className="relative container mx-auto px-4 text-center z-10">
-          <h2 className="text-5xl md:text-6xl font-extrabold text-white mb-6">
-            Try Jobocate Free Today
-          </h2>
-          <p className="text-2xl text-white/90 mb-10 max-w-3xl mx-auto">
-            Ready to see results? Start applying in minutes and watch the interviews roll in.
-          </p>
-          <Link href="/signup">
-            <button className="px-12 py-5 bg-white text-orange-600 font-bold text-xl rounded-xl shadow-2xl hover:shadow-3xl hover:scale-110 transition-all duration-300">
-              Get Started - It's Free →
-            </button>
-          </Link>
-          <p className="text-white/80 mt-6 text-lg">No credit card required • 7-day money-back guarantee</p>
-        </div>
-      </section>
+        {/* COMPARISON MATRIX */}
+        <section style={{ maxWidth: 1080, margin: '0 auto', padding: '20px 32px 80px' }}>
+          <div style={{ textAlign: 'center', marginBottom: 44 }}>
+            <div
+              style={{
+                fontFamily: "'JetBrains Mono',monospace",
+                fontSize: 11.5,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: '#1FA463',
+                marginBottom: 14,
+              }}
+            >
+              — Compare plans
+            </div>
+            <h2 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 44, lineHeight: 1.05, margin: 0 }}>
+              Everything, side by side
+            </h2>
+          </div>
+          <div style={{ border: '1px solid #E1D9C9', borderRadius: 16, overflow: 'hidden', background: '#FBF8F1' }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1.6fr 1fr 1fr 1fr',
+                background: '#F1ECE0',
+                borderBottom: '1px solid #E1D9C9',
+                position: 'sticky',
+                top: 72,
+                zIndex: 2,
+              }}
+            >
+              <div
+                style={{
+                  padding: '16px 22px',
+                  fontFamily: "'JetBrains Mono',monospace",
+                  fontSize: 11,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: '#9A9286',
+                }}
+              >
+                Feature
+              </div>
+              <div style={{ padding: '16px 18px', fontWeight: 700, fontSize: 14, borderLeft: '1px solid #E1D9C9' }}>Free</div>
+              <div style={{ padding: '16px 18px', fontWeight: 700, fontSize: 14, color: '#157A49', borderLeft: '1px solid #E1D9C9', background: '#EAF6EE' }}>
+                Pro
+              </div>
+              <div style={{ padding: '16px 18px', fontWeight: 700, fontSize: 14, borderLeft: '1px solid #E1D9C9' }}>Premium</div>
+            </div>
+            {matrix.map((m, i) =>
+              m.isGroup ? (
+                <div
+                  key={`g-${i}`}
+                  style={{
+                    padding: '14px 22px',
+                    background: '#F4EFE4',
+                    borderBottom: '1px solid #E1D9C9',
+                    fontFamily: "'JetBrains Mono',monospace",
+                    fontSize: 10.5,
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                    color: '#7A7367',
+                  }}
+                >
+                  {m.group}
+                </div>
+              ) : (
+                <div
+                  key={`r-${i}`}
+                  style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr 1fr 1fr', borderBottom: '1px solid #EEE7D9' }}
+                >
+                  <div style={{ padding: '15px 22px', fontSize: 14, fontWeight: 500 }}>{m.label}</div>
+                  <div style={{ padding: '15px 18px', fontSize: 13.5, color: '#7A7367', borderLeft: '1px solid #EEE7D9' }}>{m.free}</div>
+                  <div
+                    style={{
+                      padding: '15px 18px',
+                      fontSize: 13.5,
+                      color: '#1B1A16',
+                      fontWeight: 600,
+                      borderLeft: '1px solid #EEE7D9',
+                      background: '#F4FAF6',
+                    }}
+                  >
+                    {m.pro}
+                  </div>
+                  <div style={{ padding: '15px 18px', fontSize: 13.5, color: '#1B1A16', borderLeft: '1px solid #EEE7D9' }}>{m.premium}</div>
+                </div>
+              )
+            )}
+          </div>
+        </section>
 
-      <Footer />
+        {/* FAQ */}
+        <section style={{ maxWidth: 860, margin: '0 auto', padding: '0 32px 90px' }}>
+          <div style={{ textAlign: 'center', marginBottom: 46 }}>
+            <div
+              style={{
+                fontFamily: "'JetBrains Mono',monospace",
+                fontSize: 11.5,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: '#1FA463',
+                marginBottom: 14,
+              }}
+            >
+              — Billing FAQ
+            </div>
+            <h2 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 44, lineHeight: 1.05, margin: 0 }}>Good to know</h2>
+          </div>
+          <div style={{ borderTop: '1px solid #E1D9C9' }}>
+            {FAQ_DATA.map((item, i) => {
+              const isOpen = open === i;
+              return (
+                <div key={item.q} style={{ borderBottom: '1px solid #E1D9C9' }}>
+                  <button
+                    onClick={() => setOpen((s) => (s === i ? -1 : i))}
+                    style={{
+                      width: '100%',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      padding: '22px 4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 20,
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    <span style={{ fontSize: 18, fontWeight: 600, color: '#1B1A16' }}>{item.q}</span>
+                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 22, color: '#1FA463', flexShrink: 0, lineHeight: 1 }}>
+                      {isOpen ? '–' : '+'}
+                    </span>
+                  </button>
+                  <div style={{ overflow: 'hidden', maxHeight: isOpen ? '220px' : '0px', transition: 'max-height 0.3s ease' }}>
+                    <p style={{ fontSize: 15, lineHeight: 1.6, color: '#5A544A', margin: 0, padding: '0 4px 24px', maxWidth: 660 }}>{item.a}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
 
-      <style jsx>{`
-        @keyframes blob {
-          0%, 100% { transform: translate(0px, 0px) scale(1); }
-          33% { transform: translate(30px, -50px) scale(1.1); }
-          66% { transform: translate(-20px, 20px) scale(0.9); }
-        }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-      `}</style>
-    </div>
+        <SiteFooter />
+      </div>
+    </>
   );
-};
-
-export default PricingPage;
+}

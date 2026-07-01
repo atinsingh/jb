@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -16,6 +16,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { StarIcon as SolidStarIcon } from '@heroicons/react/24/solid';
 import EmployerLayout from '@/components/layout/EmployerLayout';
+import { employerPipelineApi } from '@/services/employerApi';
 
 // Function to generate avatar URL with initials
 const getAvatarUrl = (name, size = 128) => {
@@ -28,7 +29,7 @@ const getAvatarUrl = (name, size = 128) => {
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&background=random&color=fff&size=${size}`;
 };
 
-const candidates = [
+const SAMPLE_CANDIDATES = [
   {
     id: 1,
     name: 'Alex Johnson',
@@ -79,6 +80,31 @@ const candidates = [
   },
 ];
 
+// Map backend pipeline stages to the status labels this page renders.
+const STAGE_TO_STATUS = {
+  applied: 'New',
+  screening: 'Reviewed',
+  interview: 'Interview',
+  offer: 'Interview',
+  hired: 'Hired',
+  rejected: 'Rejected',
+};
+
+// Adapt a backend applicant into this page's candidate shape.
+const adaptApplicant = (a, i) => ({
+  id: a._id || i,
+  name: a.candidateName || 'Unknown candidate',
+  title: a.candidateHeadline || '',
+  location: a.candidateLocation || '',
+  status: STAGE_TO_STATUS[a.stage] || 'New',
+  match: typeof a.aiScore === 'number' ? a.aiScore : 0,
+  skills: Array.isArray(a.skills) ? a.skills : [],
+  experience:
+    typeof a.yearsExperience === 'number' ? `${a.yearsExperience}+ years` : '—',
+  lastActive: a.appliedAt ? new Date(a.appliedAt).toLocaleDateString() : 'recently',
+  avatar: getAvatarUrl(a.candidateName || 'Unknown'),
+});
+
 // Status badge component
 const StatusBadge = ({ status }) => {
   const statusStyles = {
@@ -115,6 +141,28 @@ export default function EmployerCandidates() {
 
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+
+  // Live candidates seeded with design samples; overridden on successful fetch.
+  const [candidates, setCandidates] = useState(SAMPLE_CANDIDATES);
+
+  // Fetch live applicant pipeline; on any failure keep the sample fallback.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const applicants = await employerPipelineApi.list();
+        if (!alive) return;
+        if (Array.isArray(applicants) && applicants.length) {
+          setCandidates(applicants.map(adaptApplicant));
+        }
+      } catch {
+        // keep samples
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const handleViewDetails = (candidate) => {
     setSelectedCandidate(candidate);

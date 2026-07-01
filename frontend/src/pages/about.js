@@ -1,334 +1,373 @@
+'use client';
+
 import Head from 'next/head';
 import Link from 'next/link';
-import { useRouter } from 'next/router';
-import { Navbar } from '@/components/navbar';
-import { Footer } from '@/components/footer';
-import { motion } from 'framer-motion';
+import SiteNav from '@/components/site/SiteNav';
+import SiteFooter from '@/components/site/SiteFooter';
+import { appRoute } from '@/components/app/appRoutes';
 
-const team = [
+const STATS = [
+  { value: '100K+', label: 'People hired with Jobocate' },
+  { value: '2021', label: 'Founded in San Francisco' },
+  { value: '48', label: 'People on the team' },
+  { value: '$40M', label: 'Raised to back the mission' },
+];
+
+const VALUES = [
   {
-    name: 'Alex Chen',
-    role: 'CEO & Co-founder',
-    bio: 'Former Google engineer with 10+ years in AI/ML. Passionate about democratizing access to career opportunities.',
-    avatar: 'AC'
+    title: 'Candidate-first, always',
+    body: "We work for the job seeker — never recruiters paying for placement. If it's not good for the candidate, we don't ship it.",
   },
   {
-    name: 'Sarah Williams',
-    role: 'CTO & Co-founder',
-    bio: 'Built recommendation systems at Netflix. Expert in NLP and machine learning applications.',
-    avatar: 'SW'
+    title: 'Real roles, no spam',
+    body: 'We only ever touch verified employer pages. No resale boards, no ghost jobs, no scams — ever.',
   },
   {
-    name: 'Marcus Johnson',
+    title: 'Automation with a human in the loop',
+    body: "AI does the busywork; you stay in control. Nothing goes out that you couldn't review and approve.",
+  },
+];
+
+const TEAM = [
+  {
+    initials: 'AM',
+    bg: '#1FA463',
+    color: '#0C2C1C',
+    name: 'Aisha Mensah',
+    role: 'Co-founder & CEO',
+    body: 'Ex-recruiting lead. Spent a decade watching great people get filtered out by bad software.',
+  },
+  {
+    initials: 'RK',
+    bg: '#1B1A16',
+    color: '#F7F3EA',
+    name: 'Ravi Kapoor',
+    role: 'Co-founder & CTO',
+    body: 'Built ML ranking at scale. Believes automation should serve people, not replace them.',
+  },
+  {
+    initials: 'LT',
+    bg: '#C9622E',
+    color: '#fff',
+    name: 'Lena Torres',
     role: 'Head of Product',
-    bio: 'Previously led product at LinkedIn Jobs. Deep understanding of recruiter and job seeker needs.',
-    avatar: 'MJ'
+    body: 'Career-switcher turned PM. Designs for the version of herself that was job-hunting at 2am.',
   },
   {
-    name: 'Emily Rodriguez',
-    role: 'Head of AI',
-    bio: 'PhD in Computer Science from Stanford. Pioneered advancements in resume parsing and job matching.',
-    avatar: 'ER'
+    initials: 'JO',
+    bg: '#3A6F4E',
+    color: '#fff',
+    name: 'Jordan Okafor',
+    role: 'Head of Trust & Safety',
+    body: 'Keeps every application on a real, verified page. The reason we never touch scam boards.',
   },
-];
-
-const values = [
-  {
-    title: 'User First',
-    description: 'Every decision we make starts with how it impacts job seekers. Your success is our success.',
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-      </svg>
-    )
-  },
-  {
-    title: 'Transparency',
-    description: 'We only apply to verified company career pages. No hidden job boards or questionable listings.',
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-      </svg>
-    )
-  },
-  {
-    title: 'Privacy',
-    description: 'Your data belongs to you. GDPR compliant with full control over your information.',
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-      </svg>
-    )
-  },
-  {
-    title: 'Innovation',
-    description: 'We continuously improve our AI to give you the best possible job search experience.',
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-      </svg>
-    )
-  },
-];
-
-const milestones = [
-  { year: '2022', title: 'Founded', description: 'Started with a simple mission: make job searching less painful.' },
-  { year: '2023', title: '100K Users', description: 'Reached our first major milestone with users across 50 countries.' },
-  { year: '2023', title: 'Series A', description: 'Raised $15M to accelerate product development and AI capabilities.' },
-  { year: '2024', title: '1M Applications', description: 'Processed over 1 million job applications for our users.' },
 ];
 
 export default function About() {
-  const router = useRouter();
-
   return (
-    <div className="min-h-screen bg-white">
+    <>
       <Head>
-        <title>About Us - Jobocate | AI-Powered Job Search Platform</title>
-        <meta name="description" content="Learn about Jobocate's mission to revolutionize job searching with AI. Meet our team and discover our values." />
+        <title>About — Jobocate</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+          rel="stylesheet"
+        />
       </Head>
 
-      <Navbar />
+      <style jsx global>{`
+        #jbabout * {
+          box-sizing: border-box;
+        }
+        html {
+          scroll-behavior: smooth;
+        }
+        #jbabout ::selection {
+          background: #1fa463;
+          color: #f7f3ea;
+        }
+        @keyframes riseIn {
+          from {
+            opacity: 0;
+            transform: translateY(18px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
 
-      <main>
-      {/* Hero Section */}
-        <section className="relative pt-32 pb-20 overflow-hidden bg-gradient-to-b from-primary-50/50 via-white to-white">
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute top-20 left-1/4 w-[500px] h-[500px] bg-primary-100/40 rounded-full blur-[100px]" />
-            <div className="dot-pattern absolute inset-0 opacity-30" />
+      <div
+        id="jbabout"
+        style={{
+          background: '#F7F3EA',
+          color: '#1B1A16',
+          fontFamily: "'Hanken Grotesk',sans-serif",
+          WebkitFontSmoothing: 'antialiased',
+        }}
+      >
+        <div style={{ position: 'sticky', top: 0, zIndex: 50 }}>
+          <SiteNav />
+        </div>
+
+        {/* HERO */}
+        <section style={{ maxWidth: 1000, margin: '0 auto', padding: '72px 32px 48px', textAlign: 'center' }}>
+          <div
+            style={{
+              fontFamily: "'JetBrains Mono',monospace",
+              fontSize: 11.5,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              color: '#1FA463',
+              marginBottom: 18,
+            }}
+          >
+            — About Jobocate
           </div>
-
-          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-              <span className="text-primary-600 text-sm font-semibold uppercase tracking-wider">About Jobocate</span>
-              <h1 className="text-5xl md:text-7xl font-display font-bold text-gray-900 mt-4 mb-6">
-                On a Mission to <span className="gradient-text">Transform</span> Job Search
+          <h1
+            style={{
+              fontFamily: "'Instrument Serif',serif",
+              fontWeight: 400,
+              fontSize: 64,
+              lineHeight: 1.04,
+              letterSpacing: '-0.01em',
+              margin: '0 0 22px',
+              animation: 'riseIn 0.7s ease both',
+            }}
+          >
+            The job search is broken.
+            <br />
+            We&apos;re{' '}
+            <span style={{ background: 'linear-gradient(transparent 56%, rgba(31,164,99,0.32) 56%)', padding: '0 2px' }}>
+              fixing it.
+            </span>
           </h1>
-              <p className="max-w-3xl mx-auto text-xl text-gray-600">
-                We believe everyone deserves access to great career opportunities. Our AI-powered platform levels the playing field, helping job seekers compete with confidence.
-              </p>
-            </motion.div>
-        </div>
-      </section>
+          <p style={{ fontSize: 19, lineHeight: 1.6, color: '#4B463E', maxWidth: 600, margin: '0 auto' }}>
+            Talented people spend months lost in application portals while great roles go unfilled. Jobocate exists to
+            close that gap — putting world-class job-search tooling in everyone&apos;s hands, not just those who can
+            afford a coach.
+          </p>
+        </section>
 
-        {/* Story Section */}
-        <section className="py-24 bg-gray-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid lg:grid-cols-2 gap-16 items-center">
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
+        {/* MISSION STATEMENT */}
+        <section style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 32px 80px' }}>
+          <div style={{ background: '#1B1A16', borderRadius: 24, padding: '64px 56px', position: 'relative', overflow: 'hidden' }}>
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'radial-gradient(circle at 15% 0%, rgba(31,164,99,0.28), transparent 55%)',
+                pointerEvents: 'none',
+              }}
+            />
+            <div style={{ position: 'relative', maxWidth: 760 }}>
+              <div
+                style={{
+                  fontFamily: "'JetBrains Mono',monospace",
+                  fontSize: 11.5,
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  color: '#5BD08C',
+                  marginBottom: 20,
+                }}
               >
-                <span className="text-primary-600 text-sm font-semibold uppercase tracking-wider">Our Story</span>
-                <h2 className="text-4xl font-display font-bold text-gray-900 mt-4 mb-6">
-                  Born from Frustration, Built with Purpose
-            </h2>
-                <div className="space-y-4 text-gray-600 text-lg">
-                  <p>
-                    We've all been there—spending hours customizing resumes, filling out endless application forms, and hearing nothing back. The job search process is broken.
-                  </p>
-                  <p>
-                    Our founders experienced this firsthand. Despite having great skills and experience, they watched as their applications disappeared into the void. They knew there had to be a better way.
-                  </p>
-                  <p>
-                    That's why we built Jobocate—an AI-powered platform that does the heavy lifting so you can focus on what matters: preparing for interviews and landing your dream job.
-                  </p>
-                </div>
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                className="relative"
-              >
-                <div className="aspect-square rounded-2xl bg-gradient-to-br from-primary-50 to-orange-50 border border-primary-100 p-8 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="text-8xl font-display font-bold gradient-text mb-4">2022</div>
-                    <p className="text-gray-600 text-lg">Year Founded</p>
-            </div>
-                </div>
-                <div className="absolute -bottom-4 -right-4 px-6 py-3 bg-white border border-gray-100 rounded-xl shadow-lg">
-                  <span className="text-primary-600 font-semibold">500K+ jobs applied</span>
-                </div>
-              </motion.div>
-          </div>
-        </div>
-      </section>
-
-        {/* Values Section */}
-        <section className="py-24 bg-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="text-center mb-16"
-            >
-              <span className="text-primary-600 text-sm font-semibold uppercase tracking-wider">Our Values</span>
-              <h2 className="text-4xl font-display font-bold text-gray-900 mt-4">
-                What We Stand For
-              </h2>
-            </motion.div>
-
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {values.map((value, index) => (
-                <motion.div
-                  key={value.title}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                  className="p-6 rounded-2xl bg-gray-50 border border-gray-100 hover:border-primary-100 hover:shadow-lg transition-all duration-300"
-                >
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-50 to-orange-50 border border-primary-100 flex items-center justify-center text-primary-500 mb-4">
-                    {value.icon}
+                — Our mission
               </div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">{value.title}</h3>
-                  <p className="text-gray-600 text-sm">{value.description}</p>
-                </motion.div>
+              <p style={{ fontFamily: "'Instrument Serif',serif", fontSize: 40, lineHeight: 1.22, color: '#FBF8F1', margin: 0 }}>
+                To make a fair, fast job search the default — so the right person and the right role find each other in
+                days, not desperate months.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* STATS */}
+        <section style={{ maxWidth: 1200, margin: '0 auto', padding: '0 32px 80px' }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4,1fr)',
+              gap: 24,
+              borderTop: '1px solid #E7E0D2',
+              paddingTop: 48,
+            }}
+          >
+            {STATS.map((s) => (
+              <div key={s.label}>
+                <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 44, fontWeight: 600, lineHeight: 1 }}>
+                  {s.value}
+                </div>
+                <div style={{ width: 32, height: 3, background: '#1FA463', margin: '14px 0 10px' }} />
+                <div style={{ fontSize: 14, color: '#5A544A' }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* VALUES */}
+        <section style={{ background: '#F1ECE0', borderTop: '1px solid #E7E0D2', borderBottom: '1px solid #E7E0D2' }}>
+          <div style={{ maxWidth: 1200, margin: '0 auto', padding: '84px 32px' }}>
+            <div style={{ maxWidth: 600, marginBottom: 52 }}>
+              <div
+                style={{
+                  fontFamily: "'JetBrains Mono',monospace",
+                  fontSize: 11.5,
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  color: '#1FA463',
+                  marginBottom: 16,
+                }}
+              >
+                — What we believe
+              </div>
+              <h2 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 48, lineHeight: 1.05, margin: 0 }}>
+                The principles behind the product
+              </h2>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 36 }}>
+              {VALUES.map((v) => (
+                <div key={v.title} style={{ borderTop: '2px solid #1B1A16', paddingTop: 22 }}>
+                  <h3 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 10px' }}>{v.title}</h3>
+                  <p style={{ fontSize: 15, lineHeight: 1.6, color: '#5A544A', margin: 0 }}>{v.body}</p>
+                </div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* Timeline Section */}
-        <section className="py-24 bg-gray-50">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="text-center mb-16"
+        {/* TEAM */}
+        <section style={{ maxWidth: 1200, margin: '0 auto', padding: '84px 32px' }}>
+          <div style={{ maxWidth: 600, marginBottom: 48 }}>
+            <div
+              style={{
+                fontFamily: "'JetBrains Mono',monospace",
+                fontSize: 11.5,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: '#1FA463',
+                marginBottom: 16,
+              }}
             >
-              <span className="text-primary-600 text-sm font-semibold uppercase tracking-wider">Our Journey</span>
-              <h2 className="text-4xl font-display font-bold text-gray-900 mt-4">
-                Milestones
-              </h2>
-            </motion.div>
-
-            <div className="relative">
-              <div className="absolute left-1/2 -translate-x-1/2 w-px h-full bg-gradient-to-b from-primary-200 via-orange-200 to-transparent" />
-              
-              {milestones.map((milestone, index) => (
-                <motion.div
-                  key={milestone.year + milestone.title}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                  className={`relative flex items-center gap-8 mb-12 ${index % 2 === 0 ? 'flex-row' : 'flex-row-reverse'}`}
-                >
-                  <div className="flex-1 text-right">
-                    {index % 2 === 0 && (
-                      <div className="p-6 rounded-xl bg-white border border-gray-100 shadow-sm">
-                        <div className="text-primary-600 font-bold mb-1">{milestone.year}</div>
-                        <div className="text-gray-900 font-semibold mb-2">{milestone.title}</div>
-                        <p className="text-gray-600 text-sm">{milestone.description}</p>
-                      </div>
-                    )}
-                  </div>
-                  <div className="w-4 h-4 rounded-full bg-gradient-to-r from-primary-500 to-orange-500 border-4 border-white shadow z-10" />
-                  <div className="flex-1">
-                    {index % 2 !== 0 && (
-                      <div className="p-6 rounded-xl bg-white border border-gray-100 shadow-sm">
-                        <div className="text-primary-600 font-bold mb-1">{milestone.year}</div>
-                        <div className="text-gray-900 font-semibold mb-2">{milestone.title}</div>
-                        <p className="text-gray-600 text-sm">{milestone.description}</p>
-                </div>
-                    )}
-              </div>
-                </motion.div>
-              ))}
-          </div>
-        </div>
-      </section>
-
-        {/* Team Section */}
-        <section className="py-24 bg-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="text-center mb-16"
-            >
-              <span className="text-primary-600 text-sm font-semibold uppercase tracking-wider">Our Team</span>
-              <h2 className="text-4xl font-display font-bold text-gray-900 mt-4 mb-4">
-                Meet the People Behind Jobocate
-          </h2>
-              <p className="text-gray-600 max-w-2xl mx-auto">
-                We're a diverse team of engineers, designers, and industry experts united by a common goal.
-          </p>
-            </motion.div>
-
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-              {team.map((member, index) => (
-                <motion.div
-                  key={member.name}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                  className="text-center group"
-                >
-                  <div className="w-32 h-32 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary-500 to-orange-500 flex items-center justify-center text-white text-3xl font-bold group-hover:scale-105 transition-transform duration-300 shadow-lg">
-                    {member.avatar}
+              — Who&apos;s building it
             </div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-1">{member.name}</h3>
-                  <p className="text-primary-600 text-sm mb-3">{member.role}</p>
-                  <p className="text-gray-500 text-sm">{member.bio}</p>
-                </motion.div>
-              ))}
+            <h2 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 48, lineHeight: 1.05, margin: 0 }}>
+              A team that&apos;s been on both sides of the table
+            </h2>
           </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-        <section className="py-24 relative overflow-hidden bg-gray-900">
-          <div className="absolute inset-0 opacity-30">
-            <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary-500 rounded-full blur-[120px]" />
-            <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-orange-500 rounded-full blur-[120px]" />
-          </div>
-
-          <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-            >
-              <h2 className="text-4xl md:text-5xl font-display font-bold text-white mb-6">
-                Join Us on the Journey
-          </h2>
-              <p className="text-xl text-gray-300 mb-10 max-w-2xl mx-auto">
-                Whether you're looking for your next career move or want to join our team, we'd love to hear from you.
-              </p>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Link
-                  href="/signup"
-                  className="px-8 py-4 bg-primary-500 hover:bg-primary-600 text-white text-lg font-semibold rounded-full transition-all duration-300"
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 20 }}>
+            {TEAM.map((m) => (
+              <div
+                key={m.name}
+                style={{ background: '#FBF8F1', border: '1px solid #E1D9C9', borderRadius: 16, padding: 24 }}
+              >
+                <span
+                  style={{
+                    width: 54,
+                    height: 54,
+                    borderRadius: '50%',
+                    background: m.bg,
+                    color: m.color,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 700,
+                    fontSize: 18,
+                    marginBottom: 16,
+                  }}
                 >
-                  Start Your Job Search
+                  {m.initials}
+                </span>
+                <div style={{ fontWeight: 700, fontSize: 16 }}>{m.name}</div>
+                <div style={{ fontSize: 13, color: '#7A7367', marginBottom: 10 }}>{m.role}</div>
+                <p style={{ fontSize: 13, lineHeight: 1.5, color: '#7A7367', margin: 0 }}>{m.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* CTA */}
+        <section style={{ maxWidth: 1200, margin: '0 auto 70px', padding: '0 32px' }}>
+          <div
+            style={{
+              position: 'relative',
+              overflow: 'hidden',
+              background: '#15140F',
+              borderRadius: 24,
+              padding: '78px 40px',
+              textAlign: 'center',
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'radial-gradient(circle at 50% 130%, rgba(31,164,99,0.42), transparent 60%)',
+                pointerEvents: 'none',
+              }}
+            />
+            <div style={{ position: 'relative' }}>
+              <h2
+                style={{
+                  fontFamily: "'Instrument Serif',serif",
+                  fontWeight: 400,
+                  fontSize: 58,
+                  lineHeight: 1.02,
+                  color: '#FBF8F1',
+                  margin: '0 auto 16px',
+                  maxWidth: 640,
+                }}
+              >
+                Come build the future of work
+              </h2>
+              <p style={{ fontSize: 18, color: '#B8B1A4', maxWidth: 480, margin: '0 auto 32px', lineHeight: 1.55 }}>
+                Whether you&apos;re hunting for your next role or want to help others find theirs — there&apos;s a place
+                for you here.
+              </p>
+              <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <Link
+                  href={appRoute('Enterprise.dc.html')}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    background: '#1FA463',
+                    color: '#0C2C1C',
+                    fontSize: 17,
+                    fontWeight: 700,
+                    padding: '17px 32px',
+                    borderRadius: 999,
+                    textDecoration: 'none',
+                  }}
+                >
+                  View open roles <span style={{ fontSize: 19 }}>→</span>
                 </Link>
                 <Link
-                  href="/careers"
-                  className="px-8 py-4 bg-white/10 backdrop-blur-sm border border-white/20 text-white text-lg font-medium rounded-full hover:bg-white/20 transition-all duration-300"
+                  href={appRoute('Jobocate Home.dc.html')}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    background: 'transparent',
+                    color: '#F7F3EA',
+                    border: '1px solid #3A382F',
+                    fontSize: 17,
+                    fontWeight: 600,
+                    padding: '17px 28px',
+                    borderRadius: 999,
+                    textDecoration: 'none',
+                  }}
                 >
-                  Join Our Team
-          </Link>
+                  Try Jobocate free
+                </Link>
               </div>
-            </motion.div>
-        </div>
-      </section>
-      </main>
+            </div>
+          </div>
+        </section>
 
-      <Footer />
-    </div>
+        <SiteFooter />
+      </div>
+    </>
   );
 }

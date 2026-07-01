@@ -62,6 +62,15 @@ const getUserFromToken = async (token) => {
   return null;
 };
 
+// Public /app/* routes that never require a session (auth/entry screens).
+const PUBLIC_APP_ROUTES = [
+  '/app/login',
+  '/app/signup',
+  '/app/reset-password',
+  '/app/verify-email',
+  '/app/states',
+];
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -116,17 +125,44 @@ export const AuthProvider = ({ children }) => {
               console.debug('Could not fetch user profile (backend may be offline):', error.message);
             });
         } else {
-          // If no token but trying to access protected route, redirect to login
-          if (router.pathname.startsWith('/employer') || router.pathname.startsWith('/candidate')) {
-            router.push('/login');
+          // If no token but trying to access a protected route, redirect to login
+          if (router.pathname.startsWith('/employer/') || router.pathname.startsWith('/candidate/')) {
+            router.push('/app/login');
+          } else if (router.pathname.startsWith('/app')) {
+            // New app surface: these are public (auth/entry) routes; everything
+            // else under /app/* requires a session.
+            if (!PUBLIC_APP_ROUTES.includes(router.pathname)) {
+              router.push('/app/login');
+            }
           }
         }
         setLoading(false);
       };
-      
+
       initializeAuth();
     }
   }, [router.pathname]);
+
+  // Role-based surface enforcement: an authenticated user should only ever be
+  // on the surface that matches their role. Employers belong on /employer/*,
+  // everyone else on the candidate app (/app/*). This runs on every navigation
+  // so a stale session, a direct URL, or a back-button can't strand an employer
+  // on the jobseeker dashboard (or vice-versa). Note: `/employer/` (trailing
+  // slash) is the app; `/employers` (plural, marketing) is public and exempt.
+  useEffect(() => {
+    if (loading || !user) return;
+    const path = router.pathname;
+    const isEmployer = user.role === 'ROLE_EMPLOYER';
+    const onEmployerApp = path.startsWith('/employer/') || path === '/employer';
+    const onCandidateApp =
+      path.startsWith('/app') && !PUBLIC_APP_ROUTES.includes(path);
+
+    if (isEmployer && onCandidateApp) {
+      router.replace('/employer/dashboard');
+    } else if (!isEmployer && onEmployerApp) {
+      router.replace('/app/dashboard');
+    }
+  }, [loading, user, router.pathname]);
 
   const signup = async (signupData) => {
     const { name, email, password, role } = signupData;
@@ -245,7 +281,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('user');
     localStorage.removeItem('token'); // Also remove 'token' key used by OAuth
     setUser(null);
-    router.push('/login');
+    router.push('/app/login');
   };
 
   const hasRole = (role) => {

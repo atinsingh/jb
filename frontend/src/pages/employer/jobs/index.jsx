@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
+import { employerJobsApi } from '@/services/employerApi';
 import { 
   BriefcaseIcon,
   PlusIcon,
@@ -116,6 +117,56 @@ export default function EmployerJobs() {
   });
   
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  // Fetch live employer jobs on mount; on any failure keep the sample fallback.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await employerJobsApi.list();
+        if (!alive) return;
+        const arr = Array.isArray(res?.jobs) ? res.jobs : null;
+        if (arr && arr.length) {
+          const statusLabel = (s) => {
+            const map = {
+              active: 'Active',
+              draft: 'Draft',
+              closed: 'Closed',
+              paused: 'Pending',
+            };
+            return map[s] || 'Active';
+          };
+          const fmtSalary = (min, max) => {
+            if (min && max) return `$${Number(min).toLocaleString()} - $${Number(max).toLocaleString()}`;
+            if (min) return `From $${Number(min).toLocaleString()}`;
+            if (max) return `Up to $${Number(max).toLocaleString()}`;
+            return 'Salary not specified';
+          };
+          setJobs(
+            arr.map((j) => ({
+              id: j._id,
+              title: j.title || 'Untitled role',
+              status: statusLabel(j.status),
+              applications: j.applicantsCount ?? 0,
+              date: j.createdAt || '',
+              posted: j.createdAt ? new Date(j.createdAt).toLocaleDateString() : '—',
+              type: j.type || 'Full-time',
+              location: j.location || (j.isRemote ? 'Remote' : '—'),
+              salary: fmtSalary(j.salaryMin, j.salaryMax),
+              views: j.views ?? 0,
+              matches: j.matches ?? 0,
+              skills: Array.isArray(j.skills) ? j.skills : [],
+            })),
+          );
+        }
+      } catch {
+        // Keep sample fallback on any error.
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;

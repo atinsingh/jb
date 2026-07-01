@@ -14,6 +14,18 @@ import {
   PlusIcon
 } from '@heroicons/react/24/outline';
 import EmployerLayout from '@/components/layout/EmployerLayout';
+import { employerJobsApi } from '@/services/employerApi';
+
+// Map the form's employment-type labels to the backend enum.
+const TYPE_ENUM = {
+  'Full Time': 'Full-time',
+  'Part Time': 'Part-time',
+  Contract: 'Contract',
+  Temporary: 'Contract',
+  Internship: 'Internship',
+  Freelance: 'Contract',
+};
+const toTypeEnum = (t) => TYPE_ENUM[t] || 'Full-time';
 
 // Custom styled input component
 const StyledInput = ({ label, icon: Icon, id, ...props }) => (
@@ -131,6 +143,7 @@ const educationLevels = [
 function PostJob() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [activeSection, setActiveSection] = useState('job-info');
   
   // Initialize form data with all required fields
@@ -221,12 +234,12 @@ function PostJob() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+    setSubmitError('');
+
     try {
-      // Get auth token from localStorage
-      const authToken = localStorage.getItem('authToken');
-      if (!authToken) {
-        throw new Error('Authentication required. Please log in again.');
+      // Basic required-field validation.
+      if (!formData.title || !formData.title.trim()) {
+        throw new Error('Job title is required.');
       }
 
       // Validate salary
@@ -235,46 +248,31 @@ function PostJob() {
         throw new Error(salaryError);
       }
 
-      // Prepare the job data according to API schema
-      const jobData = {
-        title: formData.title || '',
-        type: formData.type || 'Full Time',
+      // Build the DTO from the form fields for the employer jobs API.
+      const dto = {
+        title: formData.title.trim(),
+        type: toTypeEnum(formData.type),
         location: formData.location || '',
-        companyName: formData.companyName || '',
-        companyLogo: formData.companyLogo || 'https://img.icons8.com/color/48/company.png',
-        category: formData.category || 'Development',
-        salary: formData.salary || '',
-        experience: formData.experience || '',
+        isRemote: !!formData.isRemote,
+        salaryMin: formData.salaryMin ? Number(formData.salaryMin) : undefined,
+        salaryMax: formData.salaryMax ? Number(formData.salaryMax) : undefined,
+        salaryPeriod: formData.salaryType === 'hour' ? 'hour' : 'year',
         description: formData.description || '',
         responsibilities: Array.isArray(formData.responsibilities) ? formData.responsibilities : [],
         requirements: Array.isArray(formData.requirements) ? formData.requirements : [],
-        benefits: Array.isArray(formData.benefits) ? formData.benefits : []
+        benefits: Array.isArray(formData.benefits) ? formData.benefits : [],
+        skills: Array.isArray(formData.skills) ? formData.skills : [],
+        status: 'active',
+        visibility: 'public',
       };
 
-      console.log('Submitting job:', jobData);
-      
-      // Make API call to post job
-      const { API_URL } = await import('@/config/api');
-      const response = await fetch(`${API_URL}/api/employer/jobs`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: JSON.stringify(jobData)
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to post job');
-      }
-      
-      // Redirect to jobs list after successful submission
+      await employerJobsApi.create(dto);
+
+      // Redirect to jobs list after successful submission.
       router.push('/employer/jobs');
     } catch (error) {
       console.error('Error posting job:', error);
-      // Show error message to user
-      alert(`Error: ${error.message || 'Failed to post job. Please try again.'}`);
+      setSubmitError(error?.message || 'Failed to post job. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -800,6 +798,12 @@ function PostJob() {
               </nav>
             </div>
           </div>
+
+          {submitError && (
+            <div className="mb-6 rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+              {submitError}
+            </div>
+          )}
 
           <form id="jobPostForm" onSubmit={handleSubmit} className="space-y-8">
             {renderJobInfoSection()}
