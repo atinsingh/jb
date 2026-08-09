@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
 export type JobProfileDocument = JobProfile & Document;
 
@@ -11,7 +11,7 @@ export enum JobType {
 
 @Schema({ timestamps: true })
 export class JobProfile {
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true, index: true })
   userId: Types.ObjectId;
 
   @Prop({ required: true })
@@ -74,6 +74,18 @@ export class JobProfile {
 
   @Prop({ type: [String], default: [] })
   preferredLocations?: string[];
+
+  /**
+   * ISO2 country codes this profile is TARGETING — where the candidate wants to
+   * work. Distinct from `UserPreferences.country` (where they currently are) and
+   * from `UserPreferences.workAuthCountries` (where they may legally work).
+   *
+   * Drives the Stage-1a geo pre-filter and gates auto-apply. Empty means "fall
+   * back to the candidate's current country" (see `resolveTargetCountries`), so
+   * existing profiles keep their current behaviour until a target is set.
+   */
+  @Prop({ type: [String], default: [] })
+  targetCountries?: string[];
 
   @Prop({ type: [String], default: [] })
   preferredJobTypes?: string[];

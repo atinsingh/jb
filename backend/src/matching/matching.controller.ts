@@ -24,6 +24,7 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { MatchingService } from './matching.service';
+import { EligibleJobsService } from './eligible-jobs.service';
 import { ExpressInterestDto, InterestStatus } from './dto/express-interest.dto';
 import { AgentAssignmentService } from '../applications/agent-assignment.service';
 
@@ -35,9 +36,38 @@ export class MatchingController {
 
   constructor(
     private matchingService: MatchingService,
+    private eligibleJobsService: EligibleJobsService,
     @Inject(forwardRef(() => AgentAssignmentService))
     private agentAssignmentService: AgentAssignmentService,
   ) {}
+
+  @Get('eligible-jobs')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Geographically/legally eligible jobs for the candidate (Stage 1)' })
+  @ApiQuery({ name: 'keywords', required: false })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'profileId', required: false, description: 'Job profile driving this search (defaults to the active profile)' })
+  async eligibleJobs(
+    @Request() req,
+    @Query('keywords') keywords?: string,
+    @Query('limit') limit?: string,
+    @Query('profileId') profileId?: string,
+  ) {
+    return this.eligibleJobsService.getEligibleJobs(req.user._id.toString(), {
+      keywords,
+      profileId,
+      limit: limit ? parseInt(limit, 10) : 40,
+      includeConditional: true,
+    });
+  }
+
+  @Get('preview')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Preview how current preferences shape matching (real counts)' })
+  @ApiQuery({ name: 'profileId', required: false })
+  async preview(@Request() req, @Query('profileId') profileId?: string) {
+    return this.eligibleJobsService.previewImpact(req.user._id.toString(), profileId);
+  }
 
   @Post('calculate/:jobId')
   @ApiBearerAuth('JWT-auth')

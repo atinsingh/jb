@@ -87,6 +87,9 @@ temp/
 # Brainstorming session mockups (visual companion)
 .superpowers/
 
+# Agent tooling state (leaks into source dirs)
+.omc/
+
 # Mobile development
 android-sdk/ frontend/node_modules/@next/swc-linux-arm64-musl/next-swc.linux-arm64-musl.node
 frontend/node_modules/@next/swc-linux-arm64-gnu/next-swc.linux-arm64-gnu.node

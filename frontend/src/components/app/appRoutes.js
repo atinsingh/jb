@@ -32,6 +32,7 @@ const MAP = {
   'App Onboarding.dc.html': '/app/onboarding',
   'App Dashboard.dc.html': '/app/dashboard',
   'App Matches.dc.html': '/app/matches',
+  'App Job Profiles.dc.html': '/app/job-profiles',
   'App Job.dc.html': '/app/job',
   'App Apply.dc.html': '/app/apply',
   'App Saved.dc.html': '/app/saved',
@@ -61,7 +62,8 @@ const MAP = {
   'App Help Center.dc.html': '/app/help',
   'App Support.dc.html': '/app/support',
   'App States.dc.html': '/app/states',
-  'Jobocate App Spec.dc.html': '/app/spec',
+  // 'Jobocate App Spec.dc.html' removed: it mapped to /app/spec, which has no
+  // page file. Anything asking for it now falls through to '/app'.
 
   // ---- Employer surface (/employer/*) ----
   'EmployerSidebar.dc.html': '/employer/dashboard',

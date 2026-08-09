@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, IsEnum, IsNumber, IsArray, Min, Max } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsNumber, IsArray, IsBoolean, Min, Max, Matches } from 'class-validator';
 import { JobType } from '../../schemas/job-profile.schema';
 
 export class CreateJobProfileDto {
@@ -80,6 +80,23 @@ export class CreateJobProfileDto {
   preferredLocations?: string[];
 
   @ApiProperty({
+    description:
+      'ISO2 country codes this profile targets (where the candidate wants to work). ' +
+      'Empty falls back to the candidate\'s current country.',
+    type: [String],
+    example: ['CA', 'US'],
+    required: false,
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @Matches(/^[A-Z]{2}$/, {
+    each: true,
+    message: 'targetCountries must be uppercase ISO2 country codes (e.g. "CA")',
+  })
+  @IsOptional()
+  targetCountries?: string[];
+
+  @ApiProperty({
     description: 'Preferred job types',
     type: [String],
     enum: JobType,
@@ -90,5 +107,25 @@ export class CreateJobProfileDto {
   @IsString({ each: true })
   @IsOptional()
   preferredJobTypes?: string[];
+
+  @ApiProperty({
+    description: 'Minimum match score to surface / auto-apply (0-100)',
+    example: 75,
+    required: false,
+  })
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  @IsOptional()
+  minMatchScore?: number;
+
+  @ApiProperty({
+    description: 'Enable auto-apply for this profile',
+    example: false,
+    required: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  autoApply?: boolean;
 }
 
