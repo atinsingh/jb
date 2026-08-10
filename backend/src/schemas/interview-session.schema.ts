@@ -50,6 +50,39 @@ export class InterviewSession {
 
   @Prop({ type: Object, required: false })
   metadata?: Record<string, any>;
+
+  // ---- Live capture: consent and retention ------------------------------
+
+  /**
+   * When the candidate acknowledged the consent notice for this session.
+   *
+   * Live capture takes SECOND-PARTY audio — the interviewer's voice. In
+   * two-party-consent jurisdictions (California, Illinois, Washington,
+   * Pennsylvania and Florida among them) that engages wiretap law. Unset means
+   * capture has not been authorised and the gateway must refuse audio.
+   */
+  @Prop()
+  consentAcknowledgedAt?: Date;
+
+  /**
+   * Whether the candidate opted into keeping the transcript after the session.
+   *
+   * Defaults to FALSE. Transcripts of a job interview are unusually sensitive —
+   * they contain the candidate's unguarded speech and the employer's questions —
+   * so retention is opt-in per session, never inherited from a global setting.
+   */
+  @Prop({ type: Boolean, default: false })
+  retainTranscript?: boolean;
+
+  /**
+   * How audio reaches us. `tab_audio` is the browser tab share; `none` means a
+   * text-only session (LIVE_NOTES).
+   *
+   * There is deliberately no value here for stored audio: raw frames are
+   * transcribed in flight and dropped, so no capture mode implies persistence.
+   */
+  @Prop({ type: String, default: 'none' })
+  captureMode?: string;
 }
 
 export const InterviewSessionSchema = SchemaFactory.createForClass(InterviewSession);
