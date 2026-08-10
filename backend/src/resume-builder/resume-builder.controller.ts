@@ -30,6 +30,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ResumeBuilderService } from './resume-builder.service';
 import { CreateResumeDto, UpdateResumeSectionDto, RegenerateSectionDto } from './dto/create-resume.dto';
 import { UpdateResumeDto, CreateShareLinkDto } from './dto/resume-operations.dto';
+import { GenerateResumeDto, GenerateSectionDto } from './dto/generate-resume.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { StorageService } from '../storage';
 
@@ -102,6 +103,27 @@ export class ResumeBuilderController {
   @ApiResponse({ status: 201, description: 'Resume imported successfully' })
   async import(@Body() body: any, @Request() req) {
     return this.resumeBuilderService.importResume(req.user._id.toString(), body);
+  }
+
+  // ---- Generation --------------------------------------------------------
+  // Declared before every `:id` route. These are collection-level paths and
+  // parameterised matching would otherwise be free to swallow them.
+  //
+  // The frontend (services/resumeGenerateApi.js) has called both of these since
+  // /app/resume-generate shipped; neither existed, so every generate threw.
+
+  @Post('generate')
+  @ApiOperation({ summary: 'Generate a résumé tailored to a role, grounded in the candidate\'s own history' })
+  @ApiResponse({ status: 201, description: 'Generated résumé returned (not saved)' })
+  async generate(@Body() dto: GenerateResumeDto, @Request() req) {
+    return this.resumeBuilderService.generate(req.user._id.toString(), dto);
+  }
+
+  @Post('generate/section')
+  @ApiOperation({ summary: 'Generate a single résumé section' })
+  @ApiResponse({ status: 201, description: 'Section content returned (not saved)' })
+  async generateSection(@Body() dto: GenerateSectionDto, @Request() req) {
+    return this.resumeBuilderService.generateSection(req.user._id.toString(), dto);
   }
 
   @Post(':id/duplicate')

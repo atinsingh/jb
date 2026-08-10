@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Logger, ConflictException, ForbiddenException, Inject, forwardRef, Optional } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, ConflictException, ForbiddenException, BadRequestException, Inject, forwardRef, Optional } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { QUEUE_PDF, JOB_GENERATE_PDF } from '../queue/queue.constants';
@@ -15,6 +15,15 @@ import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { ResumeVersion, ResumeVersionDocument } from '../schemas/resume-version.schema';
 import { ShareLink, ShareLinkDocument } from '../schemas/share-link.schema';
 import { UpdateResumeDto, CreateShareLinkDto } from './dto/resume-operations.dto';
+import { GenerateResumeDto, GenerateSectionDto } from './dto/generate-resume.dto';
+import {
+  extractSourceFacts,
+  enforceExperienceGrounding,
+  findFabricatedMetrics,
+  GroundingViolation,
+  GROUNDING_SYSTEM_PROMPT,
+} from './resume-grounding';
+import { normalizeSkills } from '../matching/skill-taxonomy';
 import { v4 as uuidv4 } from 'uuid';
 import * as bcrypt from 'bcryptjs';
 import { JwtService } from '@nestjs/jwt';
@@ -367,6 +376,224 @@ export class ResumeBuilderService {
       throw new NotFoundException('Resume not found or link expired');
     }
     return this.sanitizeResumeHtml(resume) as unknown as ResumeDocument;
+  }
+
+  /**
+   * Resolve the résumé a generation draws its facts from.
+   *
+   * Explicit `source` wins; otherwise the primary résumé; otherwise the most
+   * recently updated. Generating with no source at all is refused rather than
+   * satisfied — a résumé built from nothing is a fabricated résumé.
+   */
+  private async resolveSource(userId: string, source?: string): Promise<ResumeDocument> {
+    if (source) return this.findOne(source, userId);
+
+    const resumes = await this.resumeModel
+      .find({ userId: new Types.ObjectId(userId), archivedAt: { $in: [null, undefined] } })
+      .sort({ isPrimary: -1, updatedAt: -1 })
+      .limit(1)
+      .exec();
+
+    const resume = resumes[0];
+    if (!resume) {
+      throw new BadRequestException(
+        'Add your experience to a résumé first — we generate from your own history, and will not invent one.',
+      );
+    }
+    return resume;
+  }
+
+  /** True when there is enough material to tailor rather than invent. */
+  private hasSourceMaterial(resume: ResumeDocument): boolean {
+    const experience = (resume as any).experience || [];
+    const skills = (resume as any).skills || [];
+    const summary = (resume as any).summary || '';
+    return experience.length > 0 || skills.length > 0 || String(summary).trim().length > 0;
+  }
+
+  /** Extract the requirement keywords a job description is asking for. */
+  private jobKeywords(jobDescription?: string): string[] {
+    if (!jobDescription) return [];
+    const tokens = String(jobDescription)
+      .toLowerCase()
+      .split(/[^a-z0-9+#.]+/)
+      .filter((t) => t.length > 2);
+    return [...new Set(normalizeSkills(tokens))];
+  }
+
+  /**
+   * Generate a résumé tailored to a role, grounded in the candidate's own
+   * history.
+   *
+   * Implements `POST /api/resume-builder/generate`, which the frontend has been
+   * calling since it shipped and which did not exist.
+   *
+   * The model's output is not trusted: `resume-grounding` strips any experience
+   * entry naming an employer, title or date absent from the source, and reports
+   * any figure with no origin. A candidate has to defend this document in an
+   * interview.
+   */
+  async generate(userId: string, dto: GenerateResumeDto) {
+    const source = await this.resolveSource(userId, dto.source);
+    if (!this.hasSourceMaterial(source)) {
+      throw new BadRequestException(
+        'Your résumé has no experience or skills yet — add them and we will tailor from there.',
+      );
+    }
+
+    const facts = extractSourceFacts(source as any);
+    const user = await this.userModel.findById(userId).exec();
+
+    const prompt = [
+      `Target role: ${dto.role}`,
+      dto.seniority ? `Seniority register: ${dto.seniority}` : '',
+      dto.tone ? `Tone: ${dto.tone}` : '',
+      dto.jobDescription ? `Job description:\n${dto.jobDescription}` : '',
+      '',
+      'CANDIDATE MATERIAL (the only facts you may use):',
+      `Name: ${(source as any).fullName || user?.name || 'Candidate'}`,
+      `Skills: ${((source as any).skills || []).join(', ')}`,
+      `Experience: ${JSON.stringify((source as any).experience || [])}`,
+      `Education: ${JSON.stringify((source as any).education || [])}`,
+      (source as any).summary ? `Existing summary: ${(source as any).summary}` : '',
+      '',
+      'Return ONLY valid JSON of the shape:',
+      '{"summary": string, "experience": [{"title","company","startDate","endDate","description","achievements":[]}], "skills": [string], "keywords": [string]}',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const provider = this.llmRoutingService.getProviderForFeature(LLMFeature.REWRITE_BULLETS);
+    const config = this.llmRoutingService.getFeatureConfig(LLMFeature.REWRITE_BULLETS);
+
+    let parsed: any;
+    try {
+      const response = await provider.chat({
+        messages: [
+          { role: 'system', content: GROUNDING_SYSTEM_PROMPT },
+          { role: 'user', content: prompt },
+        ],
+        model: config.model,
+        temperature: config.temperature,
+        maxTokens: config.maxTokens,
+      });
+      parsed = this.parseGeneratedJson(response?.content);
+    } catch (error) {
+      this.logger.error('Résumé generation failed:', error);
+      throw new BadRequestException('Could not generate a résumé right now. Your existing résumé is unchanged.');
+    }
+
+    // ---- Grounding enforcement, after the model has spoken ----------------
+    const { kept, violations } = enforceExperienceGrounding(parsed.experience, facts);
+    const metricViolations: GroundingViolation[] = [
+      ...findFabricatedMetrics(parsed.summary || '', facts, 'summary'),
+      ...kept.flatMap((e, i) =>
+        findFabricatedMetrics(
+          [e.description, ...(e.achievements || [])].filter(Boolean).join(' '),
+          facts,
+          `experience[${i}]`,
+        ),
+      ),
+    ];
+
+    const skills: string[] = Array.isArray(parsed.skills) ? parsed.skills : [];
+    const generatedText = [parsed.summary, JSON.stringify(kept), skills.join(' ')].join(' ').toLowerCase();
+
+    // ---- Coverage: report gaps honestly ----------------------------------
+    const required = this.jobKeywords(dto.jobDescription);
+    const covered = required.filter((k) => generatedText.includes(k.toLowerCase()));
+    const missing = required.filter((k) => !covered.includes(k));
+
+    return {
+      id: String(source._id),
+      summary: parsed.summary || '',
+      experience: kept,
+      skills,
+      keywords: Array.isArray(parsed.keywords) ? parsed.keywords : [],
+      coverage: {
+        required,
+        covered,
+        missing,
+        percent: required.length ? Math.round((covered.length / required.length) * 100) : null,
+      },
+      // Surfaced rather than swallowed: the candidate should see what we removed.
+      groundingViolations: [...violations, ...metricViolations],
+    };
+  }
+
+  /**
+   * Regenerate a single section. Implements
+   * `POST /api/resume-builder/generate/section`.
+   *
+   * Touches exactly one section — deliberately not implemented as a full
+   * generate with the other sections discarded, which would cost the same as a
+   * full generation for a fraction of the value.
+   */
+  async generateSection(userId: string, dto: GenerateSectionDto): Promise<{ content: any }> {
+    const source = await this.resolveSource(userId, dto.source);
+    const facts = extractSourceFacts(source as any);
+
+    const instructions: Record<string, string> = {
+      summary: 'Write a professional summary of 2-3 sentences.',
+      experience: 'Rewrite the experience entries with stronger phrasing. Return a JSON array.',
+      skills: 'Return a JSON array of the candidate\'s relevant skills.',
+    };
+
+    const prompt = [
+      instructions[dto.section],
+      dto.role ? `Target role: ${dto.role}` : '',
+      dto.jobDescription ? `Job description:\n${dto.jobDescription}` : '',
+      '',
+      'CANDIDATE MATERIAL (the only facts you may use):',
+      `Skills: ${((source as any).skills || []).join(', ')}`,
+      `Experience: ${JSON.stringify((source as any).experience || [])}`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const provider = this.llmRoutingService.getProviderForFeature(LLMFeature.REWRITE_BULLETS);
+    const config = this.llmRoutingService.getFeatureConfig(LLMFeature.REWRITE_BULLETS);
+
+    try {
+      const response = await provider.chat({
+        messages: [
+          { role: 'system', content: GROUNDING_SYSTEM_PROMPT },
+          { role: 'user', content: prompt },
+        ],
+        model: config.model,
+        temperature: config.temperature,
+        maxTokens: config.maxTokens,
+      });
+
+      const raw = String(response?.content || '').trim();
+      if (!raw) throw new Error('empty generation');
+
+      if (dto.section === 'experience') {
+        const { kept } = enforceExperienceGrounding(this.parseGeneratedJson(raw), facts);
+        return { content: kept };
+      }
+      if (dto.section === 'skills') {
+        return { content: this.parseGeneratedJson(raw) };
+      }
+      return { content: raw };
+    } catch (error) {
+      this.logger.error(`Section generation failed for ${dto.section}:`, error);
+      throw new BadRequestException(`Could not generate the ${dto.section} section.`);
+    }
+  }
+
+  /** Parse a model response that should be JSON, tolerating fenced blocks. */
+  private parseGeneratedJson(content: string | undefined): any {
+    const raw = String(content || '').trim();
+    if (!raw) throw new Error('empty generation');
+
+    try {
+      return JSON.parse(raw);
+    } catch {
+      const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (fenced) return JSON.parse(fenced[1]);
+      throw new Error('generation was not valid JSON');
+    }
   }
 
   async regenerateSection(
