@@ -12,6 +12,8 @@ import { LLMQuotaService } from '../llm/llm-quota.service';
 import { ResumeParserService } from '../resume/resume-parser.service';
 import { StorageService } from '../storage';
 import { HtmlSanitizerService } from '../ingestion/pipeline/html-sanitizer.service';
+import { AtsParseabilityService } from '../ats/ats-parseability.service';
+import { AtsMatchService } from '../ats/ats-match.service';
 
 // uuid ships as ESM which the repo's jest transform does not process; the
 // value is irrelevant to these tests. Matches the convention already used by
@@ -128,6 +130,10 @@ describe('ResumeBuilderService — generate() / generateSection()', () => {
         // HtmlSanitizerService()` resolves to the { sanitize } stub instead
         // of pulling in the real sanitize-html dependency chain.
         HtmlSanitizerService,
+        // Pure, dependency-free computation — the real services are cheaper
+        // and more faithful here than stubs would be.
+        AtsParseabilityService,
+        AtsMatchService,
       ],
     }).compile();
 

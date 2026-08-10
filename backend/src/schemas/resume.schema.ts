@@ -199,8 +199,28 @@ export class Resume {
   @Prop({ default: false })
   isPrimary?: boolean;
 
+  /**
+   * Generic parseability score, 0-100. Deterministic and document-only — it
+   * answers "will a parser read this?", never "does this match a job?".
+   * Written by AtsParseabilityService; read by the résumé score ring and the
+   * library's sort.
+   */
   @Prop({ type: Number })
   atsScore?: number;
+
+  /**
+   * The findings behind `atsScore`, each with an actionable fix.
+   *
+   * Stores the extracted text LENGTH, never the text: this report must not
+   * become a second copy of the candidate's personal data.
+   */
+  @Prop({ type: Object })
+  atsReport?: {
+    score: number;
+    checkedAt: Date;
+    extractedTextLength: number;
+    findings: Array<{ code: string; severity: string; message: string; fix: string }>;
+  };
 
   @Prop({ type: Number, default: 0 })
   applicationCount?: number;

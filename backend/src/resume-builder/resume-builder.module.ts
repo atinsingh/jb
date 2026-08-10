@@ -14,6 +14,7 @@ import { bullQueueImports } from '../queue/queue.config';
 import { isQueueEnabled, QUEUE_PDF } from '../queue/queue.constants';
 import { ResumeBuilderPdfProcessor } from './resume-builder.pdf.processor';
 import { HtmlSanitizerService } from '../ingestion/pipeline/html-sanitizer.service';
+import { AtsModule } from '../ats/ats.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { HtmlSanitizerService } from '../ingestion/pipeline/html-sanitizer.servi
       { name: ShareLink.name, schema: ShareLinkSchema },
     ]),
     LLMModule,
+    AtsModule,
     forwardRef(() => ResumeModule),
     JwtModule.registerAsync({
       imports: [ConfigModule],

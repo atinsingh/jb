@@ -21,6 +21,8 @@ import { v4 as uuidv4 } from 'uuid';
 import * as bcrypt from 'bcryptjs';
 import { JwtService } from '@nestjs/jwt';
 import { HtmlSanitizerService } from '../ingestion/pipeline/html-sanitizer.service';
+import { AtsParseabilityService } from '../ats/ats-parseability.service';
+import { AtsMatchService } from '../ats/ats-match.service';
 import {
   CandidateFacts,
   normalizeFacts,
@@ -56,6 +58,8 @@ export class ResumeBuilderService {
     private shareLinkModel: Model<ShareLinkDocument>,
     private readonly llmRoutingService: LLMRoutingService,
     private readonly llmQuotaService: LLMQuotaService,
+    private readonly atsParseability: AtsParseabilityService,
+    private readonly atsMatch: AtsMatchService,
     private resumeParserService: ResumeParserService,
     private jwtService: JwtService,
     private readonly storageService: StorageService,
@@ -275,6 +279,8 @@ export class ResumeBuilderService {
     delete updates.version;
 
     Object.assign(resume, this.sanitizeResumeHtml(updates as any));
+    // Rescore before saving so the ring reflects what was just written.
+    this.applyAtsScore(resume);
     return resume.save();
   }
 
@@ -911,6 +917,60 @@ ${
       });
       throw new Error(`Failed to generate PDF: ${error?.message || 'Unknown error'}`);
     }
+  }
+
+  // ---- ATS compatibility -------------------------------------------------
+
+  /**
+   * Score a résumé's machine-readability and persist the result.
+   *
+   * `Resume.atsScore` has been rendered by the score ring and sorted on by the
+   * library since they shipped, while nothing wrote it. This is the producer.
+   */
+  async checkAts(id: string, userId: string) {
+    const resume = await this.findOne(id, userId);
+    this.applyAtsScore(resume);
+    await resume.save();
+
+    return resume.atsReport;
+  }
+
+  /**
+   * Coverage of a résumé against a specific job description.
+   *
+   * Deliberately does NOT touch `atsScore`. That number answers "will a parser
+   * read this?" and would be meaningless if it moved every time the candidate
+   * looked at a different job.
+   */
+  async matchAts(id: string, userId: string, jobDescription: string) {
+    if (!jobDescription || !jobDescription.trim()) {
+      throw new BadRequestException('A job description is required to check coverage.');
+    }
+
+    const resume = await this.findOne(id, userId);
+    return this.atsMatch.match(resume as any, jobDescription);
+  }
+
+  /**
+   * Recompute the score onto the document, without saving.
+   *
+   * Called before every write so the ring is never stale, and debounced so a
+   * burst of autosaves does not rescore on each keystroke. Cheap enough to run
+   * inline: the check is pure and synchronous.
+   */
+  private applyAtsScore(resume: ResumeDocument): void {
+    const lastChecked = (resume as any).atsReport?.checkedAt;
+    if (lastChecked && Date.now() - new Date(lastChecked).getTime() < 2000) return;
+
+    const result = this.atsParseability.check({ structured: resume as any });
+
+    (resume as any).atsScore = result.score;
+    (resume as any).atsReport = {
+      score: result.score,
+      checkedAt: new Date(),
+      extractedTextLength: result.extractedTextLength,
+      findings: result.findings,
+    };
   }
 
   async delete(id: string, userId: string): Promise<void> {

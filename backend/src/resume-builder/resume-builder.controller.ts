@@ -127,6 +127,26 @@ export class ResumeBuilderController {
     return this.resumeBuilderService.generateSection(req.user._id.toString(), generateSectionDto);
   }
 
+  @Post(':id/ats-check')
+  @ApiOperation({ summary: 'Score how well an ATS can read this résumé (deterministic, persisted)' })
+  @ApiResponse({ status: 200, description: 'Score plus findings, each with an actionable fix' })
+  async atsCheck(@Param('id') id: string, @Request() req) {
+    return this.resumeBuilderService.checkAts(id, req.user._id.toString());
+  }
+
+  @Post(':id/ats-match')
+  @ApiOperation({ summary: 'Coverage of this résumé against a specific job description (ephemeral)' })
+  @ApiResponse({ status: 200, description: 'Coverage percentage plus matched and missing concepts' })
+  async atsMatch(
+    @Param('id') id: string,
+    @Body('jobDescription') jobDescription: string,
+    @Request() req,
+  ) {
+    // Never writes atsScore — a JD-relative number would make the stored score
+    // meaningless without a job attached.
+    return this.resumeBuilderService.matchAts(id, req.user._id.toString(), jobDescription);
+  }
+
   @Post(':id/duplicate')
   @ApiOperation({ summary: 'Duplicate a resume into a new independent resume' })
   async duplicate(@Param('id') id: string, @Body() body: any, @Request() req) {
