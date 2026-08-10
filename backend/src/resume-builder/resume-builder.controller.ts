@@ -29,8 +29,8 @@ import { extname } from 'path';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ResumeBuilderService } from './resume-builder.service';
 import { CreateResumeDto, UpdateResumeSectionDto, RegenerateSectionDto } from './dto/create-resume.dto';
-import { UpdateResumeDto, CreateShareLinkDto } from './dto/resume-operations.dto';
 import { GenerateResumeDto, GenerateSectionDto } from './dto/generate-resume.dto';
+import { UpdateResumeDto, CreateShareLinkDto } from './dto/resume-operations.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { StorageService } from '../storage';
 
@@ -105,25 +105,26 @@ export class ResumeBuilderController {
     return this.resumeBuilderService.importResume(req.user._id.toString(), body);
   }
 
-  // ---- Generation --------------------------------------------------------
-  // Declared before every `:id` route. These are collection-level paths and
-  // parameterised matching would otherwise be free to swallow them.
-  //
-  // The frontend (services/resumeGenerateApi.js) has called both of these since
-  // /app/resume-generate shipped; neither existed, so every generate threw.
+  // ---------------------------------------------------------------------
+  // Collection-level routes (POST generate / POST generate/section) — must
+  // stay declared here, before every `:id`-prefixed route that follows
+  // (':id/duplicate', ':id/primary' and the rest), or Nest's parameterised
+  // matching would be free to treat "generate" as an :id value.
+  // ---------------------------------------------------------------------
 
   @Post('generate')
-  @ApiOperation({ summary: 'Generate a résumé tailored to a role, grounded in the candidate\'s own history' })
-  @ApiResponse({ status: 201, description: 'Generated résumé returned (not saved)' })
-  async generate(@Body() dto: GenerateResumeDto, @Request() req) {
-    return this.resumeBuilderService.generate(req.user._id.toString(), dto);
+  @ApiOperation({ summary: "Generate a tailored résumé draft from the candidate's existing facts (does not save)" })
+  @ApiResponse({ status: 200, description: 'Generated résumé draft' })
+  @ApiResponse({ status: 400, description: 'No source résumé or profile experience to generate from' })
+  async generate(@Body() generateDto: GenerateResumeDto, @Request() req) {
+    return this.resumeBuilderService.generate(req.user._id.toString(), generateDto);
   }
 
   @Post('generate/section')
-  @ApiOperation({ summary: 'Generate a single résumé section' })
-  @ApiResponse({ status: 201, description: 'Section content returned (not saved)' })
-  async generateSection(@Body() dto: GenerateSectionDto, @Request() req) {
-    return this.resumeBuilderService.generateSection(req.user._id.toString(), dto);
+  @ApiOperation({ summary: 'Regenerate exactly one section of a résumé draft' })
+  @ApiResponse({ status: 200, description: 'Regenerated section content' })
+  async generateSection(@Body() generateSectionDto: GenerateSectionDto, @Request() req) {
+    return this.resumeBuilderService.generateSection(req.user._id.toString(), generateSectionDto);
   }
 
   @Post(':id/duplicate')
