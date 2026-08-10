@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ApplyRunnerService } from './apply-runner.service';
 import { ApprovalQueueService } from './approval-queue.service';
 import { PrepareSchedulerService } from './prepare-scheduler.service';
+import { PreparedExpiryService } from './prepared-expiry.service';
 import { JobProfile, JobProfileSchema } from '../schemas/job-profile.schema';
 import { MatchingModule } from '../matching/matching.module';
 import { Application, ApplicationSchema } from '../schemas/application.schema';
@@ -11,6 +12,7 @@ import { Resume, ResumeSchema } from '../schemas/resume.schema';
 import { User, UserSchema } from '../schemas/user.schema';
 import { LoggerModule } from '../common/logger/logger.module';
 import { ApplyRunnerController } from './apply-runner.controller';
+import { SelectorsController } from './selectors.controller';
 import { ApplicationsModule } from '../applications/applications.module';
 import { UsersModule } from '../users/users.module';
 import { CandidateMaterialsService } from './ats/candidate-materials.service';
@@ -37,13 +39,14 @@ import { isQueueEnabled, QUEUE_ATS } from '../queue/queue.constants';
     // EligibleJobsService supplies the auto-apply-safe, geo-gated candidates.
     forwardRef(() => MatchingModule),
   ],
-  controllers: [ApplyRunnerController],
+  controllers: [ApplyRunnerController, SelectorsController],
   // The processor is registered ONLY when queues are enabled; the @Optional()
   // @InjectQueue in the controller resolves to undefined otherwise → inline path.
   providers: [
     ApplyRunnerService,
     ApprovalQueueService,
     PrepareSchedulerService,
+    PreparedExpiryService,
     CandidateMaterialsService,
     AtsAdapterRegistry,
     ...(isQueueEnabled() ? [AtsSubmitProcessor] : []),

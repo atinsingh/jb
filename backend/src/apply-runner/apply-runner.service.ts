@@ -25,6 +25,16 @@ const MAX_UNREVIEWED_PREPARES = Number(process.env.MAX_UNREVIEWED_PREPARES || 10
 /** How long a prepared application stays valid before it must be re-prepared. */
 const PREPARED_TTL_DAYS = 7;
 
+/**
+ * Fill coverage below this raises an alarm.
+ *
+ * Set deliberately high: when an ATS changes its markup, coverage degrades
+ * gradually rather than failing outright, and every partially-filled form
+ * silently becomes a `needs_human`. By the time someone notices the queue is
+ * full of them, days of applications have been lost.
+ */
+const FILL_COVERAGE_ALARM = Number(process.env.FILL_COVERAGE_ALARM || 0.9);
+
 /** Puppeteer returns Buffer or Uint8Array depending on version — normalize. */
 function toPngBuffer(shot: any): Buffer {
   if (Buffer.isBuffer(shot)) return shot;
@@ -218,6 +228,213 @@ export class ApplyRunnerService {
           /* already gone */
         }
       }
+    }
+  }
+
+  /**
+   * COMMIT PASS — submit a previously prepared, candidate-approved application.
+   *
+   * Re-drives the form because a headless session cannot be held open across the
+   * hours or days between preparing and approving. Before anything is clicked it
+   * re-introspects and compares fingerprints: if the employer changed the form
+   * after approval, the approval no longer describes what would be sent, so this
+   * refuses to submit and sends the application back to be prepared again.
+   *
+   * Four things must all hold or nothing is submitted:
+   *   1. `AUTO_APPLICATION_ENABLED` is on.
+   *   2. The application carries a `prepared.approvalId` — an explicit human act.
+   *   3. The preparation has not expired.
+   *   4. The form fingerprint still matches what was approved.
+   */
+  async commitOne(applicationId: string): Promise<{ id: string; status: string; failReason?: string }> {
+    if (!this.isAutoEnabled()) {
+      return { id: applicationId, status: 'skipped', failReason: 'auto-apply disabled' };
+    }
+
+    // Atomic claim that ALSO enforces the approval invariant: the query only
+    // matches an approved, not-yet-committed application, so an unapproved one
+    // can never be picked up and a second delivery finds it already claimed.
+    const claimed = await this.applicationModel
+      .findOneAndUpdate(
+        {
+          _id: applicationId,
+          status: 'awaiting_approval',
+          'prepared.approvalId': { $exists: true, $ne: null },
+          'atsMetadata.committedAt': { $exists: false },
+        },
+        { $set: { 'atsMetadata.committedAt': new Date() } },
+        { new: true },
+      )
+      .exec();
+
+    if (!claimed) {
+      this.logger.debug(`Application ${applicationId} is not approved, or already committing.`);
+      return { id: applicationId, status: 'skipped', failReason: 'not approved or already claimed' };
+    }
+
+    const prepared: any = (claimed as any).prepared || {};
+
+    if (prepared.expiresAt && new Date(prepared.expiresAt).getTime() < Date.now()) {
+      await this.requeueForPreparation(applicationId, claimed, 'The preparation expired before it was submitted');
+      return { id: applicationId, status: 'expired', failReason: 'preparation expired' };
+    }
+
+    const job = await this.jobModel.findById(claimed.jobId).exec();
+    const applyUrl = resolveApplyUrl(job as any);
+    const adapter = this.registry.resolve(applyUrl);
+
+    if (!applyUrl || !adapter || !adapter.capabilities?.headlessSubmit) {
+      const reason = !applyUrl
+        ? 'No apply URL on job — manual apply required'
+        : `${claimed.atsType || 'This ATS'} cannot be submitted for you — finish it in your browser`;
+      await this.finish(applicationId, claimed, 'needs_human', reason);
+      return { id: applicationId, status: 'needs_human', failReason: reason };
+    }
+
+    let browser: any;
+    try {
+      const materials = await this.candidateMaterialsService.assembleMaterials(
+        String(claimed.candidateId),
+        claimed,
+      );
+
+      browser = await this.launchBrowser();
+      const page = await browser.newPage();
+
+      // Re-read the form and check nothing changed under the approval.
+      const schema = await adapter.introspect({ page, applyUrl });
+      if (schema.fingerprint !== prepared.fingerprint) {
+        this.logger.warn(
+          `Form changed for application ${applicationId} — refusing to submit an approval that no longer matches.`,
+        );
+        await this.requeueForPreparation(
+          applicationId,
+          claimed,
+          'The employer changed this form after you approved it, so we did not submit. We will prepare it again.',
+        );
+        return { id: applicationId, status: 'preparing', failReason: 'form changed since approval' };
+      }
+
+      // Refill from the answers the candidate actually saw.
+      const values: Record<string, any> = {};
+      for (const a of prepared.answers || []) values[a.fieldName] = a.value;
+      const fillReport = await adapter.fill({ page, applyUrl }, values, materials);
+
+      await this.recordFillCoverage(claimed.atsType || 'unknown', fillReport.coverage);
+
+      // Hand off to the existing submit path — CAPTCHA, missing-button and
+      // unconfirmed-submit gates all still apply, unchanged.
+      const result: SubmitResult = await adapter.submit({ page, applyUrl, materials });
+
+      const proofUrls = await this.persistProof(applicationId, result.screenshots || []);
+      const status = result.ok ? 'submitted' : result.needsHuman ? 'needs_human' : 'failed';
+
+      await this.finish(applicationId, claimed, status, result.failReason, {
+        proofUrls,
+        atsMetadata: { ...(result.atsMetadata || {}), fillCoverage: fillReport.coverage },
+        confirmationText: result.confirmationText,
+      });
+
+      return { id: applicationId, status, failReason: result.failReason };
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Commit failed for application ${applicationId}: ${reason}`);
+      await this.finish(applicationId, claimed, 'failed', `Submission error: ${reason}`);
+      return { id: applicationId, status: 'failed', failReason: reason };
+    } finally {
+      if (browser) {
+        try {
+          await browser.close();
+        } catch {
+          /* already gone */
+        }
+      }
+    }
+  }
+
+  /**
+   * Submit every application the candidate has approved, up to `limit`.
+   *
+   * This is the counterpart to `process()`: that one drives the legacy
+   * pending → submit path, this one drives approved → submit. Both are no-ops
+   * while `AUTO_APPLICATION_ENABLED` is off.
+   */
+  async commitApproved(limit = 10) {
+    if (!this.isAutoEnabled()) {
+      this.logger.log('AUTO_APPLICATION_ENABLED is off — no approved applications will be submitted.');
+      return { enabled: false, processed: 0, results: [] as any[] };
+    }
+
+    const approved = await this.applicationModel
+      .find({
+        status: 'awaiting_approval',
+        'prepared.approvalId': { $exists: true, $ne: null },
+        'atsMetadata.committedAt': { $exists: false },
+      })
+      .limit(limit)
+      .exec();
+
+    const results = [];
+    for (const app of approved) {
+      results.push(await this.commitOne(String(app._id)));
+    }
+
+    return { enabled: true, processed: results.length, results };
+  }
+
+  /**
+   * Send an application back to be prepared again, discarding the stale
+   * preparation and its approval.
+   *
+   * The approval is dropped deliberately: it described a form state that no
+   * longer exists, so carrying it forward would let a changed form inherit
+   * consent the candidate never gave it.
+   */
+  private async requeueForPreparation(
+    applicationId: string,
+    app: ApplicationDocument,
+    message: string,
+  ): Promise<void> {
+    await this.applicationModel
+      .updateOne(
+        { _id: applicationId },
+        {
+          $set: { status: 'pending' },
+          $unset: {
+            prepared: '',
+            'atsMetadata.claimedAt': '',
+            'atsMetadata.committedAt': '',
+          },
+        },
+      )
+      .exec();
+
+    await this.applicationEventsService.recordEvent({
+      applicationId: app._id as any,
+      userId: app.candidateId,
+      type: 'ats_requeued',
+      message,
+      meta: { atsType: app.atsType },
+    });
+  }
+
+  /**
+   * Track how much of a form the adapter actually managed to fill.
+   *
+   * This is the selector-rot alarm. When an ATS redesigns their markup the
+   * failure is not a crash — it is a slow slide into `needs_human` that looks
+   * like normal operation. A coverage drop is the only early signal.
+   */
+  private async recordFillCoverage(atsType: string, coverage: number): Promise<void> {
+    if (typeof coverage !== 'number') return;
+
+    if (coverage < FILL_COVERAGE_ALARM) {
+      this.logger.error(
+        `FILL COVERAGE ALARM — ${atsType} filled only ${Math.round(coverage * 100)}% of fields ` +
+          `(floor ${Math.round(FILL_COVERAGE_ALARM * 100)}%). Selectors have probably rotted.`,
+      );
+    } else {
+      this.logger.debug(`${atsType} fill coverage ${Math.round(coverage * 100)}%`);
     }
   }
 

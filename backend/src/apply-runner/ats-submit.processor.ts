@@ -25,8 +25,17 @@ export class AtsSubmitProcessor {
   async handleSubmit(job: Job<AtsSubmitJobData>) {
     const limit = job.data?.limit ?? 10;
     this.logger.debug(`Processing ATS submit job ${job.id} (limit ${limit})`);
+
+    // Two distinct populations, both gated on AUTO_APPLICATION_ENABLED inside
+    // the runner:
+    //   commitApproved — prepared applications the candidate has approved
+    //   process        — the legacy pending -> submit path
+    const committed = await this.runner.commitApproved(limit);
     const result = await this.runner.process(limit);
-    this.logger.debug(`ATS submit job ${job.id} complete: ${result.processed} processed`);
-    return result;
+
+    this.logger.debug(
+      `ATS submit job ${job.id} complete: ${committed.processed} approved committed, ${result.processed} legacy processed`,
+    );
+    return { committed, legacy: result };
   }
 }

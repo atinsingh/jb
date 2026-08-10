@@ -7,13 +7,14 @@
  * adding new ATS hostnames.
  */
 
-export type AtsType = 'greenhouse' | 'lever' | 'workday' | 'unknown';
+export type AtsType = 'greenhouse' | 'lever' | 'ashby' | 'workday' | 'unknown';
 
 /**
  * Detect the ATS from an apply URL by inspecting its hostname.
  *
  *   greenhouse.io                    -> 'greenhouse'
  *   lever.co                         -> 'lever'
+ *   ashbyhq.com                      -> 'ashby'
  *   myworkdayjobs.com / *workday*    -> 'workday'
  *   anything else / unparseable      -> 'unknown'
  *
@@ -32,6 +33,7 @@ export function detectAtsType(applyUrl: string | null | undefined): AtsType {
 
   if (hostname.includes('greenhouse.io')) return 'greenhouse';
   if (hostname.includes('lever.co')) return 'lever';
+  if (hostname.includes('ashbyhq.com') || hostname.includes('ashby.hq')) return 'ashby';
   if (hostname.includes('myworkdayjobs') || hostname.includes('workday')) {
     return 'workday';
   }

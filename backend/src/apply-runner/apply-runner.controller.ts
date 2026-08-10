@@ -74,6 +74,14 @@ export class ApplyRunnerController {
     return this.approvals.decline(req.user._id.toString(), id, reason);
   }
 
+  @Post('commit')
+  @ApiOperation({ summary: 'Submit applications the candidate has already approved' })
+  async commit(@Body('limit') limit = 10) {
+    // No-op unless AUTO_APPLICATION_ENABLED is on — the gate lives in the runner
+    // so every entry point inherits it.
+    return this.runner.commitApproved(limit || 10);
+  }
+
   @Post('process')
   @ApiOperation({ summary: 'Process pending auto-applied applications (ATS runner)' })
   async process(@Body('limit') limit = 10) {
