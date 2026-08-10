@@ -10,8 +10,12 @@ import { User } from '../schemas/user.schema';
 import { ResumeVersion } from '../schemas/resume-version.schema';
 import { ShareLink } from '../schemas/share-link.schema';
 import { LLMRoutingService } from '../llm/llm-routing.service';
+import { LLMQuotaService } from '../llm/llm-quota.service';
 import { ResumeParserService } from '../resume/resume-parser.service';
 import { StorageService } from '../storage';
+import { AtsParseabilityService } from '../ats/ats-parseability.service';
+import { AtsMatchService } from '../ats/ats-match.service';
+import { HtmlSanitizerService } from '../ingestion/pipeline/html-sanitizer.service';
 
 jest.mock('uuid', () => ({ v4: () => 'test-uuid' }));
 
@@ -30,9 +34,14 @@ const baseProviders = () => [
       getFeatureConfig: jest.fn(),
     },
   },
+  // Dependencies added to ResumeBuilderService while this suite could not load.
+  { provide: LLMQuotaService, useValue: { enforceQuota: jest.fn(), recordUsage: jest.fn() } },
+  AtsParseabilityService,
+  AtsMatchService,
   { provide: ResumeParserService, useValue: {} },
   { provide: JwtService, useValue: { sign: jest.fn() } },
   { provide: StorageService, useValue: {} },
+  HtmlSanitizerService,
 ];
 
 describe('ResumeBuilderService PDF producer (queue vs inline)', () => {

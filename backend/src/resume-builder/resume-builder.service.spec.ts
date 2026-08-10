@@ -7,8 +7,12 @@ import { User } from '../schemas/user.schema';
 import { ResumeVersion } from '../schemas/resume-version.schema';
 import { ShareLink } from '../schemas/share-link.schema';
 import { LLMRoutingService } from '../llm/llm-routing.service';
+import { LLMQuotaService } from '../llm/llm-quota.service';
 import { ResumeParserService } from '../resume/resume-parser.service';
 import { StorageService } from '../storage';
+import { AtsParseabilityService } from '../ats/ats-parseability.service';
+import { AtsMatchService } from '../ats/ats-match.service';
+import { HtmlSanitizerService } from '../ingestion/pipeline/html-sanitizer.service';
 
 // uuid ships as ESM which the repo's jest transform does not process; the
 // value is irrelevant to these tests.
@@ -59,6 +63,14 @@ describe('ResumeBuilderService (storage migration)', () => {
         { provide: getModelToken(User.name), useValue: userModel },
         { provide: getModelToken(ResumeVersion.name), useValue: {} },
         { provide: getModelToken(ShareLink.name), useValue: {} },
+        // Added to the service while this suite could not load. Real
+        // implementations: both are pure computation with no dependencies.
+        { provide: LLMQuotaService, useValue: { enforceQuota: jest.fn(), recordUsage: jest.fn() } },
+        AtsParseabilityService,
+        AtsMatchService,
+        // The REAL sanitizer. It is the stored-XSS boundary, and now that the
+        // jest transform can load sanitize-html there is no reason to stub it.
+        HtmlSanitizerService,
         {
           provide: LLMRoutingService,
           useValue: {

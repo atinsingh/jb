@@ -20,19 +20,6 @@ import { AtsMatchService } from '../ats/ats-match.service';
 // resume-builder.service.spec.ts.
 jest.mock('uuid', () => ({ v4: () => 'test-uuid' }));
 
-// resume-builder.service.ts transitively imports HtmlSanitizerService, which
-// does `import sanitizeHtml = require('sanitize-html')` — sanitize-html's
-// dependency chain pulls in an ESM-only build of htmlparser2 that the repo's
-// jest transform cannot parse (this is the pre-existing, out-of-scope issue
-// that makes resume-builder.service.spec.ts / .controller.spec.ts /
-// .queue.spec.ts fail to load). Mocking the service one level up avoids ever
-// reaching that import, without touching the pre-existing broken suites.
-jest.mock('../ingestion/pipeline/html-sanitizer.service', () => ({
-  HtmlSanitizerService: jest.fn().mockImplementation(() => ({
-    sanitize: (html: any) => html,
-  })),
-}));
-
 const USER_ID = '507f1f77bcf86cd799439011';
 
 // A résumé with two roles, real employers/titles/dates, no digits anywhere

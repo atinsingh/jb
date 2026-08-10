@@ -1,0 +1,29 @@
+{
+  // Test-only compiler settings. Kept separate from tsconfig.json so `nest build`
+  // is completely unaffected by anything here.
+  //
+  // WHY THIS FILE EXISTS: sanitize-html does `require('htmlparser2')`, and
+  // htmlparser2 (with domhandler, domutils, entities, dom-serializer) is
+  // ESM-only — no `require` export condition, no CJS build. Node >= 20.17 can
+  // require() ESM, so the app runs; Jest's CJS loader cannot, so any suite that
+  // transitively imported HtmlSanitizerService failed to LOAD.
+  //
+  // The fix is two halves that only work together:
+  //   1. transformIgnorePatterns (package.json) lets those packages reach the
+  //      transformer instead of being skipped as node_modules.
+  //   2. allowJs (here) lets ts-jest actually transform the .js it now sees.
+  //
+  // Setting only #1 changes the error from "Cannot use import statement" to
+  // "Unexpected token 'export'" — the file arrives at the transformer and is
+  // passed through untouched. That is the trap.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowJs": true,
+    // The ESM deps ship their own .d.ts; we only need them executable.
+    "checkJs": false,
+    "declaration": false,
+    "incremental": false
+  },
+  "include": ["src/**/*", "test/**/*"],
+  "exclude": ["dist"]
+}

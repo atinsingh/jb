@@ -16,14 +16,6 @@ import { AtsMatchService } from '../ats/ats-match.service';
 
 jest.mock('uuid', () => ({ v4: () => 'test-uuid' }));
 
-// See resume-builder.generate.spec.ts — mocking one level up avoids the
-// sanitize-html -> htmlparser2 ESM chain the jest transform cannot parse.
-jest.mock('../ingestion/pipeline/html-sanitizer.service', () => ({
-  HtmlSanitizerService: jest.fn().mockImplementation(() => ({
-    sanitize: (html: any) => html,
-  })),
-}));
-
 const USER_ID = '507f1f77bcf86cd799439011';
 
 /**

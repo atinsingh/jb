@@ -12,12 +12,6 @@ import { StorageService } from '../storage';
 // for the full explanation). Both are mocked the same way the pre-existing
 // resume-builder.controller.spec.ts already mocks uuid.
 jest.mock('uuid', () => ({ v4: () => 'test-uuid' }));
-jest.mock('../ingestion/pipeline/html-sanitizer.service', () => ({
-  HtmlSanitizerService: jest.fn().mockImplementation(() => ({
-    sanitize: (html: any) => html,
-  })),
-}));
-
 describe('ResumeBuilderController — generate routes', () => {
   let controller: ResumeBuilderController;
 

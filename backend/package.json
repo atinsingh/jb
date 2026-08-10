@@ -125,8 +125,17 @@
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
+      "^.+\\.(t|j)s$": [
+        "ts-jest",
+        {
+          "tsconfig": "<rootDir>/../tsconfig.spec.json"
+        }
+      ]
     },
+    "transformIgnorePatterns": [
+      "/node_modules/\\.pnpm/(?!(htmlparser2|domhandler|domutils|dom-serializer|entities|domelementtype)@)"
+    ],
+    "workerIdleMemoryLimit": "512MB",
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],
