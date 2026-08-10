@@ -15,6 +15,7 @@ import {
   createResume,
 } from '@/services/resumeApi';
 import { LoadingState, EmptyState, ErrorState } from '@/components/app/AppStates';
+import AtsPanel from '@/components/app/AtsPanel';
 import {
   TEMPLATES,
   ACCENTS,
@@ -564,28 +565,20 @@ export default function AppResume() {
                   <DesignPanel design={design} onChange={updateDesign} />
                 ) : (
                   <>
-                {/* COMPLETENESS or ATS SCORE */}
-                {data.atsScore > 0 ? (
-                  <div
-                    style={{
-                      background: '#FFFEFB',
-                      border: '1px solid #E6DECF',
-                      borderRadius: 16,
-                      padding: 20,
-                      marginBottom: 18,
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                      <ScoreRing value={data.atsScore} />
-                      <div>
-                        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 3 }}>ATS score: Excellent</div>
-                        <div style={{ fontSize: 13, color: '#5A544A' }}>
-                          Clears automated screening for 9 of 10 roles.
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
+                {/* ATS COMPATIBILITY — real score, real findings, real fixes.
+                    Replaces a panel that read "Excellent · clears automated
+                    screening for 9 of 10 roles" at every score, including bad
+                    ones, and which nothing ever populated. */}
+                {activeResumeId && (
+                  <AtsPanel
+                    resumeId={activeResumeId}
+                    initialScore={typeof data.atsScore === 'number' ? data.atsScore : null}
+                    initialReport={data.atsReport || null}
+                  />
+                )}
+
+                {/* COMPLETENESS */}
+                {data.atsScore > 0 ? null : (
                   <div
                     style={{
                       background:
@@ -1154,6 +1147,11 @@ function mergeResumeDoc(base, doc) {
 
   if (typeof doc.atsScore === 'number') next.atsScore = doc.atsScore;
   else if (typeof content.atsScore === 'number') next.atsScore = content.atsScore;
+
+  // Carry the findings through so the panel can show them without forcing a
+  // re-check on every page load — the score is recomputed server-side on save.
+  if (doc.atsReport) next.atsReport = doc.atsReport;
+  else if (content.atsReport) next.atsReport = content.atsReport;
 
   if (content.summary || content.profile || content.profileSummary)
     next.summary = content.summary || content.profile || content.profileSummary;

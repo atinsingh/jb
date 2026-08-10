@@ -10,7 +10,7 @@ import { LLMRoutingService, LLMFeature } from '../llm/llm-routing.service';
 import { LLMQuotaService } from '../llm/llm-quota.service';
 import { ResumeParserService } from '../resume/resume-parser.service';
 import { ResumeService } from '../resume/resume.service';
-import { CreateResumeDto, RegenerateSectionDto } from './dto/create-resume.dto';
+import { CreateResumeDto, RegenerateSectionDto, DEFAULT_RESUME_TEMPLATE } from './dto/create-resume.dto';
 import { GenerateResumeDto, GenerateSectionDto } from './dto/generate-resume.dto';
 import { StorageService } from '../storage';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
@@ -134,7 +134,7 @@ export class ResumeBuilderService {
 
     let resumeData: any = {
       userId: new Types.ObjectId(userId),
-      template: createDto.template,
+      template: createDto.template || DEFAULT_RESUME_TEMPLATE,
       name: createDto.name || 'Untitled Resume',
     };
 
@@ -153,7 +153,27 @@ export class ResumeBuilderService {
       };
     }
 
+    // Explicitly supplied content wins over the profile import: the caller
+    // accepted THIS document, and silently replacing it with profile defaults
+    // would discard the tailoring they just reviewed.
+    for (const field of ['summary', 'experience', 'skills', 'education'] as const) {
+      if (createDto[field] !== undefined) resumeData[field] = createDto[field];
+    }
+
+    // Provenance — how this document came to exist, so a generated résumé stays
+    // auditable after the fact.
+    if (createDto.targetRole) resumeData.targetRole = createDto.targetRole;
+    if (createDto.targetCompany) resumeData.targetCompany = createDto.targetCompany;
+    if (createDto.source) {
+      resumeData.source = createDto.source;
+      resumeData.creationMethod = createDto.source;
+    }
+
     const resume = new this.resumeModel(this.sanitizeResumeHtml(resumeData));
+
+    // Score on creation so the library's ring is never blank for a new résumé.
+    this.applyAtsScore(resume as any);
+
     return resume.save();
   }
 

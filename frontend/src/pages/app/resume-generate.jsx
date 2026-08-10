@@ -52,6 +52,10 @@ export default function AppResumeGenerate() {
   const [draft, setDraft] = useState(null); // { summary, experience[], skills[], keywords[], coverage }
 
   // ---- acceptance state ----
+  // Save-to-library outcome. Previously the save was fire-and-forget behind a
+  // <Link>, so the candidate always saw "success" — including when it 400'd.
+  const [saveState, setSaveState] = useState({ status: 'idle', message: '' });
+
   const [aSummary, setASummary] = useState(false);
   const [aExp, setAExp] = useState(false);
   const [aSkills, setASkills] = useState(false);
@@ -161,18 +165,35 @@ export default function AppResumeGenerate() {
     }
   };
 
-  // "Save to library" — fire-and-forget; navigation handled by the Link.
-  const handleSave = () => {
-    saveGeneratedResume({
-      name: `${role} · Stripe`,
-      role,
-      jobDescription: jd,
-      tone,
-      seniority,
-      summary: summaryText,
-      experience: expBullets,
-      skills,
-    }).catch(() => {});
+  /**
+   * "Save to library".
+   *
+   * Two things were wrong here and both were invisible. The payload carried
+   * fields the create DTO does not accept (role/jobDescription/tone/seniority)
+   * and omitted the one it required, and the API runs with
+   * `forbidNonWhitelisted`, so every save was a 400. The empty `.catch()` then
+   * swallowed it, and the candidate was navigated away as though it had worked.
+   *
+   * Now: send exactly what the contract accepts, and surface the outcome.
+   */
+  const handleSave = async () => {
+    setSaveState({ status: 'saving', message: '' });
+    try {
+      await saveGeneratedResume({
+        name: role || 'Generated résumé',
+        summary: summaryText,
+        experience: expBullets,
+        skills,
+        targetRole: role || undefined,
+        source: 'generated',
+      });
+      setSaveState({ status: 'saved', message: 'Saved to your library.' });
+    } catch (e) {
+      setSaveState({
+        status: 'error',
+        message: e?.message || 'Could not save this résumé. Nothing was lost — try again.',
+      });
+    }
   };
 
   const isInput = phase === 'input';
@@ -462,12 +483,53 @@ export default function AppResumeGenerate() {
                 </div>
 
                 {/* FOOTER */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 24 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 24, flexWrap: 'wrap' }}>
                   <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, color: '#8A8378' }}>{acceptedCount} / 3 sections accepted</span>
                   <div style={{ flex: 1 }} />
-                  <Link href={appRoute('App Resume Library.dc.html')} onClick={handleSave} style={{ fontFamily: 'inherit', fontSize: 14, fontWeight: 600, color: '#1B1A16', background: '#FFFEFB', border: '1px solid #D9D0BE', borderRadius: 999, padding: '13px 20px', textDecoration: 'none' }}>Save to library</Link>
+
+                  {/* A button, not a <Link>: navigating while the save is in
+                      flight is what hid the failure for so long. */}
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={saveState.status === 'saving'}
+                    style={{
+                      fontFamily: 'inherit', fontSize: 14, fontWeight: 600, color: '#1B1A16',
+                      background: '#FFFEFB', border: '1px solid #D9D0BE', borderRadius: 999,
+                      padding: '13px 20px',
+                      cursor: saveState.status === 'saving' ? 'wait' : 'pointer',
+                    }}
+                  >
+                    {saveState.status === 'saving' ? 'Saving…' : 'Save to library'}
+                  </button>
+
                   <Link href={appRoute('App Resume.dc.html')} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 14.5, fontWeight: 700, color: '#0C2C1C', background: '#1FA463', borderRadius: 999, padding: '13px 22px', textDecoration: 'none' }}>Open in editor →</Link>
                 </div>
+
+                {saveState.status !== 'idle' && saveState.status !== 'saving' && (
+                  <div
+                    role="status"
+                    style={{
+                      marginTop: 12,
+                      padding: '10px 13px',
+                      borderRadius: 10,
+                      fontSize: 13,
+                      background: saveState.status === 'saved' ? '#EAF6EE' : '#FDE4E0',
+                      border: `1px solid ${saveState.status === 'saved' ? '#CDE9D6' : '#F0C4BB'}`,
+                      color: saveState.status === 'saved' ? '#157A49' : '#B23A22',
+                    }}
+                  >
+                    {saveState.message}
+                    {saveState.status === 'saved' && (
+                      <>
+                        {' '}
+                        <Link href={appRoute('App Resume Library.dc.html')} style={{ fontWeight: 700, color: '#157A49' }}>
+                          Open your library →
+                        </Link>
+                      </>
+                    )}
+                  </div>
+                )}
                 </>
                 )}
               </div>
