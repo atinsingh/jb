@@ -15,6 +15,7 @@ import {
   createResume,
 } from '@/services/resumeApi';
 import { LoadingState, EmptyState, ErrorState } from '@/components/app/AppStates';
+import Link from 'next/link';
 import AtsPanel from '@/components/app/AtsPanel';
 import {
   TEMPLATES,
@@ -435,16 +436,35 @@ export default function AppResume() {
                 color: '#8A8378',
               }}
             >
+              {/* `idle` used to fall through to "Saved · just now", so a résumé
+                  that had never been written — including a brand-new one with
+                  nothing in the database — displayed as saved. A save indicator
+                  that reports success for a save that never happened is worse
+                  than having none. Idle now says so plainly. */}
               <span
                 style={{
                   width: 6,
                   height: 6,
                   borderRadius: '50%',
-                  background: saveState === 'error' ? '#B4472A' : saveState === 'saving' ? '#C9622E' : '#1FA463',
-                  boxShadow: '0 0 0 3px rgba(31,164,99,0.18)',
+                  background:
+                    saveState === 'error'
+                      ? '#B4472A'
+                      : saveState === 'saving'
+                        ? '#C9622E'
+                        : saveState === 'saved'
+                          ? '#1FA463'
+                          : '#B8B0A0',
+                  boxShadow:
+                    saveState === 'saved' ? '0 0 0 3px rgba(31,164,99,0.18)' : 'none',
                 }}
               />
-              {saveState === 'saving' ? 'Saving…' : saveState === 'error' ? 'Save failed' : `Saved · ${savedAt}`}
+              {saveState === 'saving'
+                ? 'Saving…'
+                : saveState === 'error'
+                  ? 'Save failed — your changes are not stored'
+                  : saveState === 'saved'
+                    ? `Saved · ${savedAt}`
+                    : 'Draft — not saved yet'}
             </span>
 
             {/* Upload (parse) — hidden file input behind a styled label */}
@@ -491,8 +511,13 @@ export default function AppResume() {
             >
               {exporting ? 'Exporting…' : 'Export PDF'}
             </button>
-            <button
-              type="button"
+            {/* This was a <button> with no onClick — the loudest control on the
+                résumé editor did nothing at all, while the AI generator it
+                should open (/app/resume-generate) was reachable only by typing
+                the URL. Now it goes there, carrying the résumé so the generator
+                grounds itself in this document rather than starting blank. */}
+            <Link
+              href={`/app/resume-generate${activeResumeId ? `?source=${activeResumeId}` : ''}`}
               className="jb-btn-green"
               style={{
                 display: 'inline-flex',
@@ -507,10 +532,11 @@ export default function AppResume() {
                 borderRadius: 999,
                 padding: '9px 16px',
                 cursor: 'pointer',
+                textDecoration: 'none',
               }}
             >
               Tailor to a job ✦
-            </button>
+            </Link>
           </header>
 
           {/* NOTICE */}
