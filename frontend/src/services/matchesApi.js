@@ -67,10 +67,18 @@ export const getJobRecommendations = async (minScore) => {
 };
 
 // GET /api/matching/eligible-jobs -> geographically/legally eligible jobs (Stage 1)
-export const getEligibleJobs = async ({ keywords = '', limit = 40 } = {}) => {
+//
+// `profileId` scopes the search to one job profile's target countries. It used
+// to be missing from this destructure, so callers that passed it had it
+// silently discarded — the page sent it, the controller accepted it, the
+// service resolved it, and this helper dropped it on the floor. The visible
+// symptom was a "United States only" role showing under a profile targeting
+// Canada, with no error anywhere.
+export const getEligibleJobs = async ({ keywords = '', limit = 40, profileId } = {}) => {
   const params = new URLSearchParams();
   if (keywords) params.append('keywords', keywords);
   if (limit) params.append('limit', limit);
+  if (profileId) params.append('profileId', profileId);
   const qs = params.toString();
   return apiCall(`/api/matching/eligible-jobs${qs ? `?${qs}` : ''}`);
 };

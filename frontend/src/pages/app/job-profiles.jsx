@@ -471,36 +471,47 @@ export default function JobProfilesPage() {
                       <div style={{ minWidth: 0 }}>
                         <h3 style={{ fontSize: 15.5, fontWeight: 700, color: '#1B1A16', margin: 0 }}>
                           {p.profileName}
-                          {p.active && (
-                            <span
-                              style={{
-                                marginLeft: 9,
-                                fontSize: 11,
-                                fontWeight: 700,
-                                color: '#157A49',
-                                background: '#EAF6EE',
-                                border: '1px solid #CDE9D6',
-                                borderRadius: 999,
-                                padding: '2px 8px',
-                              }}
-                            >
-                              ACTIVE
-                            </span>
-                          )}
+                          {/* An inactive profile does nothing at all, so it says
+                              so plainly. Previously only ACTIVE was rendered —
+                              an idle profile looked identical to a running one
+                              apart from a button label, while still showing a
+                              confident AUTO-PREPARE badge. */}
+                          <span
+                            style={{
+                              marginLeft: 9,
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: p.active ? '#157A49' : '#6B655A',
+                              background: p.active ? '#EAF6EE' : '#F0EDE4',
+                              border: `1px solid ${p.active ? '#CDE9D6' : '#DED8C9'}`,
+                              borderRadius: 999,
+                              padding: '2px 8px',
+                            }}
+                          >
+                            {p.active ? 'ACTIVE' : 'PAUSED'}
+                          </span>
                           {p.autoApply && (
                             <span
+                              title={
+                                p.active
+                                  ? 'Applications are prepared for your approval'
+                                  : 'Switched on, but nothing runs while this profile is paused'
+                              }
                               style={{
                                 marginLeft: 6,
                                 fontSize: 11,
                                 fontWeight: 700,
-                                color: '#8A6100',
-                                background: '#FFF3D9',
-                                border: '1px solid #F0DDAE',
+                                // Muted while paused: the setting is on, but it
+                                // is not doing anything, and the badge must not
+                                // imply otherwise.
+                                color: p.active ? '#8A6100' : '#8A8375',
+                                background: p.active ? '#FFF3D9' : '#F0EDE4',
+                                border: `1px solid ${p.active ? '#F0DDAE' : '#DED8C9'}`,
                                 borderRadius: 999,
                                 padding: '2px 8px',
                               }}
                             >
-                              AUTO-PREPARE
+                              AUTO-PREPARE{p.active ? '' : ' (IDLE)'}
                             </span>
                           )}
                         </h3>

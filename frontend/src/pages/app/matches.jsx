@@ -140,6 +140,13 @@ const normalizeMatch = (m, i) => {
     salary: formatSalary(job),
     match: score != null ? `${Math.round(score)}%` : null,
     matchNum: score != null ? Math.round(score) : null,
+    // The scorer weights skills heavily, so a posting that listed none produces
+    // a score driven almost entirely by defaults. Flagged so the UI can present
+    // it as an estimate rather than a measurement.
+    lowConfidence:
+      score != null &&
+      !(m.matchedSkills || []).length &&
+      !(Array.isArray(job.skills) ? job.skills : []).length,
     workplaceType: job.workplaceType || m.workplaceType || null,
     scrapedAt: job.scrapedAt || m.scrapedAt || null,
     matchLabel: m.matchLabel || null,
@@ -201,8 +208,17 @@ export default function AppMatches() {
       let raw = [];
       let count = null;
 
-      // 1) Personalized matches (pre-computed), when available.
-      if (!opts.forceBrowse) {
+      // 1) Pre-computed matches — ONLY when no profile is driving this view.
+      //
+      // `/matching/matches` returns stored JobMatch rows and has no geography
+      // awareness: it does not know about target countries and ignores
+      // profileId. Because it used to run first and the eligible path only ran
+      // when it came back empty, a candidate with ANY stored matches silently
+      // bypassed the entire geo gate — observed live as a "United States only"
+      // role sitting in a profile that targets Canada.
+      //
+      // Anything geo-sensitive therefore goes through Stage-1 eligibility below.
+      if (!opts.forceBrowse && !opts.profileId) {
         try {
           const res = await getMyMatches({ minScore: 60 });
           raw = res.matches || res.data || [];
@@ -331,7 +347,17 @@ export default function AppMatches() {
               />
               <span className="font-mono text-[11px] text-jb-ink-ghost border border-jb-line-3 rounded-[5px] px-[5px] py-px">↵</span>
             </div>
-            <Link href={appRoute('App Auto-Apply.dc.html')} className="inline-flex items-center gap-[7px] bg-jb-green text-jb-green-ink text-[13.5px] font-bold px-4 py-2.5 rounded-full no-underline hover:bg-[#1b9159]">Auto-apply all ✦</Link>
+            {/* Was "Auto-apply all ✦" — the loudest control on the page promised
+                exactly the bulk-blast behaviour this product positions against,
+                and linked to a settings page rather than applying to anything.
+                Now it describes its destination, and is styled as secondary so
+                it stops competing with the per-role Apply action. */}
+            <Link
+              href={appRoute('App Auto-Apply.dc.html')}
+              className="inline-flex items-center gap-[7px] border border-jb-line-2 text-jb-ink text-[13.5px] font-semibold px-4 py-2.5 rounded-full no-underline hover:bg-jb-surface-2"
+            >
+              Auto-apply settings
+            </Link>
           </header>
 
           <div className="px-8 pt-[30px] pb-12 w-full">
@@ -415,10 +441,25 @@ export default function AppMatches() {
                           </div>
                           <div className="flex-shrink-0 flex flex-col items-end gap-3.5">
                             <div className="text-right">
+                              {/* A score derived from a posting that listed no
+                                  skills is a default, not a measurement. Showing
+                                  a confident "60% match" beside our own note that
+                                  "skills weren't listed on this posting" is false
+                                  precision, so low-confidence scores are rendered
+                                  muted and labelled as an estimate. */}
                               {job.match ? (
                                 <>
-                                  <div className="font-mono text-2xl font-semibold text-jb-green-text leading-none">{job.match}</div>
-                                  <div className="text-[11px] text-jb-ink-subtle font-mono">match</div>
+                                  <div
+                                    className={`font-mono text-2xl font-semibold leading-none ${
+                                      job.lowConfidence ? 'text-jb-ink-subtle' : 'text-jb-green-text'
+                                    }`}
+                                    title={job.lowConfidence ? 'This posting listed no skills, so the score is a rough estimate.' : undefined}
+                                  >
+                                    {job.match}
+                                  </div>
+                                  <div className="text-[11px] text-jb-ink-subtle font-mono">
+                                    {job.lowConfidence ? 'estimate' : 'match'}
+                                  </div>
                                 </>
                               ) : job.source ? (
                                 <span className="font-mono text-[11px] font-semibold text-jb-ink-subtle bg-[#f4efe4] px-[9px] py-1 rounded-full">via {job.source}</span>
@@ -447,6 +488,18 @@ export default function AppMatches() {
                               <div className="flex items-center gap-2.5 flex-wrap">
                                 <EligBadge status={job.eligibility.status} label={job.eligibility.label} />
                                 <span className="text-[13px] text-jb-ink-muted">{job.eligibility.geographyExplanation}</span>
+                                {/* "Eligible with conditions" without naming the
+                                    condition makes the candidate guess. The
+                                    engine already produces a reason per soft
+                                    finding — show it. */}
+                                {(job.eligibility.reasons || [])
+                                  .filter((r) => r.severity === 'soft')
+                                  .slice(0, 1)
+                                  .map((r) => (
+                                    <span key={r.code} className="text-[13px] text-[#8A6100]">
+                                      — {r.message}
+                                    </span>
+                                  ))}
                               </div>
                             )}
                             {job.reason && (
