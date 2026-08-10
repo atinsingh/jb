@@ -64,6 +64,16 @@ export function introspectFormInPage(): any[] {
   const seenRadioGroups: Record<string, boolean> = {};
   const controls = Array.from(document.querySelectorAll('input, select, textarea')) as any[];
 
+  /**
+   * A selector that actually re-finds this control.
+   *
+   * Modern Greenhouse and Ashby render controls with an `id` and no `name`, so
+   * a `[name="..."]` selector matches nothing. Prefer the attribute the element
+   * really has.
+   */
+  const selectorFor = (el: any, key: string, prefix = ''): string =>
+    el.name ? `${prefix}[name="${key}"]` : `#${key}`;
+
   for (const el of controls) {
     const tag = (el.tagName || '').toLowerCase();
     const type = (el.type || '').toLowerCase();
@@ -91,7 +101,7 @@ export function introspectFormInPage(): any[] {
         type: 'radio',
         required: group.some((r) => isRequired(r, groupLabel)),
         options: group.map((r) => ({ value: r.value, label: labelFor(r) || r.value })),
-        selector: `input[type="radio"][name="${name}"]`,
+        selector: selectorFor(el, name, 'input[type="radio"]'),
       });
       continue;
     }
@@ -110,7 +120,7 @@ export function introspectFormInPage(): any[] {
         type: 'select',
         required: isRequired(el, label),
         options,
-        selector: `select[name="${name}"]`,
+        selector: selectorFor(el, name, 'select'),
       });
       continue;
     }
@@ -121,7 +131,7 @@ export function introspectFormInPage(): any[] {
         label,
         type: 'file',
         required: isRequired(el, label),
-        selector: `input[name="${name}"]`,
+        selector: selectorFor(el, name, 'input'),
       });
       continue;
     }
@@ -132,7 +142,7 @@ export function introspectFormInPage(): any[] {
         label,
         type: 'checkbox',
         required: isRequired(el, label),
-        selector: `input[type="checkbox"][name="${name}"]`,
+        selector: selectorFor(el, name, 'input[type="checkbox"]'),
       });
       continue;
     }
@@ -144,7 +154,7 @@ export function introspectFormInPage(): any[] {
       type: tag === 'textarea' ? 'textarea' : type || 'text',
       required: isRequired(el, label),
       maxLength,
-      selector: `${tag}[name="${name}"]`,
+      selector: selectorFor(el, name, tag),
     });
   }
 
@@ -159,6 +169,47 @@ export function introspectFormInPage(): any[] {
 export function fillFormInPage(answers: Record<string, any>): any {
   const filled: string[] = [];
   const skipped: Array<{ name: string; reason: string }> = [];
+
+  /**
+   * Resolve a field key to a control.
+   *
+   * `introspect` keys fields as `el.name || el.id`, so the key may be either.
+   * Modern Greenhouse (and Ashby) render React forms where controls carry an
+   * `id` and NO `name` at all — a live dry run against real postings scored 5%
+   * coverage because every lookup here was `[name="..."]` and missed.
+   */
+  function findControl(key: string): any {
+    const byName = document.querySelector(
+      `select[name="${key}"], textarea[name="${key}"], input[name="${key}"]`,
+    );
+    if (byName) return byName;
+
+    try {
+      const escaped = (window as any).CSS?.escape ? (window as any).CSS.escape(key) : key;
+      const byId = document.getElementById(key) || document.querySelector(`#${escaped}`);
+      if (byId && /^(INPUT|SELECT|TEXTAREA)$/.test((byId as any).tagName)) return byId;
+    } catch {
+      /* invalid selector — fall through */
+    }
+    return null;
+  }
+
+  /** Radio groups: by shared name, else by a shared id prefix. */
+  function findRadios(key: string): any[] {
+    const byName = Array.from(
+      document.querySelectorAll(`input[type="radio"][name="${key}"]`),
+    ) as any[];
+    if (byName.length) return byName;
+
+    const el = document.getElementById(key) as any;
+    if (el && (el.type || '').toLowerCase() === 'radio') {
+      // An id-only radio: gather any siblings sharing its group container.
+      const group = el.closest('fieldset, [role="radiogroup"], .field, [class*="question"]');
+      if (group) return Array.from(group.querySelectorAll('input[type="radio"]')) as any[];
+      return [el];
+    }
+    return [];
+  }
 
   function setNativeValue(el: any, value: string) {
     // React-controlled inputs ignore a plain `.value =`, so go through the
@@ -175,9 +226,7 @@ export function fillFormInPage(answers: Record<string, any>): any {
     const value = answers[name];
     if (value === undefined || value === null) continue;
 
-    const radios = Array.from(
-      document.querySelectorAll(`input[type="radio"][name="${name}"]`),
-    ) as any[];
+    const radios = findRadios(name);
 
     if (radios.length) {
       const hit = radios.find((r) => String(r.value) === String(value));
@@ -190,9 +239,7 @@ export function fillFormInPage(answers: Record<string, any>): any {
       continue;
     }
 
-    const el = document.querySelector(
-      `select[name="${name}"], textarea[name="${name}"], input[name="${name}"]`,
-    ) as any;
+    const el = findControl(name);
 
     if (!el) {
       skipped.push({ name, reason: 'control not found' });

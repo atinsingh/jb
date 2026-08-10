@@ -136,6 +136,23 @@ async function run(): Promise<void> {
       const page = await browser.newPage();
       try {
         const schema = await adapter.introspect({ page, applyUrl: url });
+
+        // A form with no fields is a TOTAL introspection failure, not a perfect
+        // score. `fill` divides by the number of fields it was asked to fill, so
+        // zero fields yields coverage 1.0 — which once made this harness report
+        // PASS on pages where it had found nothing at all. A gate that cannot
+        // fail is worse than no gate: it manufactures the evidence used to turn
+        // real submissions on.
+        if (schema.fields.length === 0) {
+          results.push({
+            url,
+            ok: false,
+            atsType: adapter.atsType,
+            error: 'no form fields found — the page did not render a form we can read',
+          });
+          continue;
+        }
+
         const answers = syntheticAnswers(schema.fields);
         const report = await adapter.fill({ page, applyUrl: url }, answers, {});
 

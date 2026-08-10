@@ -50,6 +50,16 @@ export class GreenhouseMonitorService {
             source: 'Greenhouse',
             externalUrl: job.absolute_url,
             canonicalUrl: job.absolute_url,
+            // The Greenhouse-hosted form, which is NOT where absolute_url
+            // points for the many employers who embed the board on their own
+            // domain (Stripe's absolute_url is stripe.com/careers/...).
+            //
+            // A live dry run surfaced this: detectAtsType keys off the hostname,
+            // so those postings resolved to 'unknown' and could never be
+            // auto-applied. `originalApplyUrl` takes precedence in
+            // resolveApplyUrl, so recording the canonical board URL here is what
+            // makes self-hosted employers reachable.
+            originalApplyUrl: `https://job-boards.greenhouse.io/${board}/jobs/${job.id}`,
             externalId,
             scrapedAt: new Date(),
             skills: extractSkills(`${job.title}\n${description}`),
