@@ -5,6 +5,7 @@ import { Application, ApplicationDocument } from '../schemas/application.schema'
 import { Resume, ResumeDocument } from '../schemas/resume.schema';
 import { Job, JobDocument } from '../schemas/job.schema';
 import { InterviewChatService } from '../llm/features/interview-chat.service';
+import { SessionContextBuilderService } from './services/session-context-builder.service';
 import { LLMChatMessage } from '../llm/interfaces/llm-provider.interface';
 import {
   InterviewSession,
@@ -31,7 +32,136 @@ export class InterviewBuddyService {
     @InjectModel(InterviewTurn.name)
     private interviewTurnModel: Model<InterviewTurnDocument>,
     private interviewChatService: InterviewChatService,
+    private readonly contextBuilder: SessionContextBuilderService,
   ) {}
+
+  /**
+   * Create a session and build its context pack.
+   *
+   * The pack is built ONCE here rather than per question: it is the expensive
+   * part (résumé + JD + role), and rebuilding it mid-interview would spend the
+   * latency budget the copilot exists to protect.
+   */
+  async createSession(
+    userId: string,
+    dto: {
+      mode: 'PRACTICE' | 'CONSENT' | 'LIVE_NOTES';
+      roleTitle: string;
+      companyName?: string;
+      resumeVersionId?: string;
+      roleFamily?: any;
+      seniority?: any;
+      interviewType?: any;
+    },
+  ) {
+    const session = await this.interviewSessionModel.create({
+      userId: new Types.ObjectId(userId),
+      mode: dto.mode,
+      roleTitle: dto.roleTitle,
+      companyName: dto.companyName,
+      resumeVersionId: dto.resumeVersionId ? new Types.ObjectId(dto.resumeVersionId) : undefined,
+      status: 'CREATED',
+      // Audio only ever comes from a shared browser tab. There is deliberately
+      // no captureMode meaning "stored audio" — none is ever kept.
+      captureMode: dto.mode === 'LIVE_NOTES' ? 'none' : 'tab_audio',
+      retainTranscript: false,
+    });
+
+    const contextPack = await this.contextBuilder.buildContextPack(
+      userId,
+      String(session._id),
+      dto.mode,
+      dto.roleTitle,
+      dto.resumeVersionId,
+      undefined,
+      dto.companyName,
+      dto.roleFamily,
+      dto.seniority,
+      dto.interviewType,
+    );
+
+    session.contextPack = contextPack as any;
+    await session.save();
+
+    return { session };
+  }
+
+  /**
+   * Record the candidate's consent acknowledgement, and their retention choice.
+   *
+   * Until this is set, `LiveSessionService.start` refuses to open a microphone.
+   */
+  async acknowledgeConsent(
+    sessionId: string,
+    userId: string,
+    params: { acknowledged: boolean; retainTranscript?: boolean },
+  ) {
+    const found = await this.getSession(sessionId, userId);
+    if (!found) throw new NotFoundException('Interview session not found');
+
+    if (!params.acknowledged) {
+      throw new BadRequestException('Capture cannot start without your acknowledgement.');
+    }
+
+    await this.interviewSessionModel
+      .updateOne(
+        { _id: sessionId },
+        {
+          $set: {
+            consentAcknowledgedAt: new Date(),
+            retainTranscript: !!params.retainTranscript,
+          },
+        },
+      )
+      .exec();
+
+    return {
+      sessionId,
+      consentAcknowledged: true,
+      retainTranscript: !!params.retainTranscript,
+    };
+  }
+
+  /** Move a session to IN_PROGRESS. */
+  async startSession(sessionId: string, userId: string) {
+    const found = await this.getSession(sessionId, userId);
+    if (!found) throw new NotFoundException('Interview session not found');
+
+    await this.interviewSessionModel
+      .updateOne({ _id: sessionId }, { $set: { status: 'IN_PROGRESS', startedAt: new Date() } })
+      .exec();
+
+    return { sessionId, status: 'IN_PROGRESS' };
+  }
+
+  /**
+   * End a session.
+   *
+   * When the candidate did not opt into retention, the turns are deleted here.
+   * Raw audio never existed to delete — it is transcribed in flight and dropped —
+   * but the transcript is written as turns during the session, so this is where
+   * "not retained" is actually honoured.
+   */
+  async completeSession(sessionId: string, userId: string) {
+    const found = await this.getSession(sessionId, userId);
+    if (!found) throw new NotFoundException('Interview session not found');
+
+    const retain = !!(found.session as any).retainTranscript;
+    let discardedTurns = 0;
+
+    if (!retain) {
+      const result = await this.interviewTurnModel
+        .deleteMany({ sessionId: new Types.ObjectId(sessionId) })
+        .exec();
+      discardedTurns = result?.deletedCount ?? 0;
+    }
+
+    await this.interviewSessionModel
+      .updateOne({ _id: sessionId }, { $set: { status: 'COMPLETED', endedAt: new Date() } })
+      .exec();
+
+    return { sessionId, status: 'COMPLETED', transcriptRetained: retain, discardedTurns };
+  }
 
   async getSession(sessionId: string, userId: string) {
     const session = await this.interviewSessionModel

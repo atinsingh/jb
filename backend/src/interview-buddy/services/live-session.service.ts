@@ -226,6 +226,23 @@ export class LiveSessionService {
     }
   }
 
+  /**
+   * Coach on a question the candidate typed themselves.
+   *
+   * The fallback path that keeps the product useful when transcription is
+   * unavailable or wrong — the candidate types what was asked and still gets
+   * grounded talking points. This is what "degrade honestly" means in practice:
+   * the feature narrows, it does not silently stop working.
+   */
+  async askManually(
+    sessionId: string,
+    questionText: string,
+    emit: (e: LiveEvent) => void,
+  ): Promise<void> {
+    if (!this.active.has(sessionId)) return;
+    await this.onQuestion(sessionId, questionText, emit);
+  }
+
   /** Whether this session's transcript may be written down. */
   shouldPersistTranscript(sessionId: string): boolean {
     return !!this.active.get(sessionId)?.retainTranscript;

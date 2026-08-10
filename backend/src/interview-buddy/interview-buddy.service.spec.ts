@@ -17,6 +17,7 @@ describe('InterviewBuddyService.chat (llm migration)', () => {
       {} as any,
       {} as any,
       interviewChat as any,
+      {} as any, // SessionContextBuilderService — only used by createSession
     );
   });
 

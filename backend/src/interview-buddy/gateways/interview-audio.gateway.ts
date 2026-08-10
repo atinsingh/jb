@@ -8,18 +8,32 @@ import {
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger, UseGuards } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InterviewBuddyService } from '../interview-buddy.service';
-import { STTProvider } from '../interfaces/stt-provider.interface';
-import { Inject } from '@nestjs/common';
-import { TurnType } from '../../schemas/interview-turn.schema';
+import { LiveSessionService } from '../services/live-session.service';
+import type { SpeechSource } from '../interfaces/streaming-stt.interface';
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
   sessionId?: string;
 }
 
+/**
+ * Audio transport for the live interview copilot.
+ *
+ * Deliberately thin: it authenticates, authorises, and moves bytes. Every rule
+ * that matters — consent, retention, "raw audio is never persisted", honest
+ * degradation when transcription is unconfigured — lives in
+ * {@link LiveSessionService}, where it is unit-tested without sockets.
+ *
+ * SECURITY: an unauthenticated socket that accepted frames would be an open
+ * transcription relay billed to us, so both the JWT and session ownership are
+ * verified before a single frame is taken.
+ *
+ * AUDIO RETENTION: frames pass through `pushAudio` to the vendor and the
+ * reference is dropped. There is no code path here that writes audio anywhere.
+ */
 @WebSocketGateway({
   namespace: '/interview-sessions',
   cors: {
@@ -27,207 +41,135 @@ interface AuthenticatedSocket extends Socket {
     credentials: true,
   },
 })
-export class InterviewAudioGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
-{
+export class InterviewAudioGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
   private readonly logger = new Logger(InterviewAudioGateway.name);
-  private readonly activeConnections = new Map<string, AuthenticatedSocket>();
 
   constructor(
     private readonly jwtService: JwtService,
     private readonly interviewBuddyService: InterviewBuddyService,
-    @Inject('STTProvider') private readonly sttProvider: STTProvider,
+    private readonly liveSessions: LiveSessionService,
   ) {}
 
   async handleConnection(client: AuthenticatedSocket) {
     try {
-      // Extract token from handshake auth or query
-      const token =
-        client.handshake.auth?.token ||
-        client.handshake.query?.token?.toString();
-
+      const token = client.handshake.auth?.token || client.handshake.query?.token?.toString();
       if (!token) {
-        this.logger.warn(`Connection rejected: No token provided`);
+        this.logger.warn('Connection rejected: no token');
         client.disconnect();
         return;
       }
 
-      // Verify JWT token
       const payload = this.jwtService.verify(token);
       client.userId = payload.sub || payload._id || payload.id;
 
-      // Extract session ID from query
       const sessionId = client.handshake.query?.sessionId?.toString();
       if (!sessionId) {
-        this.logger.warn(`Connection rejected: No sessionId provided`);
+        this.logger.warn('Connection rejected: no sessionId');
         client.disconnect();
         return;
       }
-
       client.sessionId = sessionId;
 
-      // Verify user owns the session
-      try {
-        const session = await this.interviewBuddyService.getSession(
-          sessionId,
-          client.userId,
-        );
-        if (!session) {
-          this.logger.warn(
-            `Connection rejected: Session ${sessionId} not found or access denied`,
-          );
-          client.disconnect();
-          return;
-        }
-
-        // Check if session is in Practice or Consent mode
-        if (
-          session.session.mode !== 'PRACTICE' &&
-          session.session.mode !== 'CONSENT'
-        ) {
-          this.logger.warn(
-            `Connection rejected: Audio streaming not allowed for mode ${session.session.mode}`,
-          );
-          client.disconnect();
-          return;
-        }
-      } catch (error) {
-        this.logger.error(`Error verifying session: ${error.message}`);
+      // Ownership: getSession is scoped by userId and throws otherwise.
+      const found = await this.interviewBuddyService.getSession(sessionId, client.userId);
+      const session: any = (found as any)?.session;
+      if (!session) {
+        this.logger.warn(`Connection rejected: session ${sessionId} not found for this user`);
         client.disconnect();
         return;
       }
 
-      // Store connection
-      const connectionKey = `${client.userId}:${sessionId}`;
-      this.activeConnections.set(connectionKey, client);
+      // LIVE_NOTES is a text-only mode; it must never open an audio channel.
+      if (session.mode !== 'PRACTICE' && session.mode !== 'CONSENT') {
+        this.logger.warn(`Connection rejected: audio not allowed in mode ${session.mode}`);
+        client.emit('notice', {
+          level: 'error',
+          message: 'This session does not capture audio.',
+        });
+        client.disconnect();
+        return;
+      }
 
-      // Join session room
       client.join(`session:${sessionId}`);
 
-      this.logger.log(
-        `Client connected: ${client.userId} to session ${sessionId}`,
-      );
+      const started = await this.liveSessions.start({
+        sessionId,
+        userId: client.userId,
+        consentAcknowledgedAt: session.consentAcknowledgedAt,
+        retainTranscript: session.retainTranscript,
+        contextPack: session.contextPack,
+        emit: (event) => client.emit(event.type, event),
+      });
 
-      // Send connection confirmation
+      if (!started.ok) {
+        // Say why, then close. Never leave a socket open that looks live but
+        // transcribes nothing.
+        client.emit('notice', { level: 'error', message: started.reason });
+        client.disconnect();
+        return;
+      }
+
       client.emit('connected', {
         sessionId,
-        message: 'Connected to audio stream',
+        transcription: this.liveSessions.transcriptionAvailable,
       });
-    } catch (error) {
-      this.logger.error(`Connection error: ${error.message}`);
+      this.logger.log(`Client ${client.userId} connected to session ${sessionId}`);
+    } catch (error: any) {
+      this.logger.error(`Connection error: ${error?.message}`);
       client.disconnect();
     }
   }
 
-  handleDisconnect(client: AuthenticatedSocket) {
-    if (client.userId && client.sessionId) {
-      const connectionKey = `${client.userId}:${client.sessionId}`;
-      this.activeConnections.delete(connectionKey);
-      this.logger.log(
-        `Client disconnected: ${client.userId} from session ${client.sessionId}`,
-      );
-    }
+  async handleDisconnect(client: AuthenticatedSocket) {
+    if (!client.sessionId) return;
+    await this.liveSessions.stop(client.sessionId);
+    this.logger.log(`Client ${client.userId} disconnected from ${client.sessionId}`);
   }
 
+  /**
+   * One PCM frame (16kHz mono, ~100ms).
+   *
+   * `source` distinguishes the meeting tab (the interviewer) from the
+   * candidate's own microphone. Turn attribution comes from the track, not from
+   * speaker diarisation — which is both more reliable and far cheaper.
+   */
   @SubscribeMessage('audio-chunk')
-  async handleAudioChunk(
-    @MessageBody() data: { chunk: ArrayBuffer; timestamp: number },
+  handleAudioChunk(
+    @MessageBody() data: { chunk: ArrayBuffer; source?: SpeechSource },
     @ConnectedSocket() client: AuthenticatedSocket,
   ) {
     if (!client.userId || !client.sessionId) {
-      client.emit('error', { message: 'Not authenticated' });
+      client.emit('notice', { level: 'error', message: 'Not authenticated.' });
       return;
     }
+    if (!data?.chunk) return;
 
-    try {
-      // Convert ArrayBuffer to Buffer
-      const audioBuffer = Buffer.from(data.chunk);
-
-      // For now, we'll accumulate chunks and process periodically
-      // In production, you'd want to use streaming STT if available
-      // For this implementation, we'll use batch processing
-
-      // Emit acknowledgment
-      client.emit('audio-received', {
-        timestamp: data.timestamp,
-        message: 'Audio chunk received',
-      });
-
-      // Note: Real-time streaming STT would process chunks here
-      // For now, we'll use a simplified approach where the client
-      // sends complete audio segments
-    } catch (error) {
-      this.logger.error(`Error processing audio chunk: ${error.message}`);
-      client.emit('error', { message: 'Failed to process audio chunk' });
-    }
+    this.liveSessions.pushAudio(
+      client.sessionId,
+      Buffer.from(data.chunk),
+      data.source === 'CANDIDATE' ? 'CANDIDATE' : 'INTERVIEWER',
+    );
   }
 
-  @SubscribeMessage('audio-segment')
-  async handleAudioSegment(
-    @MessageBody()
-    data: {
-      audioData: ArrayBuffer;
-      startTime: number;
-      endTime: number;
-    },
+  /** The candidate typed a question themselves (LIVE_NOTES, or STT is down). */
+  @SubscribeMessage('manual-question')
+  async handleManualQuestion(
+    @MessageBody() data: { text: string },
     @ConnectedSocket() client: AuthenticatedSocket,
   ) {
-    if (!client.userId || !client.sessionId) {
-      client.emit('error', { message: 'Not authenticated' });
-      return;
-    }
-
-    try {
-      // Convert ArrayBuffer to Buffer
-      const audioBuffer = Buffer.from(data.audioData);
-
-      // Transcribe audio segment
-      const transcription = await this.sttProvider.transcribe(audioBuffer);
-
-      // Create turn for the answer
-      const turn = await this.interviewBuddyService.addTurn(
-        client.sessionId,
-        client.userId,
-        TurnType.ANSWER,
-        transcription.text,
-        transcription.segments,
-        transcription.confidence,
-      );
-
-      // Emit transcript to client
-      client.emit('transcript', {
-        turnId: turn._id,
-        text: transcription.text,
-        segments: transcription.segments,
-        confidence: transcription.confidence,
-        timestamp: Date.now(),
-      });
-
-      // Broadcast to session room (for multi-client scenarios)
-      this.server.to(`session:${client.sessionId}`).emit('transcript-update', {
-        turnId: turn._id,
-        text: transcription.text,
-        type: 'ANSWER',
-      });
-    } catch (error) {
-      this.logger.error(`Error processing audio segment: ${error.message}`);
-      client.emit('error', { message: 'Failed to transcribe audio' });
-    }
+    if (!client.userId || !client.sessionId || !data?.text?.trim()) return;
+    await this.liveSessions.askManually(client.sessionId, data.text.trim(), (event) =>
+      client.emit(event.type, event),
+    );
   }
 
   @SubscribeMessage('stop-recording')
   async handleStopRecording(@ConnectedSocket() client: AuthenticatedSocket) {
-    if (!client.userId || !client.sessionId) {
-      return;
-    }
-
-    client.emit('recording-stopped', {
-      message: 'Recording stopped',
-      timestamp: Date.now(),
-    });
+    if (!client.sessionId) return;
+    await this.liveSessions.stop(client.sessionId);
+    client.emit('notice', { level: 'info', message: 'Capture stopped.' });
   }
 }
-
