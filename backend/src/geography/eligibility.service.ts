@@ -95,8 +95,18 @@ export class EligibilityService {
     }
 
     // 3) Core geography
-    if (!candCountry) {
-      add(ReasonCode.INSUFFICIENT_JOB_INFORMATION, 'soft', 'Set your country in preferences to filter by eligibility.');
+    //
+    // Runs when we know EITHER where the candidate is OR where they want to be.
+    // This used to require `candCountry`, which meant a candidate who set target
+    // countries but never filled in "where you live now" got no geographic
+    // filtering at all — every job in the pool came back eligible. That is the
+    // common shape for a new signup, and it silently defeated the whole gate.
+    if (!candCountry && !effectiveTargets.length) {
+      add(
+        ReasonCode.INSUFFICIENT_JOB_INFORMATION,
+        'soft',
+        'Set your country, or the countries you are targeting, to filter by eligibility.',
+      );
     } else if (wp === WorkplaceType.REMOTE) {
       if (scope === RemoteScope.GLOBAL) {
         add(ReasonCode.REMOTE_GLOBAL, 'info', 'Open to remote workers worldwide.');
@@ -121,7 +131,13 @@ export class EligibilityService {
         } else if (this.canRelocateInternationally(cand)) {
           add(ReasonCode.RELOCATION_REQUIRED, 'soft', `Remote is limited to ${eligible.map(countryName).join(', ')}; would require relocation.`);
         } else {
-          add(ReasonCode.REMOTE_NOT_GLOBAL, 'hard', `Remote is limited to ${eligible.map(countryName).join(', ')}, not ${countryName(candCountry)}.`);
+          add(
+            ReasonCode.REMOTE_NOT_GLOBAL,
+            'hard',
+            candCountry
+              ? `Remote is limited to ${eligible.map(countryName).join(', ')}, not ${countryName(candCountry)}.`
+              : `Remote is limited to ${eligible.map(countryName).join(', ')}, which is outside the countries you're targeting.`,
+          );
         }
       } else {
         // Unknown scope — conservative: surface but flag, never auto-apply.
@@ -158,7 +174,13 @@ export class EligibilityService {
         } else if (this.canRelocateInternationally(cand)) {
           add(ReasonCode.RELOCATION_REQUIRED, 'soft', `Located in ${countryName(jobCountry)}; would require international relocation.`);
         } else {
-          add(ReasonCode.COUNTRY_NOT_SUPPORTED, 'hard', `On-site in ${countryName(jobCountry)}, not ${countryName(candCountry)}.`);
+          add(
+            ReasonCode.COUNTRY_NOT_SUPPORTED,
+            'hard',
+            candCountry
+              ? `On-site in ${countryName(jobCountry)}, not ${countryName(candCountry)}.`
+              : `On-site in ${countryName(jobCountry)}, outside the countries you're targeting.`,
+          );
         }
       }
     }

@@ -79,6 +79,21 @@ export class CreateJobProfileDto {
   @IsOptional()
   preferredLocations?: string[];
 
+  // The JobProfile schema has always stored `skills`, and UpdateJobProfileDto
+  // accepted it — but this DTO did not, so skills could be edited later and
+  // never set at creation. With `forbidNonWhitelisted` that is not a silent
+  // drop but a hard 400: creating a profile with skills failed outright.
+  @ApiProperty({
+    description: 'Skills this profile targets',
+    type: [String],
+    example: ['typescript', 'postgres'],
+    required: false,
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  skills?: string[];
+
   @ApiProperty({
     description:
       'ISO2 country codes this profile targets (where the candidate wants to work). ' +

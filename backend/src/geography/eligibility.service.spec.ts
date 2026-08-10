@@ -62,6 +62,61 @@ describe('EligibilityService — target countries', () => {
     ...over,
   });
 
+  /**
+   * REGRESSION: the geography branch used to be gated on the candidate's
+   * CURRENT country, so someone who set target countries but never filled in
+   * "where you live now" got no geographic filtering at all — every job in the
+   * pool came back eligible.
+   *
+   * It survived 719 unit tests because the `candidate()` helper above defaults
+   * `country: 'IN'`, so every existing case set one. It was only caught by
+   * driving the real UI, where a freshly-registered account has no preferences
+   * yet: "Check impact" reported 1500 eligible / 0 excluded by geography while
+   * the profile plainly said "Targeting Canada". After the fix, the same
+   * account reports 587 eligible / 913 excluded.
+   *
+   * A new signup is the COMMON shape, not an edge case, which is what made this
+   * worth pinning.
+   */
+  describe('a candidate with targets but no current country', () => {
+    const noHome = (over: Partial<CandidateEligibilityProfile> = {}) =>
+      candidate({ country: null, targetCountries: ['CA'], ...over });
+
+    it('still excludes a job outside the targeted countries', () => {
+      const d = service.evaluate(onsiteIn('DE'), noHome());
+
+      expect(d.status).toBe(EligibilityStatus.INELIGIBLE);
+    });
+
+    it('still accepts a job inside the targeted countries', () => {
+      const d = service.evaluate(onsiteIn('CA'), noHome());
+
+      expect(d.status).not.toBe(EligibilityStatus.INELIGIBLE);
+    });
+
+    it('excludes remote work scoped to an untargeted country', () => {
+      const d = service.evaluate(remoteScopedTo(['DE']), noHome());
+
+      expect(d.status).toBe(EligibilityStatus.INELIGIBLE);
+    });
+
+    it('never renders an undefined country in the reason text', () => {
+      const d = service.evaluate(onsiteIn('DE'), noHome());
+
+      for (const r of d.reasons) {
+        expect(r.message).not.toMatch(/undefined|null/i);
+      }
+    });
+
+    // Only when we know NEITHER where they are nor where they want to be is
+    // "we cannot filter" the honest answer.
+    it('asks for input only when there is no country information at all', () => {
+      const d = service.evaluate(onsiteIn('DE'), candidate({ country: null, targetCountries: [] }));
+
+      expect(d.reasons.some((r) => /Set your country/i.test(r.message))).toBe(true);
+    });
+  });
+
   // ------------------------------------------------------------ AC1.3 ----
   describe('a targeted country is an intent to work there', () => {
     it('surfaces an on-site job in a targeted country instead of hard-excluding it', () => {
