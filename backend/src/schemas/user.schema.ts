@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types, Document } from 'mongoose';
+import { HydratedDocument, Types, Document, Schema as MongooseSchema } from 'mongoose';
 
 // Define types locally
 export type UserRole = 'ROLE_CANDIDATE' | 'ROLE_EMPLOYER' | 'ROLE_AGENT' | 'ROLE_ADMIN';
@@ -57,6 +57,12 @@ export class User {
   location?: string;
 
   @Prop()
+  headline?: string;
+
+  @Prop()
+  linkedin?: string;
+
+  @Prop()
   summary?: string;
 
   @Prop([{ type: String }])
@@ -110,7 +116,7 @@ export class User {
   @Prop({ enum: ['free', 'pro', 'elite', 'interview'], default: 'free' })
   package?: string;
 
-  @Prop({ type: Types.ObjectId, ref: 'UserSubscription' })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'UserSubscription' })
   subscriptionId?: Types.ObjectId;
 
   @Prop({ enum: ['active', 'canceled', 'past_due', 'incomplete', 'incomplete_expired', 'trialing', 'unpaid', 'paused'] })
@@ -127,8 +133,25 @@ export class User {
   @Prop({ default: true })
   isActive: boolean;
 
+  // Admin moderation — account suspension (distinct from isActive so an admin can
+  // record WHY/WHEN an account was disabled). Suspending also flips isActive:false.
+  @Prop({ default: false })
+  suspended?: boolean;
+
+  @Prop()
+  suspendedReason?: string;
+
+  @Prop()
+  suspendedAt?: Date;
+
   @Prop()
   lastLogin?: Date;
+
+  // Session generation embedded in every issued JWT. Incremented on logout so a
+  // leaked or shared-device token stops working immediately instead of living
+  // out its multi-day expiry.
+  @Prop({ default: 0 })
+  tokenVersion?: number;
 
   // Password reset
   @Prop()

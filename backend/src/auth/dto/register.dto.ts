@@ -19,25 +19,25 @@ export class RegisterDto {
   email: string;
 
   @ApiProperty({
-    description: 'User password (minimum 6 characters)',
+    description: 'User password (minimum 8 characters)',
     example: 'SecurePassword123!',
-    minLength: 6,
+    minLength: 8,
   })
   @IsString()
-  @MinLength(6)
+  @MinLength(8, { message: 'Password must be at least 8 characters' })
   @IsNotEmpty()
   password: string;
 
   @ApiProperty({
-    description: 'User role',
+    description: 'User role (self-registration is limited to candidate or employer)',
     example: 'ROLE_CANDIDATE',
-    enum: ['ROLE_CANDIDATE', 'ROLE_EMPLOYER', 'ROLE_AGENT', 'ROLE_ADMIN'],
+    enum: ['ROLE_CANDIDATE', 'ROLE_EMPLOYER'],
     required: false,
     default: 'ROLE_CANDIDATE',
   })
   @IsOptional()
   @IsString()
-  @IsIn(['ROLE_CANDIDATE', 'ROLE_EMPLOYER', 'ROLE_AGENT', 'ROLE_ADMIN'])
+  @IsIn(['ROLE_CANDIDATE', 'ROLE_EMPLOYER'])
   role?: string;
 }
 

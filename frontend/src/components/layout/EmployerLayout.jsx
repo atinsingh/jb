@@ -16,7 +16,6 @@ import {
   BellIcon,
   Bars3Icon,
   XMarkIcon,
-  Cog6ToothIcon,
   UserCircleIcon,
   ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline';
@@ -53,7 +52,7 @@ function EmployerLayoutContent({ children }) {
   const handleSignOut = async () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
-    router.push('/login');
+    router.push('/app/login');
   };
 
   function isActive(href) {
@@ -149,10 +148,10 @@ function EmployerLayoutContent({ children }) {
                       <UserCircleIcon className="mr-3 h-5 w-5" />
                       Profile
                     </Link>
-                    <Link href="/employer/settings" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                      <Cog6ToothIcon className="mr-3 h-5 w-5" />
-                      Settings
-                    </Link>
+                    {/* /employer/settings does not exist. The real account
+                        surface is /employer/profile, which "Profile" above
+                        already opens, so the duplicate dead link is dropped
+                        rather than repointed. */}
                     <button
                       onClick={handleSignOut}
                       className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"

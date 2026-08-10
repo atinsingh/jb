@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { resumeApi } from '@/lib/resume-api';
 import ResumePreview from '@/components/resume-builder/ResumePreview';
+import { API_URL } from '@/config/api';
 
 export default function ResumePrint() {
     const router = useRouter();
@@ -20,7 +21,7 @@ export default function ResumePrint() {
 
                 let data;
                 if (token) {
-                    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/resume-builder/${id}`, {
+                    const res = await fetch(`${API_URL}/api/resume-builder/${id}`, {
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
                     if (!res.ok) throw new Error('Failed');

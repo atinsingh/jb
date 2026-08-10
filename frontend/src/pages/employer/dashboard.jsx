@@ -4,49 +4,40 @@ import { useEffect, useRef, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import EmployerSidebar from '@/components/employer/EmployerSidebar';
+import { LoadingState, ErrorState, EmptyState } from '@/components/employer/EmployerStates';
 import { appRoute } from '@/components/app/appRoutes';
 import {
   employerJobsApi,
   employerPipelineApi,
   aiRecruiterApi,
+  employerInterviewsApi,
+  employerCompanyApi,
+  employerProfileApi,
 } from '@/services/employerApi';
 
-// ---- Sample data (fallback when the employer backend is unavailable) ----
+const FUNNEL_COLORS = ['#5C7CEF', '#4263EB', '#364FC7', '#2A3E9E', '#1FA463'];
 
-const STAT_TARGETS = [
-  { label: 'Active jobs', target: 5, suffix: '', trend: '3 of 5 slots used', trendColor: '#8A8378' },
-  { label: 'New applicants', target: 37, suffix: '', trend: '▲ 14 today', trendColor: '#4263EB' },
-  { label: 'Interviews this week', target: 8, suffix: '', trend: '2 today', trendColor: '#8A8378' },
-  { label: 'Avg time-to-hire', target: 24, suffix: 'd', trend: '▼ 2d vs last month', trendColor: '#157A49' },
-];
+// Format an ISO timestamp into { time, ampm }.
+function clockParts(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return { time: '--:--', ampm: '' };
+  let h = d.getHours();
+  const m = d.getMinutes().toString().padStart(2, '0');
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return { time: `${h}:${m}`, ampm };
+}
 
-const FUNNEL_RAW = [
-  { label: 'Applicants', target: 133, color: '#5C7CEF' },
-  { label: 'Screened', target: 48, color: '#4263EB' },
-  { label: 'Interview', target: 19, color: '#364FC7' },
-  { label: 'Offer', target: 4, color: '#2A3E9E' },
-  { label: 'Hired', target: 1, color: '#1FA463' },
-];
-
-const JOBS_RAW = [
-  { title: 'Senior Product Designer', meta: 'Remote (US) · Full-time', newCount: '12', note: '12 unreviewed' },
-  { title: 'Staff Frontend Engineer', meta: 'San Francisco · Full-time', newCount: '8', note: 'interview backlog' },
-  { title: 'Product Manager, Growth', meta: 'New York · Hybrid', newCount: '5', note: 'awaiting screens' },
-];
-
-const IV_RAW = [
-  { time: '11:00', ampm: 'AM', name: 'Jordan Lee', req: 'Staff Frontend Eng', round: 'Technical', type: 'Onsite' },
-  { time: '2:00', ampm: 'PM', name: 'Sarah Chen', req: 'Senior Product Designer', round: 'Final round', type: 'Video' },
-  { time: '4:30', ampm: 'PM', name: 'Lena Fischer', req: 'PM, Growth', round: 'Recruiter screen', type: 'Phone' },
-];
-
-const ACT_RAW = [
-  { text: 'Sarah Chen applied to Senior Product Designer — 96% match.', time: '8m ago', t: 'indigo' },
-  { text: 'Jordan Lee confirmed his Thu 2:00 PM interview.', time: '1h ago', t: 'neutral' },
-  { text: 'Priya Nair accepted your offer for Staff Frontend Engineer.', time: '3h ago', t: 'green' },
-  { text: 'You moved Marcus Obi to the Interview stage.', time: '5h ago', t: 'neutral' },
-  { text: '14 new applicants arrived across your 3 open roles.', time: '6h ago', t: 'indigo' },
-];
+function isToday(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return false;
+  const now = new Date();
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  );
+}
 
 const typeStyle = (t) =>
   t === 'Video'
@@ -66,76 +57,114 @@ export default function EmployerDashboard() {
   const [p, setP] = useState(0);
   const rafRef = useRef(null);
 
-  // Live data seeded with design samples; overridden on successful fetch.
-  const [statTargets, setStatTargets] = useState(STAT_TARGETS);
-  const [funnelRaw, setFunnelRaw] = useState(FUNNEL_RAW);
-  const [jobsRaw, setJobsRaw] = useState(JOBS_RAW);
-  const [actRaw, setActRaw] = useState(ACT_RAW);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Fetch live employer data; on any failure keep the sample fallback.
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      const [statsRes, jobsRes, autopilot] = await Promise.all([
-        employerPipelineApi.stats().catch(() => null),
-        employerJobsApi.list().catch(() => null),
+  // Real data only — starts empty, populated from the backend.
+  const [statTargets, setStatTargets] = useState([]);
+  const [funnelRaw, setFunnelRaw] = useState([]);
+  const [jobsRaw, setJobsRaw] = useState([]);
+  const [actRaw, setActRaw] = useState([]);
+  const [ivRaw, setIvRaw] = useState([]);
+  const [firstName, setFirstName] = useState('');
+  const [companyName, setCompanyName] = useState('');
+
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Core data — a failure here is surfaced as an error state.
+      const [statsRes, jobsRes, autopilot, interviewsRes] = await Promise.all([
+        employerPipelineApi.stats(),
+        employerJobsApi.list(),
         aiRecruiterApi.autopilot().catch(() => null),
+        employerInterviewsApi.list({ status: 'scheduled' }).catch(() => null),
       ]);
-      if (!alive) return;
 
-      const jobsArr = Array.isArray(jobsRes?.jobs) ? jobsRes.jobs : null;
-      const activeJobs = jobsArr
-        ? jobsArr.filter((j) => (j.status || 'active') === 'active')
-        : null;
+      const jobsArr = Array.isArray(jobsRes?.jobs) ? jobsRes.jobs : [];
+      const activeJobs = jobsArr.filter(
+        (j) => (j.status || 'active') !== 'closed' && (j.status || 'active') !== 'archived',
+      );
 
-      if (statsRes && typeof statsRes.total === 'number') {
-        setFunnelRaw([
-          { label: 'Applicants', target: statsRes.total, color: '#5C7CEF' },
-          { label: 'Screened', target: statsRes.screening || 0, color: '#4263EB' },
-          { label: 'Interview', target: statsRes.interview || 0, color: '#364FC7' },
-          { label: 'Offer', target: statsRes.offer || 0, color: '#2A3E9E' },
-          { label: 'Hired', target: statsRes.hired || 0, color: '#1FA463' },
-        ]);
-        setStatTargets((prev) => [
-          {
-            ...prev[0],
-            target: activeJobs ? activeJobs.length : prev[0].target,
-            trend: autopilot?.stats
-              ? `${autopilot.stats.reqsCovered} covered by autopilot`
-              : prev[0].trend,
-          },
-          { ...prev[1], target: statsRes.applied || 0, trend: `${statsRes.applied || 0} awaiting review` },
-          { ...prev[2], target: statsRes.interview || 0, trend: `${statsRes.interview || 0} in interview` },
-          prev[3],
-        ]);
-      }
+      const stats = statsRes && typeof statsRes.total === 'number' ? statsRes : {};
 
-      if (activeJobs && activeJobs.length) {
-        setJobsRaw(
-          activeJobs.slice(0, 3).map((j) => ({
-            title: j.title || 'Untitled role',
-            meta:
-              [j.location, j.type].filter(Boolean).join(' · ') ||
-              (j.isRemote ? 'Remote' : '—'),
-            newCount: String(j.applicantsCount ?? j.newApplicants ?? 0),
-            note: 'view pipeline',
-          })),
-        );
-      }
+      setFunnelRaw([
+        { label: 'Applicants', target: stats.total || 0 },
+        { label: 'Screened', target: stats.screening || 0 },
+        { label: 'Interview', target: stats.interview || 0 },
+        { label: 'Offer', target: stats.offer || 0 },
+        { label: 'Hired', target: stats.hired || 0 },
+      ]);
 
-      if (autopilot?.activity?.length) {
-        setActRaw(
-          autopilot.activity.slice(0, 5).map((a) => ({
-            text: `${a.name} — ${String(a.event || '').replace(/_/g, ' ')}`,
-            time: 'recent',
-            t: a.event === 'received' ? 'indigo' : 'green',
-          })),
-        );
-      }
-    })();
-    return () => {
-      alive = false;
-    };
+      setStatTargets([
+        { label: 'Active jobs', target: activeJobs.length, suffix: '', trend: `${jobsArr.length} total`, trendColor: '#8A8378' },
+        { label: 'New applicants', target: stats.applied || 0, suffix: '', trend: `${stats.applied || 0} awaiting review`, trendColor: '#4263EB' },
+        { label: 'In interview', target: stats.interview || 0, suffix: '', trend: `${stats.offer || 0} at offer`, trendColor: '#8A8378' },
+        { label: 'Hired', target: stats.hired || 0, suffix: '', trend: 'all time', trendColor: '#157A49' },
+      ]);
+
+      setJobsRaw(
+        activeJobs.slice(0, 3).map((j) => ({
+          title: j.title || 'Untitled role',
+          meta:
+            [j.location, j.type].filter(Boolean).join(' · ') ||
+            (j.isRemote ? 'Remote' : '—'),
+          newCount: String(j.applicantsCount ?? j.newApplicants ?? 0),
+          note: 'view pipeline',
+        })),
+      );
+
+      const interviews = Array.isArray(interviewsRes?.interviews)
+        ? interviewsRes.interviews
+        : [];
+      setIvRaw(
+        interviews
+          .filter((iv) => iv.scheduledAt && isToday(iv.scheduledAt))
+          .sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt))
+          .map((iv) => {
+            const { time, ampm } = clockParts(iv.scheduledAt);
+            return {
+              time,
+              ampm,
+              name: iv.candidateName || 'Candidate',
+              req: iv.role || iv.jobTitle || '',
+              round: iv.round || iv.stage || 'Interview',
+              type: iv.type || iv.mode || 'Video',
+            };
+          }),
+      );
+
+      setActRaw(
+        Array.isArray(autopilot?.activity)
+          ? autopilot.activity.slice(0, 5).map((a) => ({
+              text: `${a.name} — ${String(a.event || '').replace(/_/g, ' ')}`,
+              time: 'recent',
+              t: a.event === 'received' ? 'indigo' : 'green',
+            }))
+          : [],
+      );
+    } catch (err) {
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    // Best-effort personalization — cosmetic only, never fabricated.
+    employerProfileApi
+      .get()
+      .then((res) => {
+        const name = res?.user?.name || '';
+        setFirstName(name.split(' ')[0] || '');
+      })
+      .catch(() => {});
+    employerCompanyApi
+      .get()
+      .then((res) => setCompanyName(res?.company?.name || ''))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -160,7 +189,7 @@ export default function EmployerDashboard() {
     trendColor: s.trendColor,
   }));
 
-  const max = funnelRaw[0].target || 1;
+  const max = funnelRaw[0]?.target || 1;
   const funnel = funnelRaw.map((f, i) => {
     const pctOfMax = Math.max((f.target / max) * 100, 7);
     const prevTarget = i === 0 ? 0 : funnelRaw[i - 1].target;
@@ -168,7 +197,7 @@ export default function EmployerDashboard() {
       i === 0 ? 'start' : (prevTarget ? Math.round((f.target / prevTarget) * 100) : 0) + '%';
     return {
       label: f.label,
-      color: f.color,
+      color: FUNNEL_COLORS[i] || '#4263EB',
       count: String(n(f.target)),
       width: pctOfMax * p + '%',
       conv,
@@ -181,9 +210,15 @@ export default function EmployerDashboard() {
     divider: i < arr.length - 1 ? '#F2ECE0' : 'transparent',
   }));
 
-  const interviews = IV_RAW.map((iv) => {
+  const interviews = ivRaw.map((iv) => {
     const ts = typeStyle(iv.type);
     return { ...iv, typeColor: ts.color, typeBg: ts.bg, typeBorder: ts.border };
+  });
+
+  const todayLabel = new Date().toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
   });
 
   const activity = actRaw.map((a, i, arr) => ({
@@ -197,12 +232,6 @@ export default function EmployerDashboard() {
     <>
       <Head>
         <title>Dashboard — Jobocate for Employers</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
       <style jsx global>{`
@@ -230,7 +259,7 @@ export default function EmployerDashboard() {
           display: 'flex',
           minHeight: '100vh',
           background: '#F7F3EA',
-          fontFamily: "'Hanken Grotesk',sans-serif",
+          fontFamily: 'var(--jb-font-sans)',
           color: '#1B1A16',
         }}
       >
@@ -254,14 +283,14 @@ export default function EmployerDashboard() {
           >
             <div
               style={{
-                fontFamily: "'JetBrains Mono',monospace",
+                fontFamily: 'var(--jb-font-mono)',
                 fontSize: 11.5,
                 letterSpacing: '0.1em',
                 textTransform: 'uppercase',
                 color: '#9A9286',
               }}
             >
-              Stripe · Hiring / Dashboard
+              {companyName ? `${companyName} · Hiring / Dashboard` : 'Hiring / Dashboard'}
             </div>
             <div style={{ flex: 1 }} />
             <Link
@@ -284,12 +313,12 @@ export default function EmployerDashboard() {
             </Link>
           </header>
 
-          <div style={{ padding: '30px 32px 56px', maxWidth: 1180, width: '100%', margin: '0 auto' }}>
+          <div style={{ padding: '20px 16px 40px', maxWidth: 1180, width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
             {/* GREETING */}
             <div style={{ marginBottom: 24 }}>
               <h1
                 style={{
-                  fontFamily: "'Instrument Serif',serif",
+                  fontFamily: 'var(--jb-font-display)',
                   fontWeight: 400,
                   fontSize: 40,
                   lineHeight: 1,
@@ -297,16 +326,22 @@ export default function EmployerDashboard() {
                   margin: '0 0 8px',
                 }}
               >
-                Good morning, Dana.
+                {firstName ? `Good morning, ${firstName}.` : 'Good morning.'}
               </h1>
               <p style={{ fontSize: 15.5, color: '#5A544A', margin: 0 }}>
                 Here&rsquo;s where hiring stands today ·{' '}
-                <span style={{ fontFamily: "'JetBrains Mono',monospace", color: '#8A8378' }}>Sun, Jun 29</span>
+                <span style={{ fontFamily: 'var(--jb-font-mono)', color: '#8A8378' }}>{todayLabel}</span>
               </p>
             </div>
 
+            {loading ? (
+              <LoadingState label="Loading dashboard…" />
+            ) : error ? (
+              <ErrorState error={error} onRetry={load} />
+            ) : (
+             <>
             {/* STAT CARDS */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 16 }}>
               {stats.map((s) => (
                 <div
                   key={s.label}
@@ -314,8 +349,8 @@ export default function EmployerDashboard() {
                 >
                   <div
                     style={{
-                      fontFamily: "'JetBrains Mono',monospace",
-                      fontSize: 10.5,
+                      fontFamily: 'var(--jb-font-mono)',
+                      fontSize: 11,
                       letterSpacing: '0.06em',
                       textTransform: 'uppercase',
                       color: '#9A9286',
@@ -326,7 +361,7 @@ export default function EmployerDashboard() {
                   </div>
                   <div
                     style={{
-                      fontFamily: "'JetBrains Mono',monospace",
+                      fontFamily: 'var(--jb-font-mono)',
                       fontSize: 34,
                       fontWeight: 600,
                       lineHeight: 1,
@@ -371,7 +406,7 @@ export default function EmployerDashboard() {
                 }}
               >
                 <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Hiring funnel</h2>
-                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#8A8378' }}>
+                <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#8A8378' }}>
                   All open roles · last 30 days
                 </span>
               </div>
@@ -396,7 +431,7 @@ export default function EmployerDashboard() {
                       >
                         <span
                           style={{
-                            fontFamily: "'JetBrains Mono',monospace",
+                            fontFamily: 'var(--jb-font-mono)',
                             fontSize: 13,
                             fontWeight: 600,
                             color: '#FFFFFF',
@@ -411,7 +446,7 @@ export default function EmployerDashboard() {
                         width: 56,
                         flexShrink: 0,
                         textAlign: 'right',
-                        fontFamily: "'JetBrains Mono',monospace",
+                        fontFamily: 'var(--jb-font-mono)',
                         fontSize: 11.5,
                         color: f.convColor,
                       }}
@@ -424,7 +459,7 @@ export default function EmployerDashboard() {
             </div>
 
             {/* TWO COLUMN */}
-            <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'stretch' }}>
               {/* LEFT */}
               <div style={{ flex: 1.5, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {/* JOBS NEEDING ATTENTION */}
@@ -470,8 +505,8 @@ export default function EmployerDashboard() {
                         <span
                           style={{
                             flexShrink: 0,
-                            fontFamily: "'JetBrains Mono',monospace",
-                            fontSize: 10.5,
+                            fontFamily: 'var(--jb-font-mono)',
+                            fontSize: 11,
                             fontWeight: 600,
                             color: '#FFFFFF',
                             background: '#4263EB',
@@ -484,6 +519,11 @@ export default function EmployerDashboard() {
                         <span style={{ color: '#C9BFAC', flexShrink: 0 }}>→</span>
                       </Link>
                     ))}
+                    {jobs.length === 0 && (
+                      <div style={{ padding: '14px 0', fontSize: 13, color: '#8A8378' }}>
+                        No open jobs yet.
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -504,7 +544,7 @@ export default function EmployerDashboard() {
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              fontSize: 9,
+                              fontSize: 11,
                               color: a.iconColor,
                             }}
                           >
@@ -518,8 +558,8 @@ export default function EmployerDashboard() {
                           <div style={{ fontSize: 13.5, lineHeight: 1.5, color: '#3A352C' }}>{a.text}</div>
                           <div
                             style={{
-                              fontFamily: "'JetBrains Mono',monospace",
-                              fontSize: 10.5,
+                              fontFamily: 'var(--jb-font-mono)',
+                              fontSize: 11,
                               color: '#A79E8F',
                               marginTop: 3,
                             }}
@@ -529,6 +569,11 @@ export default function EmployerDashboard() {
                         </div>
                       </div>
                     ))}
+                    {activity.length === 0 && (
+                      <div style={{ fontSize: 13, color: '#8A8378' }}>
+                        No recent activity.
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -571,7 +616,7 @@ export default function EmployerDashboard() {
                         <div style={{ flexShrink: 0, textAlign: 'center', width: 54 }}>
                           <div
                             style={{
-                              fontFamily: "'JetBrains Mono',monospace",
+                              fontFamily: 'var(--jb-font-mono)',
                               fontSize: 14,
                               fontWeight: 600,
                               color: '#1B1A16',
@@ -579,7 +624,7 @@ export default function EmployerDashboard() {
                           >
                             {iv.time}
                           </div>
-                          <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, color: '#A79E8F' }}>
+                          <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#A79E8F' }}>
                             {iv.ampm}
                           </div>
                         </div>
@@ -589,8 +634,8 @@ export default function EmployerDashboard() {
                             <span style={{ fontSize: 14, fontWeight: 700, color: '#1B1A16' }}>{iv.name}</span>
                             <span
                               style={{
-                                fontFamily: "'JetBrains Mono',monospace",
-                                fontSize: 9,
+                                fontFamily: 'var(--jb-font-mono)',
+                                fontSize: 11,
                                 fontWeight: 600,
                                 color: iv.typeColor,
                                 background: iv.typeBg,
@@ -608,10 +653,17 @@ export default function EmployerDashboard() {
                         </div>
                       </Link>
                     ))}
+                    {interviews.length === 0 && (
+                      <div style={{ padding: '16px 4px', fontSize: 13, color: '#8A8378' }}>
+                        No interviews scheduled today.
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
+             </>
+            )}
           </div>
         </main>
       </div>

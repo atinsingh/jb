@@ -13,14 +13,58 @@ export interface LLMCompletionOptions {
   stop?: string[];
 }
 
+/**
+ * Tool definition (function schema) advertised to the model.
+ * `parameters` is a JSON Schema describing the tool's input.
+ */
+export interface LLMToolDef {
+  name: string;
+  description?: string;
+  parameters: Record<string, any>;
+}
+
+/**
+ * A tool/function call requested by the model. `arguments` is the parsed input
+ * object (already JSON-decoded).
+ */
+export interface LLMToolCall {
+  id: string;
+  name: string;
+  arguments: Record<string, any>;
+}
+
+/**
+ * A single chat message.
+ *
+ * Backward-compatible with the original `{ role, content }` shape:
+ * - `content` remains a required string for `system` / `user` / `assistant`
+ *   text turns (it may be an empty string when an assistant turn only carries
+ *   `toolCalls`).
+ * - `role` now also allows `'tool'` for tool-result turns; a tool message
+ *   should carry `toolCallId` linking it back to the originating `LLMToolCall`.
+ * - An assistant message may carry `toolCalls` when the model asked to invoke
+ *   tools.
+ */
 export interface LLMChatMessage {
-  role: 'system' | 'user' | 'assistant';
+  role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
+  /** Present on `role: 'tool'` messages — the id of the tool call being answered. */
+  toolCallId?: string;
+  /** Present on `role: 'assistant'` messages that requested tool invocations. */
+  toolCalls?: LLMToolCall[];
 }
 
 export interface LLMChatOptions extends LLMCompletionOptions {
   messages: LLMChatMessage[];
   stream?: boolean;
+}
+
+/**
+ * Options for a tool-enabled chat turn.
+ */
+export interface LLMChatWithToolsOptions extends LLMChatOptions {
+  tools: LLMToolDef[];
+  toolChoice?: 'auto' | 'none';
 }
 
 export interface LLMEmbeddingOptions {
@@ -40,6 +84,8 @@ export interface LLMResponse<T = string> {
   usage: LLMUsage;
   model: string;
   finishReason?: string;
+  /** Populated when the model requested one or more tool invocations. */
+  toolCalls?: LLMToolCall[];
 }
 
 export interface LLMEmbeddingResponse {
@@ -64,6 +110,16 @@ export interface LLMProvider {
    * Chat completion (multi-turn conversation)
    */
   chat(options: LLMChatOptions): Promise<LLMResponse<string>>;
+
+  /**
+   * Tool-enabled chat completion (optional).
+   *
+   * Providers that don't implement tool-use may omit this method entirely, so
+   * callers must feature-detect (`if (provider.chatWithTools)`) before use.
+   */
+  chatWithTools?(
+    options: LLMChatWithToolsOptions,
+  ): Promise<LLMResponse<string> & { toolCalls?: LLMToolCall[] }>;
 
   /**
    * Generate embeddings (optional)

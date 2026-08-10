@@ -6,7 +6,7 @@ export type PlanEntitlementDocument = HydratedDocument<PlanEntitlement>;
 
 @Schema({ timestamps: true, collection: 'plan_entitlements' })
 export class PlanEntitlement {
-  @Prop({ type: Types.ObjectId, ref: 'SubscriptionPlan', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'SubscriptionPlan', required: true })
   planId: Types.ObjectId;
 
   @Prop({ required: true })

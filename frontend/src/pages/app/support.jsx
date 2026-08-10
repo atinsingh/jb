@@ -5,49 +5,9 @@ import Head from 'next/head';
 import Link from 'next/link';
 import AppSidebar from '@/components/app/AppSidebar';
 import { appRoute } from '@/components/app/appRoutes';
+import { LoadingState, EmptyState, ErrorState } from '@/components/app/AppStates';
 
-/* --------------------------------------------------------------- sample data ---
- * Mirrors the dc Component.ticketData(). Used as the graceful fallback whenever
- * the user is unauthenticated or the backend request fails — the page always
- * renders faithfully. */
-const SAMPLE_TICKETS = [
-  {
-    id: '#JB-4790',
-    subject: 'Auto-Apply skipped a saved role',
-    category: 'Auto-Apply',
-    status: 'open',
-    updated: '2h ago',
-    msgs: [
-      { me: true, text: 'Auto-Apply skipped the Stripe Staff Product Designer role I saved — is that expected?', time: 'Jun 27 · 9:10 AM' },
-      { me: false, author: 'Jordan · Support', text: 'Thanks for flagging! That role landed just below your auto-apply quality threshold, so we held it for review. I can lower the threshold or whitelist this specific role — which would you prefer?', time: 'Jun 27 · 10:42 AM' },
-    ],
-  },
-  {
-    id: '#JB-4772',
-    subject: 'Annual plan invoice question',
-    category: 'Billing & plans',
-    status: 'awaiting',
-    updated: 'Yesterday',
-    msgs: [
-      { me: true, text: 'Why was I charged $468 when annual Premium shows as $39/mo?', time: 'Jun 26 · 2:15 PM' },
-      { me: false, author: 'Jordan · Support', text: 'Great question. $39/mo billed annually is $468 charged once per year — that’s the 33% saving versus paying monthly. I’ve attached your invoice; let me know if you’d rather switch to monthly billing.', time: 'Jun 26 · 3:01 PM' },
-    ],
-  },
-  {
-    id: '#JB-4731',
-    subject: 'Can’t export résumé as PDF',
-    category: 'Résumé & cover letters',
-    status: 'resolved',
-    updated: 'Jun 22',
-    msgs: [
-      { me: true, text: 'The Export PDF button does nothing in the résumé builder.', time: 'Jun 21 · 11:20 AM' },
-      { me: false, author: 'Jordan · Support', text: 'Sorry about that! It was a conflict with a browser extension. We shipped a fix this morning — could you try the export again?', time: 'Jun 22 · 8:30 AM' },
-      { me: true, text: 'Works now — thank you!', time: 'Jun 22 · 9:05 AM' },
-      { me: false, author: 'Jordan · Support', text: 'Wonderful. I’ll mark this one resolved — reach out anytime if it comes back.', time: 'Jun 22 · 9:12 AM' },
-    ],
-  },
-];
-
+/* Static form options (product UI, not user data). */
 const CATEGORIES = [
   'Billing & plans',
   'Auto-Apply',
@@ -80,32 +40,37 @@ export default function AppSupport() {
   const [ticketNum, setTicketNum] = useState('#JB-4821');
 
   /* ----- requests + thread ----- */
-  const [tickets, setTickets] = useState(SAMPLE_TICKETS);
-  const [loading, setLoading] = useState(false);
+  const [tickets, setTickets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [activeId, setActiveId] = useState(null); // null => list, id => thread
   const [reply, setReply] = useState('');
   const [sent, setSent] = useState({}); // { [ticketId]: [{me,text,time}] }
 
-  /* Fetch real tickets when authenticated; fall back to sample data on any
-   * failure so the page always renders. */
+  /* Fetch the user's real tickets when authenticated. No fabricated fallback:
+   * empty stays empty and failures surface an error. */
   useEffect(() => {
     let cancelled = false;
     const token =
       typeof window !== 'undefined'
         ? localStorage.getItem('authToken') || localStorage.getItem('token')
         : null;
-    if (!token) return; // unauthenticated → keep sample data
+    if (!token) {
+      setLoading(false);
+      return; // unauthenticated → no requests to show
+    }
 
     setLoading(true);
+    setError(null);
     import('@/services/supportApi')
       .then((m) => m.getMyTickets())
       .then((data) => {
         if (cancelled) return;
         const list = Array.isArray(data) ? data : data?.tickets;
-        if (Array.isArray(list) && list.length) setTickets(list);
+        setTickets(Array.isArray(list) ? list : []);
       })
-      .catch(() => {
-        /* graceful fallback — sample data already in state */
+      .catch((e) => {
+        if (!cancelled) setError(e);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -214,12 +179,6 @@ export default function AppSupport() {
     <>
       <Head>
         <title>Support — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
       <style jsx global>{`
@@ -253,13 +212,13 @@ export default function AppSupport() {
         }
       `}</style>
 
-      <div id="jbapp" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: "'Hanken Grotesk',sans-serif", color: '#1B1A16' }}>
+      <div id="jbapp" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16' }}>
         <AppSidebar active="support" />
 
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           {/* HEADER */}
           <header style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: 20, padding: '15px 32px', background: 'rgba(247,243,234,0.85)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #E7E0D2' }}>
-            <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9286' }}>Support</div>
+            <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9286' }}>Support</div>
             <div style={{ flex: 1 }} />
             <Link href={appRoute('App Help Center.dc.html')} style={{ fontSize: 13, fontWeight: 600, color: '#157A49', textDecoration: 'none' }}>Browse help center →</Link>
           </header>
@@ -267,7 +226,7 @@ export default function AppSupport() {
           <div style={{ padding: '30px 32px 64px', maxWidth: 1080, width: '100%', margin: '0 auto' }}>
             {/* TITLE */}
             <div style={{ marginBottom: 24 }}>
-              <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 40, lineHeight: 1, letterSpacing: '-0.01em', margin: '0 0 8px' }}>Support</h1>
+              <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 40, lineHeight: 1, letterSpacing: '-0.01em', margin: '0 0 8px' }}>Support</h1>
               <p style={{ fontSize: 15.5, color: '#5A544A', margin: 0 }}>
                 Open a request or pick up a conversation. <span style={{ color: '#157A49', fontWeight: 600 }}>Typical response: under 4 hours</span> on weekdays.
               </p>
@@ -357,9 +316,9 @@ export default function AppSupport() {
                 {showSuccess && (
                   <div style={{ background: '#FFFEFB', border: '1px solid #CDE9D6', borderRadius: 18, padding: '36px 28px', textAlign: 'center', animation: 'rbpop 0.3s ease' }}>
                     <div style={{ width: 60, height: 60, margin: '0 auto 20px', borderRadius: '50%', background: '#1FA463', color: '#0C2C1C', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>✓</div>
-                    <h2 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 28, lineHeight: 1.1, margin: '0 0 8px' }}>Request received</h2>
+                    <h2 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 28, lineHeight: 1.1, margin: '0 0 8px' }}>Request received</h2>
                     <p style={{ fontSize: 14.5, color: '#5A544A', margin: '0 auto 18px', maxWidth: 320 }}>
-                      We’ve opened ticket <b style={{ fontFamily: "'JetBrains Mono',monospace", color: '#157A49' }}>{ticketNum}</b> and emailed you a copy. Expect a reply within <b>4 hours</b>.
+                      We’ve opened ticket <b style={{ fontFamily: 'var(--jb-font-mono)', color: '#157A49' }}>{ticketNum}</b> and emailed you a copy. Expect a reply within <b>4 hours</b>.
                     </p>
                     <button
                       onClick={resetForm}
@@ -377,12 +336,15 @@ export default function AppSupport() {
                 {showList && (
                   <div>
                     <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 14px' }}>My requests</h2>
-                    {loading && tickets.length === 0 ? (
-                      <div style={{ fontSize: 14, color: '#8A8378', padding: '8px 2px' }}>Loading your requests…</div>
+                    {loading ? (
+                      <LoadingState label="Loading your requests…" />
+                    ) : error ? (
+                      <ErrorState error={error} />
                     ) : tickets.length === 0 ? (
-                      <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 15, padding: '28px 20px', textAlign: 'center', fontSize: 14, color: '#8A8378' }}>
-                        No requests yet. Open one on the left and we’ll get right back to you.
-                      </div>
+                      <EmptyState
+                        title="No requests yet"
+                        hint="Open one on the left and we’ll get right back to you."
+                      />
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
                         {tickets.map((t) => {
@@ -394,9 +356,9 @@ export default function AppSupport() {
                               style={{ textAlign: 'left', background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 15, padding: '18px 20px', cursor: 'pointer', fontFamily: 'inherit' }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 7 }}>
-                                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#9A9286' }}>{t.id}</span>
+                                <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#9A9286' }}>{t.id}</span>
                                 <span style={{ flex: 1 }} />
-                                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, fontWeight: 600, letterSpacing: '0.04em', color: ss.color, background: ss.bg, border: `1px solid ${ss.border}`, padding: '3px 9px', borderRadius: 999 }}>{ss.label}</span>
+                                <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', color: ss.color, background: ss.bg, border: `1px solid ${ss.border}`, padding: '3px 9px', borderRadius: 999 }}>{ss.label}</span>
                               </div>
                               <div style={{ fontSize: 15.5, fontWeight: 700, color: '#1B1A16', marginBottom: 5 }}>{t.subject}</div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: '#8A8378' }}>
@@ -426,9 +388,9 @@ export default function AppSupport() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '18px 22px', borderBottom: '1px solid #F2ECE0' }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 3 }}>
-                            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#9A9286' }}>{active.id}</span>
+                            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#9A9286' }}>{active.id}</span>
                             {threadStatus && (
-                              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, fontWeight: 600, letterSpacing: '0.04em', color: threadStatus.color, background: threadStatus.bg, border: `1px solid ${threadStatus.border}`, padding: '3px 9px', borderRadius: 999 }}>{threadStatus.label}</span>
+                              <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', color: threadStatus.color, background: threadStatus.bg, border: `1px solid ${threadStatus.border}`, padding: '3px 9px', borderRadius: 999 }}>{threadStatus.label}</span>
                             )}
                           </div>
                           <div style={{ fontSize: 16, fontWeight: 700 }}>{active.subject}</div>
@@ -439,10 +401,10 @@ export default function AppSupport() {
                         {threadMsgs.map((m, i) => (
                           <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: m.align }}>
                             {m.showAuthor && (
-                              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#9A9286', marginBottom: 5 }}>{m.author}</span>
+                              <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#9A9286', marginBottom: 5 }}>{m.author}</span>
                             )}
                             <div style={{ maxWidth: '78%', fontSize: 14, lineHeight: 1.5, color: '#1B1A16', background: m.bubbleBg, border: `1px solid ${m.bubbleBorder}`, borderRadius: m.radius, padding: '11px 15px' }}>{m.text}</div>
-                            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#A79E8F', margin: '5px 3px 0' }}>{m.time}</span>
+                            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#A79E8F', margin: '5px 3px 0' }}>{m.time}</span>
                           </div>
                         ))}
                       </div>

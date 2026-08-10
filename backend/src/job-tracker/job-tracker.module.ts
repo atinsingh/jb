@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { Job, JobSchema } from '../schemas/job.schema';
 import { Application, ApplicationSchema } from '../schemas/application.schema';
@@ -19,7 +18,11 @@ import { StoryBankService } from './story-bank.service';
 import { RemindersService } from './reminders.service';
 import { AnalyticsService } from './analytics.service';
 import { JobTrackerController } from './job-tracker.controller';
+import { JobTrackerCronProcessor } from './job-tracker.cron.processor';
 import { LLMModule } from '../llm/llm.module';
+import { bullQueueImports } from '../queue/queue.config';
+import { isQueueEnabled } from '../queue/queue.constants';
+import { QUEUE_CRON } from '../queue/cron-queue.constants';
 
 @Module({
   imports: [
@@ -34,7 +37,8 @@ import { LLMModule } from '../llm/llm.module';
       { name: LLMAuditLog.name, schema: LLMAuditLogSchema },
       { name: User.name, schema: UserSchema },
     ]),
-    ScheduleModule.forRoot(),
+    // ScheduleModule.forRoot() is registered once globally in AppModule; a
+    // second forRoot() here caused a duplicate registration.
     ThrottlerModule.forRoot([
       {
         name: 'job-ingestion',
@@ -48,6 +52,9 @@ import { LLMModule } from '../llm/llm.module';
       },
     ]),
     LLMModule,
+    // Registers the shared 'cron' Bull queue only when QUEUE_ENABLED=true; []
+    // otherwise, so the services' @Optional queue resolves to undefined.
+    ...bullQueueImports(QUEUE_CRON),
   ],
   providers: [
     JobIngestionService,
@@ -57,6 +64,8 @@ import { LLMModule } from '../llm/llm.module';
     StoryBankService,
     RemindersService,
     AnalyticsService,
+    // Bull consumer wired in only when queues are enabled.
+    ...(isQueueEnabled() ? [JobTrackerCronProcessor] : []),
   ],
   controllers: [JobTrackerController],
   exports: [

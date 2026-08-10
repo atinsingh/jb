@@ -1,17 +1,22 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
 export type EmployerInterviewDocument = EmployerInterview & Document;
 
 @Schema({ timestamps: true })
 export class EmployerInterview {
-  @Prop({ type: Types.ObjectId, ref: 'EmployerJob', required: false })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'EmployerJob', required: false })
   jobId?: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'EmployerApplicant', required: false })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'EmployerApplicant', required: false })
   applicantId?: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
+  // Real candidate (User) the interview is for. Resolved from the linked
+  // EmployerApplicant on create; drives the candidate-side notification.
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: false, index: true })
+  candidateId?: Types.ObjectId;
+
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true, index: true })
   ownerId: Types.ObjectId;
 
   @Prop({ default: '' })
@@ -51,7 +56,7 @@ export class EmployerInterview {
   @Prop({
     type: [
       {
-        interviewerId: { type: Types.ObjectId },
+        interviewerId: { type: MongooseSchema.Types.ObjectId },
         interviewerName: String,
         competencies: [
           {
@@ -80,6 +85,5 @@ export class EmployerInterview {
 export const EmployerInterviewSchema =
   SchemaFactory.createForClass(EmployerInterview);
 
-EmployerInterviewSchema.index({ ownerId: 1 });
-EmployerInterviewSchema.index({ status: 1 });
+// ownerId and status are already single-field indexed via @Prop({ index: true }).
 EmployerInterviewSchema.index({ ownerId: 1, status: 1 });

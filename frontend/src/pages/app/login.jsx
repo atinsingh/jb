@@ -5,6 +5,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { appRoute } from '@/components/app/appRoutes';
+import Logo from '@/components/brand/Logo';
 import { API_URL } from '@/config/api';
 import { useAuth } from '@/context/AuthContext';
 
@@ -18,11 +19,45 @@ export default function AppLogin() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Role-aware landing: employers go to the employer surface, everyone else
-  // to the candidate app dashboard.
+  // Employer-branded sign-in when arriving from the employer marketing site
+  // (/app/login?as=employer). Copy + accent adapt; the flow is otherwise
+  // identical and the post-login redirect stays role-aware.
+  const asEmployer = router.query.as === 'employer';
+  // Accent is one of two known brand colours, so we branch static Tailwind
+  // classes rather than compute a colour at runtime.
+  const accentDot = asEmployer ? 'bg-[#4263EB]' : 'bg-jb-green';
+  const accentText = asEmployer ? 'text-[#4263EB]' : 'text-jb-green';
+  const copy = asEmployer
+    ? {
+        badge: 'Welcome back',
+        heading: ['Log in to keep', 'hiring on autopilot.'],
+        sub: 'Your candidates, interviews and AI recruiter are waiting.',
+        signupHref: '/app/signup?as=employer',
+        aside: 'Your recruiting copilot, still working',
+        stat1: ['37', 'screened overnight'],
+        stat2: ['8', 'interviews booked'],
+        promise: 'Every shortlist shows the reasoning behind it, and nothing is sent without your approval.',
+        trust: 'Free to post your first role · No card required',
+      }
+    : {
+        badge: 'Welcome back',
+        heading: ['Log in to keep', 'the search running.'],
+        sub: 'Your matches and auto-applications are waiting.',
+        signupHref: '/app/signup',
+        aside: 'Your copilot, still working',
+        stat1: ['14', 'new matches'],
+        stat2: ['6', 'auto-applied'],
+        promise: 'Every match shows why it fits, and nothing is submitted until you approve it.',
+        trust: 'Free to start · You approve every application',
+      };
+
+  // Role-aware landing: employers go to the employer surface, human career
+  // agents to the concierge console, everyone else to the candidate app.
   const landingFor = (u) =>
     u?.role === 'ROLE_EMPLOYER'
       ? '/employer/dashboard'
+      : u?.role === 'ROLE_AGENT'
+      ? '/agent/dashboard'
       : appRoute('App Dashboard.dc.html');
 
   // If already authenticated, bounce to the right dashboard.
@@ -52,225 +87,98 @@ export default function AppLogin() {
     }
   };
 
+  // Shared field classes: the focus ring replaces the old styled-jsx
+  // `#jblogin input:focus` rule.
+  const fieldClass =
+    'w-full font-sans text-[15px] text-jb-ink bg-jb-paper border border-jb-line-input rounded-xl px-[15px] py-[13px] ' +
+    'placeholder:text-jb-ink-ghost transition-[box-shadow,border-color] duration-150 ' +
+    'focus:outline-none focus:border-jb-green focus:shadow-[0_0_0_3px_rgba(31,164,99,0.15)]';
+  const oauthBtnClass =
+    'flex-1 flex items-center justify-center gap-[9px] bg-jb-paper border border-jb-line-input rounded-xl p-3 ' +
+    'cursor-pointer font-sans text-sm font-semibold text-jb-ink';
+
   return (
     <>
       <Head>
         <title>Log in — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
-      <style jsx global>{`
-        #jblogin * {
-          box-sizing: border-box;
-        }
-        #jblogin input::placeholder {
-          color: #a79e8f;
-        }
-        #jblogin input:focus {
-          outline: none;
-          border-color: #1fa463;
-          box-shadow: 0 0 0 3px rgba(31, 164, 99, 0.15);
-        }
-        @keyframes riseIn {
-          from {
-            opacity: 0;
-            transform: translateY(16px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
-
-      <div
-        id="jblogin"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          minHeight: '100vh',
-          background: '#F7F3EA',
-          fontFamily: "'Hanken Grotesk',sans-serif",
-          color: '#1B1A16',
-        }}
-      >
+      <div className="grid grid-cols-1 md:grid-cols-2 min-h-screen bg-jb-cream font-sans text-jb-ink">
         {/* FORM SIDE */}
-        <div style={{ display: 'flex', flexDirection: 'column', padding: '40px 56px' }}>
-          <Link href={appRoute('Jobocate Home.dc.html')} style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none' }}>
-            <span style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 800, letterSpacing: '-0.02em', fontSize: 24, color: '#1B1A16' }}>
-              Jobocate<span style={{ color: '#1FA463' }}>.</span>
-            </span>
+        <div className="flex flex-col px-6 py-10 sm:px-14">
+          <Link href={appRoute('Jobocate Home.dc.html')} className="flex items-center gap-[9px] no-underline">
+            {/* Was a hand-rolled "Jobocate." wordmark, so the auth screens
+                carried a different logo from every other page. */}
+            <Logo size={26} />
           </Link>
 
-          <div
-            style={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              maxWidth: 400,
-              width: '100%',
-              margin: '0 auto',
-              animation: 'riseIn 0.6s ease both',
-            }}
-          >
-            <div
-              style={{
-                display: 'inline-flex',
-                alignSelf: 'flex-start',
-                alignItems: 'center',
-                gap: 8,
-                border: '1px solid #D9D0BE',
-                borderRadius: 999,
-                padding: '6px 13px',
-                marginBottom: 22,
-              }}
-            >
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#1FA463' }} />
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#5A544A' }}>
-                Welcome back
+          <div className="flex-1 flex flex-col justify-center w-full max-w-[400px] mx-auto animate-rise-in">
+            <div className="inline-flex self-start items-center gap-2 border border-jb-line-input rounded-full px-[13px] py-[6px] mb-[22px]">
+              <span className={`w-1.5 h-1.5 rounded-full ${accentDot}`} />
+              <span className="font-mono text-[11px] tracking-[0.1em] uppercase text-jb-ink-muted">
+                {copy.badge}
               </span>
             </div>
 
-            <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 46, lineHeight: 1.02, letterSpacing: '-0.01em', margin: '0 0 10px' }}>
-              Log in to keep
+            <h1 className="font-display font-normal text-[46px] leading-[1.02] tracking-[-0.01em] mb-2.5">
+              {copy.heading[0]}
               <br />
-              the search running.
+              {copy.heading[1]}
             </h1>
-            <p style={{ fontSize: 15.5, color: '#5A544A', margin: '0 0 30px' }}>Your matches and auto-applications are waiting.</p>
+            <p className="text-[15.5px] text-jb-ink-muted mb-[30px]">{copy.sub}</p>
 
             {/* OAUTH BUTTONS */}
-            <div style={{ display: 'flex', gap: 11, marginBottom: 22 }}>
-              <button
-                type="button"
-                onClick={() => startOAuth('google')}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 9,
-                  background: '#FFFEFB',
-                  border: '1px solid #D9D0BE',
-                  borderRadius: 12,
-                  padding: 12,
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                  fontSize: 14,
-                  fontWeight: 600,
-                  color: '#1B1A16',
-                }}
-              >
-                <span
-                  style={{
-                    width: 18,
-                    height: 18,
-                    borderRadius: '50%',
-                    background: 'conic-gradient(from -45deg, #EA4335, #FBBC05, #34A853, #4285F4, #EA4335)',
-                  }}
-                />
+            <div className="flex gap-[11px] mb-[22px]">
+              <button type="button" onClick={() => startOAuth('google')} className={oauthBtnClass}>
+                <span className="w-[18px] h-[18px] rounded-full bg-[conic-gradient(from_-45deg,#EA4335,#FBBC05,#34A853,#4285F4,#EA4335)]" />
                 Google
               </button>
-              <button
-                type="button"
-                onClick={() => startOAuth('linkedin')}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 9,
-                  background: '#FFFEFB',
-                  border: '1px solid #D9D0BE',
-                  borderRadius: 12,
-                  padding: 12,
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                  fontSize: 14,
-                  fontWeight: 600,
-                  color: '#1B1A16',
-                }}
-              >
-                <span
-                  style={{
-                    width: 18,
-                    height: 18,
-                    borderRadius: 4,
-                    background: '#0A66C2',
-                    color: '#fff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontFamily: "'Bricolage Grotesque',sans-serif",
-                    fontWeight: 800,
-                    fontSize: 11,
-                  }}
-                >
+              <button type="button" onClick={() => startOAuth('linkedin')} className={oauthBtnClass}>
+                <span className="w-[18px] h-[18px] rounded bg-[#0A66C2] text-white flex items-center justify-center font-display font-extrabold text-[11px]">
                   in
                 </span>
                 LinkedIn
               </button>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 22 }}>
-              <span style={{ flex: 1, height: 1, background: '#E1D9C9' }} />
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#A79E8F' }}>
+            <div className="flex items-center gap-3.5 mb-[22px]">
+              <span className="flex-1 h-px bg-jb-line-3" />
+              <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-jb-ink-ghost">
                 or with email
               </span>
-              <span style={{ flex: 1, height: 1, background: '#E1D9C9' }} />
+              <span className="flex-1 h-px bg-jb-line-3" />
             </div>
 
-            <label style={{ fontSize: 13, fontWeight: 600, color: '#46413A', marginBottom: 7, display: 'block' }}>Email</label>
+            <label htmlFor="login-email" className="block text-[13px] font-semibold text-jb-ink-heading mb-[7px]">Email</label>
             <input
+              id="login-email"
+              name="email"
+              autoComplete="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              style={{
-                width: '100%',
-                fontFamily: 'inherit',
-                fontSize: 15,
-                color: '#1B1A16',
-                background: '#FFFEFB',
-                border: '1px solid #D9D0BE',
-                borderRadius: 12,
-                padding: '13px 15px',
-                marginBottom: 18,
-                transition: 'box-shadow 0.15s, border-color 0.15s',
-              }}
+              className={`${fieldClass} mb-[18px]`}
             />
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: '#46413A' }}>Password</label>
-              <a href="#" style={{ fontSize: 13, fontWeight: 600, color: '#157A49', textDecoration: 'none' }}>
+            <div className="flex items-center justify-between mb-[7px]">
+              <label htmlFor="login-password" className="text-[13px] font-semibold text-jb-ink-heading">Password</label>
+              <a href="#" className="text-[13px] font-semibold text-jb-green-text no-underline">
                 Forgot?
               </a>
             </div>
             <input
+              id="login-password"
+              name="password"
+              autoComplete="current-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleEmailLogin(e); }}
-              style={{
-                width: '100%',
-                fontFamily: 'inherit',
-                fontSize: 15,
-                color: '#1B1A16',
-                background: '#FFFEFB',
-                border: '1px solid #D9D0BE',
-                borderRadius: 12,
-                padding: '13px 15px',
-                marginBottom: 22,
-                transition: 'box-shadow 0.15s, border-color 0.15s',
-              }}
+              className={`${fieldClass} mb-[22px]`}
             />
 
             {error ? (
-              <div style={{ fontSize: 13, color: '#B4231F', background: '#FBECEA', border: '1px solid #F0CFCB', borderRadius: 10, padding: '10px 13px', marginBottom: 14 }}>
+              <div className="text-[13px] text-jb-danger bg-jb-danger-tint border border-jb-danger-line rounded-[10px] px-[13px] py-2.5 mb-3.5">
                 {error}
               </div>
             ) : null}
@@ -280,120 +188,62 @@ export default function AppLogin() {
               type="button"
               onClick={handleEmailLogin}
               disabled={submitting}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 9,
-                background: '#1B1A16',
-                color: '#F7F3EA',
-                fontSize: 16,
-                fontWeight: 600,
-                padding: 15,
-                borderRadius: 999,
-                border: 'none',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                width: '100%',
-              }}
+              className="flex items-center justify-center gap-[9px] w-full bg-jb-ink text-jb-cream text-base font-semibold p-[15px] rounded-full border-none cursor-pointer font-sans"
             >
-              {submitting ? 'Signing in…' : 'Log in'} <span style={{ fontSize: 18 }}>→</span>
+              {submitting ? 'Signing in…' : 'Log in'} <span className="text-[18px]">→</span>
             </button>
 
-            <p style={{ fontSize: 14, color: '#5A544A', textAlign: 'center', margin: '26px 0 0' }}>
+            <p className="text-sm text-jb-ink-muted text-center mt-[26px]">
               New here?{' '}
-              <Link href="/app/signup" style={{ color: '#157A49', fontWeight: 600, textDecoration: 'none' }}>
+              <Link href={copy.signupHref} className={`${accentText} font-semibold no-underline`}>
                 Create an account
               </Link>
             </p>
           </div>
 
-          <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#A79E8F' }}>© 2026 Jobocate</div>
+          <div className="font-mono text-[11px] text-jb-ink-ghost">© 2026 Jobocate</div>
         </div>
 
-        {/* BRAND SIDE */}
-        <div
-          style={{
-            position: 'relative',
-            overflow: 'hidden',
-            background: '#15140F',
-            padding: 48,
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              background:
-                'radial-gradient(circle at 80% 10%, rgba(31,164,99,0.32), transparent 55%), radial-gradient(circle at 10% 100%, rgba(31,164,99,0.18), transparent 50%)',
-              pointerEvents: 'none',
-            }}
-          />
+        {/* BRAND SIDE — hidden on mobile so the form gets the full width. */}
+        <div className="relative overflow-hidden bg-jb-deep p-12 hidden md:flex md:flex-col md:justify-between">
+          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_80%_10%,rgba(31,164,99,0.32),transparent_55%),radial-gradient(circle_at_10%_100%,rgba(31,164,99,0.18),transparent_50%)]" />
 
-          <div style={{ position: 'relative', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#5BD08C' }}>
-            — Your copilot, still working
+          <div className="relative font-mono text-[11px] tracking-[0.14em] uppercase text-jb-green-on-dark">
+            — {copy.aside}
           </div>
 
-          <div style={{ position: 'relative' }}>
-            <div
-              style={{
-                background: '#1E1C15',
-                border: '1px solid #2C2A22',
-                borderRadius: 16,
-                padding: 20,
-                boxShadow: '0 30px 60px -28px rgba(0,0,0,0.6)',
-                marginBottom: 24,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: '#FBF8F1' }}>While you were away</span>
-                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#5BD08C' }}>● live</span>
+          <div className="relative">
+            <div className="bg-[#1e1c15] border border-[#2c2a22] rounded-2xl p-5 shadow-[0_30px_60px_-28px_rgba(0,0,0,0.6)] mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-[13px] font-bold text-[#fbf8f1]">While you were away</span>
+                <span className="font-mono text-[11px] text-jb-green-on-dark">● live</span>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div style={{ background: '#15140F', borderRadius: 10, padding: 13 }}>
-                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 24, fontWeight: 600, color: '#FBF8F1' }}>14</div>
-                  <div style={{ fontSize: 12, color: '#8A8378' }}>new matches</div>
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="bg-jb-deep rounded-[10px] p-[13px]">
+                  <div className="font-mono text-2xl font-semibold text-[#fbf8f1]">{copy.stat1[0]}</div>
+                  <div className="text-xs text-jb-ink-subtle">{copy.stat1[1]}</div>
                 </div>
-                <div style={{ background: '#15140F', borderRadius: 10, padding: 13 }}>
-                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 24, fontWeight: 600, color: '#5BD08C' }}>6</div>
-                  <div style={{ fontSize: 12, color: '#8A8378' }}>auto-applied</div>
+                <div className="bg-jb-deep rounded-[10px] p-[13px]">
+                  <div className="font-mono text-2xl font-semibold text-jb-green-on-dark">{copy.stat2[0]}</div>
+                  <div className="text-xs text-jb-ink-subtle">{copy.stat2[1]}</div>
                 </div>
               </div>
             </div>
 
-            <p style={{ fontFamily: "'Instrument Serif',serif", fontSize: 30, lineHeight: 1.2, color: '#F2EDE2', margin: '0 0 22px', maxWidth: 420 }}>
-              &ldquo;I logged back in to two interview requests I didn&apos;t even have to chase.&rdquo;
+            {/*
+              An attributed testimonial ran here — "Marcus Johnson, Product
+              Manager at Stripe" for candidates, "Dana Whitfield, Head of Talent
+              at Northwind" for employers. Neither person nor customer exists.
+              Replaced with a factual statement of how the product behaves.
+            */}
+            <p className="font-display text-[30px] leading-[1.2] text-[#f2ede2] m-0 max-w-[420px]">
+              {copy.promise}
             </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span
-                style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: '50%',
-                  background: '#C9622E',
-                  color: '#fff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 700,
-                  fontSize: 14,
-                }}
-              >
-                MJ
-              </span>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 14.5, color: '#FBF8F1' }}>Marcus Johnson</div>
-                <div style={{ fontSize: 13, color: '#9A9286' }}>Product Manager at Stripe</div>
-              </div>
-            </div>
           </div>
 
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#9A9286' }}>
-            <span style={{ color: '#1FA463', letterSpacing: '0.1em' }}>★★★★★</span>
-            Trusted by 100,000+ job seekers
+          <div className="relative flex items-center gap-2 text-[13px] text-jb-ink-faint">
+            <span className={accentText}>✓</span>
+            {copy.trust}
           </div>
         </div>
       </div>

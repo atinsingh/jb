@@ -2,15 +2,14 @@
 
 import Head from 'next/head';
 import Link from 'next/link';
-import SiteNav from '@/components/site/SiteNav';
-import SiteFooter from '@/components/site/SiteFooter';
+import PublicLayout from '@/components/layout/PublicLayout';
 import { appRoute } from '@/components/app/appRoutes';
 
 const STATS = [
-  { value: '100K+', label: 'People hired with Jobocate' },
-  { value: '2021', label: 'Founded in San Francisco' },
-  { value: '48', label: 'People on the team' },
-  { value: '$40M', label: 'Raised to back the mission' },
+  { value: 'Eligible', label: 'Every match is checked against what the role actually requires' },
+  { value: 'Tailored', label: 'Applications drafted from your real resume and experience' },
+  { value: 'Your call', label: 'Nothing is submitted until you review and approve it' },
+  { value: 'Verified', label: 'We only apply on real, employer-owned job pages' },
 ];
 
 const VALUES = [
@@ -31,15 +30,15 @@ const VALUES = [
 const TEAM = [
   {
     initials: 'AM',
-    bg: '#1FA463',
-    color: '#0C2C1C',
+    bg: 'var(--jb-d-accent)',
+    color: 'var(--jb-d-bg)',
     name: 'Aisha Mensah',
     role: 'Co-founder & CEO',
     body: 'Ex-recruiting lead. Spent a decade watching great people get filtered out by bad software.',
   },
   {
     initials: 'RK',
-    bg: '#1B1A16',
+    bg: 'var(--jb-d-footer)',
     color: '#F7F3EA',
     name: 'Ravi Kapoor',
     role: 'Co-founder & CTO',
@@ -67,13 +66,7 @@ export default function About() {
   return (
     <>
       <Head>
-        <title>About — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
+        <title>About Jobocate — AI job search on your terms</title>
       </Head>
 
       <style jsx global>{`
@@ -84,7 +77,7 @@ export default function About() {
           scroll-behavior: smooth;
         }
         #jbabout ::selection {
-          background: #1fa463;
+          background: var(--jb-d-accent);
           color: #f7f3ea;
         }
         @keyframes riseIn {
@@ -102,25 +95,23 @@ export default function About() {
       <div
         id="jbabout"
         style={{
-          background: '#F7F3EA',
-          color: '#1B1A16',
-          fontFamily: "'Hanken Grotesk',sans-serif",
+          background: 'transparent',
+          color: 'var(--jb-d-ink)',
+          fontFamily: 'var(--jb-font-sans)',
           WebkitFontSmoothing: 'antialiased',
         }}
       >
-        <div style={{ position: 'sticky', top: 0, zIndex: 50 }}>
-          <SiteNav />
-        </div>
+        <PublicLayout>
 
         {/* HERO */}
         <section style={{ maxWidth: 1000, margin: '0 auto', padding: '72px 32px 48px', textAlign: 'center' }}>
           <div
             style={{
-              fontFamily: "'JetBrains Mono',monospace",
+              fontFamily: 'var(--jb-font-mono)',
               fontSize: 11.5,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
-              color: '#1FA463',
+              color: 'var(--jb-d-accent)',
               marginBottom: 18,
             }}
           >
@@ -128,9 +119,9 @@ export default function About() {
           </div>
           <h1
             style={{
-              fontFamily: "'Instrument Serif',serif",
+              fontFamily: 'var(--jb-font-display)',
               fontWeight: 400,
-              fontSize: 64,
+              fontSize: 'clamp(29px, 6vw, 64px)',
               lineHeight: 1.04,
               letterSpacing: '-0.01em',
               margin: '0 0 22px',
@@ -144,16 +135,16 @@ export default function About() {
               fixing it.
             </span>
           </h1>
-          <p style={{ fontSize: 19, lineHeight: 1.6, color: '#4B463E', maxWidth: 600, margin: '0 auto' }}>
-            Talented people spend months lost in application portals while great roles go unfilled. Jobocate exists to
-            close that gap — putting world-class job-search tooling in everyone&apos;s hands, not just those who can
-            afford a coach.
+          <p style={{ fontSize: 19, lineHeight: 1.6, color: 'var(--jb-d-ink-85)', maxWidth: 600, margin: '0 auto' }}>
+            Good candidates spend months lost in application portals while roles they&apos;d be right for go unfilled.
+            Jobocate closes that gap — putting real job-search tooling in everyone&apos;s hands: eligibility-checked
+            matches, applications tailored from your experience, and auto-apply you approve.
           </p>
         </section>
 
         {/* MISSION STATEMENT */}
         <section style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 32px 80px' }}>
-          <div style={{ background: '#1B1A16', borderRadius: 24, padding: '64px 56px', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ background: 'var(--jb-d-footer)', borderRadius: 24, padding: '64px 56px', position: 'relative', overflow: 'hidden' }}>
             <div
               style={{
                 position: 'absolute',
@@ -165,19 +156,19 @@ export default function About() {
             <div style={{ position: 'relative', maxWidth: 760 }}>
               <div
                 style={{
-                  fontFamily: "'JetBrains Mono',monospace",
+                  fontFamily: 'var(--jb-font-mono)',
                   fontSize: 11.5,
                   letterSpacing: '0.14em',
                   textTransform: 'uppercase',
-                  color: '#5BD08C',
+                  color: 'var(--jb-d-accent)',
                   marginBottom: 20,
                 }}
               >
                 — Our mission
               </div>
-              <p style={{ fontFamily: "'Instrument Serif',serif", fontSize: 40, lineHeight: 1.22, color: '#FBF8F1', margin: 0 }}>
-                To make a fair, fast job search the default — so the right person and the right role find each other in
-                days, not desperate months.
+              <p style={{ fontFamily: 'var(--jb-font-display)', fontSize: 'clamp(26px, 5vw, 40px)', lineHeight: 1.22, color: '#FBF8F1', margin: 0 }}>
+                To make a fair, focused job search the default — so the right person and the right role find each other
+                with less noise, less guesswork, and nothing sent without your say-so.
               </p>
             </div>
           </div>
@@ -188,49 +179,49 @@ export default function About() {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(4,1fr)',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))',
               gap: 24,
-              borderTop: '1px solid #E7E0D2',
+              borderTop: '1px solid var(--jb-d-line-card)',
               paddingTop: 48,
             }}
           >
             {STATS.map((s) => (
               <div key={s.label}>
-                <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 44, fontWeight: 600, lineHeight: 1 }}>
+                <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 'clamp(26px, 5vw, 44px)', fontWeight: 600, lineHeight: 1 }}>
                   {s.value}
                 </div>
-                <div style={{ width: 32, height: 3, background: '#1FA463', margin: '14px 0 10px' }} />
-                <div style={{ fontSize: 14, color: '#5A544A' }}>{s.label}</div>
+                <div style={{ width: 32, height: 3, background: 'var(--jb-d-accent)', margin: '14px 0 10px' }} />
+                <div style={{ fontSize: 14, color: 'var(--jb-d-ink-70)' }}>{s.label}</div>
               </div>
             ))}
           </div>
         </section>
 
         {/* VALUES */}
-        <section style={{ background: '#F1ECE0', borderTop: '1px solid #E7E0D2', borderBottom: '1px solid #E7E0D2' }}>
+        <section style={{ background: 'var(--jb-d-glass)', borderTop: '1px solid var(--jb-d-line-card)', borderBottom: '1px solid var(--jb-d-line-card)' }}>
           <div style={{ maxWidth: 1200, margin: '0 auto', padding: '84px 32px' }}>
             <div style={{ maxWidth: 600, marginBottom: 52 }}>
               <div
                 style={{
-                  fontFamily: "'JetBrains Mono',monospace",
+                  fontFamily: 'var(--jb-font-mono)',
                   fontSize: 11.5,
                   letterSpacing: '0.14em',
                   textTransform: 'uppercase',
-                  color: '#1FA463',
+                  color: 'var(--jb-d-accent)',
                   marginBottom: 16,
                 }}
               >
                 — What we believe
               </div>
-              <h2 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 48, lineHeight: 1.05, margin: 0 }}>
+              <h2 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 'clamp(26px, 5vw, 48px)', lineHeight: 1.05, margin: 0 }}>
                 The principles behind the product
               </h2>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 36 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', gap: 36 }}>
               {VALUES.map((v) => (
-                <div key={v.title} style={{ borderTop: '2px solid #1B1A16', paddingTop: 22 }}>
+                <div key={v.title} style={{ borderTop: '2px solid var(--jb-d-footer)', paddingTop: 22 }}>
                   <h3 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 10px' }}>{v.title}</h3>
-                  <p style={{ fontSize: 15, lineHeight: 1.6, color: '#5A544A', margin: 0 }}>{v.body}</p>
+                  <p style={{ fontSize: 15, lineHeight: 1.6, color: 'var(--jb-d-ink-70)', margin: 0 }}>{v.body}</p>
                 </div>
               ))}
             </div>
@@ -242,25 +233,25 @@ export default function About() {
           <div style={{ maxWidth: 600, marginBottom: 48 }}>
             <div
               style={{
-                fontFamily: "'JetBrains Mono',monospace",
+                fontFamily: 'var(--jb-font-mono)',
                 fontSize: 11.5,
                 letterSpacing: '0.14em',
                 textTransform: 'uppercase',
-                color: '#1FA463',
+                color: 'var(--jb-d-accent)',
                 marginBottom: 16,
               }}
             >
               — Who&apos;s building it
             </div>
-            <h2 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 48, lineHeight: 1.05, margin: 0 }}>
+            <h2 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 'clamp(26px, 5vw, 48px)', lineHeight: 1.05, margin: 0 }}>
               A team that&apos;s been on both sides of the table
             </h2>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))', gap: 20 }}>
             {TEAM.map((m) => (
               <div
                 key={m.name}
-                style={{ background: '#FBF8F1', border: '1px solid #E1D9C9', borderRadius: 16, padding: 24 }}
+                style={{ background: 'var(--jb-d-glass)', border: '1px solid var(--jb-d-line-card)', borderRadius: 16, padding: 24 }}
               >
                 <span
                   style={{
@@ -280,8 +271,8 @@ export default function About() {
                   {m.initials}
                 </span>
                 <div style={{ fontWeight: 700, fontSize: 16 }}>{m.name}</div>
-                <div style={{ fontSize: 13, color: '#7A7367', marginBottom: 10 }}>{m.role}</div>
-                <p style={{ fontSize: 13, lineHeight: 1.5, color: '#7A7367', margin: 0 }}>{m.body}</p>
+                <div style={{ fontSize: 13, color: 'var(--jb-d-ink-65)', marginBottom: 10 }}>{m.role}</div>
+                <p style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--jb-d-ink-65)', margin: 0 }}>{m.body}</p>
               </div>
             ))}
           </div>
@@ -293,7 +284,7 @@ export default function About() {
             style={{
               position: 'relative',
               overflow: 'hidden',
-              background: '#15140F',
+              background: 'var(--jb-d-footer)',
               borderRadius: 24,
               padding: '78px 40px',
               textAlign: 'center',
@@ -310,20 +301,20 @@ export default function About() {
             <div style={{ position: 'relative' }}>
               <h2
                 style={{
-                  fontFamily: "'Instrument Serif',serif",
+                  fontFamily: 'var(--jb-font-display)',
                   fontWeight: 400,
-                  fontSize: 58,
+                  fontSize: 'clamp(27px, 5vw, 58px)',
                   lineHeight: 1.02,
                   color: '#FBF8F1',
                   margin: '0 auto 16px',
                   maxWidth: 640,
                 }}
               >
-                Come build the future of work
+                Find your next role — or help others find theirs
               </h2>
-              <p style={{ fontSize: 18, color: '#B8B1A4', maxWidth: 480, margin: '0 auto 32px', lineHeight: 1.55 }}>
-                Whether you&apos;re hunting for your next role or want to help others find theirs — there&apos;s a place
-                for you here.
+              <p style={{ fontSize: 18, color: 'var(--jb-d-ink-65)', maxWidth: 480, margin: '0 auto 32px', lineHeight: 1.55 }}>
+                Start your search free, or come build the product that runs it. Either way, there&apos;s a place for you
+                here.
               </p>
               <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
                 <Link
@@ -332,8 +323,8 @@ export default function About() {
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 10,
-                    background: '#1FA463',
-                    color: '#0C2C1C',
+                    background: 'var(--jb-d-accent)',
+                    color: 'var(--jb-d-bg)',
                     fontSize: 17,
                     fontWeight: 700,
                     padding: '17px 32px',
@@ -366,7 +357,7 @@ export default function About() {
           </div>
         </section>
 
-        <SiteFooter />
+        </PublicLayout>
       </div>
     </>
   );

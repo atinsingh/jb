@@ -1,14 +1,14 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
 export type ApplicationEventDocument = ApplicationEvent & Document;
 
 @Schema({ timestamps: true })
 export class ApplicationEvent {
-  @Prop({ type: Types.ObjectId, ref: 'Application', required: false, index: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Application', required: false, index: true })
   applicationId?: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true, index: true })
   userId: Types.ObjectId;
 
   @Prop({ required: true })

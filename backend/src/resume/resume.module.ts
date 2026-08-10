@@ -4,12 +4,12 @@ import { ResumeController } from './resume.controller';
 import { ResumeService } from './resume.service';
 import { ResumeParserService } from './resume-parser.service';
 import { User, UserSchema } from '../schemas/user.schema';
-import { AiServicesModule } from '../ai-services/ai-services.module';
+import { LLMModule } from '../llm/llm.module';
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
-    AiServicesModule,
+    LLMModule,
   ],
   controllers: [ResumeController],
   providers: [ResumeService, ResumeParserService],

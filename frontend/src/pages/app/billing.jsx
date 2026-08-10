@@ -6,22 +6,13 @@ import Link from 'next/link';
 import AppSidebar from '@/components/app/AppSidebar';
 import { appRoute } from '@/components/app/appRoutes';
 import { getInvoices } from '@/services/billingApi';
+import { LoadingState, EmptyState, ErrorState } from '@/components/app/AppStates';
 
 // ---- status pill styling (ported from the design's statusStyle()) -----------
 const statusStyle = (s) =>
   s === 'paid'
     ? { label: 'PAID', color: '#157A49', bg: '#EAF6EE', border: '#CDE9D6' }
     : { label: 'REFUNDED', color: '#8A8378', bg: '#F2ECE0', border: '#E6DECF' };
-
-// ---- the design's own sample invoices (graceful fallback) -------------------
-const SAMPLE_INVOICES = [
-  { date: 'Jul 28, 2025', desc: 'Premium · Annual', amount: '$468.00', status: 'paid' },
-  { date: 'Jun 28, 2025', desc: 'Pro · Monthly', amount: '$29.00', status: 'paid' },
-  { date: 'May 28, 2025', desc: 'Pro · Monthly', amount: '$29.00', status: 'paid' },
-  { date: 'Apr 28, 2025', desc: 'Pro · Monthly', amount: '$29.00', status: 'paid' },
-  { date: 'Mar 30, 2025', desc: 'Pro · Monthly (prorated refund)', amount: '$12.40', status: 'refunded' },
-  { date: 'Mar 28, 2025', desc: 'Pro · Monthly', amount: '$29.00', status: 'paid' },
-];
 
 // Normalize a raw invoice list into render-ready rows (status pill + divider).
 const buildInvoices = (raw) =>
@@ -64,40 +55,32 @@ const normalizeApiInvoice = (i) => {
 };
 
 const headerCell = {
-  fontFamily: "'JetBrains Mono',monospace",
-  fontSize: 10,
+  fontFamily: 'var(--jb-font-mono)',
+  fontSize: 11,
   letterSpacing: '0.06em',
   textTransform: 'uppercase',
   color: '#9A9286',
 };
 
-const inputStyle = {
-  fontFamily: 'inherit',
-  fontSize: 14,
-  color: '#1B1A16',
-  background: '#FBF8F1',
-  border: '1px solid #E1D9C9',
-  borderRadius: 12,
-  padding: '11px 14px',
-};
-
 export default function AppBilling() {
-  const [editing, setEditing] = useState(false);
-  const [invoices, setInvoices] = useState(() => buildInvoices(SAMPLE_INVOICES));
+  const [invoices, setInvoices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Attempt a real fetch; gracefully fall back to the design sample data on any
-  // failure (no live endpoint, unauthenticated, etc.) so the page always renders.
+  // Fetch the user's real invoices. No sample fallback — an authenticated user
+  // with no billing history sees a genuine empty state, not fabricated rows.
   useEffect(() => {
     let active = true;
     (async () => {
       try {
         const data = await getInvoices();
         const list = Array.isArray(data) ? data : data?.invoices;
-        if (active && Array.isArray(list) && list.length > 0) {
-          setInvoices(buildInvoices(list.map(normalizeApiInvoice)));
-        }
-      } catch {
-        // keep sample fallback
+        const rows = Array.isArray(list) ? list.map(normalizeApiInvoice) : [];
+        if (active) setInvoices(buildInvoices(rows));
+      } catch (e) {
+        if (active) setError(e);
+      } finally {
+        if (active) setLoading(false);
       }
     })();
     return () => {
@@ -111,12 +94,6 @@ export default function AppBilling() {
     <>
       <Head>
         <title>Billing · Plan &amp; billing — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
       <style jsx global>{`
@@ -143,7 +120,7 @@ export default function AppBilling() {
           display: 'flex',
           minHeight: '100vh',
           background: '#F7F3EA',
-          fontFamily: "'Hanken Grotesk',sans-serif",
+          fontFamily: 'var(--jb-font-sans)',
           color: '#1B1A16',
         }}
       >
@@ -180,7 +157,7 @@ export default function AppBilling() {
               ← Back to settings
             </Link>
             <div style={{ flex: 1 }} />
-            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, color: '#9A9286' }}>
+            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, color: '#9A9286' }}>
               Plan &amp; billing
             </span>
           </header>
@@ -188,7 +165,7 @@ export default function AppBilling() {
           <div style={{ padding: '30px 32px 64px', maxWidth: 820, width: '100%', margin: '0 auto' }}>
             <h1
               style={{
-                fontFamily: "'Instrument Serif',serif",
+                fontFamily: 'var(--jb-font-display)',
                 fontWeight: 400,
                 fontSize: 38,
                 lineHeight: 1,
@@ -198,91 +175,42 @@ export default function AppBilling() {
               Billing
             </h1>
 
-            {/* SUMMARY */}
+            {/* SUMMARY — real subscription/payment summary is surfaced on the
+                subscription & payment-method pages; no fabricated charge here. */}
             <div
               style={{
                 background: '#FFFEFB',
                 border: '1px solid #E6DECF',
                 borderRadius: 18,
-                padding: '24px 26px',
+                padding: '8px 26px',
                 marginBottom: 18,
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
-                <div style={{ flex: 1, minWidth: 200 }}>
-                  <div
+              <EmptyState
+                icon="💳"
+                title="No active subscription"
+                hint="When you subscribe, your next charge and payment method appear here."
+                action={
+                  <Link
+                    href={appRoute('App Payment Methods.dc.html')}
                     style={{
-                      fontFamily: "'JetBrains Mono',monospace",
-                      fontSize: 10.5,
-                      letterSpacing: '0.08em',
-                      textTransform: 'uppercase',
-                      color: '#9A9286',
-                      marginBottom: 8,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 7,
+                      marginTop: 6,
+                      fontSize: 13.5,
+                      fontWeight: 700,
+                      color: '#0C2C1C',
+                      background: '#1FA463',
+                      borderRadius: 999,
+                      padding: '10px 18px',
+                      textDecoration: 'none',
                     }}
                   >
-                    Next charge
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                    <span
-                      style={{
-                        fontFamily: "'JetBrains Mono',monospace",
-                        fontSize: 28,
-                        fontWeight: 600,
-                        color: '#1B1A16',
-                      }}
-                    >
-                      $39.00
-                    </span>
-                    <span style={{ fontSize: 13.5, color: '#5A544A' }}>
-                      /mo · annual renewal of <b style={{ color: '#1B1A16' }}>$468.00</b>
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 13, color: '#8A8378', marginTop: 5 }}>
-                    On Jul 28, 2026 · Premium plan
-                  </div>
-                </div>
-                <Link
-                  href={appRoute('App Payment Methods.dc.html')}
-                  className="jb-pm"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 13,
-                    background: '#FBF8F1',
-                    border: '1px solid #E1D9C9',
-                    borderRadius: 13,
-                    padding: '13px 16px',
-                    textDecoration: 'none',
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 34,
-                      height: 24,
-                      borderRadius: 5,
-                      background: 'linear-gradient(135deg,#1FA463,#157A49)',
-                      flexShrink: 0,
-                    }}
-                  />
-                  <span>
-                    <span
-                      style={{
-                        display: 'block',
-                        fontFamily: "'JetBrains Mono',monospace",
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: '#1B1A16',
-                      }}
-                    >
-                      •••• 4242
-                    </span>
-                    <span style={{ display: 'block', fontSize: 11.5, color: '#8A8378' }}>
-                      Visa · expires 09/27
-                    </span>
-                  </span>
-                  <span style={{ color: '#A79E8F', fontSize: 14, marginLeft: 4 }}>→</span>
-                </Link>
-              </div>
+                    Manage payment methods →
+                  </Link>
+                }
+              />
             </div>
 
             {/* INVOICES */}
@@ -298,160 +226,83 @@ export default function AppBilling() {
               <div style={{ padding: '18px 24px', borderBottom: '1px solid #F2ECE0' }}>
                 <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Invoices</h2>
               </div>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: gridCols,
-                  padding: '11px 24px',
-                  background: '#FBF9F4',
-                  borderBottom: '1px solid #F2ECE0',
-                }}
-              >
-                <span style={headerCell}>Date</span>
-                <span style={headerCell}>Description</span>
-                <span style={headerCell}>Amount</span>
-                <span style={headerCell}>Status</span>
-                <span style={{ ...headerCell, textAlign: 'right' }}>Receipt</span>
-              </div>
-              {invoices.map((i, idx) => (
-                <div
-                  key={`${i.date}-${idx}`}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: gridCols,
-                    alignItems: 'center',
-                    padding: '15px 24px',
-                    borderBottom: `1px solid ${i.divider}`,
-                  }}
-                >
-                  <span style={{ fontSize: 13.5, color: '#5A544A' }}>{i.date}</span>
-                  <span style={{ fontSize: 13.5, fontWeight: 600, color: '#1B1A16' }}>{i.desc}</span>
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 13, color: '#1B1A16' }}>
-                    {i.amount}
-                  </span>
-                  <span>
-                    <span
-                      style={{
-                        fontFamily: "'JetBrains Mono',monospace",
-                        fontSize: 9.5,
-                        fontWeight: 600,
-                        letterSpacing: '0.04em',
-                        color: i.statusColor,
-                        background: i.statusBg,
-                        border: `1px solid ${i.statusBorder}`,
-                        padding: '3px 9px',
-                        borderRadius: 999,
-                      }}
-                    >
-                      {i.statusLabel}
-                    </span>
-                  </span>
-                  <a
-                    href="#"
+
+              {loading ? (
+                <LoadingState label="Loading invoices…" />
+              ) : error ? (
+                <ErrorState error={error} onRetry={() => window.location.reload()} />
+              ) : invoices.length === 0 ? (
+                <EmptyState
+                  icon="🧾"
+                  title="No invoices yet"
+                  hint="Your paid invoices and receipts will appear here once you have an active subscription."
+                />
+              ) : (
+                <>
+                  <div
                     style={{
-                      fontFamily: "'JetBrains Mono',monospace",
-                      fontSize: 11.5,
-                      fontWeight: 600,
-                      color: '#157A49',
-                      textDecoration: 'none',
-                      textAlign: 'right',
+                      display: 'grid',
+                      gridTemplateColumns: gridCols,
+                      padding: '11px 24px',
+                      background: '#FBF9F4',
+                      borderBottom: '1px solid #F2ECE0',
                     }}
                   >
-                    PDF ↓
-                  </a>
-                </div>
-              ))}
-            </div>
-
-            {/* BILLING ADDRESS */}
-            <div
-              style={{
-                background: '#FFFEFB',
-                border: '1px solid #E6DECF',
-                borderRadius: 18,
-                padding: '24px 26px',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: 16,
-                }}
-              >
-                <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Billing address</h2>
-                {!editing && (
-                  <button
-                    onClick={() => setEditing(true)}
-                    style={{
-                      fontFamily: 'inherit',
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: '#157A49',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: 0,
-                    }}
-                  >
-                    Edit
-                  </button>
-                )}
-              </div>
-
-              {!editing && (
-                <div style={{ fontSize: 14.5, lineHeight: 1.7, color: '#46413A' }}>
-                  <div style={{ fontWeight: 600, color: '#1B1A16' }}>Sarah Chen</div>
-                  <div>1100 Market Street, Suite 400</div>
-                  <div>San Francisco, CA 94103</div>
-                  <div>United States</div>
-                </div>
-              )}
-
-              {editing && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <input defaultValue="Sarah Chen" style={{ ...inputStyle, width: '100%' }} />
-                  <input defaultValue="1100 Market Street, Suite 400" style={{ ...inputStyle, width: '100%' }} />
-                  <div style={{ display: 'flex', gap: 12 }}>
-                    <input defaultValue="San Francisco" style={{ ...inputStyle, flex: 1 }} />
-                    <input defaultValue="CA" style={{ ...inputStyle, width: 80 }} />
-                    <input defaultValue="94103" style={{ ...inputStyle, width: 110 }} />
+                    <span style={headerCell}>Date</span>
+                    <span style={headerCell}>Description</span>
+                    <span style={headerCell}>Amount</span>
+                    <span style={headerCell}>Status</span>
+                    <span style={{ ...headerCell, textAlign: 'right' }}>Receipt</span>
                   </div>
-                  <input defaultValue="United States" style={{ ...inputStyle, width: '100%' }} />
-                  <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-                    <button
-                      onClick={() => setEditing(false)}
+                  {invoices.map((i, idx) => (
+                    <div
+                      key={`${i.date}-${idx}`}
                       style={{
-                        fontFamily: 'inherit',
-                        fontSize: 13.5,
-                        fontWeight: 700,
-                        color: '#0C2C1C',
-                        background: '#1FA463',
-                        border: 'none',
-                        borderRadius: 999,
-                        padding: '10px 20px',
-                        cursor: 'pointer',
+                        display: 'grid',
+                        gridTemplateColumns: gridCols,
+                        alignItems: 'center',
+                        padding: '15px 24px',
+                        borderBottom: `1px solid ${i.divider}`,
                       }}
                     >
-                      Save
-                    </button>
-                    <button
-                      onClick={() => setEditing(false)}
-                      style={{
-                        fontFamily: 'inherit',
-                        fontSize: 13.5,
-                        fontWeight: 600,
-                        color: '#5A544A',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
+                      <span style={{ fontSize: 13.5, color: '#5A544A' }}>{i.date}</span>
+                      <span style={{ fontSize: 13.5, fontWeight: 600, color: '#1B1A16' }}>{i.desc}</span>
+                      <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 13, color: '#1B1A16' }}>
+                        {i.amount}
+                      </span>
+                      <span>
+                        <span
+                          style={{
+                            fontFamily: 'var(--jb-font-mono)',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            letterSpacing: '0.04em',
+                            color: i.statusColor,
+                            background: i.statusBg,
+                            border: `1px solid ${i.statusBorder}`,
+                            padding: '3px 9px',
+                            borderRadius: 999,
+                          }}
+                        >
+                          {i.statusLabel}
+                        </span>
+                      </span>
+                      <a
+                        href="#"
+                        style={{
+                          fontFamily: 'var(--jb-font-mono)',
+                          fontSize: 11.5,
+                          fontWeight: 600,
+                          color: '#157A49',
+                          textDecoration: 'none',
+                          textAlign: 'right',
+                        }}
+                      >
+                        PDF ↓
+                      </a>
+                    </div>
+                  ))}
+                </>
               )}
             </div>
           </div>

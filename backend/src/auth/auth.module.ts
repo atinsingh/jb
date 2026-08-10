@@ -19,7 +19,13 @@ import { LoggerModule } from '../common/logger/logger.module';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => {
-        const secret = configService.get<string>('JWT_SECRET') || 'your-secret-key';
+        const envSecret = configService.get<string>('JWT_SECRET');
+        if (!envSecret && process.env.NODE_ENV === 'production') {
+          throw new Error(
+            'JWT_SECRET must be set in production — refusing to start with an insecure default secret.',
+          );
+        }
+        const secret = envSecret || 'dev-insecure-secret-change-me';
         const expiresIn = configService.get<string>('JWT_EXPIRES_IN') || '7d';
         return {
           secret,

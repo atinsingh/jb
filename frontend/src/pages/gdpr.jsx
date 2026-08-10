@@ -1,7 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
-import { Navbar } from '@/components/navbar';
-import { Footer } from '@/components/footer';
+import PublicLayout from '@/components/layout/PublicLayout';
 import { motion } from 'framer-motion';
 
 export default function GDPR() {
@@ -70,11 +69,9 @@ export default function GDPR() {
         <meta name="description" content="Learn about Jobocate's GDPR compliance and your data protection rights." />
       </Head>
 
-      <Navbar />
-
-      <main>
+      <PublicLayout>
         {/* Hero Section */}
-        <section className="relative pt-32 pb-16 overflow-hidden bg-gradient-to-b from-primary-50/50 via-white to-white">
+        <section className="relative pt-16 pb-16 overflow-hidden bg-gradient-to-b from-primary-50/50 via-white to-white">
           <div className="absolute inset-0 pointer-events-none">
             <div className="absolute top-20 right-1/4 w-[500px] h-[500px] bg-primary-100/40 rounded-full blur-[100px]" />
             <div className="dot-pattern absolute inset-0 opacity-30" />
@@ -188,7 +185,7 @@ export default function GDPR() {
               className="mt-16 text-center"
             >
               <Link
-                href="/signup"
+                href="/app/signup"
                 className="inline-flex items-center gap-2 px-8 py-4 bg-primary-500 hover:bg-primary-600 text-white text-lg font-semibold rounded-full transition-all duration-300"
               >
                 Start Your Job Search
@@ -199,9 +196,7 @@ export default function GDPR() {
             </motion.div>
           </div>
         </section>
-      </main>
-
-      <Footer />
+      </PublicLayout>
     </div>
   );
 }

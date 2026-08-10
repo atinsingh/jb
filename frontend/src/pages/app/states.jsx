@@ -40,7 +40,7 @@ function SectionLabel({ tag, tagColor, note }) {
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10 }}>
       <span
         style={{
-          fontFamily: "'JetBrains Mono',monospace",
+          fontFamily: 'var(--jb-font-mono)',
           fontSize: 11,
           fontWeight: 600,
           letterSpacing: '0.08em',
@@ -60,12 +60,6 @@ export default function AppStates() {
     <>
       <Head>
         <title>App states · Reusable patterns — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
       <style jsx global>{`
@@ -96,7 +90,7 @@ export default function AppStates() {
         style={{
           minHeight: '100vh',
           background: '#F7F3EA',
-          fontFamily: "'Hanken Grotesk',sans-serif",
+          fontFamily: 'var(--jb-font-sans)',
           color: '#1B1A16',
           padding: '40px 32px 72px',
         }}
@@ -106,7 +100,7 @@ export default function AppStates() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 8 }}>
             <span
               style={{
-                fontFamily: "'Bricolage Grotesque',sans-serif",
+                fontFamily: 'var(--jb-font-display)',
                 fontWeight: 800,
                 letterSpacing: '-0.02em',
                 fontSize: 23,
@@ -117,7 +111,7 @@ export default function AppStates() {
             </span>
             <span
               style={{
-                fontFamily: "'JetBrains Mono',monospace",
+                fontFamily: 'var(--jb-font-mono)',
                 fontSize: 11,
                 letterSpacing: '0.12em',
                 textTransform: 'uppercase',
@@ -129,7 +123,7 @@ export default function AppStates() {
           </div>
           <h1
             style={{
-              fontFamily: "'Instrument Serif',serif",
+              fontFamily: 'var(--jb-font-display)',
               fontWeight: 400,
               fontSize: 38,
               lineHeight: 1.02,
@@ -157,7 +151,7 @@ export default function AppStates() {
               >
                 <div
                   style={{
-                    fontFamily: "'Instrument Serif',serif",
+                    fontFamily: 'var(--jb-font-display)',
                     fontSize: 88,
                     lineHeight: 1,
                     color: '#1FA463',
@@ -169,7 +163,7 @@ export default function AppStates() {
                 </div>
                 <h2
                   style={{
-                    fontFamily: "'Instrument Serif',serif",
+                    fontFamily: 'var(--jb-font-display)',
                     fontWeight: 400,
                     fontSize: 30,
                     lineHeight: 1.05,
@@ -251,7 +245,7 @@ export default function AppStates() {
                 </div>
                 <h2
                   style={{
-                    fontFamily: "'Instrument Serif',serif",
+                    fontFamily: 'var(--jb-font-display)',
                     fontWeight: 400,
                     fontSize: 28,
                     lineHeight: 1.05,
@@ -303,8 +297,8 @@ export default function AppStates() {
                 </div>
                 <div
                   style={{
-                    fontFamily: "'JetBrains Mono',monospace",
-                    fontSize: 10.5,
+                    fontFamily: 'var(--jb-font-mono)',
+                    fontSize: 11,
                     color: '#B5AC9C',
                     marginTop: 18,
                   }}
@@ -342,8 +336,8 @@ export default function AppStates() {
                 >
                   <span
                     style={{
-                      fontFamily: "'JetBrains Mono',monospace",
-                      fontSize: 9.5,
+                      fontFamily: 'var(--jb-font-mono)',
+                      fontSize: 11,
                       letterSpacing: '0.06em',
                       textTransform: 'uppercase',
                       color: '#A79E8F',
@@ -354,7 +348,7 @@ export default function AppStates() {
                 </div>
                 <h2
                   style={{
-                    fontFamily: "'Instrument Serif',serif",
+                    fontFamily: 'var(--jb-font-display)',
                     fontWeight: 400,
                     fontSize: 26,
                     lineHeight: 1.1,
@@ -422,8 +416,8 @@ export default function AppStates() {
                   </span>
                   <span
                     style={{
-                      fontFamily: "'JetBrains Mono',monospace",
-                      fontSize: 10.5,
+                      fontFamily: 'var(--jb-font-mono)',
+                      fontSize: 11,
                       color: '#9A6A2E',
                       flexShrink: 0,
                     }}
@@ -465,8 +459,8 @@ export default function AppStates() {
                   <Link
                     href={appRoute('App Help Center.dc.html')}
                     style={{
-                      fontFamily: "'JetBrains Mono',monospace",
-                      fontSize: 10.5,
+                      fontFamily: 'var(--jb-font-mono)',
+                      fontSize: 11,
                       fontWeight: 600,
                       color: '#5BD08C',
                       textDecoration: 'none',

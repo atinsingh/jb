@@ -247,7 +247,10 @@ export class JobProfilesController {
     }
 
     // Parse resume
-    const parseResult = await this.resumeParserService.parseResume(file);
+    const parseResult = await this.resumeParserService.parseResume(
+      file,
+      req.user._id.toString(),
+    );
 
     // Update profile with extracted data
     const profile = await this.jobProfilesService.updateProfileFromResume(

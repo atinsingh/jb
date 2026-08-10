@@ -1,12 +1,15 @@
 import { Controller, Get, Post, Body, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { EmployerBillingService } from './employer-billing.service';
 import { UpgradeDto } from './dto/upgrade.dto';
 
 @ApiTags('employer-billing')
 @Controller('employer/billing')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('ROLE_EMPLOYER', 'ROLE_ADMIN')
 export class EmployerBillingController {
   constructor(private readonly employerBillingService: EmployerBillingService) {}
 
@@ -34,13 +37,47 @@ export class EmployerBillingController {
 
   @Post('upgrade')
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Upgrade the employer plan / billing cycle' })
-  @ApiResponse({ status: 201, description: 'Subscription upgraded successfully' })
+  @ApiOperation({
+    summary: 'Start a plan change — returns a Stripe Checkout URL to redirect to',
+    description:
+      'Does NOT grant the plan. The plan changes only once Stripe confirms payment ' +
+      'via webhook. Sales-led plans (enterprise) are rejected with 400.',
+  })
+  @ApiResponse({ status: 201, description: 'Checkout session created' })
+  @ApiResponse({ status: 400, description: 'Plan is not self-serve purchasable' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async upgrade(@Body() upgradeDto: UpgradeDto, @Request() req) {
     const ownerId = req.user._id.toString();
-    const subscription = await this.employerBillingService.upgrade(ownerId, upgradeDto);
-    return { message: 'Subscription upgraded successfully', subscription };
+    return this.employerBillingService.upgrade(
+      ownerId,
+      upgradeDto,
+      req.user.email,
+    );
+  }
+
+  @Post('portal')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Create a Stripe billing-portal session (payment method, cancel, invoices)',
+  })
+  @ApiResponse({ status: 201, description: 'Portal session created' })
+  @ApiResponse({ status: 400, description: 'No billing information found' })
+  async portal(@Request() req, @Body() body: { returnUrl?: string }) {
+    const ownerId = req.user._id.toString();
+    return this.employerBillingService.createBillingPortalSession(
+      ownerId,
+      body?.returnUrl,
+    );
+  }
+
+  @Get('plans')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get the plan catalog with the current plan flagged' })
+  @ApiResponse({ status: 200, description: 'Plans retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getPlans(@Request() req) {
+    const ownerId = req.user._id.toString();
+    return this.employerBillingService.getPlans(ownerId);
   }
 
   @Get('invoices')

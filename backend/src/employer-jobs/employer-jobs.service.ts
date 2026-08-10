@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import {
@@ -7,13 +7,35 @@ import {
 } from './schemas/employer-job.schema';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
+import { PublisherService } from '../ingestion/pipeline/publisher.service';
 
 @Injectable()
 export class EmployerJobsService {
+  private readonly logger = new Logger(EmployerJobsService.name);
+
   constructor(
     @InjectModel(EmployerJob.name)
     private employerJobModel: Model<EmployerJobDocument>,
+    private readonly publisherService: PublisherService,
   ) {}
+
+  /**
+   * Bridge a directly-posted employer job into the searchable `jobs` collection
+   * so it becomes matchable to candidates. Publishes live when active, and
+   * re-publishes as paused/inactive otherwise. Fully defensive: a publish
+   * failure must never fail the employer's job save.
+   */
+  private async publishToSearch(job: EmployerJobDocument): Promise<void> {
+    try {
+      await this.publisherService.publishEmployerJob(job as any);
+    } catch (err) {
+      this.logger.warn(
+        `publishEmployerJob failed for job ${String(job?._id)}: ${
+          err instanceof Error ? err.message : err
+        }`,
+      );
+    }
+  }
 
   async create(
     ownerId: string,
@@ -23,7 +45,9 @@ export class EmployerJobsService {
       ...dto,
       ownerId,
     });
-    return job.save();
+    const saved = await job.save();
+    await this.publishToSearch(saved);
+    return saved;
   }
 
   async findAll(
@@ -59,6 +83,7 @@ export class EmployerJobsService {
     if (!job) {
       throw new NotFoundException('Job not found');
     }
+    await this.publishToSearch(job);
     return job;
   }
 
@@ -73,6 +98,7 @@ export class EmployerJobsService {
     if (!job) {
       throw new NotFoundException('Job not found');
     }
+    await this.publishToSearch(job);
     return job;
   }
 

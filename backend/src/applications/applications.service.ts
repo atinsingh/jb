@@ -1,14 +1,26 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Application, ApplicationDocument } from '../schemas/application.schema';
+import { User, UserDocument } from '../schemas/user.schema';
+import { Job, JobDocument } from '../schemas/job.schema';
+import { Resume, ResumeDocument } from '../schemas/resume.schema';
 import { ApplicationEventsService } from './application-events.service';
+import { EmployerPipelineService } from '../employer-pipeline/employer-pipeline.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class ApplicationsService {
+  private readonly logger = new Logger(ApplicationsService.name);
+
   constructor(
     @InjectModel(Application.name) private applicationModel: Model<ApplicationDocument>,
+    @InjectModel(Job.name) private jobModel: Model<JobDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Resume.name) private resumeModel: Model<ResumeDocument>,
     private readonly applicationEventsService: ApplicationEventsService,
+    private readonly employerPipelineService: EmployerPipelineService,
+    private readonly notificationsService: NotificationsService,
   ) { }
 
   async createApplication(
@@ -45,6 +57,7 @@ export class ApplicationsService {
       type: 'queued',
       message: 'Application queued',
     });
+    await this.bridgeApplicationToPipeline(saved);
     return saved;
   }
 
@@ -81,6 +94,7 @@ export class ApplicationsService {
   async updateApplicationStatus(
     applicationId: string,
     status: string,
+    failReason?: string,
   ): Promise<ApplicationDocument> {
     const application = await this.applicationModel.findById(applicationId);
     if (!application) {
@@ -94,6 +108,9 @@ export class ApplicationsService {
       'interviewed',
       'rejected',
       'accepted',
+      // Auto-apply terminal outcomes (2c ATS runner):
+      'failed', // submission attempt errored (retryable)
+      'needs_human', // blocked — needs manual completion
     ];
     if (!validStatuses.includes(status)) {
       throw new BadRequestException(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
@@ -103,8 +120,52 @@ export class ApplicationsService {
     if (status === 'submitted' && !application.submittedAt) {
       application.submittedAt = new Date();
     }
+    // Stamp the reason on the two auto-apply failure outcomes so the runner /
+    // support surface can explain why a submission stopped.
+    if (status === 'failed' || status === 'needs_human') {
+      application.failReason =
+        failReason ||
+        (status === 'needs_human'
+          ? 'Automatic apply was blocked and needs manual completion'
+          : 'Automatic apply failed');
+    }
 
-    return application.save();
+    const saved = await application.save();
+
+    // Producer: notify the candidate their application status changed.
+    // Notification policy for the auto-apply outcomes:
+    //   - `failed`     -> retryable/internal, NOT a "good" update. Stay silent;
+    //                     the runner will retry, so we don't alarm the candidate.
+    //   - `needs_human`-> the candidate must act, so we DO notify them (neutral
+    //                     "needs your attention" wording, not a success message).
+    //   - everything else keeps the existing generic status notification.
+    try {
+      if (saved.candidateId) {
+        if (status === 'failed') {
+          // intentionally silent
+        } else if (status === 'needs_human') {
+          await this.notificationsService.create({
+            audience: 'candidate',
+            userId: String(saved.candidateId),
+            type: 'applications',
+            text: 'An application needs your attention to finish applying',
+            href: '/app/applications',
+          });
+        } else {
+          await this.notificationsService.create({
+            audience: 'candidate',
+            userId: String(saved.candidateId),
+            type: 'applications',
+            text: `Your application status is now "${status}"`,
+            href: '/app/applications',
+          });
+        }
+      }
+    } catch {
+      /* notifications must never break the status update */
+    }
+
+    return saved;
   }
 
   async deleteApplication(applicationId: string): Promise<void> {
@@ -146,5 +207,146 @@ export class ApplicationsService {
     }
 
     return stats;
+  }
+
+  /* ------------------------------------------------------------------ bridge */
+
+  /**
+   * Cross-surface bridge fired after an application is created (manual queue OR
+   * auto-apply). Always notifies the candidate that their application went out,
+   * and — when the underlying Job was posted directly by an employer on Jobocate
+   * — mirrors it into that employer's applicant pipeline and notifies the owner.
+   *
+   * Purely-scraped jobs have no employer surface, so only the candidate
+   * notification fires. Fully defensive: a failure here must never break the
+   * application save that triggered it.
+   */
+  async bridgeApplicationToPipeline(application: ApplicationDocument): Promise<void> {
+    try {
+      const candidateId = application.candidateId
+        ? String(application.candidateId)
+        : '';
+      const job: any = application.jobId
+        ? await this.jobModel.findById(application.jobId).lean()
+        : null;
+
+      // Candidate-side notification always fires on a new application.
+      if (candidateId) {
+        await this.notificationsService.create({
+          audience: 'candidate',
+          userId: candidateId,
+          type: 'applications',
+          text: job?.title
+            ? `Application submitted for ${job.title}`
+            : 'Application submitted',
+          href: '/app/applications',
+        });
+      }
+
+      // Resolve the employer only for first-party Jobocate jobs.
+      if (!job) return;
+      const isEmployerPosted =
+        job.isExternal === false &&
+        (String(job.externalId || '').startsWith('jobocate:') ||
+          job.source === 'Jobocate');
+      if (!isEmployerPosted) return;
+
+      const ownerId = job.addedBy ? String(job.addedBy) : '';
+      const employerJobId = job.sourceJobKey ? String(job.sourceJobKey) : '';
+      if (!employerJobId || !candidateId) return;
+
+      const candidateFields = await this.resolveCandidateFields(candidateId);
+
+      await this.employerPipelineService.upsertApplicant({
+        ownerId: ownerId || undefined,
+        jobId: employerJobId,
+        candidateId,
+        aiScore: application.matchScore || 0,
+        source: 'jobocate_apply',
+        stage: 'applied',
+        ...candidateFields,
+      });
+
+      // Employer-side notification (only when we resolved an owner).
+      if (ownerId) {
+        await this.notificationsService.create({
+          audience: 'employer',
+          userId: ownerId,
+          type: 'applicants',
+          text: `${candidateFields.candidateName || 'A candidate'} applied to ${job.title}`,
+          href: '/employer/pipeline',
+        });
+      }
+    } catch (err) {
+      this.logger.warn(
+        `bridgeApplicationToPipeline failed for application ${String(
+          application?._id,
+        )}: ${err instanceof Error ? err.message : err}`,
+      );
+    }
+  }
+
+  /**
+   * Build the applicant's snapshot from the candidate's User row + primary
+   * résumé (mirrors EligibleJobsService.scoreProfile: résumés sorted
+   * isPrimary desc then updatedAt desc; skills unioned; first headline wins).
+   */
+  private async resolveCandidateFields(userId: string): Promise<{
+    candidateName: string;
+    candidateEmail: string;
+    candidateLocation: string;
+    candidateHeadline: string;
+    skills: string[];
+    yearsExperience: number;
+  }> {
+    const user: any = await this.userModel.findById(userId).lean();
+    const resumes: any[] = await this.resumeModel
+      .find({ userId: new Types.ObjectId(userId) })
+      .sort({ isPrimary: -1, updatedAt: -1 })
+      .limit(5)
+      .lean();
+
+    const skillSet = new Set<string>();
+    let headline = '';
+    let experience: any[] = [];
+    for (const r of resumes) {
+      (r.skills || []).forEach((s: string) => skillSet.add(s));
+      if (!headline) {
+        headline =
+          r.headline || (r.experience && r.experience[0] && r.experience[0].title) || '';
+      }
+      if (!experience.length && Array.isArray(r.experience)) {
+        experience = r.experience;
+      }
+    }
+
+    return {
+      candidateName: user?.name || '',
+      candidateEmail: user?.email || '',
+      candidateLocation: user?.location || '',
+      candidateHeadline: headline,
+      skills: [...skillSet],
+      yearsExperience: this.deriveYearsExperience(experience),
+    };
+  }
+
+  /** Rough total years of experience summed from résumé experience date ranges. */
+  private deriveYearsExperience(experience: any[]): number {
+    if (!Array.isArray(experience) || !experience.length) return 0;
+    const nowYear = new Date().getFullYear();
+    let total = 0;
+    for (const e of experience) {
+      const start = this.yearOf(e?.startDate);
+      if (!start) continue;
+      const end = e?.current ? nowYear : this.yearOf(e?.endDate) || start;
+      total += Math.max(0, end - start);
+    }
+    return total;
+  }
+
+  private yearOf(value: any): number {
+    if (!value) return 0;
+    const m = String(value).match(/(19|20)\d{2}/);
+    return m ? parseInt(m[0], 10) : 0;
   }
 }

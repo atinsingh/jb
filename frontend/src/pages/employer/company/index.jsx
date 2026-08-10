@@ -1,301 +1,304 @@
-import { useState } from 'react';
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
-import { 
-  BuildingOfficeIcon,
-  GlobeAltIcon,
-  MapPinIcon,
-  UsersIcon,
-  LinkIcon,
-  PencilIcon,
-  CheckIcon,
-  XMarkIcon
-} from '@heroicons/react/24/outline';
-import EmployerLayout from '@/components/layout/EmployerLayout';
+import EmployerSidebar from '@/components/employer/EmployerSidebar';
+import { LoadingState, ErrorState, InlineError } from '@/components/employer/EmployerStates';
+import { employerCompanyApi, employerJobsApi, employerPipelineApi } from '@/services/employerApi';
+
+const SIZE_OPTIONS = [
+  '1-10 employees',
+  '11-50 employees',
+  '51-200 employees',
+  '201-500 employees',
+  '501-1000 employees',
+  '1001-5000 employees',
+  '5000+ employees',
+];
+
+const EMPTY_FORM = {
+  name: '',
+  industry: '',
+  size: '',
+  website: '',
+  hq: '',
+  description: '',
+  logoUrl: '',
+  coverUrl: '',
+};
+
+/* ------------------------------------------------------------- ui atoms --- */
+const monoLabel = { fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9A9286' };
+const blueBtn = { display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: 'inherit', fontSize: 13, fontWeight: 700, color: '#fff', background: '#4263EB', border: 'none', borderRadius: 999, padding: '9px 16px', cursor: 'pointer' };
+const ghostBtn = { fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: '#1B1A16', background: '#FFFEFB', border: '1px solid #D9D0BE', borderRadius: 999, padding: '9px 15px', cursor: 'pointer' };
+const fieldInput = { width: '100%', fontFamily: 'inherit', fontSize: 13.5, color: '#1B1A16', background: '#FBF8F1', border: '1px solid #E1D9C9', borderRadius: 10, padding: '10px 12px' };
+const fieldLabel = { ...monoLabel, display: 'block', marginBottom: 6 };
+
+const svgProps = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round' };
+const Icon = {
+  building: <svg {...svgProps}><rect x="5" y="3" width="14" height="18" rx="1.5" /><rect x="8" y="7" width="2" height="2" rx="0.4" /><rect x="14" y="7" width="2" height="2" rx="0.4" /><rect x="8" y="11" width="2" height="2" rx="0.4" /><rect x="14" y="11" width="2" height="2" rx="0.4" /><rect x="10.5" y="16" width="3" height="5" rx="0.4" /></svg>,
+  users: <svg {...svgProps}><circle cx="9" cy="8.5" r="3" /><path d="M3.5 19 a5.5 5.5 0 0 1 11 0" /><circle cx="17" cy="7.5" r="2.3" /><path d="M15 13 a4.6 4.6 0 0 1 5.5 4.4" /></svg>,
+  globe: <svg {...svgProps}><circle cx="12" cy="12" r="9" /><line x1="3" y1="12" x2="21" y2="12" /><path d="M12 3 a15 15 0 0 1 0 18 a15 15 0 0 1 0 -18" /></svg>,
+  pin: <svg {...svgProps}><path d="M12 21 s-6.5 -5.5 -6.5 -10.5 a6.5 6.5 0 0 1 13 0 C18.5 15.5 12 21 12 21 Z" /><circle cx="12" cy="10.5" r="2.3" /></svg>,
+};
 
 export default function CompanyProfile() {
+  const [company, setCompany] = useState(null);
+  const [stats, setStats] = useState(null);
+  const [formData, setFormData] = useState(EMPTY_FORM);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [company, setCompany] = useState({
-    name: 'TechCorp Inc.',
-    industry: 'Information Technology',
-    size: '51-200 employees',
-    website: 'https://techcorp.example.com',
-    location: 'San Francisco, CA',
-    about: 'TechCorp is a leading technology company specializing in innovative software solutions. We are committed to creating products that make a difference in people\'s lives.',
-    logo: '/logos/techcorp-logo.png',
-    coverPhoto: '/covers/techcorp-cover.jpg'
-  });
-  const [formData, setFormData] = useState({ ...company });
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [companyRes, jobsRes, statsRes] = await Promise.all([
+        employerCompanyApi.get(),
+        employerJobsApi.list().catch(() => null),
+        employerPipelineApi.stats().catch(() => null),
+      ]);
+      const c = companyRes?.company || {};
+      setCompany(c);
+      setFormData({ ...EMPTY_FORM, ...c });
+      const openPositions = jobsRes
+        ? Array.isArray(jobsRes.jobs)
+          ? jobsRes.jobs.filter((j) => (j.status || 'active') === 'active').length
+          : jobsRes.total || 0
+        : null;
+      setStats(
+        statsRes || openPositions != null
+          ? {
+              openPositions,
+              totalApplicants: statsRes?.total ?? null,
+              interviewing: statsRes?.interview ?? null,
+              hired: statsRes?.hired ?? null,
+            }
+          : null,
+      );
+    } catch (err) {
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value
-    });
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setCompany(formData);
-    setIsEditing(false);
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const res = await employerCompanyApi.update({
+        name: formData.name,
+        industry: formData.industry,
+        size: formData.size,
+        website: formData.website,
+        hq: formData.hq,
+        description: formData.description,
+        logoUrl: formData.logoUrl,
+        coverUrl: formData.coverUrl,
+      });
+      const c = res?.company || formData;
+      setCompany(c);
+      setFormData({ ...EMPTY_FORM, ...c });
+      setIsEditing(false);
+    } catch (err) {
+      setSaveError(err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancel = () => {
-    setFormData(company);
+    setFormData({ ...EMPTY_FORM, ...company });
+    setSaveError(null);
     setIsEditing(false);
   };
 
+  const statTiles = stats
+    ? [
+        { name: 'Open Positions', value: stats.openPositions },
+        { name: 'Total Applicants', value: stats.totalApplicants },
+        { name: 'Interviewing', value: stats.interviewing },
+        { name: 'Hired', value: stats.hired },
+      ].filter((s) => s.value != null)
+    : [];
+
   return (
-    <EmployerLayout>
+    <>
       <Head>
-        <title>Company Profile | Jobocate</title>
+        <title>Company Profile · Jobocate for Employers</title>
       </Head>
 
-      <div className="py-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-          <div className="md:flex md:items-center md:justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold text-gray-900">Company Profile</h1>
-              <p className="mt-1 text-sm text-gray-500">Manage your company's public profile</p>
-            </div>
-            <div className="mt-4 md:mt-0">
-              {!isEditing ? (
-                <button
-                  type="button"
-                  onClick={() => setIsEditing(true)}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
-                >
-                  <PencilIcon className="-ml-1 mr-2 h-5 w-5" />
-                  Edit Profile
-                </button>
-              ) : (
-                <div className="flex space-x-2">
-                  <button
-                    type="button"
-                    onClick={handleCancel}
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
-                  >
-                    <XMarkIcon className="-ml-1 mr-2 h-5 w-5" />
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSubmit}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
-                  >
-                    <CheckIcon className="-ml-1 mr-2 h-5 w-5" />
-                    Save Changes
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
+      <style jsx global>{`
+        #emapp ::-webkit-scrollbar { width: 8px; }
+        #emapp ::-webkit-scrollbar-thumb { background: #e1d9c9; border-radius: 8px; }
+        #emapp input:focus, #emapp textarea:focus, #emapp select:focus { outline: none; border-color: #4263eb; box-shadow: 0 0 0 3px rgba(66,99,235,0.14); }
+        #emapp .em-blue-btn:hover { background: #364fc7 !important; }
+        #emapp .em-ghost:hover { background: #f4efe4 !important; }
+        @keyframes emrise { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }
+      `}</style>
 
-          <div className="mt-6">
-            {/* Cover Photo */}
-            <div className="bg-gray-200 rounded-lg overflow-hidden h-48 relative">
-              {company.coverPhoto ? (
-                <img
-                  src={company.coverPhoto}
-                  alt="Cover"
-                  className="w-full h-full object-cover"
-                />
+      <div id="emapp" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16' }}>
+        <EmployerSidebar active="company" />
+
+        <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          {/* HEADER */}
+          <header style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: 14, padding: '14px 32px', background: 'rgba(247,243,234,0.85)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #E7E0D2' }}>
+            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9286' }}>Company · Profile</span>
+            <div style={{ flex: 1 }} />
+            {!loading && !error && (
+              !isEditing ? (
+                <button type="button" onClick={() => setIsEditing(true)} className="em-blue-btn" style={blueBtn}>✎ Edit profile</button>
               ) : (
-                <div className="w-full h-full bg-gradient-to-r from-orange-400 to-pink-500 flex items-center justify-center">
-                  <BuildingOfficeIcon className="h-16 w-16 text-white opacity-75" />
+                <div style={{ display: 'flex', gap: 9 }}>
+                  <button type="button" onClick={handleCancel} disabled={saving} className="em-ghost" style={{ ...ghostBtn, opacity: saving ? 0.5 : 1 }}>Cancel</button>
+                  <button type="button" onClick={handleSubmit} disabled={saving} className="em-blue-btn" style={{ ...blueBtn, opacity: saving ? 0.6 : 1 }}>{saving ? 'Saving…' : 'Save changes'}</button>
                 </div>
-              )}
-              <div className="absolute bottom-4 right-4">
-                {isEditing && (
-                  <label className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-black bg-opacity-50 hover:bg-opacity-70 cursor-pointer">
-                    <PencilIcon className="h-3 w-3 mr-1" />
-                    Change Cover
-                    <input type="file" className="hidden" />
-                  </label>
-                )}
-              </div>
+              )
+            )}
+          </header>
+
+          <div style={{ padding: '28px 32px 64px', maxWidth: 880, width: '100%', margin: '0 auto' }}>
+            <div style={{ marginBottom: 22 }}>
+              <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 36, lineHeight: 1, margin: '0 0 6px' }}>Company profile</h1>
+              <p style={{ fontSize: 14.5, color: '#5A544A', margin: 0 }}>Manage the public profile candidates see on your careers page.</p>
             </div>
 
-            {/* Company Info */}
-            <div className="bg-white shadow rounded-lg -mt-12 relative z-10 mx-4">
-              <div className="px-6 pt-2 pb-8 sm:px-8">
-                <div className="flex flex-col sm:flex-row">
-                  <div className="flex-shrink-0 -mt-8 mb-4 sm:mb-0 sm:mr-6">
-                    <div className="h-24 w-24 rounded-lg bg-white border-4 border-white shadow-md overflow-hidden">
-                      {company.logo ? (
-                        <img
-                          src={company.logo}
-                          alt={company.name}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="h-full w-full bg-gray-200 flex items-center justify-center">
-                          <BuildingOfficeIcon className="h-12 w-12 text-gray-400" />
-                        </div>
-                      )}
-                    </div>
-                    {isEditing && (
-                      <label className="mt-2 block text-center text-xs text-orange-600 hover:text-orange-700 cursor-pointer">
-                        <span>Update Logo</span>
-                        <input type="file" className="hidden" />
-                      </label>
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    {isEditing ? (
-                      <div className="space-y-4">
-                        <div>
-                          <label htmlFor="name" className="block text-sm font-medium text-gray-700">Company Name</label>
-                          <input
-                            type="text"
-                            name="name"
-                            id="name"
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
-                            value={formData.name}
-                            onChange={handleInputChange}
-                          />
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div>
-                            <label htmlFor="industry" className="block text-sm font-medium text-gray-700">Industry</label>
-                            <input
-                              type="text"
-                              name="industry"
-                              id="industry"
-                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
-                              value={formData.industry}
-                              onChange={handleInputChange}
-                            />
-                          </div>
-                          <div>
-                            <label htmlFor="size" className="block text-sm font-medium text-gray-700">Company Size</label>
-                            <select
-                              id="size"
-                              name="size"
-                              className="mt-1 block w-full border border-gray-300 bg-white rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
-                              value={formData.size}
-                              onChange={handleInputChange}
-                            >
-                              <option>1-10 employees</option>
-                              <option>11-50 employees</option>
-                              <option>51-200 employees</option>
-                              <option>201-500 employees</option>
-                              <option>501-1000 employees</option>
-                              <option>1001-5000 employees</option>
-                              <option>5000+ employees</option>
-                            </select>
-                          </div>
-                        </div>
-                        <div>
-                          <label htmlFor="website" className="block text-sm font-medium text-gray-700">Website</label>
-                          <div className="mt-1 flex rounded-md shadow-sm">
-                            <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
-                              https://
-                            </span>
-                            <input
-                              type="text"
-                              name="website"
-                              id="website"
-                              className="flex-1 min-w-0 block w-full px-3 py-2 rounded-none rounded-r-md border-gray-300 focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
-                              placeholder="example.com"
-                              value={formData.website.replace('https://', '')}
-                              onChange={(e) => {
-                                setFormData({
-                                  ...formData,
-                                  website: `https://${e.target.value}`
-                                });
-                              }}
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label htmlFor="location" className="block text-sm font-medium text-gray-700">Location</label>
-                          <input
-                            type="text"
-                            name="location"
-                            id="location"
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
-                            value={formData.location}
-                            onChange={handleInputChange}
-                          />
-                        </div>
-                        <div>
-                          <label htmlFor="about" className="block text-sm font-medium text-gray-700">About Us</label>
-                          <div className="mt-1">
-                            <textarea
-                              id="about"
-                              name="about"
-                              rows={4}
-                              className="shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border border-gray-300 rounded-md"
-                              value={formData.about}
-                              onChange={handleInputChange}
-                            />
-                          </div>
-                          <p className="mt-2 text-sm text-gray-500">
-                            Brief description about your company for candidates
-                          </p>
-                        </div>
-                      </div>
+            {loading ? (
+              <LoadingState label="Loading company profile…" />
+            ) : error ? (
+              <ErrorState error={error} onRetry={load} />
+            ) : (
+              <>
+                {saveError && <div style={{ marginBottom: 16 }}><InlineError error={saveError} /></div>}
+
+                {/* COVER + LOGO */}
+                <div style={{ position: 'relative', marginBottom: 56 }}>
+                  <div style={{ height: 176, borderRadius: 16, overflow: 'hidden', border: '1px solid #E6DECF', background: formData.coverUrl ? '#EDE7DA' : 'linear-gradient(120deg, #EDF0FE, #EAF6EE)' }}>
+                    {formData.coverUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={formData.coverUrl} alt="Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
-                      <div>
-                        <h2 className="text-2xl font-bold text-gray-900">{company.name}</h2>
-                        <div className="mt-1 flex flex-col sm:flex-row sm:flex-wrap sm:mt-0 sm:space-x-6">
-                          <div className="mt-2 flex items-center text-sm text-gray-500">
-                            <BuildingOfficeIcon className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" />
-                            {company.industry}
-                          </div>
-                          <div className="mt-2 flex items-center text-sm text-gray-500">
-                            <UsersIcon className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" />
-                            {company.size}
-                          </div>
-                          <div className="mt-2 flex items-center text-sm text-gray-500">
-                            <GlobeAltIcon className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" />
-                            <a href={company.website} target="_blank" rel="noopener noreferrer" className="text-orange-600 hover:text-orange-500">
-                              {company.website.replace('https://', '')}
-                            </a>
-                          </div>
-                          <div className="mt-2 flex items-center text-sm text-gray-500">
-                            <MapPinIcon className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" />
-                            {company.location}
-                          </div>
-                        </div>
-                        <div className="mt-4">
-                          <h3 className="text-sm font-medium text-gray-900">About Us</h3>
-                          <p className="mt-1 text-sm text-gray-600 whitespace-pre-line">{company.about}</p>
-                        </div>
+                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8DA2F5' }}>
+                        <span style={{ opacity: 0.6 }}>{Icon.building}</span>
                       </div>
                     )}
                   </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Company Stats */}
-          <div className="mt-8">
-            <h3 className="text-lg font-medium text-gray-900">Company Statistics</h3>
-            <div className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-              {[
-                { name: 'Open Positions', value: '12', change: '+2', changeType: 'increase' },
-                { name: 'Total Applicants', value: '245', change: '+15%', changeType: 'increase' },
-                { name: 'Interviewing', value: '24', change: '+5', changeType: 'increase' },
-                { name: 'Hired This Month', value: '8', change: '+3', changeType: 'increase' },
-              ].map((stat) => (
-                <div key={stat.name} className="bg-white overflow-hidden shadow rounded-lg">
-                  <div className="px-4 py-5 sm:p-6">
-                    <dt className="text-sm font-medium text-gray-500 truncate">{stat.name}</dt>
-                    <dd className="mt-1 text-3xl font-semibold text-gray-900">{stat.value}</dd>
-                    <div className={`mt-2 flex items-baseline text-sm font-semibold ${stat.changeType === 'increase' ? 'text-green-600' : 'text-red-600'}`}>
-                      {stat.change}
-                      <span className="sr-only">{stat.changeType === 'increase' ? 'Increased' : 'Decreased'} by</span>
-                    </div>
+                  <div style={{ position: 'absolute', left: 24, bottom: -36, width: 88, height: 88, borderRadius: 18, background: '#FFFEFB', border: '3px solid #FFFEFB', boxShadow: '0 8px 24px -12px rgba(27,26,22,0.35)', overflow: 'hidden' }}>
+                    {formData.logoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={formData.logoUrl} alt={formData.name || 'Company logo'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ width: '100%', height: '100%', background: '#F2ECE0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#A79E8F' }}>{Icon.building}</div>
+                    )}
                   </div>
                 </div>
-              ))}
-            </div>
+
+                {/* MAIN CARD */}
+                <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 16, padding: 24 }}>
+                  {isEditing ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, animation: 'emrise 0.2s ease' }}>
+                      <div>
+                        <label htmlFor="name" style={fieldLabel}>Company name</label>
+                        <input type="text" name="name" id="name" style={fieldInput} value={formData.name} onChange={handleInputChange} />
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+                        <div>
+                          <label htmlFor="industry" style={fieldLabel}>Industry</label>
+                          <input type="text" name="industry" id="industry" style={fieldInput} value={formData.industry} onChange={handleInputChange} />
+                        </div>
+                        <div>
+                          <label htmlFor="size" style={fieldLabel}>Company size</label>
+                          <select id="size" name="size" style={{ ...fieldInput, appearance: 'none', cursor: 'pointer' }} value={formData.size} onChange={handleInputChange}>
+                            <option value="">Select size…</option>
+                            {SIZE_OPTIONS.map((s) => (<option key={s}>{s}</option>))}
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <label htmlFor="website" style={fieldLabel}>Website</label>
+                        <input type="text" name="website" id="website" placeholder="https://example.com" style={fieldInput} value={formData.website} onChange={handleInputChange} />
+                      </div>
+                      <div>
+                        <label htmlFor="hq" style={fieldLabel}>Headquarters</label>
+                        <input type="text" name="hq" id="hq" style={fieldInput} value={formData.hq} onChange={handleInputChange} />
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+                        <div>
+                          <label htmlFor="logoUrl" style={fieldLabel}>Logo URL</label>
+                          <input type="text" name="logoUrl" id="logoUrl" placeholder="https://…" style={fieldInput} value={formData.logoUrl} onChange={handleInputChange} />
+                        </div>
+                        <div>
+                          <label htmlFor="coverUrl" style={fieldLabel}>Cover image URL</label>
+                          <input type="text" name="coverUrl" id="coverUrl" placeholder="https://…" style={fieldInput} value={formData.coverUrl} onChange={handleInputChange} />
+                        </div>
+                      </div>
+                      <div>
+                        <label htmlFor="description" style={fieldLabel}>About us</label>
+                        <textarea id="description" name="description" rows={5} style={{ ...fieldInput, resize: 'vertical', lineHeight: 1.6 }} value={formData.description} onChange={handleInputChange} />
+                        <p style={{ fontSize: 12, color: '#8A8378', margin: '8px 0 0' }}>Brief description about your company for candidates.</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <h2 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 12px', color: '#1B1A16' }}>{company.name || 'Your company'}</h2>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 22px', marginBottom: 20 }}>
+                        {company.industry && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13.5, color: '#5A544A' }}><span style={{ color: '#A79E8F' }}>{Icon.building}</span>{company.industry}</span>
+                        )}
+                        {company.size && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13.5, color: '#5A544A' }}><span style={{ color: '#A79E8F' }}>{Icon.users}</span>{company.size}</span>
+                        )}
+                        {company.website && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13.5, color: '#5A544A' }}>
+                            <span style={{ color: '#A79E8F' }}>{Icon.globe}</span>
+                            <a href={company.website} target="_blank" rel="noopener noreferrer" style={{ color: '#4263EB', textDecoration: 'none', fontWeight: 600 }}>{company.website.replace(/^https?:\/\//, '')}</a>
+                          </span>
+                        )}
+                        {company.hq && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13.5, color: '#5A544A' }}><span style={{ color: '#A79E8F' }}>{Icon.pin}</span>{company.hq}</span>
+                        )}
+                      </div>
+                      <div style={{ borderTop: '1px solid #F2ECE0', paddingTop: 18 }}>
+                        <div style={{ ...monoLabel, marginBottom: 8 }}>About us</div>
+                        <p style={{ fontSize: 14, lineHeight: 1.65, color: '#3A352C', margin: 0, whiteSpace: 'pre-line' }}>{company.description || 'No description added yet.'}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* STATS */}
+                {statTiles.length > 0 && (
+                  <div style={{ marginTop: 32 }}>
+                    <div style={{ ...monoLabel, marginBottom: 13 }}>Company statistics</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
+                      {statTiles.map((stat) => (
+                        <div key={stat.name} style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 16, padding: '18px 20px' }}>
+                          <div style={{ fontSize: 13, color: '#8A8378', marginBottom: 6 }}>{stat.name}</div>
+                          <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 28, fontWeight: 600, color: '#1B1A16', lineHeight: 1 }}>{stat.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
-        </div>
+        </main>
       </div>
-    </EmployerLayout>
+    </>
   );
 }

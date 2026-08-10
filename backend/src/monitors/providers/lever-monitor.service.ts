@@ -3,6 +3,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import axios from 'axios';
 import { Model } from 'mongoose';
 import { Job, JobDocument } from '../../schemas/job.schema';
+import { JobGeoService } from '../../geography/job-geo.service';
+import { extractSkills } from '../../matching/skill-taxonomy';
 
 @Injectable()
 export class LeverMonitorService {
@@ -10,6 +12,7 @@ export class LeverMonitorService {
 
   constructor(
     @InjectModel(Job.name) private jobModel: Model<JobDocument>,
+    private geo: JobGeoService,
   ) {}
 
   async run(boardTokens: string[] = []) {
@@ -31,17 +34,36 @@ export class LeverMonitorService {
           const existed = await this.jobModel.exists({ externalId });
           const commitment = (job?.categories?.commitment || '').toLowerCase();
           const jobType = this.mapCommitment(commitment);
+          const title = job.text || job.title;
+          const location = job?.categories?.location || 'Not specified';
+          const description = job.descriptionPlain || job.description || '';
+          const url = job.hostedUrl || job.applyUrl;
+          const workplaceHint = (job?.workplaceType || '') as string; // Lever exposes workplaceType
+          const g = this.geo.normalize({ location, description, title, workplaceType: workplaceHint });
           const doc = {
-            title: job.text || job.title,
-            companyName: job?.categories?.team || 'Unknown',
-            location: job?.categories?.location || 'Not specified',
-            description: job.descriptionPlain || job.description || '',
+            title,
+            companyName: board || 'Unknown',
+            location,
+            description,
             source: 'Lever',
             jobType,
-            externalUrl: job.hostedUrl || job.applyUrl,
-            canonicalUrl: job.hostedUrl || job.applyUrl,
+            externalUrl: url,
+            canonicalUrl: url,
             externalId,
             scrapedAt: new Date(),
+            skills: extractSkills(`${title}\n${description}`),
+            companyLogo: this.geo.deriveLogo(board, url),
+            country: g.country,
+            region: g.region,
+            city: g.city,
+            workplaceType: g.workplaceType,
+            remoteScope: g.remoteScope,
+            eligibleCountries: g.eligibleCountries,
+            excludedCountries: g.excludedCountries,
+            sponsorship: g.sponsorship,
+            locationConfidence: g.locationConfidence,
+            needsGeoReview: g.needsGeoReview,
+            geoEvidence: g.geoEvidence,
           };
           await this.jobModel.findOneAndUpdate(
             { externalId },

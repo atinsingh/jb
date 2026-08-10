@@ -4,7 +4,7 @@ import { CoverLettersController } from './cover-letters.controller';
 import { CoverLettersService } from './cover-letters.service';
 import { CoverLetter, CoverLetterSchema } from '../schemas/cover-letter.schema';
 import { User, UserSchema } from '../schemas/user.schema';
-import { AiServicesModule } from '../ai-services/ai-services.module';
+import { LLMModule } from '../llm/llm.module';
 
 @Module({
   imports: [
@@ -12,7 +12,7 @@ import { AiServicesModule } from '../ai-services/ai-services.module';
       { name: CoverLetter.name, schema: CoverLetterSchema },
       { name: User.name, schema: UserSchema },
     ]),
-    AiServicesModule,
+    LLMModule,
   ],
   controllers: [CoverLettersController],
   providers: [CoverLettersService],

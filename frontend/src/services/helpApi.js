@@ -1,43 +1,12 @@
-import { API_URL } from '@/config/api';
-
-// ---------------------------------------------------------------- auth helper
-const getAuthToken = () => {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('authToken') || localStorage.getItem('token');
-  }
-  return null;
-};
-
-// Shared fetch wrapper following the api.js convention (token auto-attached,
-// JSON body, throw on !ok). Kept local so we never modify api.js.
-const apiCall = async (endpoint, options = {}) => {
-  const token = getAuthToken();
-  const headers = {
-    'Content-Type': 'application/json',
-    ...options.headers,
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Request failed' }));
-    throw new Error(error.message || 'Request failed');
-  }
-  return response.json();
-};
-
 // ---------------------------------------------------------------- Help center
-// The help center is content-driven; if a backend articles endpoint exists it
-// is consumed here, otherwise the page falls back to its bundled sample data.
-// GET /api/users/help/articles — list of help articles (best-effort).
-export const getHelpArticles = async () => apiCall('/api/users/help/articles');
+// Help content is bundled static in the frontend (HELP_ARTICLES / HELP_CATEGORIES
+// on the page). There is no backend articles endpoint, so these resolve locally
+// (no network) instead of 404-ing against /api/users/help/*.
+//
+// getHelpArticles resolves to null so the page keeps its bundled content; a real
+// CMS-backed help endpoint can replace this later. (Backlog.)
+export const getHelpArticles = async () => null;
 
-// POST /api/users/help/feedback — { articleId, vote: 'yes' | 'no' }
-export const submitArticleFeedback = async (articleId, vote) =>
-  apiCall('/api/users/help/feedback', {
-    method: 'POST',
-    body: JSON.stringify({ articleId, vote }),
-  });
+// Feedback has no backend sink yet — accept it gracefully as a no-op so votes
+// never surface an error to the user. (Backlog: persist help feedback.)
+export const submitArticleFeedback = async (_articleId, _vote) => ({ ok: true });

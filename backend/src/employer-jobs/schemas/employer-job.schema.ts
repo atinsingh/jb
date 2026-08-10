@@ -1,11 +1,11 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
 export type EmployerJobDocument = EmployerJob & Document;
 
 @Schema({ timestamps: true })
 export class EmployerJob {
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true, index: true })
   ownerId: Types.ObjectId;
 
   @Prop({ default: '' })
@@ -85,7 +85,6 @@ export class EmployerJob {
 
 export const EmployerJobSchema = SchemaFactory.createForClass(EmployerJob);
 
-// Add indexes
-EmployerJobSchema.index({ ownerId: 1 });
-EmployerJobSchema.index({ status: 1 });
+// ownerId and status are already single-field indexed via @Prop({ index: true });
+// add only the compound index here.
 EmployerJobSchema.index({ ownerId: 1, status: 1 });

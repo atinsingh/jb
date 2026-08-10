@@ -18,6 +18,8 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { EmployerPipelineService } from './employer-pipeline.service';
 import { CreateApplicantDto } from './dto/create-applicant.dto';
 import { UpdateStageDto } from './dto/update-stage.dto';
@@ -26,7 +28,8 @@ import { AddNoteDto } from './dto/add-note.dto';
 @ApiTags('employer-applicants')
 @ApiBearerAuth('JWT-auth')
 @Controller('employer/applicants')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('ROLE_EMPLOYER', 'ROLE_ADMIN')
 export class EmployerPipelineController {
   constructor(private readonly pipelineService: EmployerPipelineService) {}
 

@@ -1,15 +1,19 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { EmployerOrg, EmployerOrgDocument } from '../schemas/employer-org.schema';
 import { InviteMemberDto } from './dto/invite-member.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
+import { EmailService } from '../common/services/email.service';
 
 @Injectable()
 export class EmployerOrgService {
+  private readonly logger = new Logger(EmployerOrgService.name);
+
   constructor(
     @InjectModel(EmployerOrg.name)
     private employerOrgModel: Model<EmployerOrgDocument>,
+    private readonly emailService: EmailService,
   ) {}
 
   async getOrCreateOrg(ownerId: string): Promise<EmployerOrgDocument> {
@@ -50,7 +54,27 @@ export class EmployerOrgService {
       invitedAt: new Date(),
     });
 
-    return org.save();
+    const saved = await org.save();
+
+    // Notify the invited teammate. The invite is already persisted, so any
+    // email failure must not break the invite flow — log and continue.
+    try {
+      const savedInvites: any[] = (saved as any).invites || [];
+      const newInvite = savedInvites[savedInvites.length - 1];
+      const token = newInvite && newInvite._id ? newInvite._id.toString() : '';
+
+      await this.emailService.sendOrgInviteEmail(dto.email, {
+        orgName: saved.companyName,
+        token,
+        role: dto.role,
+      });
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to send org invite email to ${dto.email}: ${error?.message}`,
+      );
+    }
+
+    return saved;
   }
 
   async updateMemberRole(

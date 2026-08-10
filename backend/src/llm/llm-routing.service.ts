@@ -3,6 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import { LLMProvider } from './interfaces/llm-provider.interface';
 import { OpenAIProvider } from './providers/openai.provider';
 import { MockProvider } from './providers/mock.provider';
+import { AnthropicProvider } from './providers/anthropic.provider';
+import {
+  OpenRouterProvider,
+  DEFAULT_OPENROUTER_MODEL,
+} from './providers/openrouter.provider';
 
 export enum LLMFeature {
   REWRITE_BULLETS = 'rewriteBullets',
@@ -13,6 +18,19 @@ export enum LLMFeature {
   CALCULATE_MATCH = 'calculateMatch',
   INTERVIEW_COACHING = 'interviewCoaching',
   INTERVIEW_SCORING = 'interviewScoring',
+  // Employer "AI Recruiter" features
+  SCREEN_APPLICANTS = 'screenApplicants',
+  RECRUITER_COPILOT = 'recruiterCopilot',
+  SOURCE_CANDIDATES = 'sourceCandidates',
+  INTERVIEW_SCORECARD = 'interviewScorecard',
+  // Generic reusable AI agent runtime (planner/executor loop). Individual
+  // agents (e.g. the Job-Search Copilot) run on this feature unless they
+  // define their own dedicated feature.
+  AGENT_RUNTIME = 'agentRuntime',
+  // Candidate Job-Search Copilot — a dedicated agent that runs on the agent
+  // runtime (find matches → cover letter → apply → track → follow up). Has its
+  // own feature so it can be routed/metered independently of the generic runtime.
+  JOB_SEARCH_COPILOT = 'jobSearchCopilot',
 }
 
 export interface FeatureModelConfig {
@@ -28,10 +46,15 @@ export class LLMRoutingService {
   private providers: Map<string, LLMProvider> = new Map();
   private featureConfigs: Map<LLMFeature, FeatureModelConfig> = new Map();
 
+  /** Features already warned about a provider fallback — keeps logs to one line each. */
+  private readonly fallbackWarned = new Set<LLMFeature>();
+
   constructor(
     private readonly configService: ConfigService,
     private readonly openaiProvider: OpenAIProvider,
     private readonly mockProvider: MockProvider,
+    private readonly anthropicProvider: AnthropicProvider,
+    private readonly openrouterProvider: OpenRouterProvider,
   ) {
     this.initializeProviders();
     this.initializeFeatureConfigs();
@@ -44,16 +67,21 @@ export class LLMRoutingService {
       this.logger.log('✅ OpenAI provider registered');
     }
 
+    // Register Anthropic (real Claude provider) when an API key is present
+    if (this.anthropicProvider.isAvailable()) {
+      this.providers.set('anthropic', this.anthropicProvider);
+      this.logger.log('✅ Anthropic provider registered');
+    }
+
+    // Register OpenRouter (OpenAI-compatible gateway to ~400 models)
+    if (this.openrouterProvider.isAvailable()) {
+      this.providers.set('openrouter', this.openrouterProvider);
+      this.logger.log('✅ OpenRouter provider registered');
+    }
+
     // Register Mock provider (always available)
     this.providers.set('mock', this.mockProvider);
     this.logger.log('✅ Mock provider registered');
-
-    // Register Anthropic if available (can be added later)
-    const anthropicKey = this.configService.get<string>('ANTHROPIC_API_KEY');
-    if (anthropicKey) {
-      // TODO: Add AnthropicProvider when implemented
-      this.logger.log('⚠️ Anthropic provider not yet implemented');
-    }
   }
 
   private initializeFeatureConfigs() {
@@ -124,40 +152,136 @@ export class LLMRoutingService {
       temperature: parseFloat(this.configService.get<string>('LLM_INTERVIEW_SCORING_TEMP') || '0.3'),
       maxTokens: parseInt(this.configService.get<string>('LLM_INTERVIEW_SCORING_MAX_TOKENS') || '2000'),
     });
+
+    // Employer "AI Recruiter" features default to the Anthropic (Claude)
+    // provider + a current-gen model, so they are genuinely Claude-backed once
+    // ANTHROPIC_API_KEY is present. Without a key the router falls back to Mock,
+    // and each caller falls back to its deterministic result.
+
+    // Screen Applicants
+    this.featureConfigs.set(LLMFeature.SCREEN_APPLICANTS, {
+      model: this.configService.get<string>('LLM_SCREEN_APPLICANTS_MODEL') || 'claude-opus-4-8',
+      provider: this.configService.get<string>('LLM_SCREEN_APPLICANTS_PROVIDER') || 'anthropic',
+      temperature: parseFloat(this.configService.get<string>('LLM_SCREEN_APPLICANTS_TEMP') || '0.3'),
+      maxTokens: parseInt(this.configService.get<string>('LLM_SCREEN_APPLICANTS_MAX_TOKENS') || '2000'),
+    });
+
+    // Recruiter Copilot
+    this.featureConfigs.set(LLMFeature.RECRUITER_COPILOT, {
+      model: this.configService.get<string>('LLM_RECRUITER_COPILOT_MODEL') || 'claude-opus-4-8',
+      provider: this.configService.get<string>('LLM_RECRUITER_COPILOT_PROVIDER') || 'anthropic',
+      temperature: parseFloat(this.configService.get<string>('LLM_RECRUITER_COPILOT_TEMP') || '0.6'),
+      maxTokens: parseInt(this.configService.get<string>('LLM_RECRUITER_COPILOT_MAX_TOKENS') || '600'),
+    });
+
+    // Source Candidates
+    this.featureConfigs.set(LLMFeature.SOURCE_CANDIDATES, {
+      model: this.configService.get<string>('LLM_SOURCE_CANDIDATES_MODEL') || 'claude-opus-4-8',
+      provider: this.configService.get<string>('LLM_SOURCE_CANDIDATES_PROVIDER') || 'anthropic',
+      temperature: parseFloat(this.configService.get<string>('LLM_SOURCE_CANDIDATES_TEMP') || '0.5'),
+      maxTokens: parseInt(this.configService.get<string>('LLM_SOURCE_CANDIDATES_MAX_TOKENS') || '2000'),
+    });
+
+    // Interview Scorecard
+    this.featureConfigs.set(LLMFeature.INTERVIEW_SCORECARD, {
+      model: this.configService.get<string>('LLM_INTERVIEW_SCORECARD_MODEL') || 'claude-opus-4-8',
+      provider: this.configService.get<string>('LLM_INTERVIEW_SCORECARD_PROVIDER') || 'anthropic',
+      temperature: parseFloat(this.configService.get<string>('LLM_INTERVIEW_SCORECARD_TEMP') || '0.3'),
+      maxTokens: parseInt(this.configService.get<string>('LLM_INTERVIEW_SCORECARD_MAX_TOKENS') || '2000'),
+    });
+
+    // Agent Runtime (generic tool-use agent loop). Defaults to Claude via the
+    // Anthropic provider; falls back to Mock when no key is present. The per-turn
+    // maxTokens caps a single LLM turn — the whole-run token budget is enforced
+    // separately by AgentRuntimeService.
+    this.featureConfigs.set(LLMFeature.AGENT_RUNTIME, {
+      model: this.configService.get<string>('LLM_AGENT_RUNTIME_MODEL') || 'claude-opus-4-8',
+      provider: this.configService.get<string>('LLM_AGENT_RUNTIME_PROVIDER') || 'anthropic',
+      temperature: parseFloat(this.configService.get<string>('LLM_AGENT_RUNTIME_TEMP') || '0.4'),
+      maxTokens: parseInt(this.configService.get<string>('LLM_AGENT_RUNTIME_MAX_TOKENS') || '4000'),
+    });
+
+    // Job-Search Copilot (candidate). Defaults to Claude (Opus) via Anthropic;
+    // falls back to Mock when no key is present. Per-turn maxTokens caps a single
+    // LLM turn — the whole-run token budget is enforced by AgentRuntimeService.
+    this.featureConfigs.set(LLMFeature.JOB_SEARCH_COPILOT, {
+      model: this.configService.get<string>('LLM_JOB_SEARCH_COPILOT_MODEL') || 'claude-opus-4-8',
+      provider: this.configService.get<string>('LLM_JOB_SEARCH_COPILOT_PROVIDER') || 'anthropic',
+      temperature: parseFloat(this.configService.get<string>('LLM_JOB_SEARCH_COPILOT_TEMP') || '0.4'),
+      maxTokens: parseInt(this.configService.get<string>('LLM_JOB_SEARCH_COPILOT_MAX_TOKENS') || '4000'),
+    });
+  }
+
+  /**
+   * Resolve a feature to the provider that will actually serve it, plus the
+   * config matching that provider.
+   *
+   * `getProviderForFeature` and `getFeatureConfig` are separate calls at every
+   * call site, so they must agree: resolving both here stops a feature from
+   * sending, say, a `claude-opus-4-8` model id to OpenRouter.
+   *
+   * Order: the configured provider → OpenRouter → Mock. OpenRouter sits in the
+   * middle because it fronts every major lab, so a feature pinned to a provider
+   * we hold no key for still reaches a real model instead of degrading to the
+   * deterministic fallback. Its model id comes from `OPENROUTER_MODEL`, not from
+   * the feature config, since provider-native ids are not OpenRouter slugs.
+   */
+  private resolveFeature(feature: LLMFeature): {
+    provider: LLMProvider;
+    config: FeatureModelConfig;
+  } {
+    const config = this.featureConfigs.get(feature);
+    if (!config) {
+      throw new Error(`No configuration found for feature: ${feature}`);
+    }
+
+    const configured = this.providers.get(config.provider);
+    if (configured?.isAvailable()) {
+      return { provider: configured, config: { ...config } };
+    }
+
+    const openrouter = this.providers.get('openrouter');
+    if (openrouter?.isAvailable()) {
+      this.warnFallbackOnce(feature, config.provider, 'openrouter');
+      return {
+        provider: openrouter,
+        config: {
+          ...config,
+          provider: 'openrouter',
+          model:
+            this.configService.get<string>('OPENROUTER_MODEL') ||
+            DEFAULT_OPENROUTER_MODEL,
+        },
+      };
+    }
+
+    this.warnFallbackOnce(feature, config.provider, 'mock');
+    return {
+      provider: this.mockProvider,
+      config: { ...config, provider: 'mock' },
+    };
+  }
+
+  private warnFallbackOnce(feature: LLMFeature, from: string, to: string) {
+    if (this.fallbackWarned.has(feature)) return;
+    this.fallbackWarned.add(feature);
+    this.logger.warn(
+      `Provider ${from} not available for ${feature}, falling back to ${to}`,
+    );
   }
 
   /**
    * Get the appropriate provider for a feature
    */
   getProviderForFeature(feature: LLMFeature): LLMProvider {
-    const config = this.featureConfigs.get(feature);
-    if (!config) {
-      throw new Error(`No configuration found for feature: ${feature}`);
-    }
-
-    const provider = this.providers.get(config.provider);
-    if (!provider) {
-      this.logger.warn(`Provider ${config.provider} not available, falling back to mock`);
-      return this.mockProvider;
-    }
-
-    if (!provider.isAvailable()) {
-      this.logger.warn(`Provider ${config.provider} not available, falling back to mock`);
-      return this.mockProvider;
-    }
-
-    return provider;
+    return this.resolveFeature(feature).provider;
   }
 
   /**
    * Get model configuration for a feature
    */
   getFeatureConfig(feature: LLMFeature): FeatureModelConfig {
-    const config = this.featureConfigs.get(feature);
-    if (!config) {
-      throw new Error(`No configuration found for feature: ${feature}`);
-    }
-    return { ...config };
+    return this.resolveFeature(feature).config;
   }
 
   /**

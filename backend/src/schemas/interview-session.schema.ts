@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
 export type InterviewSessionDocument = InterviewSession & Document;
 
@@ -18,16 +18,16 @@ export enum InterviewStatus {
 
 @Schema({ timestamps: true })
 export class InterviewSession {
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true, index: true })
   userId: Types.ObjectId;
 
   @Prop({ required: true, enum: InterviewMode })
   mode: InterviewMode;
 
-  @Prop({ type: Types.ObjectId, ref: 'Resume', required: false })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Resume', required: false })
   resumeVersionId?: Types.ObjectId;
 
-  @Prop({ type: [{ type: Types.ObjectId, ref: 'Job' }], default: [] })
+  @Prop({ type: [{ type: MongooseSchema.Types.ObjectId, ref: 'Job' }], default: [] })
   jobDescriptionIds: Types.ObjectId[]; // Multiple if pasted
 
   @Prop({ required: true, maxlength: 140 })

@@ -2,14 +2,13 @@
 
 import Head from 'next/head';
 import Link from 'next/link';
-import SiteNav from '@/components/site/SiteNav';
-import SiteFooter from '@/components/site/SiteFooter';
+import PublicLayout from '@/components/layout/PublicLayout';
 import { appRoute } from '@/components/app/appRoutes';
 
 const HERO_STATS = [
-  { value: '40%', label: 'faster time-to-hire', color: '#5BD08C' },
+  { value: '40%', label: 'faster time-to-hire', color: 'var(--jb-d-accent)' },
   { value: '6', label: 'designers hired in Q1', color: '#FBF8F1' },
-  { value: '0', label: 'recruiters added', color: '#8DA2F5' },
+  { value: '0', label: 'recruiters added', color: '#7cc4ff' },
 ];
 
 const META = [
@@ -20,7 +19,7 @@ const META = [
 ];
 
 const BLOCKS = [
-  { isH: true, color: '#C9622E', text: 'The challenge' },
+  { isH: true, color: 'var(--jb-d-amber)', text: 'The challenge' },
   {
     isP: true,
     text: 'Stripe’s design org was growing fast, but the talent team was small. Every open req drew hundreds of applicants, and manual screening had become the bottleneck — strong candidates sat in the queue for days while recruiters triaged.',
@@ -30,7 +29,7 @@ const BLOCKS = [
     text: '"We were drowning in applicants and still worried we were missing the best ones."',
     cite: 'Dana Whitfield · Senior Recruiter',
   },
-  { isH: true, color: '#157A49', text: 'The solution' },
+  { isH: true, color: 'var(--jb-d-accent)', text: 'The solution' },
   {
     isP: true,
     text: 'They turned on Autopilot across five design reqs. It scored every applicant against each role’s rubric, advanced the strongest into screening overnight, and queued polite declines for the rest — all waiting for one-tap recruiter approval.',
@@ -44,7 +43,7 @@ const BLOCKS = [
     text: '"Autopilot does the screening we never had time for. We hired a full design team without adding a recruiter."',
     cite: 'Dana Whitfield · Senior Recruiter',
   },
-  { isH: true, color: '#364FC7', text: 'The results' },
+  { isH: true, color: '#7cc4ff', text: 'The results' },
   {
     isP: true,
     text: 'In a single quarter, Stripe cut time-to-hire by 40% and filled six design roles — including a senior hire sourced entirely through the agent. The team’s hours shifted from filtering résumés to interviewing the people who mattered.',
@@ -52,9 +51,9 @@ const BLOCKS = [
 ];
 
 const RESULTS = [
-  { value: '40%', label: 'faster time-to-hire', color: '#5BD08C' },
+  { value: '40%', label: 'faster time-to-hire', color: 'var(--jb-d-accent)' },
   { value: '6', label: 'roles filled in Q1', color: '#FBF8F1' },
-  { value: '92%', label: 'of interviews from AI shortlist', color: '#8DA2F5' },
+  { value: '92%', label: 'of interviews from AI shortlist', color: '#7cc4ff' },
 ];
 
 export default function CustomerStory() {
@@ -62,12 +61,6 @@ export default function CustomerStory() {
     <>
       <Head>
         <title>How Stripe hired a full design pod — Jobocate Customer Story</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
       <style jsx global>{`
@@ -75,7 +68,7 @@ export default function CustomerStory() {
           box-sizing: border-box;
         }
         #emkt ::selection {
-          background: #4263eb;
+          background: #7cc4ff;
           color: #f7f3ea;
         }
       `}</style>
@@ -83,18 +76,16 @@ export default function CustomerStory() {
       <div
         id="emkt"
         style={{
-          fontFamily: "'Hanken Grotesk', sans-serif",
-          color: '#1B1A16',
-          background: '#F7F3EA',
+          fontFamily: 'var(--jb-font-sans)',
+          color: 'var(--jb-d-ink)',
+          background: 'transparent',
           WebkitFontSmoothing: 'antialiased',
         }}
       >
-        <div style={{ position: 'sticky', top: 0, zIndex: 50, display: 'block' }}>
-          <SiteNav />
-        </div>
+        <PublicLayout>
 
         {/* HERO */}
-        <section style={{ position: 'relative', overflow: 'hidden', background: '#15140F' }}>
+        <section style={{ position: 'relative', overflow: 'hidden', background: 'var(--jb-d-footer)' }}>
           <div
             style={{
               position: 'absolute',
@@ -104,11 +95,11 @@ export default function CustomerStory() {
             }}
           />
           <div style={{ position: 'relative', maxWidth: 900, margin: '0 auto', padding: '56px 32px 60px' }}>
-            <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, color: '#8DA2F5', marginBottom: 18 }}>
-              <Link href={appRoute('Customer Stories.dc.html')} style={{ color: '#8DA2F5', textDecoration: 'none' }}>
+            <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, color: '#7cc4ff', marginBottom: 18 }}>
+              <Link href={appRoute('Customer Stories.dc.html')} style={{ color: '#7cc4ff', textDecoration: 'none' }}>
                 Customer stories
               </Link>{' '}
-              / <span style={{ color: '#B8B1A4' }}>Stripe</span>
+              / <span style={{ color: 'var(--jb-d-ink-65)' }}>Stripe</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 13, marginBottom: 22 }}>
               <span
@@ -117,24 +108,24 @@ export default function CustomerStory() {
                   height: 48,
                   borderRadius: 13,
                   background: '#1E2436',
-                  color: '#8DA2F5',
+                  color: '#7cc4ff',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontWeight: 700,
                   fontSize: 17,
-                  fontFamily: "'JetBrains Mono',monospace",
+                  fontFamily: 'var(--jb-font-mono)',
                 }}
               >
                 St
               </span>
               <span
                 style={{
-                  fontFamily: "'JetBrains Mono',monospace",
-                  fontSize: 9.5,
+                  fontFamily: 'var(--jb-font-mono)',
+                  fontSize: 11,
                   fontWeight: 600,
                   letterSpacing: '0.04em',
-                  color: '#8DA2F5',
+                  color: '#7cc4ff',
                   background: 'rgba(66,99,235,0.16)',
                   border: '1px solid rgba(66,99,235,0.32)',
                   padding: '4px 10px',
@@ -146,9 +137,9 @@ export default function CustomerStory() {
             </div>
             <h1
               style={{
-                fontFamily: "'Instrument Serif',serif",
+                fontFamily: 'var(--jb-font-display)',
                 fontWeight: 400,
-                fontSize: 46,
+                fontSize: 'clamp(26px, 5vw, 46px)',
                 lineHeight: 1.08,
                 color: '#FBF8F1',
                 margin: '0 0 18px',
@@ -160,10 +151,10 @@ export default function CustomerStory() {
             <div style={{ display: 'flex', gap: 36, flexWrap: 'wrap', marginTop: 30 }}>
               {HERO_STATS.map((h) => (
                 <div key={h.label}>
-                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 38, fontWeight: 600, color: h.color, lineHeight: 1 }}>
+                  <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 'clamp(26px, 5vw, 38px)', fontWeight: 600, color: h.color, lineHeight: 1 }}>
                     {h.value}
                   </div>
-                  <div style={{ fontSize: 13, color: '#9A9286', marginTop: 5 }}>{h.label}</div>
+                  <div style={{ fontSize: 13, color: 'var(--jb-d-ink-55)', marginTop: 5 }}>{h.label}</div>
                 </div>
               ))}
             </div>
@@ -172,22 +163,22 @@ export default function CustomerStory() {
 
         {/* META BAR */}
         <section style={{ maxWidth: 900, margin: '0 auto', padding: '24px 32px 0' }}>
-          <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap', paddingBottom: 24, borderBottom: '1px solid #E7E0D2' }}>
+          <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap', paddingBottom: 24, borderBottom: '1px solid var(--jb-d-line-card)' }}>
             {META.map((m) => (
               <div key={m.label}>
                 <div
                   style={{
-                    fontFamily: "'JetBrains Mono',monospace",
-                    fontSize: 9.5,
+                    fontFamily: 'var(--jb-font-mono)',
+                    fontSize: 11,
                     letterSpacing: '0.06em',
                     textTransform: 'uppercase',
-                    color: '#9A9286',
+                    color: 'var(--jb-d-ink-55)',
                     marginBottom: 4,
                   }}
                 >
                   {m.label}
                 </div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#1B1A16' }}>{m.value}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--jb-d-ink)' }}>{m.value}</div>
               </div>
             ))}
           </div>
@@ -201,7 +192,7 @@ export default function CustomerStory() {
                 <h2
                   key={i}
                   style={{
-                    fontFamily: "'Instrument Serif',serif",
+                    fontFamily: 'var(--jb-font-display)',
                     fontWeight: 400,
                     fontSize: 28,
                     lineHeight: 1.15,
@@ -227,21 +218,21 @@ export default function CustomerStory() {
                   style={{
                     margin: '28px 0',
                     padding: '6px 0 6px 24px',
-                    borderLeft: '3px solid #4263EB',
-                    fontFamily: "'Instrument Serif',serif",
+                    borderLeft: '3px solid #7cc4ff',
+                    fontFamily: 'var(--jb-font-display)',
                     fontSize: 25,
                     lineHeight: 1.32,
-                    color: '#1B1A16',
+                    color: 'var(--jb-d-ink)',
                   }}
                 >
                   {b.text}
                   <span
                     style={{
                       display: 'block',
-                      fontFamily: "'Hanken Grotesk',sans-serif",
+                      fontFamily: 'var(--jb-font-sans)',
                       fontSize: 13.5,
                       fontWeight: 600,
-                      color: '#8A8378',
+                      color: 'var(--jb-d-ink-65)',
                       marginTop: 12,
                     }}
                   >
@@ -254,26 +245,26 @@ export default function CustomerStory() {
           })}
 
           {/* RESULTS BAND */}
-          <div style={{ background: '#15140F', borderRadius: 18, padding: 28, margin: '32px 0' }}>
+          <div style={{ background: 'var(--jb-d-footer)', borderRadius: 18, padding: 28, margin: '32px 0' }}>
             <div
               style={{
-                fontFamily: "'JetBrains Mono',monospace",
-                fontSize: 10,
+                fontFamily: 'var(--jb-font-mono)',
+                fontSize: 11,
                 letterSpacing: '0.08em',
                 textTransform: 'uppercase',
-                color: '#5BD08C',
+                color: 'var(--jb-d-accent)',
                 marginBottom: 18,
               }}
             >
               The results
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 18 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', gap: 18 }}>
               {RESULTS.map((r) => (
                 <div key={r.label}>
-                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 30, fontWeight: 600, color: r.color, lineHeight: 1 }}>
+                  <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 30, fontWeight: 600, color: r.color, lineHeight: 1 }}>
                     {r.value}
                   </div>
-                  <div style={{ fontSize: 12.5, color: '#B8B1A4', marginTop: 6 }}>{r.label}</div>
+                  <div style={{ fontSize: 12.5, color: 'var(--jb-d-ink-65)', marginTop: 6 }}>{r.label}</div>
                 </div>
               ))}
             </div>
@@ -282,28 +273,28 @@ export default function CustomerStory() {
 
         {/* CTA */}
         <section style={{ maxWidth: 900, margin: '0 auto', padding: '24px 32px 72px' }}>
-          <div style={{ background: '#EDF0FE', border: '1px solid #C7D2FB', borderRadius: 24, padding: 44, textAlign: 'center' }}>
-            <h2 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 32, lineHeight: 1.08, margin: '0 0 12px' }}>
+          <div style={{ background: 'rgba(124,196,255,0.12)', border: '1px solid rgba(124,196,255,0.3)', borderRadius: 24, padding: 44, textAlign: 'center' }}>
+            <h2 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 32, lineHeight: 1.08, margin: '0 0 12px' }}>
               See what Jobocate could do for your team.
             </h2>
             <div style={{ display: 'flex', gap: 13, justifyContent: 'center', flexWrap: 'wrap', marginTop: 8 }}>
               <Link
                 href={appRoute('Book Demo.dc.html')}
-                style={{ background: '#4263EB', color: '#fff', fontSize: 15, fontWeight: 700, padding: '14px 24px', borderRadius: 999, textDecoration: 'none' }}
+                style={{ background: '#7cc4ff', color: 'var(--jb-d-panel)', fontSize: 15, fontWeight: 700, padding: '14px 24px', borderRadius: 999, textDecoration: 'none' }}
               >
                 Book a demo
               </Link>
               <Link
                 href={appRoute('Customer Stories.dc.html')}
                 style={{
-                  background: '#FFFEFB',
-                  color: '#1B1A16',
+                  background: 'var(--jb-d-panel)',
+                  color: 'var(--jb-d-ink)',
                   fontSize: 15,
                   fontWeight: 600,
                   padding: '14px 24px',
                   borderRadius: 999,
                   textDecoration: 'none',
-                  border: '1px solid #C7D2FB',
+                  border: '1px solid rgba(124,196,255,0.3)',
                 }}
               >
                 More stories
@@ -312,7 +303,7 @@ export default function CustomerStory() {
           </div>
         </section>
 
-        <SiteFooter />
+        </PublicLayout>
       </div>
     </>
   );

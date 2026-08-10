@@ -161,12 +161,6 @@ export default function AppMessages() {
     <>
       <Head>
         <title>Messages — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
       <style jsx global>{`
@@ -202,16 +196,16 @@ export default function AppMessages() {
 
       <div
         id="jbapp"
-        style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#F7F3EA', fontFamily: "'Hanken Grotesk',sans-serif", color: '#1B1A16' }}
+        style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#F7F3EA', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16' }}
       >
         <AppSidebar active="messages" />
 
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           {/* HEADER */}
           <header style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 20, padding: '15px 28px', background: 'rgba(247,243,234,0.85)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #E7E0D2' }}>
-            <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9286' }}>Workspace / Messages</div>
+            <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9286' }}>Workspace / Messages</div>
             <div style={{ flex: 1 }} />
-            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, color: '#157A49' }}>{unreadTotal} unread</span>
+            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, color: '#157A49' }}>{unreadTotal} unread</span>
           </header>
 
           <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
@@ -241,17 +235,17 @@ export default function AppMessages() {
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                         {c.pinned && (
-                          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 8.5, fontWeight: 600, letterSpacing: '0.08em', color: '#157A49', background: '#EAF6EE', border: '1px solid #CDE9D6', padding: '2px 6px', borderRadius: 999, flexShrink: 0 }}>PINNED</span>
+                          <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', color: '#157A49', background: '#EAF6EE', border: '1px solid #CDE9D6', padding: '2px 6px', borderRadius: 999, flexShrink: 0 }}>PINNED</span>
                         )}
                         <span style={{ fontSize: 14, fontWeight: c.nameWeight, color: '#1B1A16', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</span>
                         <span style={{ flex: 1 }} />
-                        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, color: c.timeColor, flexShrink: 0 }}>{c.time}</span>
+                        <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: c.timeColor, flexShrink: 0 }}>{c.time}</span>
                       </span>
                       <span style={{ display: 'block', fontSize: 11.5, color: c.subColor, margin: '1px 0 3px' }}>{c.sub}</span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: c.previewColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.preview}</span>
                         {c.hasUnread && (
-                          <span style={{ flexShrink: 0, minWidth: 18, height: 18, padding: '0 5px', borderRadius: 999, background: '#1FA463', color: '#0C2C1C', fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{c.unread}</span>
+                          <span style={{ flexShrink: 0, minWidth: 18, height: 18, padding: '0 5px', borderRadius: 999, background: '#1FA463', color: '#0C2C1C', fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{c.unread}</span>
                         )}
                       </span>
                     </span>
@@ -273,19 +267,19 @@ export default function AppMessages() {
                   <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.15 }}>{active.name}</div>
                   <div style={{ fontSize: 12.5, color: '#8A8378' }}>{active.headerSub}</div>
                 </div>
-                <Link href={appRoute(active.profileHref)} style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 600, color: '#157A49', textDecoration: 'none', border: '1px solid #CDE9D6', background: '#EAF6EE', padding: '7px 13px', borderRadius: 999 }}>{active.profileLabel}</Link>
+                <Link href={appRoute(active.profileHref)} style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, color: '#157A49', textDecoration: 'none', border: '1px solid #CDE9D6', background: '#EAF6EE', padding: '7px 13px', borderRadius: 999 }}>{active.profileLabel}</Link>
               </div>
 
               <div ref={msgRef} style={{ flex: 1, overflowY: 'auto', padding: '24px 26px 8px', display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {groupsView.map((g, gi) => (
                   <div key={gi} style={{ display: 'contents' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '4px 0' }}>
-                      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9A9286', background: '#EFE8DA', padding: '4px 12px', borderRadius: 999 }}>{g.date}</span>
+                      <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9A9286', background: '#EFE8DA', padding: '4px 12px', borderRadius: 999 }}>{g.date}</span>
                     </div>
                     {g.msgs.map((m, mi) => (
                       <div key={mi} style={{ display: 'flex', flexDirection: 'column', alignItems: m.align, animation: 'rbpop 0.2s ease' }}>
                         <div style={{ maxWidth: '74%', fontSize: 14, lineHeight: 1.5, color: m.color, background: m.bubbleBg, border: `1px solid ${m.bubbleBorder}`, borderRadius: m.radius, padding: '11px 15px' }}>{m.text}</div>
-                        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#A79E8F', margin: '5px 3px 0' }}>{m.time}</span>
+                        <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#A79E8F', margin: '5px 3px 0' }}>{m.time}</span>
                       </div>
                     ))}
                   </div>

@@ -20,14 +20,17 @@ import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CoverLettersService } from './cover-letters.service';
 import { GenerateCoverLetterDto } from './dto/generate-cover-letter.dto';
-import * as fs from 'fs/promises';
+import { StorageService } from '../storage';
 
 @ApiTags('cover-letters')
 @ApiBearerAuth()
 @Controller('cover-letters')
 @UseGuards(JwtAuthGuard)
 export class CoverLettersController {
-  constructor(private readonly coverLettersService: CoverLettersService) {}
+  constructor(
+    private readonly coverLettersService: CoverLettersService,
+    private readonly storageService: StorageService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Get all cover letters for the authenticated user' })
@@ -87,24 +90,51 @@ export class CoverLettersController {
     };
   }
 
+  @Post(':id/regenerate')
+  @ApiOperation({ summary: 'Regenerate an existing cover letter with AI' })
+  @ApiResponse({ status: 201, description: 'Cover letter regenerated successfully' })
+  @ApiResponse({ status: 404, description: 'Cover letter not found' })
+  async regenerate(@Param('id') id: string, @Request() req) {
+    const userId = req.user._id.toString();
+    // Load the source letter, then re-run the existing generate pipeline with
+    // its own job context so we reuse the service logic rather than duplicating it.
+    const existing = await this.coverLettersService.findOne(id, userId);
+    const coverLetter = await this.coverLettersService.generate(userId, {
+      jobTitle: existing.jobTitle,
+      companyName: existing.companyName,
+      jobDescription: existing.jobDescription || existing.jobTitle || existing.companyName,
+      additionalInfo: existing.additionalInfo,
+      template: existing.template || 'professional',
+    });
+
+    return {
+      id: coverLetter._id,
+      jobTitle: coverLetter.jobTitle,
+      companyName: coverLetter.companyName,
+      template: coverLetter.template,
+      content: coverLetter.content,
+      body: coverLetter.content,
+      pdfUrl: coverLetter.pdfUrl,
+      createdAt: coverLetter.createdAt,
+    };
+  }
+
   @Get(':id/pdf')
   @ApiOperation({ summary: 'Download cover letter PDF' })
   @ApiResponse({ status: 200, description: 'PDF file' })
   @ApiResponse({ status: 404, description: 'PDF not found' })
   async getPDF(@Param('id') id: string, @Request() req, @Res() res: Response) {
     try {
-      const pdfPath = await this.coverLettersService.getPDFPath(id, req.user._id.toString());
-      
-      // Check if file exists
+      const key = await this.coverLettersService.getPDFPath(id, req.user._id.toString());
+
+      // Read object from storage and send
+      let pdfBuffer: Buffer;
       try {
-        await fs.access(pdfPath);
+        pdfBuffer = await this.storageService.getBuffer(key);
       } catch {
         throw new NotFoundException('PDF file not found');
       }
 
-      // Read file and send
-      const pdfBuffer = await fs.readFile(pdfPath);
-      
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `inline; filename="cover-letter-${id}.pdf"`);
       res.send(pdfBuffer);

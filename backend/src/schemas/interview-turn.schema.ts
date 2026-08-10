@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
 export type InterviewTurnDocument = InterviewTurn & Document;
 
@@ -20,7 +20,7 @@ export interface TranscriptSegment {
 
 @Schema({ timestamps: true })
 export class InterviewTurn {
-  @Prop({ type: Types.ObjectId, ref: 'InterviewSession', required: true, index: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'InterviewSession', required: true, index: true })
   sessionId: Types.ObjectId;
 
   @Prop({ required: true, enum: TurnType })

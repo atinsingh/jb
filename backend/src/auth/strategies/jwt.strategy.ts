@@ -14,16 +14,22 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private readonly logger: AppLoggerService,
     private readonly configService: ConfigService,
   ) {
-    const secret = configService.get<string>('JWT_SECRET') || 'your-secret-key';
+    const envSecret = configService.get<string>('JWT_SECRET');
+    if (!envSecret && process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'JWT_SECRET must be set in production — refusing to start with an insecure default secret.',
+      );
+    }
+    const secret = envSecret || 'dev-insecure-secret-change-me';
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: secret,
     });
     this.logger.setContext('JwtStrategy');
-    const secretLength = secret.length;
-    const secretPreview = secret.substring(0, 4) + '...' + secret.substring(secretLength - 4);
-    this.logger.debug(`JWT Strategy initialized with secret: ${secret === 'your-secret-key' ? 'DEFAULT (CHANGE THIS!)' : `***${secretPreview}*** (length: ${secretLength})`}`);
+    this.logger.debug(
+      `JWT Strategy initialized with secret: ${envSecret ? `***${secret.slice(0, 4)}…*** (length: ${secret.length})` : 'DEV FALLBACK — set JWT_SECRET before deploying'}`,
+    );
   }
 
   async validate(payload: any) {
@@ -38,6 +44,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!user) {
       this.logger.warn(`JWT validation failed - User not found in database: ${payload.id}`);
       throw new UnauthorizedException('User not found');
+    }
+
+    // Reject tokens from a superseded session generation (set on logout). A
+    // token minted before this field existed carries no tokenVersion and is
+    // treated as generation 0, matching a user who has never logged out.
+    const tokenGen = payload.tokenVersion ?? 0;
+    if (tokenGen !== (user.tokenVersion ?? 0)) {
+      this.logger.warn(`JWT rejected - stale session generation for ${user.email}`);
+      throw new UnauthorizedException('Session expired, please log in again');
     }
 
     this.logger.debug(`JWT validation successful - User found: ${user.email} (ID: ${user._id})`);

@@ -73,7 +73,7 @@ function ResumeList() {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                     <div className="flex justify-between items-center mb-8">
                         <div>
-                            <h1 className="text-3xl font-bold text-zinc-900 dark:text-white" style={{ fontFamily: 'var(--font-display)' }}>My Resumes</h1>
+                            <h1 className="text-3xl font-bold text-zinc-900 dark:text-white" style={{ fontFamily: 'var(--jb-font-display)' }}>My Resumes</h1>
                             <p className="text-zinc-500 mt-1">Manage and edit your professional resumes</p>
                         </div>
                         <button

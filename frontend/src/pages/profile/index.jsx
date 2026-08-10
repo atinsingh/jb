@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import Layout from '@/components/layout';
+import Layout from '@/components/layout/PublicLayout';
 import ProfileForm from '@/components/form/ProfileForm';
 
 export default function ProfilePage() {
@@ -17,7 +17,7 @@ export default function ProfilePage() {
       try {
         const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
         if (!token) {
-          // router.push('/login');
+          // router.push('/app/login');
           return;
         }
 
@@ -32,7 +32,7 @@ export default function ProfilePage() {
           // Token is invalid or expired
           localStorage.removeItem('authToken');
           sessionStorage.removeItem('authToken');
-          router.push('/login');
+          router.push('/app/login');
           return;
         }
 

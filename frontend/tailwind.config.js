@@ -50,11 +50,9 @@ module.exports = {
           950: '#0d0f12',
         },
       },
-      fontFamily: {
-        sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
-        display: ['Clash Display', 'Plus Jakarta Sans', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
-      },
+      // NOTE: no fontFamily here. This file is NOT loaded — Tailwind v4 is
+      // configured from `@import "tailwindcss"` in src/styles/globals.css with
+      // no @config directive. Font families live in the @theme block there.
       animation: {
         'float': 'float 6s ease-in-out infinite',
         'float-slow': 'float 8s ease-in-out infinite',

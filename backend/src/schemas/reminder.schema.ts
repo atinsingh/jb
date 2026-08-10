@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
 export type ReminderDocument = Reminder & Document;
 
@@ -19,10 +19,10 @@ export enum ReminderStatus {
 
 @Schema({ timestamps: true })
 export class Reminder {
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true, index: true })
   userId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'Application', required: false, index: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Application', required: false, index: true })
   applicationId?: Types.ObjectId;
 
   @Prop({ required: true, enum: ReminderType })
@@ -60,6 +60,6 @@ export const ReminderSchema = SchemaFactory.createForClass(Reminder);
 
 // Indexes
 ReminderSchema.index({ userId: 1, status: 1, dueDate: 1 });
-ReminderSchema.index({ applicationId: 1 });
+// applicationId is already indexed via @Prop({ index: true }).
 ReminderSchema.index({ dueDate: 1, status: 1 }); // For background job queries
 

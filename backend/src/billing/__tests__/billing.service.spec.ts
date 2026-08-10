@@ -4,6 +4,7 @@ import { getModelToken } from '@nestjs/mongoose';
 import { BadRequestException } from '@nestjs/common';
 import { BillingService } from '../billing.service';
 import { PinoLogger } from 'nestjs-pino';
+import { EmployerBillingService } from '../../employer-billing/employer-billing.service';
 
 describe('BillingService', () => {
   let service: BillingService;
@@ -63,6 +64,15 @@ describe('BillingService', () => {
         { provide: getModelToken('UserSubscription'), useValue: mockSubscriptionModel },
         { provide: getModelToken('UsageRecord'), useValue: mockUsageModel },
         { provide: PinoLogger, useValue: mockLogger },
+        // BillingService routes employer-tagged webhook events here; these unit
+        // tests only exercise candidate paths, so a stub is enough.
+        {
+          provide: EmployerBillingService,
+          useValue: {
+            applyStripeSubscription: jest.fn(),
+            recordInvoice: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -78,11 +88,17 @@ describe('BillingService', () => {
       const payload = Buffer.from('invalid payload');
       const invalidSignature = 'invalid_signature';
 
+      // BillingService logs via its own `new Logger(BillingService.name)`
+      // (NestJS Logger), not the injected PinoLogger — spy on the real instance.
+      const errorSpy = jest
+        .spyOn((service as any).logger, 'error')
+        .mockImplementation(() => undefined);
+
       await expect(
         service.handleStripeWebhook(payload, invalidSignature),
       ).rejects.toThrow(BadRequestException);
 
-      expect(mockLogger.error).toHaveBeenCalledWith(
+      expect(errorSpy).toHaveBeenCalledWith(
         expect.objectContaining({ error: expect.any(String) }),
         'Webhook signature verification failed',
       );
@@ -124,9 +140,12 @@ describe('BillingService', () => {
       const userId = '507f1f77bcf86cd799439011';
       const featureKey = 'job_applications_per_month';
 
-      mockSubscriptionModel.findOne.mockResolvedValue({
-        currentPeriodStart: new Date(),
-        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      // getUserSubscription() chains .findOne(...).populate('planId')
+      mockSubscriptionModel.findOne.mockReturnValue({
+        populate: jest.fn().mockResolvedValue({
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        }),
       });
 
       mockUsageModel.findOneAndUpdate.mockResolvedValue({
@@ -147,9 +166,12 @@ describe('BillingService', () => {
       const userId = '507f1f77bcf86cd799439011';
       const featureKey = 'ai_credits_per_month';
 
-      mockSubscriptionModel.findOne.mockResolvedValue({
-        currentPeriodStart: new Date(),
-        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      // getUserSubscription() chains .findOne(...).populate('planId')
+      mockSubscriptionModel.findOne.mockReturnValue({
+        populate: jest.fn().mockResolvedValue({
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        }),
       });
 
       mockUsageModel.findOne.mockResolvedValue({
@@ -165,7 +187,10 @@ describe('BillingService', () => {
       const userId = '507f1f77bcf86cd799439011';
       const featureKey = 'ai_credits_per_month';
 
-      mockSubscriptionModel.findOne.mockResolvedValue(null);
+      // getUserSubscription() chains .findOne(...).populate('planId')
+      mockSubscriptionModel.findOne.mockReturnValue({
+        populate: jest.fn().mockResolvedValue(null),
+      });
       mockUsageModel.findOne.mockResolvedValue(null);
 
       const result = await service.getUsage(userId, featureKey);

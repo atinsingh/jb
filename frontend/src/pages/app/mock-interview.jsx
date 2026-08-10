@@ -5,21 +5,21 @@ import Head from 'next/head';
 import Link from 'next/link';
 import AppSidebar from '@/components/app/AppSidebar';
 import { appRoute } from '@/components/app/appRoutes';
+import { EmptyState } from '@/components/app/AppStates';
 import { useAuth } from '@/context/AuthContext';
 import { getInterviewApplications } from '@/services/interviewApi';
 
-/* ------------------------------------------------------------- sample data ---
- * Ported verbatim from the design's DCLogic `questions()`. Used as the always-on
- * fallback so the page renders faithfully when unauthenticated or offline.
+/* ------------------------------------------------------------- question bank ---
+ * Static product content: the canned practice-question library with coaching
+ * hints and follow-ups. This is not user data — it's the same set for everyone.
  * ------------------------------------------------------------------------- */
-const SAMPLE_QUESTIONS = [
+const QUESTION_BANK = [
   {
     q: 'Tell me about yourself and what drew you to product design.',
     category: 'Behavioral',
     difficulty: 'Easy',
     hint: 'Keep it to ~90 seconds: a through-line from how you started to why this role, not a résumé recital.',
-    followUp: 'What part of that story is most relevant to Stripe specifically?',
-    scores: { structure: 70, specificity: 62, pace: 80 },
+    followUp: 'What part of that story is most relevant to this company specifically?',
   },
   {
     q: 'Describe a time you disagreed with an engineer. How did you resolve it?',
@@ -27,15 +27,13 @@ const SAMPLE_QUESTIONS = [
     difficulty: 'Medium',
     hint: 'Anchor in one concrete disagreement. Show the data or user signal that moved the decision.',
     followUp: 'What would you do differently if it happened again?',
-    scores: { structure: 74, specificity: 68, pace: 72 },
   },
   {
     q: 'Walk me through a project you’re proud of — start to finish.',
     category: 'Craft',
     difficulty: 'Medium',
     hint: 'Use STAR. Lead with the problem and the metric you moved, not the visuals.',
-    followUp: 'How did you know the redesign actually caused the +31% activation lift?',
-    scores: { structure: 82, specificity: 78, pace: 68 },
+    followUp: 'How did you know the redesign actually caused the outcome you’re describing?',
   },
   {
     q: 'How would you build a design system from scratch for a 40-person eng org?',
@@ -43,15 +41,13 @@ const SAMPLE_QUESTIONS = [
     difficulty: 'Medium',
     hint: 'Talk sequencing: audit → tokens → core components → adoption → governance.',
     followUp: 'How do you get engineers to actually adopt it?',
-    scores: { structure: 80, specificity: 72, pace: 74 },
   },
   {
-    q: 'Critique Stripe Checkout. What would you change, and why?',
+    q: 'Critique a checkout flow you use often. What would you change, and why?',
     category: 'Craft',
     difficulty: 'Hard',
     hint: 'Pick two or three specific, prioritized changes. Tie each to a user or business outcome.',
     followUp: 'Which change would you ship first, and how would you measure it?',
-    scores: { structure: 76, specificity: 84, pace: 66 },
   },
   {
     q: 'Tell me about a launch that didn’t go as planned.',
@@ -59,7 +55,6 @@ const SAMPLE_QUESTIONS = [
     difficulty: 'Medium',
     hint: 'Own the miss, then focus on the recovery and the system you put in place after.',
     followUp: 'What signal did you miss early that you’d watch for now?',
-    scores: { structure: 72, specificity: 70, pace: 78 },
   },
   {
     q: 'How do you balance consistency and flexibility in component APIs?',
@@ -67,7 +62,6 @@ const SAMPLE_QUESTIONS = [
     difficulty: 'Hard',
     hint: 'Name the trade-off explicitly. Use a real prop/variant decision you’ve made.',
     followUp: 'When is an escape hatch worth the inconsistency it allows?',
-    scores: { structure: 78, specificity: 74, pace: 70 },
   },
   {
     q: 'How do you measure the success of a design?',
@@ -75,7 +69,6 @@ const SAMPLE_QUESTIONS = [
     difficulty: 'Medium',
     hint: 'Separate leading vs lagging metrics, and qualitative vs quantitative signals.',
     followUp: 'What do you do when the metric improves but users complain?',
-    scores: { structure: 80, specificity: 76, pace: 76 },
   },
 ];
 
@@ -86,17 +79,6 @@ const STAR = [
   { letter: 'R', title: 'Result', desc: 'The measurable outcome.' },
 ];
 
-/* score-summary constants (ported from design) */
-const OVERALL = 84;
-const SCORE_VERDICT = 'Strong session.';
-const SCORE_SUMMARY =
-  'Your structure and specificity were consistently high. Tighten pacing on craft questions — you tend to over-explain the visuals before the impact.';
-const CAT_SCORES_RAW = [
-  { label: 'Behavioral', value: 88 },
-  { label: 'Craft', value: 82 },
-  { label: 'Systems', value: 80 },
-];
-
 /* ----------------------------------------------------------------- helpers --- */
 const catStyle = (cat) => {
   if (cat === 'Behavioral') return { bg: '#EAF6EE', fg: '#157A49', border: '#CDE9D6' };
@@ -104,7 +86,6 @@ const catStyle = (cat) => {
   return { bg: '#E8EEF5', fg: '#2A4A6B', border: '#D2DDEB' };
 };
 const diffDots = (d) => (d === 'Easy' ? '●○○' : d === 'Medium' ? '●●○' : '●●●');
-const meterColor = (v) => (v >= 78 ? '#157A49' : v >= 65 ? '#1FA463' : '#C9622E');
 const fmtTime = (elapsed) => {
   const mm = Math.floor(elapsed / 60);
   const ss = elapsed % 60;
@@ -114,13 +95,13 @@ const fmtTime = (elapsed) => {
 export default function AppMockInterview() {
   const { user } = useAuth();
 
-  /* ---- backend context (graceful fallback to the design's Stripe role) ---- */
-  const [role, setRole] = useState({ title: 'Senior Product Designer', company: 'Stripe' });
-  const [questions, setQuestions] = useState(SAMPLE_QUESTIONS);
+  /* ---- backend context (generic until a real target role loads) ---- */
+  const [role, setRole] = useState({ title: '', company: '' });
+  const [questions] = useState(QUESTION_BANK);
 
-  /* ---- session state (mirrors the DCLogic `state` object) ---- */
-  const [q, setQ] = useState(2);
-  const [elapsed, setElapsed] = useState(512);
+  /* ---- session state — starts fresh, never pre-seeded ---- */
+  const [q, setQ] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
   const [recording, setRecording] = useState(false);
   const [ended, setEnded] = useState(false);
   const [mode, setMode] = useState('voice'); // 'voice' | 'text'
@@ -129,7 +110,7 @@ export default function AppMockInterview() {
 
   const ivRef = useRef(null);
 
-  /* fetch real interview context; never crash, always fall back */
+  /* fetch the real target role for this candidate; stay generic if none */
   useEffect(() => {
     let cancelled = false;
     if (!user) return undefined;
@@ -146,7 +127,7 @@ export default function AppMockInterview() {
           }
         }
       } catch {
-        /* offline / unauthenticated — keep the sample context */
+        /* offline / unauthenticated — keep the generic context */
       }
     })();
     return () => {
@@ -154,7 +135,7 @@ export default function AppMockInterview() {
     };
   }, [user]);
 
-  /* ticking session timer (componentDidMount / componentWillUnmount port) */
+  /* ticking session timer */
   useEffect(() => {
     ivRef.current = setInterval(() => {
       setElapsed((e) => e + 1);
@@ -166,7 +147,7 @@ export default function AppMockInterview() {
     if (ended) clearInterval(ivRef.current);
   }, [ended]);
 
-  /* ---- derived render values (renderVals port) ---- */
+  /* ---- derived render values ---- */
   const qs = questions;
   const cur = qs[Math.min(q, qs.length - 1)];
   const cs = catStyle(cur.category);
@@ -190,22 +171,6 @@ export default function AppMockInterview() {
     [recording]
   );
 
-  const meters = [
-    { label: 'Structure', key: 'structure' },
-    { label: 'Specificity', key: 'specificity' },
-    { label: 'Pace', key: 'pace' },
-  ].map((m) => {
-    const v = cur.scores[m.key];
-    return { label: m.label, value: v, pct: `${v}%`, color: meterColor(v) };
-  });
-
-  const catScores = CAT_SCORES_RAW.map((c) => ({
-    label: c.label,
-    value: c.value,
-    pct: `${c.value}%`,
-    color: meterColor(c.value),
-  }));
-
   const voiceMode = mode === 'voice';
   const textMode = mode === 'text';
   const micBg = recording ? '#C9622E' : '#1FA463';
@@ -214,7 +179,8 @@ export default function AppMockInterview() {
   const recordStatus = recording ? 'Recording… tap the mic to stop' : 'Tap the mic to record your answer';
   const modeToggleLabel = mode === 'voice' ? 'Type instead' : 'Record instead';
   const nextLabel = q >= qs.length - 1 ? 'Finish session' : 'Next question';
-  const scoreDeg = `${(OVERALL / 100) * 360}deg`;
+
+  const roleTitle = role.title || 'Practice interview';
 
   /* ---- actions ---- */
   const goNext = () => {
@@ -253,13 +219,10 @@ export default function AppMockInterview() {
   return (
     <>
       <Head>
-        <title>Mock interview · {role.title} at {role.company} — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
+        <title>
+          Mock interview{role.title ? ` · ${role.title}` : ''}
+          {role.company ? ` at ${role.company}` : ''} — Jobocate
+        </title>
       </Head>
 
       <style jsx global>{`
@@ -303,18 +266,25 @@ export default function AppMockInterview() {
         }
       `}</style>
 
-      <div id="jbapp" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: "'Hanken Grotesk',sans-serif", color: '#1B1A16' }}>
+      <div id="jbapp" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16' }}>
         <AppSidebar active="interview" />
 
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           {/* HEADER */}
           <header style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: 18, padding: '13px 32px', background: 'rgba(247,243,234,0.9)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #E7E0D2' }}>
-            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, fontWeight: 600, letterSpacing: '0.1em', color: '#C9622E', border: '1px solid #EAD0C4', background: '#FBEDE4', padding: '3px 8px', borderRadius: 999 }}>MOCK</span>
+            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', color: '#C9622E', border: '1px solid #EAD0C4', background: '#FBEDE4', padding: '3px 8px', borderRadius: 999 }}>MOCK</span>
             <span style={{ fontSize: 14, fontWeight: 600 }}>
-              {role.title} <span style={{ color: '#C9BFAC' }}>·</span> <span style={{ color: '#5A544A' }}>{role.company}</span>
+              {roleTitle}
+              {role.company && (
+                <>
+                  {' '}
+                  <span style={{ color: '#C9BFAC' }}>·</span>{' '}
+                  <span style={{ color: '#5A544A' }}>{role.company}</span>
+                </>
+              )}
             </span>
             <div style={{ flex: 1 }} />
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontFamily: "'JetBrains Mono',monospace", fontSize: 14, fontWeight: 600, color: '#1B1A16' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontFamily: 'var(--jb-font-mono)', fontSize: 14, fontWeight: 600, color: '#1B1A16' }}>
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: timerDot }} />
               {timer}
             </span>
@@ -327,7 +297,7 @@ export default function AppMockInterview() {
               {/* MAIN */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18 }}>
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, fontWeight: 600, color: '#5A544A', flexShrink: 0 }}>Question {q + 1} of {qs.length}</span>
+                  <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 12, fontWeight: 600, color: '#5A544A', flexShrink: 0 }}>Question {q + 1} of {qs.length}</span>
                   <div style={{ flex: 1, height: 6, borderRadius: 999, background: '#E6DECF', overflow: 'hidden' }}>
                     <div style={{ width: progress, height: '100%', background: '#1FA463', transition: 'width 0.3s ease' }} />
                   </div>
@@ -336,13 +306,13 @@ export default function AppMockInterview() {
                 {/* QUESTION CARD */}
                 <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18, padding: 30, marginBottom: 16, animation: 'rbpop 0.25s ease' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 16 }}>
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: cs.fg, background: cs.bg, border: `1px solid ${cs.border}`, padding: '4px 10px', borderRadius: 999 }}>{cur.category}</span>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#8A8378' }}>{diffDots(cur.difficulty)} {cur.difficulty}</span>
+                    <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: cs.fg, background: cs.bg, border: `1px solid ${cs.border}`, padding: '4px 10px', borderRadius: 999 }}>{cur.category}</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#8A8378' }}>{diffDots(cur.difficulty)} {cur.difficulty}</span>
                   </div>
-                  <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 30, lineHeight: 1.18, margin: 0 }}>{cur.q}</h1>
+                  <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 30, lineHeight: 1.18, margin: 0 }}>{cur.q}</h1>
                   {hint && (
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 18, padding: '13px 15px', background: '#FBF9F2', border: '1px dashed #D2C9B7', borderRadius: 12 }}>
-                      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9, fontWeight: 600, letterSpacing: '0.06em', color: '#C9622E', background: '#FBEDE4', border: '1px solid #EAD0C4', padding: '3px 7px', borderRadius: 999, flexShrink: 0 }}>HINT</span>
+                      <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', color: '#C9622E', background: '#FBEDE4', border: '1px solid #EAD0C4', padding: '3px 7px', borderRadius: 999, flexShrink: 0 }}>HINT</span>
                       <span style={{ fontSize: 13.5, lineHeight: 1.55, color: '#5A544A' }}>{cur.hint}</span>
                     </div>
                   )}
@@ -386,7 +356,7 @@ export default function AppMockInterview() {
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginTop: 16, padding: '16px 18px', background: '#15140F', border: '1px solid #2C2A22', borderRadius: 14 }}>
                   <span style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 8, background: '#1E2D24', color: '#5BD08C', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>✦</span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#5BD08C', marginBottom: 5 }}>AI follow-up</div>
+                    <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#5BD08C', marginBottom: 5 }}>AI follow-up</div>
                     <div style={{ fontSize: 14, lineHeight: 1.5, color: '#E4DECF' }}>{cur.followUp}</div>
                   </div>
                 </div>
@@ -395,31 +365,23 @@ export default function AppMockInterview() {
               {/* RIGHT RAIL: COACHING */}
               <div style={{ width: 296, flexShrink: 0, position: 'sticky', top: 84, display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 16, padding: 20 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#1FA463' }} />
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#157A49' }}>Live coaching</span>
+                    <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#157A49' }}>Live coaching</span>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                    {meters.map((m) => (
-                      <div key={m.label}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                          <span style={{ fontSize: 13, fontWeight: 600, color: '#1B1A16' }}>{m.label}</span>
-                          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, fontWeight: 600, color: m.color }}>{m.value}</span>
-                        </div>
-                        <div style={{ height: 6, borderRadius: 999, background: '#EFE8DA', overflow: 'hidden' }}>
-                          <div style={{ width: m.pct, height: '100%', background: m.color, transition: 'width 0.4s ease' }} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <EmptyState
+                    icon="◎"
+                    title="No live scoring yet"
+                    hint="Practice freely — use the STAR guide below to structure each answer."
+                  />
                 </div>
 
                 <div style={{ background: '#FBF9F2', border: '1px solid #E6DECF', borderRadius: 16, padding: 20 }}>
-                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9A9286', marginBottom: 14 }}>STAR method</div>
+                  <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9A9286', marginBottom: 14 }}>STAR method</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
                     {STAR.map((s) => (
                       <div key={s.letter} style={{ display: 'flex', alignItems: 'flex-start', gap: 11 }}>
-                        <span style={{ width: 24, height: 24, flexShrink: 0, borderRadius: 7, background: '#EAF6EE', color: '#157A49', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, fontSize: 12 }}>{s.letter}</span>
+                        <span style={{ width: 24, height: 24, flexShrink: 0, borderRadius: 7, background: '#EAF6EE', color: '#157A49', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--jb-font-mono)', fontWeight: 600, fontSize: 12 }}>{s.letter}</span>
                         <div>
                           <div style={{ fontSize: 13, fontWeight: 700, color: '#1B1A16', lineHeight: 1.2 }}>{s.title}</div>
                           <div style={{ fontSize: 12, color: '#8A8378', lineHeight: 1.35 }}>{s.desc}</div>
@@ -432,36 +394,21 @@ export default function AppMockInterview() {
             </div>
           )}
 
-          {/* ===== SCORED SUMMARY ===== */}
+          {/* ===== SESSION COMPLETE ===== */}
           {ended && (
             <div style={{ padding: '36px 32px 64px', maxWidth: 680, width: '100%', margin: '0 auto' }}>
               <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 20, padding: 36, textAlign: 'center', animation: 'rbpop 0.35s ease' }}>
-                <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#157A49', marginBottom: 14 }}>Session complete</div>
-                <div style={{ width: 128, height: 128, margin: '0 auto 8px', borderRadius: '50%', background: `conic-gradient(#1FA463 ${scoreDeg}, #EFE8DA 0)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <div style={{ width: 104, height: 104, borderRadius: '50%', background: '#FFFEFB', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 38, fontWeight: 600, lineHeight: 1, color: '#1B1A16' }}>{OVERALL}</span>
-                    <span style={{ fontSize: 11, color: '#8A8378' }}>/ 100</span>
-                  </div>
+                <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#157A49', marginBottom: 14 }}>Session complete</div>
+                <div style={{ width: 96, height: 96, margin: '0 auto 8px', borderRadius: '50%', background: '#EAF6EE', color: '#157A49', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40 }}>
+                  ✓
                 </div>
-                <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 32, lineHeight: 1.1, margin: '14px 0 6px' }}>{SCORE_VERDICT}</h1>
-                <p style={{ fontSize: 14.5, color: '#5A544A', margin: '0 auto 26px', maxWidth: 440 }}>{SCORE_SUMMARY}</p>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16, textAlign: 'left', marginBottom: 28 }}>
-                  {catScores.map((c) => (
-                    <div key={c.label}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
-                        <span style={{ fontSize: 14, fontWeight: 600 }}>{c.label}</span>
-                        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 13, fontWeight: 600, color: c.color }}>{c.value}</span>
-                      </div>
-                      <div style={{ height: 8, borderRadius: 999, background: '#EFE8DA', overflow: 'hidden' }}>
-                        <div style={{ width: c.pct, height: '100%', background: c.color }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 32, lineHeight: 1.1, margin: '14px 0 6px' }}>Nice work — session complete.</h1>
+                <p style={{ fontSize: 14.5, color: '#5A544A', margin: '0 auto 26px', maxWidth: 440 }}>
+                  You practiced {qs.length} {qs.length === 1 ? 'question' : 'questions'}. Run another set to keep sharpening, or head back to your interview prep.
+                </p>
 
                 <div style={{ display: 'flex', gap: 11, justifyContent: 'center', flexWrap: 'wrap' }}>
-                  <Link href={appRoute('App Interview.dc.html')} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#1B1A16', color: '#F7F3EA', fontSize: 14.5, fontWeight: 600, padding: '13px 24px', borderRadius: 999, textDecoration: 'none' }}>Review answers →</Link>
+                  <Link href={appRoute('App Interview.dc.html')} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#1B1A16', color: '#F7F3EA', fontSize: 14.5, fontWeight: 600, padding: '13px 24px', borderRadius: 999, textDecoration: 'none' }}>Back to prep →</Link>
                   <button onClick={restart} style={{ fontFamily: 'inherit', fontSize: 14.5, fontWeight: 600, color: '#1B1A16', background: '#FFFEFB', border: '1px solid #D9D0BE', borderRadius: 999, padding: '13px 24px', cursor: 'pointer' }}>Practice again</button>
                 </div>
               </div>

@@ -58,7 +58,7 @@ export const uploadResume = async (file) => {
 
 // Job Scraper API
 export const triggerJobScraping = async (keywords, location) => {
-  return apiCall('/api/jobs/scraper/trigger', {
+  return apiCall('/api/jobs/scrape', {
     method: 'POST',
     body: JSON.stringify({ keywords, location }),
   });
@@ -73,16 +73,16 @@ export const searchScrapedJobs = async (filters) => {
   if (filters.limit) params.append('limit', filters.limit);
   if (filters.skip) params.append('skip', filters.skip);
 
-  return apiCall(`/api/jobs/scraper/search?${params.toString()}`);
+  return apiCall(`/api/jobs/search?${params.toString()}`);
 };
 
 export const getScrapedJobById = async (jobId) => {
-  return apiCall(`/api/jobs/scraper/${jobId}`);
+  return apiCall(`/api/jobs/${jobId}`);
 };
 
 // Job Matching API
 export const calculateJobMatch = async (jobId) => {
-  return apiCall(`/api/job-matching/calculate/${jobId}`, {
+  return apiCall(`/api/matching/calculate/${jobId}`, {
     method: 'POST',
   });
 };
@@ -94,27 +94,27 @@ export const getMyMatches = async (filters) => {
   if (filters.limit) params.append('limit', filters.limit);
   if (filters.skip) params.append('skip', filters.skip);
 
-  return apiCall(`/api/job-matching/matches?${params.toString()}`);
+  return apiCall(`/api/matching/matches?${params.toString()}`);
 };
 
 export const markJobAsInterested = async (jobId, interested) => {
-  return apiCall(`/api/job-matching/interest/${jobId}`, {
+  return apiCall(`/api/matching/interest/${jobId}`, {
     method: 'PATCH',
     body: JSON.stringify({ interested }),
   });
 };
 
 export const getInterestedJobs = async () => {
-  return apiCall('/api/job-matching/interested');
+  return apiCall('/api/matching/interested');
 };
 
 export const getJobRecommendations = async (limit = 10) => {
-  return apiCall(`/api/job-matching/recommendations?limit=${limit}`);
+  return apiCall(`/api/matching/recommendations?limit=${limit}`);
 };
 
 // Application Agent API
 export const queueApplication = async (jobId) => {
-  return apiCall(`/api/application-agent/queue/${jobId}`, {
+  return apiCall(`/api/applications/queue/${jobId}`, {
     method: 'POST',
   });
 };
@@ -125,27 +125,27 @@ export const getMyApplications = async (filters) => {
   if (filters.limit) params.append('limit', filters.limit);
   if (filters.skip) params.append('skip', filters.skip);
 
-  return apiCall(`/api/application-agent/my-applications?${params.toString()}`);
+  return apiCall(`/api/applications/my-applications?${params.toString()}`);
 };
 
 export const getApplicationById = async (applicationId) => {
-  return apiCall(`/api/application-agent/${applicationId}`);
+  return apiCall(`/api/applications/${applicationId}`);
 };
 
 export const retryApplication = async (applicationId) => {
-  return apiCall(`/api/application-agent/${applicationId}/retry`, {
+  return apiCall(`/api/applications/${applicationId}/retry`, {
     method: 'PATCH',
   });
 };
 
 export const cancelApplication = async (applicationId) => {
-  return apiCall(`/api/application-agent/${applicationId}`, {
+  return apiCall(`/api/applications/${applicationId}`, {
     method: 'DELETE',
   });
 };
 
 export const processApplicationQueue = async (limit = 10) => {
-  return apiCall(`/api/application-agent/process-queue?limit=${limit}`, {
+  return apiCall(`/api/applications/process-queue?limit=${limit}`, {
     method: 'POST',
   });
 };

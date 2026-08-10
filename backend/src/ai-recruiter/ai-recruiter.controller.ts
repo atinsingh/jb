@@ -6,6 +6,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { AiRecruiterService } from './ai-recruiter.service';
 import { ToggleAutopilotDto } from './dto/toggle-autopilot.dto';
 import { ScreenDto } from './dto/screen.dto';
@@ -15,7 +17,8 @@ import { ScorecardDto } from './dto/scorecard.dto';
 
 @ApiTags('employer-ai')
 @Controller('employer/ai')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('ROLE_EMPLOYER', 'ROLE_ADMIN')
 export class AiRecruiterController {
   constructor(private readonly aiRecruiterService: AiRecruiterService) {}
 
@@ -50,15 +53,17 @@ export class AiRecruiterController {
   @ApiOperation({ summary: 'Recruiting copilot — templated structured action response' })
   @ApiResponse({ status: 201, description: 'Copilot reply with proposed actions' })
   async copilot(@Body() dto: CopilotDto, @Request() req) {
-    return this.aiRecruiterService.copilot(dto.message);
+    const userId = req.user._id.toString();
+    return this.aiRecruiterService.copilot(userId, dto.message);
   }
 
   @Post('sourcing')
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Source sample candidates with drafted outreach for a brief' })
+  @ApiOperation({ summary: 'Rank your real candidate pool against a brief, with drafted outreach' })
   @ApiResponse({ status: 201, description: 'Ranked candidates with outreach drafts' })
   async sourcing(@Body() dto: SourcingDto, @Request() req) {
-    return this.aiRecruiterService.sourcing(dto.brief);
+    const employerId = req.user._id.toString();
+    return this.aiRecruiterService.sourcing(dto.brief, employerId);
   }
 
   @Post('interview/scorecard')
@@ -66,6 +71,7 @@ export class AiRecruiterController {
   @ApiOperation({ summary: 'Generate a templated interview scorecard from transcript/notes' })
   @ApiResponse({ status: 201, description: 'Structured scorecard' })
   async scorecard(@Body() dto: ScorecardDto, @Request() req) {
-    return this.aiRecruiterService.scorecard(dto.transcript, dto.notes);
+    const userId = req.user._id.toString();
+    return this.aiRecruiterService.scorecard(userId, dto.transcript, dto.notes);
   }
 }

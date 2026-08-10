@@ -44,6 +44,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
         message = exception.message;
         error = 'Error';
       }
+    } else if (
+      exception instanceof Error &&
+      exception.name === 'CastError' &&
+      (exception as any).kind === 'ObjectId'
+    ) {
+      // A malformed id in a route/query param reaches Mongoose and throws a
+      // CastError. That's bad input, not a server fault — report 400, not 500.
+      status = HttpStatus.BAD_REQUEST;
+      message = `Invalid identifier: ${(exception as any).value}`;
+      error = 'Bad Request';
     } else if (exception instanceof Error) {
       status = HttpStatus.INTERNAL_SERVER_ERROR;
       message = 'Internal server error';

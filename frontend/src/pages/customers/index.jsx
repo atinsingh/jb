@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import SiteNav from '@/components/site/SiteNav';
-import SiteFooter from '@/components/site/SiteFooter';
+import PublicLayout from '@/components/layout/PublicLayout';
 import { appRoute } from '@/components/app/appRoutes';
 
 const FILTER_DEFS = [
@@ -14,25 +13,25 @@ const FILTER_DEFS = [
 ];
 
 const RAW_STORIES = [
-  { type: 'employer', metric: '40%', metricLabel: 'faster time-to-hire', quote: '"Autopilot screens overnight and hands us a clean shortlist by morning."', name: 'Dana W.', role: 'Recruiter', initials: 'DW', authorAccent: 'indigo', logo: 'St', logoBg: '#EDF0FE', logoColor: '#4263EB', accent: '#4263EB' },
-  { type: 'candidate', metric: '3 weeks', metricLabel: 'from sign-up to offer', quote: '"I set it up once and woke up to interview requests. Landed at Plaid in 21 days."', name: 'Sarah C.', role: 'Designer', initials: 'SC', authorAccent: 'green', logo: 'Pl', logoBg: '#EAF6EE', logoColor: '#157A49', accent: '#1FA463' },
-  { type: 'employer', metric: '−52%', metricLabel: 'cost per hire', quote: '"We replaced an agency retainer with Jobocate and never looked back."', name: 'Raj M.', role: 'Talent Lead', initials: 'RM', authorAccent: 'indigo', logo: 'Lu', logoBg: '#F4EFE4', logoColor: '#1B1A16', accent: '#4263EB' },
-  { type: 'candidate', metric: '5×', metricLabel: 'more interviews', quote: '"Auto-apply got me in front of teams I’d never have found on my own."', name: 'Jordan L.', role: 'Engineer', initials: 'JL', authorAccent: 'green', logo: 'Sq', logoBg: '#EAF6EE', logoColor: '#157A49', accent: '#1FA463' },
-  { type: 'employer', metric: '2.5k', metricLabel: 'applicants auto-screened / mo', quote: '"Our team finally spends time on people, not on filtering résumés."', name: 'Elena C.', role: 'Hiring Manager', initials: 'EC', authorAccent: 'indigo', logo: 'Ve', logoBg: '#F4EFE4', logoColor: '#1B1A16', accent: '#4263EB' },
-  { type: 'candidate', metric: '92%', metricLabel: 'match on her final offer', quote: '"The match score was spot on — the role fit better than anything I’d applied to manually."', name: 'Priya N.', role: 'PM', initials: 'PN', authorAccent: 'green', logo: 'No', logoBg: '#EAF6EE', logoColor: '#157A49', accent: '#1FA463' },
+  { type: 'employer', metric: '40%', metricLabel: 'faster time-to-hire', quote: '"Autopilot screens overnight and hands us a clean shortlist by morning."', name: 'Dana W.', role: 'Recruiter', initials: 'DW', authorAccent: 'indigo', logo: 'St', logoBg: 'rgba(124,196,255,0.12)', logoColor: '#7cc4ff', accent: '#7cc4ff' },
+  { type: 'candidate', metric: '3 weeks', metricLabel: 'from sign-up to offer', quote: '"I set it up once and woke up to interview requests. Landed at Plaid in 21 days."', name: 'Sarah C.', role: 'Designer', initials: 'SC', authorAccent: 'green', logo: 'Pl', logoBg: 'var(--jb-d-accent-tint)', logoColor: 'var(--jb-d-accent)', accent: 'var(--jb-d-accent)' },
+  { type: 'employer', metric: '−52%', metricLabel: 'cost per hire', quote: '"We replaced an agency retainer with Jobocate and never looked back."', name: 'Raj M.', role: 'Talent Lead', initials: 'RM', authorAccent: 'indigo', logo: 'Lu', logoBg: 'transparent', logoColor: 'var(--jb-d-ink)', accent: '#7cc4ff' },
+  { type: 'candidate', metric: '5×', metricLabel: 'more interviews', quote: '"Auto-apply got me in front of teams I’d never have found on my own."', name: 'Jordan L.', role: 'Engineer', initials: 'JL', authorAccent: 'green', logo: 'Sq', logoBg: 'var(--jb-d-accent-tint)', logoColor: 'var(--jb-d-accent)', accent: 'var(--jb-d-accent)' },
+  { type: 'employer', metric: '2.5k', metricLabel: 'applicants auto-screened / mo', quote: '"Our team finally spends time on people, not on filtering résumés."', name: 'Elena C.', role: 'Hiring Manager', initials: 'EC', authorAccent: 'indigo', logo: 'Ve', logoBg: 'transparent', logoColor: 'var(--jb-d-ink)', accent: '#7cc4ff' },
+  { type: 'candidate', metric: '92%', metricLabel: 'match on her final offer', quote: '"The match score was spot on — the role fit better than anything I’d applied to manually."', name: 'Priya N.', role: 'PM', initials: 'PN', authorAccent: 'green', logo: 'No', logoBg: 'var(--jb-d-accent-tint)', logoColor: 'var(--jb-d-accent)', accent: 'var(--jb-d-accent)' },
 ];
 
 const avatar = (a) =>
   a === 'green'
-    ? { bg: '#1FA463', color: '#0C2C1C' }
+    ? { bg: 'var(--jb-d-accent)', color: 'var(--jb-d-bg)' }
     : a === 'indigo'
-    ? { bg: '#4263EB', color: '#fff' }
-    : { bg: '#EDE7DA', color: '#5A544A' };
+    ? { bg: '#7cc4ff', color: 'var(--jb-d-panel)' }
+    : { bg: 'var(--jb-d-glass)', color: 'var(--jb-d-ink-70)' };
 
 const tagStyle = (k) =>
   k === 'employer'
-    ? { label: 'EMPLOYER', color: '#4263EB', bg: '#EDF0FE', border: '#C7D2FB' }
-    : { label: 'JOB SEEKER', color: '#157A49', bg: '#EAF6EE', border: '#CDE9D6' };
+    ? { label: 'EMPLOYER', color: '#7cc4ff', bg: 'rgba(124,196,255,0.12)', border: 'rgba(124,196,255,0.3)' }
+    : { label: 'JOB SEEKER', color: 'var(--jb-d-accent)', bg: 'var(--jb-d-accent-tint)', border: '#CDE9D6' };
 
 export default function CustomerStories() {
   const [filter, setFilter] = useState('all');
@@ -44,9 +43,9 @@ export default function CustomerStories() {
     return {
       key: f.key,
       label: f.label,
-      color: on ? '#fff' : '#46413A',
-      bg: on ? '#4263EB' : '#FFFEFB',
-      border: on ? '#4263EB' : '#E1D9C9',
+      color: on ? '#fff' : 'var(--jb-d-ink-85)',
+      bg: on ? '#7cc4ff' : 'var(--jb-d-panel)',
+      border: on ? '#7cc4ff' : 'var(--jb-d-line-card)',
     };
   });
 
@@ -59,13 +58,7 @@ export default function CustomerStories() {
   return (
     <>
       <Head>
-        <title>Customer Stories — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
+        <title>Customer stories — Jobocate hiring & job search</title>
       </Head>
 
       <style jsx global>{`
@@ -73,21 +66,19 @@ export default function CustomerStories() {
           box-sizing: border-box;
         }
         #emkt ::selection {
-          background: #1fa463;
+          background: var(--jb-d-accent);
           color: #f7f3ea;
         }
       `}</style>
 
-      <div id="emkt" style={{ fontFamily: "'Hanken Grotesk',sans-serif", color: '#1B1A16', background: '#F7F3EA' }}>
-        <div style={{ position: 'sticky', top: 0, zIndex: 50, display: 'block' }}>
-          <SiteNav />
-        </div>
+      <div id="emkt" style={{ fontFamily: 'var(--jb-font-sans)', color: 'var(--jb-d-ink)', background: 'transparent' }}>
+        <PublicLayout>
 
         {/* HEADER */}
         <section style={{ maxWidth: 1140, margin: '0 auto', padding: '48px 32px 24px' }}>
-          <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#1FA463', marginBottom: 14 }}>— Customer stories</div>
-          <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 48, lineHeight: 1.04, margin: '0 0 10px' }}>Real outcomes, on both sides of the table.</h1>
-          <p style={{ fontSize: 16.5, color: '#5A544A', margin: '0 0 24px', maxWidth: 520 }}>From seekers who landed faster to teams who hired smarter — here’s what changed with Jobocate.</p>
+          <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--jb-d-accent)', marginBottom: 14 }}>— Customer stories</div>
+          <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 'clamp(26px, 5vw, 48px)', lineHeight: 1.04, margin: '0 0 10px' }}>Real outcomes for hiring teams and job seekers.</h1>
+          <p style={{ fontSize: 16.5, color: 'var(--jb-d-ink-70)', margin: '0 0 24px', maxWidth: 520 }}>Teams that hired without adding a recruiter, and candidates who landed roles that fit. Here’s what changed.</p>
           <div style={{ display: 'flex', gap: 8 }}>
             {filters.map((f) => (
               <button
@@ -103,46 +94,46 @@ export default function CustomerStories() {
 
         {/* FEATURED */}
         <section style={{ maxWidth: 1140, margin: '0 auto', padding: '8px 32px 8px' }}>
-          <Link href={storyHref} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, background: '#15140F', borderRadius: 22, overflow: 'hidden', textDecoration: 'none', position: 'relative' }}>
+          <Link href={storyHref} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', gap: 0, background: 'var(--jb-d-footer)', borderRadius: 22, overflow: 'hidden', textDecoration: 'none', position: 'relative' }}>
             <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 30% 20%, rgba(66,99,235,0.32), transparent 55%)', pointerEvents: 'none' }} />
             <div style={{ position: 'relative', padding: 44 }}>
-              <span style={{ display: 'inline-block', fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, fontWeight: 600, letterSpacing: '0.04em', color: '#8DA2F5', background: 'rgba(66,99,235,0.16)', border: '1px solid rgba(66,99,235,0.32)', padding: '3px 9px', borderRadius: 999, marginBottom: 18 }}>EMPLOYER · FEATURED</span>
-              <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 60, fontWeight: 600, color: '#5BD08C', lineHeight: 1 }}>40%</div>
-              <div style={{ fontSize: 16, color: '#B8B1A4', margin: '6px 0 20px' }}>faster time-to-hire in the first quarter</div>
-              <p style={{ fontFamily: "'Instrument Serif',serif", fontSize: 24, lineHeight: 1.3, color: '#F2EDE2', margin: '0 0 24px' }}>&quot;Autopilot does the screening we never had time for. We hired a full design team without adding a recruiter.&quot;</p>
+              <span style={{ display: 'inline-block', fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', color: '#7cc4ff', background: 'rgba(66,99,235,0.16)', border: '1px solid rgba(66,99,235,0.32)', padding: '3px 9px', borderRadius: 999, marginBottom: 18 }}>EMPLOYER · FEATURED</span>
+              <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 'clamp(28px, 6vw, 60px)', fontWeight: 600, color: 'var(--jb-d-accent)', lineHeight: 1 }}>40%</div>
+              <div style={{ fontSize: 16, color: 'var(--jb-d-ink-65)', margin: '6px 0 20px' }}>faster time-to-hire in the first quarter</div>
+              <p style={{ fontFamily: 'var(--jb-font-display)', fontSize: 24, lineHeight: 1.3, color: '#F2EDE2', margin: '0 0 24px' }}>&quot;Autopilot does the screening we never had time for. We hired a full design team without adding a recruiter.&quot;</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ width: 40, height: 40, borderRadius: '50%', background: '#4263EB', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13 }}>DW</span>
+                <span style={{ width: 40, height: 40, borderRadius: '50%', background: '#7cc4ff', color: 'var(--jb-d-panel)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13 }}>DW</span>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: '#FBF8F1' }}>Dana Whitfield</div>
-                  <div style={{ fontSize: 12.5, color: '#9A9286' }}>Senior Recruiter, Stripe</div>
+                  <div style={{ fontSize: 12.5, color: 'var(--jb-d-ink-55)' }}>Senior Recruiter, Stripe</div>
                 </div>
               </div>
             </div>
             <div style={{ position: 'relative', background: 'repeating-linear-gradient(135deg, #1E2436, #1E2436 18px, #232A40 18px, #232A40 36px)', minHeight: 320, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#5B6A92' }}>customer photo</span>
+              <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#5B6A92' }}>customer photo</span>
             </div>
           </Link>
         </section>
 
         {/* GRID */}
         <section style={{ maxWidth: 1140, margin: '0 auto', padding: '20px 32px 40px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', gap: 16 }}>
             {visible.map((s, i) => (
               <Link
                 key={`${s.name}-${i}`}
                 href={storyHref}
-                style={{ display: 'flex', flexDirection: 'column', background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18, padding: 24, textDecoration: 'none' }}
+                style={{ display: 'flex', flexDirection: 'column', background: 'var(--jb-d-panel)', border: '1px solid var(--jb-d-line-card)', borderRadius: 18, padding: 24, textDecoration: 'none' }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
-                  <span style={{ width: 38, height: 38, borderRadius: 10, background: s.logoBg, color: s.logoColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, fontFamily: "'JetBrains Mono',monospace" }}>{s.logo}</span>
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9, fontWeight: 600, letterSpacing: '0.04em', color: s.tagColor, background: s.tagBg, border: `1px solid ${s.tagBorder}`, padding: '2px 8px', borderRadius: 999 }}>{s.tag}</span>
+                  <span style={{ width: 38, height: 38, borderRadius: 10, background: s.logoBg, color: s.logoColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, fontFamily: 'var(--jb-font-mono)' }}>{s.logo}</span>
+                  <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', color: s.tagColor, background: s.tagBg, border: `1px solid ${s.tagBorder}`, padding: '2px 8px', borderRadius: 999 }}>{s.tag}</span>
                 </div>
-                <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 34, fontWeight: 600, color: s.accent, lineHeight: 1 }}>{s.metric}</div>
-                <div style={{ fontSize: 14, color: '#5A544A', margin: '6px 0 16px' }}>{s.metricLabel}</div>
-                <p style={{ fontSize: 14, lineHeight: 1.55, color: '#3A352C', margin: '0 0 16px', flex: 1 }}>{s.quote}</p>
+                <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 'clamp(26px, 5vw, 34px)', fontWeight: 600, color: s.accent, lineHeight: 1 }}>{s.metric}</div>
+                <div style={{ fontSize: 14, color: 'var(--jb-d-ink-70)', margin: '6px 0 16px' }}>{s.metricLabel}</div>
+                <p style={{ fontSize: 14, lineHeight: 1.55, color: 'var(--jb-d-ink-85)', margin: '0 0 16px', flex: 1 }}>{s.quote}</p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                  <span style={{ width: 26, height: 26, borderRadius: '50%', background: s.avatarBg, color: s.avatarColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 10 }}>{s.initials}</span>
-                  <span style={{ fontSize: 12.5, color: '#5A544A' }}>{s.name} · {s.role}</span>
+                  <span style={{ width: 26, height: 26, borderRadius: '50%', background: s.avatarBg, color: s.avatarColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 11 }}>{s.initials}</span>
+                  <span style={{ fontSize: 12.5, color: 'var(--jb-d-ink-70)' }}>{s.name} · {s.role}</span>
                 </div>
               </Link>
             ))}
@@ -151,17 +142,17 @@ export default function CustomerStories() {
 
         {/* CTA */}
         <section style={{ maxWidth: 1140, margin: '0 auto', padding: '0 32px 72px' }}>
-          <div style={{ background: '#EDF0FE', border: '1px solid #C7D2FB', borderRadius: 24, padding: 48, textAlign: 'center' }}>
-            <h2 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 36, lineHeight: 1.06, margin: '0 0 12px' }}>Write your own story.</h2>
-            <p style={{ fontSize: 16, color: '#3F4A7A', margin: '0 auto 26px', maxWidth: 440 }}>Whether you’re hiring or job-hunting, Jobocate gets you there faster.</p>
+          <div style={{ background: 'rgba(124,196,255,0.12)', border: '1px solid rgba(124,196,255,0.3)', borderRadius: 24, padding: 48, textAlign: 'center' }}>
+            <h2 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 'clamp(26px, 5vw, 36px)', lineHeight: 1.06, margin: '0 0 12px' }}>Write your own story.</h2>
+            <p style={{ fontSize: 16, color: '#3F4A7A', margin: '0 auto 26px', maxWidth: 440 }}>Hiring or job-hunting, you stay in control — matched to roles that fit, with the reasoning shown.</p>
             <div style={{ display: 'flex', gap: 13, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <Link href={appRoute('App Sign Up.dc.html')} style={{ background: '#1FA463', color: '#0C2C1C', fontSize: 15, fontWeight: 700, padding: '14px 24px', borderRadius: 999, textDecoration: 'none' }}>Get started free</Link>
-              <Link href={appRoute('Book Demo.dc.html')} style={{ background: '#FFFEFB', color: '#1B1A16', fontSize: 15, fontWeight: 600, padding: '14px 24px', borderRadius: 999, textDecoration: 'none', border: '1px solid #C7D2FB' }}>Book a demo</Link>
+              <Link href={appRoute('App Sign Up.dc.html')} style={{ background: 'var(--jb-d-accent)', color: 'var(--jb-d-bg)', fontSize: 15, fontWeight: 700, padding: '14px 24px', borderRadius: 999, textDecoration: 'none' }}>Get started free</Link>
+              <Link href={appRoute('Book Demo.dc.html')} style={{ background: 'var(--jb-d-panel)', color: 'var(--jb-d-ink)', fontSize: 15, fontWeight: 600, padding: '14px 24px', borderRadius: 999, textDecoration: 'none', border: '1px solid rgba(124,196,255,0.3)' }}>Book a demo</Link>
             </div>
           </div>
         </section>
 
-        <SiteFooter />
+        </PublicLayout>
       </div>
     </>
   );

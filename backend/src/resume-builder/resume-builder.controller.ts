@@ -31,7 +31,7 @@ import { ResumeBuilderService } from './resume-builder.service';
 import { CreateResumeDto, UpdateResumeSectionDto, RegenerateSectionDto } from './dto/create-resume.dto';
 import { UpdateResumeDto, CreateShareLinkDto } from './dto/resume-operations.dto';
 import { Public } from '../common/decorators/public.decorator';
-import * as fs from 'fs/promises';
+import { StorageService } from '../storage';
 
 const fileFilter = (req: any, file: Express.Multer.File, cb: any) => {
   const allowedTypes = ['.pdf', '.doc', '.docx'];
@@ -49,7 +49,10 @@ const fileFilter = (req: any, file: Express.Multer.File, cb: any) => {
 @Controller('resume-builder')
 @UseGuards(JwtAuthGuard)
 export class ResumeBuilderController {
-  constructor(private readonly resumeBuilderService: ResumeBuilderService) { }
+  constructor(
+    private readonly resumeBuilderService: ResumeBuilderService,
+    private readonly storageService: StorageService,
+  ) { }
 
   @Get()
   @ApiOperation({ summary: 'Get all resumes for the authenticated user' })
@@ -64,6 +67,25 @@ export class ResumeBuilderController {
       updatedAt: resume.updatedAt,
       pdfUrl: resume.pdfUrl,
       isDefault: resume.isDefault,
+      // Library / workspace metadata
+      status: resume.status || 'draft',
+      creationMethod: resume.creationMethod || 'manual',
+      targetRole: resume.targetRole || null,
+      targetCompany: resume.targetCompany || null,
+      tags: resume.tags || [],
+      isPrimary: !!resume.isPrimary,
+      atsScore: typeof resume.atsScore === 'number' ? resume.atsScore : null,
+      applicationCount: resume.applicationCount || 0,
+      version: resume.version || 1,
+      source: resume.source || null,
+      sourceResumeId: resume.sourceResumeId || null,
+      archivedAt: resume.archivedAt || null,
+      // Lightweight completeness signal for the card (no full content payload)
+      sections: {
+        hasSummary: !!resume.summary,
+        experienceCount: Array.isArray(resume.experience) ? resume.experience.length : 0,
+        skillsCount: Array.isArray(resume.skills) ? resume.skills.length : 0,
+      },
     }));
   }
 
@@ -73,6 +95,25 @@ export class ResumeBuilderController {
   async create(@Body() createDto: CreateResumeDto, @Request() req) {
     const resume = await this.resumeBuilderService.create(req.user._id.toString(), createDto);
     return resume;
+  }
+
+  @Post('import')
+  @ApiOperation({ summary: 'Create a resume from parsed import data + source metadata' })
+  @ApiResponse({ status: 201, description: 'Resume imported successfully' })
+  async import(@Body() body: any, @Request() req) {
+    return this.resumeBuilderService.importResume(req.user._id.toString(), body);
+  }
+
+  @Post(':id/duplicate')
+  @ApiOperation({ summary: 'Duplicate a resume into a new independent resume' })
+  async duplicate(@Param('id') id: string, @Body() body: any, @Request() req) {
+    return this.resumeBuilderService.duplicate(id, req.user._id.toString(), body?.name);
+  }
+
+  @Patch(':id/primary')
+  @ApiOperation({ summary: 'Set a resume as the primary / default resume' })
+  async setPrimary(@Param('id') id: string, @Request() req) {
+    return this.resumeBuilderService.setPrimary(id, req.user._id.toString());
   }
 
   @Post('upload')
@@ -131,15 +172,14 @@ export class ResumeBuilderController {
   @ApiResponse({ status: 404, description: 'PDF not found' })
   async getPDF(@Param('id') id: string, @Request() req, @Res() res: Response) {
     try {
-      const pdfPath = await this.resumeBuilderService.getPDFPath(id, req.user._id.toString());
+      const key = await this.resumeBuilderService.getPDFPath(id, req.user._id.toString());
 
+      let pdfBuffer: Buffer;
       try {
-        await fs.access(pdfPath);
+        pdfBuffer = await this.storageService.getBuffer(key);
       } catch {
         throw new NotFoundException('PDF file not found');
       }
-
-      const pdfBuffer = await fs.readFile(pdfPath);
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `inline; filename="resume-${id}.pdf"`);
@@ -230,19 +270,15 @@ export class ResumeBuilderController {
 
   @Post(':id/generate-pdf')
   @ApiOperation({ summary: 'Generate PDF for resume' })
-  @ApiResponse({ status: 200, description: 'PDF generated successfully' })
+  @ApiResponse({ status: 200, description: 'PDF generated (inline) or queued' })
   async generatePDF(@Param('id') id: string, @Request() req) {
-    const resume = await this.resumeBuilderService.findOne(id, req.user._id.toString());
-    const pdfPath = await this.resumeBuilderService.generatePDF(resume, req.user._id.toString());
-
-    resume.pdfPath = pdfPath;
-    resume.pdfUrl = `/api/resume-builder/${resume._id}/pdf`;
-    await resume.save();
-
-    return {
-      pdfUrl: resume.pdfUrl,
-      message: 'PDF generated successfully',
-    };
+    // Producer: enqueues when QUEUE_ENABLED=true, otherwise runs inline and
+    // returns { queued:false, pdfUrl, message } exactly as before (backward
+    // compatible — the frontend keeps polling GET :id/pdf either way).
+    return this.resumeBuilderService.requestPdfGeneration(
+      id,
+      req.user._id.toString(),
+    );
   }
 
   @Public()

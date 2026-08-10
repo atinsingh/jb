@@ -17,13 +17,16 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { EmployerOrgService } from './employer-org.service';
 import { InviteMemberDto } from './dto/invite-member.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 
 @ApiTags('employer-team')
 @Controller('employer/team')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('ROLE_EMPLOYER', 'ROLE_ADMIN')
 export class EmployerOrgController {
   constructor(private readonly employerOrgService: EmployerOrgService) {}
 

@@ -22,6 +22,7 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 import { Response } from 'express';
+import * as crypto from 'crypto';
 import { AuthService } from './auth.service';
 import { GoogleOAuthGuard } from './guards/google-oauth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -102,12 +103,16 @@ export class AuthController {
   @ApiExcludeEndpoint()
   async linkedinAuth(@Query('role') role: string, @Res() res: Response) {
     const linkedinAuthUrl = 'https://www.linkedin.com/oauth/v2/authorization';
-    // Carry the intended role (employer signup) through as `state`; LinkedIn
-    // echoes it back on the callback so a new user gets the right role.
-    const state =
-      role === 'ROLE_EMPLOYER'
-        ? 'ROLE_EMPLOYER'
-        : Math.random().toString(36).substring(7);
+    // `state` doubles as a CSRF token and role carrier. It embeds a
+    // cryptographically random nonce (unguessable, unlike the old fixed
+    // 'ROLE_EMPLOYER' constant) alongside the intended role, which LinkedIn
+    // echoes back on the callback. Only ROLE_EMPLOYER intent is honored;
+    // everything else falls back to candidate.
+    const intendedRole = role === 'ROLE_EMPLOYER' ? 'ROLE_EMPLOYER' : 'ROLE_CANDIDATE';
+    const nonce = crypto.randomBytes(16).toString('hex');
+    const state = Buffer.from(
+      JSON.stringify({ nonce, role: intendedRole }),
+    ).toString('base64url');
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: process.env.LINKEDIN_CLIENT_ID || '',
@@ -137,7 +142,8 @@ export class AuthController {
     }
 
     try {
-      const user = await this.authService.handleLinkedInCallback(code, state);
+      const intendedRole = this.parseRoleFromState(state);
+      const user = await this.authService.handleLinkedInCallback(code, intendedRole);
       const token = this.authService.generateToken(user);
       
       const userData = {
@@ -157,6 +163,31 @@ export class AuthController {
     } catch (error: any) {
       this.logger.error('❌ [LinkedIn Callback] Error processing callback', error.stack);
       res.redirect(`${process.env.FRONTEND_URL}/login?error=linkedin_auth_failed`);
+    }
+  }
+
+  /**
+   * Extract the intended role from the OAuth `state` value produced by
+   * linkedinAuth (base64url of `{ nonce, role }`). Only ROLE_EMPLOYER is
+   * honored as an elevated intent; anything unparseable or unexpected falls
+   * back to ROLE_CANDIDATE. NOTE: this validates the *shape* of state but does
+   * not yet verify the nonce against a server-side store (see security note).
+   */
+  private parseRoleFromState(state?: string): string {
+    if (!state) {
+      return 'ROLE_CANDIDATE';
+    }
+    // Backward-compat: legacy links passed the bare role as state.
+    if (state === 'ROLE_EMPLOYER') {
+      return 'ROLE_EMPLOYER';
+    }
+    try {
+      const decoded = JSON.parse(
+        Buffer.from(state, 'base64url').toString('utf8'),
+      );
+      return decoded?.role === 'ROLE_EMPLOYER' ? 'ROLE_EMPLOYER' : 'ROLE_CANDIDATE';
+    } catch {
+      return 'ROLE_CANDIDATE';
     }
   }
 
@@ -241,9 +272,12 @@ export class AuthController {
   }
 
   @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Logout user' })
   @ApiResponse({ status: 200, description: 'Logged out successfully' })
-  logout() {
+  async logout(@Request() req) {
+    await this.authService.logout(req.user._id.toString());
     this.logger.log('User logged out');
     return { message: 'Logged out successfully' };
   }

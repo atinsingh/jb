@@ -7,9 +7,7 @@ import AppSidebar from '@/components/app/AppSidebar';
 import { appRoute } from '@/components/app/appRoutes';
 import { getSubscription, submitCancellation, acceptRetentionOffer } from '@/services/cancelApi';
 
-// ---- Design sample data (faithful fallback when unauthenticated / offline) ----
-const SAMPLE_RENEWAL = 'Jul 28, 2026';
-
+// ---- Static UI content: cancellation reasons, retention offers, feature list.
 const REASON_DEFS = [
   { key: 'expensive', label: 'It’s too expensive' },
   { key: 'found_job', label: 'I found a job 🎉' },
@@ -80,9 +78,9 @@ export default function AppCancel() {
   const [reason, setReason] = useState(null);
   const [note, setNote] = useState('');
   const [success, setSuccess] = useState(null); // null | 'stay' | 'kept' | 'cancelled'
-  const [renewal, setRenewal] = useState(SAMPLE_RENEWAL);
+  const [renewal, setRenewal] = useState('');
 
-  // Fetch real subscription/renewal info; gracefully fall back to sample data.
+  // Fetch the user's real renewal date; leave blank (generic copy) if none.
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -100,7 +98,7 @@ export default function AppCancel() {
           }
         }
       } catch {
-        // Unauthenticated or backend offline — keep sample renewal date.
+        // Unauthenticated or backend offline — leave the date blank.
       }
     })();
     return () => {
@@ -167,7 +165,7 @@ export default function AppCancel() {
       iconBg: '#F2ECE0',
       iconColor: '#8A8378',
       title: 'Membership cancelled.',
-      body: `Your Premium access stays active until ${renewal}, then you’ll move to the Free plan. Your data is never deleted.`,
+      body: `Your Premium access stays active until ${renewal || 'the end of your billing period'}, then you’ll move to the Free plan. Your data is never deleted.`,
       cta: 'Back to settings',
       href: appRoute('App Settings.dc.html'),
       secondary: true,
@@ -182,12 +180,6 @@ export default function AppCancel() {
     <>
       <Head>
         <title>Cancel membership — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
       <style jsx global>{`
@@ -221,7 +213,7 @@ export default function AppCancel() {
           display: 'flex',
           minHeight: '100vh',
           background: '#F7F3EA',
-          fontFamily: "'Hanken Grotesk',sans-serif",
+          fontFamily: 'var(--jb-font-sans)',
           color: '#1B1A16',
         }}
       >
@@ -261,7 +253,7 @@ export default function AppCancel() {
             {inFlow && (
               <span
                 style={{
-                  fontFamily: "'JetBrains Mono',monospace",
+                  fontFamily: 'var(--jb-font-mono)',
                   fontSize: 11.5,
                   color: '#9A9286',
                 }}
@@ -277,7 +269,7 @@ export default function AppCancel() {
               <div style={{ animation: 'rbpop 0.25s ease' }}>
                 <h1
                   style={{
-                    fontFamily: "'Instrument Serif',serif",
+                    fontFamily: 'var(--jb-font-display)',
                     fontWeight: 400,
                     fontSize: 34,
                     lineHeight: 1.06,
@@ -421,8 +413,8 @@ export default function AppCancel() {
                     <span
                       style={{
                         display: 'inline-block',
-                        fontFamily: "'JetBrains Mono',monospace",
-                        fontSize: 10,
+                        fontFamily: 'var(--jb-font-mono)',
+                        fontSize: 11,
                         fontWeight: 600,
                         letterSpacing: '0.08em',
                         color: '#0C2C1C',
@@ -436,7 +428,7 @@ export default function AppCancel() {
                     </span>
                     <h1
                       style={{
-                        fontFamily: "'Instrument Serif',serif",
+                        fontFamily: 'var(--jb-font-display)',
                         fontWeight: 400,
                         fontSize: 32,
                         lineHeight: 1.08,
@@ -493,7 +485,7 @@ export default function AppCancel() {
               <div style={{ animation: 'rbpop 0.25s ease' }}>
                 <h1
                   style={{
-                    fontFamily: "'Instrument Serif',serif",
+                    fontFamily: 'var(--jb-font-display)',
                     fontWeight: 400,
                     fontSize: 34,
                     lineHeight: 1.06,
@@ -557,7 +549,8 @@ export default function AppCancel() {
                   <span style={{ color: '#9A9286', flexShrink: 0 }}>◷</span>
                   <span style={{ fontSize: 13.5, color: '#5A544A' }}>
                     Your Premium access stays active until{' '}
-                    <b style={{ color: '#1B1A16' }}>{renewal}</b>. Your data is never deleted.
+                    <b style={{ color: '#1B1A16' }}>{renewal || 'the end of your billing period'}</b>. Your data is
+                    never deleted.
                   </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -628,7 +621,7 @@ export default function AppCancel() {
                 </div>
                 <h1
                   style={{
-                    fontFamily: "'Instrument Serif',serif",
+                    fontFamily: 'var(--jb-font-display)',
                     fontWeight: 400,
                     fontSize: 34,
                     lineHeight: 1.06,

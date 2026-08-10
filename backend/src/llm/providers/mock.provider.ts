@@ -3,10 +3,12 @@ import {
   LLMProvider,
   LLMCompletionOptions,
   LLMChatOptions,
+  LLMChatWithToolsOptions,
   LLMEmbeddingOptions,
   LLMResponse,
   LLMEmbeddingResponse,
   LLMUsage,
+  LLMToolCall,
 } from '../interfaces/llm-provider.interface';
 
 /**
@@ -17,6 +19,17 @@ import {
 export class MockProvider implements LLMProvider {
   private readonly logger = new Logger(MockProvider.name);
   private readonly defaultModel = 'mock-model-v1';
+
+  /**
+   * Scripted tool-call turns for `chatWithTools`. Each entry is one turn's
+   * worth of tool calls; each call to `chatWithTools` shifts one entry off the
+   * front. When the queue is empty, `chatWithTools` returns a terminal text
+   * response. Set via {@link setScriptedToolTurns}. Used by agent-loop tests.
+   */
+  private scriptedToolTurns: LLMToolCall[][] = [];
+
+  /** Terminal text returned once the scripted tool turns are exhausted. */
+  private scriptedDoneText = 'Done';
 
   constructor() {
     this.logger.log('✅ Mock LLM provider initialized');
@@ -74,6 +87,59 @@ export class MockProvider implements LLMProvider {
       },
       model: options.model || this.defaultModel,
       finishReason: 'stop',
+    };
+  }
+
+  /**
+   * Queue up scripted tool-call turns for `chatWithTools`. Each element is the
+   * set of tool calls the mock should return on one turn. After all scripted
+   * turns are consumed, `chatWithTools` returns a terminal text response.
+   *
+   * @param turns   Ordered list of tool-call batches (one per turn).
+   * @param doneText Optional terminal text returned once turns are exhausted.
+   */
+  setScriptedToolTurns(turns: LLMToolCall[][], doneText?: string): void {
+    this.scriptedToolTurns = [...turns];
+    if (doneText !== undefined) {
+      this.scriptedDoneText = doneText;
+    }
+  }
+
+  async chatWithTools(
+    options: LLMChatWithToolsOptions,
+  ): Promise<LLMResponse<string> & { toolCalls?: LLMToolCall[] }> {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const next = this.scriptedToolTurns.shift();
+
+    if (next && next.length > 0) {
+      return {
+        content: '',
+        usage: {
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0,
+          cost: 0,
+        },
+        model: options.model || this.defaultModel,
+        finishReason: 'tool_use',
+        toolCalls: next,
+      };
+    }
+
+    // Terminal turn — no more scripted tool calls.
+    const content = this.scriptedDoneText;
+    return {
+      content,
+      usage: {
+        promptTokens: 0,
+        completionTokens: Math.ceil(content.length / 4),
+        totalTokens: Math.ceil(content.length / 4),
+        cost: 0,
+      },
+      model: options.model || this.defaultModel,
+      finishReason: 'stop',
+      toolCalls: undefined,
     };
   }
 

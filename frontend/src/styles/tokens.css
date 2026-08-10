@@ -1,0 +1,433 @@
+/*
+ * Jobocate editorial design system — single source of truth.
+ *
+ * The marketing surface (SiteNav, SiteFooter, homepage, feature/pricing pages)
+ * is ivory/emerald/charcoal and is unrelated to the coral `--color-primary-*`
+ * scale in globals.css, which belongs to the older app surface. Everything here
+ * is namespaced `--jb-*` so the two systems cannot collide.
+ *
+ * Contrast: every value paired with a "on ivory" note below has been checked to
+ * clear WCAG AA (4.5:1) for normal text. --jb-accent is 2.9:1 on ivory and is
+ * DECORATIVE ONLY — never put small text in it. Use --jb-accent-text instead.
+ */
+
+:root {
+  /* =========================================================================
+     FLIGHT PLAN — dark marketing surface
+     =========================================================================
+     The public marketing surface runs on this dark forest-green palette. Values
+     are taken verbatim from the approved `.dc.html` mocks; see
+     docs/superpowers/specs/2026-07-31-flight-plan-dark-marketing-design.md.
+
+     The cream `--jb-*` set below is retained: the signed-in app surfaces
+     (/app/*, /employer/*, /admin/*) still run on it. Only the marketing pages
+     wear the dark layer, and they get it from PublicLayout rather than by
+     declaring a background per page.
+
+     Contrast, measured against the darkest gradient stop (#0d2418):
+       --jb-d-ink        13.6:1
+       --jb-d-ink-70      9.1:1
+       --jb-d-ink-55      6.6:1   <- lightest allowed for text a user must read
+       --jb-d-accent      9.7:1
+     Green and amber fills always take --jb-d-bg as their text colour: #f2ecdb
+     on #8fd6a3 is 1.9:1, while #0d2418 on #8fd6a3 is 10.4:1.
+     ------------------------------------------------------------------------- */
+
+  /* ---- Dark surfaces ---- */
+  --jb-d-bg: #0d2418;
+  --jb-d-gradient: linear-gradient(178deg, #0d2418 0%, #123424 40%, #17452e 100%);
+  --jb-d-footer: #091a11;
+  --jb-d-panel: rgba(9, 26, 17, 0.55);      /* manifest, job rows, plan cards */
+  --jb-d-panel-solid: rgba(9, 26, 17, 0.6); /* arrivals, form cards */
+  --jb-d-glass: rgba(242, 236, 219, 0.07);  /* waypoint / feature cards */
+  --jb-d-glass-hi: rgba(242, 236, 219, 0.06);
+
+  /* ---- Dark ink ---- */
+  --jb-d-ink: #f2ecdb;
+  --jb-d-ink-85: rgba(242, 236, 219, 0.85);
+  --jb-d-ink-70: rgba(242, 236, 219, 0.7);
+  --jb-d-ink-65: rgba(242, 236, 219, 0.65);
+  --jb-d-ink-55: rgba(242, 236, 219, 0.55);
+  --jb-d-ink-45: rgba(242, 236, 219, 0.45); /* microcopy only, never body */
+
+  /* ---- Dark accent ----
+     Amber is reserved: the OFFER waypoint and final-call CTAs. Using it
+     anywhere else costs the route metaphor its destination colour. */
+  --jb-d-accent: #8fd6a3;
+  --jb-d-accent-hi: #a9e4b8;
+  --jb-d-accent-tint: rgba(143, 214, 163, 0.1);
+  --jb-d-amber: #ffb52e;
+  --jb-d-amber-hi: #ffc75c;
+  --jb-d-danger: #e07856; /* the ✕ marks in the comparison block */
+
+  /* ---- Dark borders ---- */
+  --jb-d-line: rgba(242, 236, 219, 0.12);
+  --jb-d-line-card: rgba(242, 236, 219, 0.15);
+  --jb-d-line-glass: rgba(242, 236, 219, 0.18);
+  --jb-d-line-strong: rgba(242, 236, 219, 0.2);
+  --jb-d-line-input: rgba(242, 236, 219, 0.25);
+  --jb-d-line-dashed: rgba(242, 236, 219, 0.3);
+  --jb-d-line-btn: rgba(242, 236, 219, 0.4);
+
+  /* Focus ring for dark surfaces. The cream --jb-focus blue disappears against
+     #0d2418, so the dark surface uses the accent green at full strength. */
+  --jb-d-focus: #8fd6a3;
+
+  /* ---- Dark layout ---- */
+  --jb-d-max: 1280px;
+  --jb-d-pad: 48px;
+  --jb-d-pad-mobile: 20px;
+
+  /* Chrome surfaces. The nav wash is translucent so content scrolling under a
+     sticky header stays hinted; the raised surface is opaque because dropdowns
+     and drawers must occlude what they cover. */
+  --jb-nav-wash: rgba(13, 36, 24, 0.72);
+  --jb-nav-wash-solid: rgba(13, 36, 24, 0.9);
+  --jb-surface-raised: #102c1d;
+
+  /* =========================================================================
+     APP STAGE — the signed-in content area (/app/*)
+     =========================================================================
+     The app is a dark sidebar next to a content stage. The SIDEBAR stays dark
+     in both themes on purpose — it is the product's spine and the design
+     already treats it as a constant, the same call made for the marketing
+     footer. Only the stage flips.
+
+     Defaults here are the DARK stage, matching the marketing surface, and
+     [data-jb-theme='light'] restores the cream stage that shipped before —
+     so light mode is a pixel-for-pixel no-op against the current design.
+
+     Contrast on --jb-a-stage (#101c14): ink 13.9:1, ink-muted 6.4:1.
+     ------------------------------------------------------------------------- */
+  --jb-a-stage: #101c14;
+  --jb-a-header: #14261a;
+  --jb-a-card: #16281c;
+  --jb-a-card-alt: #1b2f21;
+  --jb-a-control: #1b2f21;
+  --jb-a-line: rgba(242, 236, 219, 0.14);
+  --jb-a-line-strong: rgba(242, 236, 219, 0.22);
+  --jb-a-ink: #eef1e9;
+  --jb-a-ink-2: rgba(238, 241, 233, 0.82);
+  --jb-a-ink-muted: rgba(238, 241, 233, 0.62);
+  --jb-a-accent: #5bd08c;
+  --jb-a-accent-ink: #0e2e12;
+  --jb-a-accent-2: #8fd6a3;
+  --jb-a-tint: rgba(91, 208, 140, 0.12);
+  --jb-a-tint-line: rgba(91, 208, 140, 0.3);
+  --jb-a-blue: #9db6c4;
+  --jb-a-blue-tint: rgba(157, 182, 196, 0.14);
+  --jb-a-blue-ink: #bcd4e0;
+  --jb-a-blue-line: rgba(157, 182, 196, 0.3);
+
+  /* Inverted accent card — the dark panel that sits inside the stage (the
+     Auto-Apply card, the funnel). On the light stage it is near-black for
+     contrast; on the dark stage it lifts slightly instead, since going darker
+     than the stage would make it disappear. */
+  --jb-a-invert: #0b170f;
+  --jb-a-invert-panel: #16281c;
+  --jb-a-invert-ink: #eef1e9;
+  --jb-a-invert-muted: rgba(238, 241, 233, 0.62);
+}
+
+/* =========================================================================
+   FLIGHT PLAN — light mode
+   =========================================================================
+   The supplied mocks are dark only, so light is a derived theme rather than a
+   second design. It re-points the same --jb-d-* names at the warm cream
+   palette this site already shipped, which means every page follows without a
+   single page-level edit — the same mechanism as the cream->dark remap in
+   PublicLayout.
+
+   Scoped to [data-jb-theme='light'] on <html>, NOT to next-themes' .light
+   class. next-themes is global and drives the signed-in app (/app/*,
+   /employer/*, /admin/*), which is cream-designed and must not flip with the
+   marketing surface. Marketing therefore owns its own attribute, defaults to
+   dark, and only goes light when a visitor asks.
+
+   Contrast, measured on --jb-d-bg (#fcf5ec):
+     --jb-d-ink       15.9:1
+     --jb-d-ink-70     6.8:1
+     --jb-d-ink-55     5.3:1   <- lightest allowed for text a user must read
+     --jb-d-accent     5.0:1   (also the fill colour, with cream text on it)
+   ------------------------------------------------------------------------- */
+html[data-jb-theme='light'] {
+  --jb-d-bg: #fcf5ec;
+  --jb-d-gradient: linear-gradient(178deg, #fcf5ec 0%, #f7f1e6 45%, #f2ece0 100%);
+  /* The footer stays dark in both themes — it anchors the page and keeps the
+     green/cream logo lockup identical across modes. */
+  --jb-d-footer: #17201a;
+  --jb-d-panel: #fffefb;
+  --jb-d-panel-solid: #fffefb;
+  --jb-d-glass: rgba(27, 26, 22, 0.04);
+  --jb-d-glass-hi: rgba(27, 26, 22, 0.03);
+
+  --jb-d-ink: #1b1a16;
+  --jb-d-ink-85: #3e3a33;
+  --jb-d-ink-70: #5a544a;
+  --jb-d-ink-65: #5a544a;
+  --jb-d-ink-55: #6b6459;
+  --jb-d-ink-45: #8a8378;
+
+  /* One green does both jobs here: 5.0:1 as text on cream, and as a fill it
+     carries --jb-d-bg (cream) at 5.0:1. The bright #8fd6a3 used on dark is
+     1.6:1 on cream and cannot be used for either. */
+  --jb-d-accent: #12724d;
+  --jb-d-accent-hi: #0b5a3c;
+  --jb-d-accent-tint: rgba(18, 114, 77, 0.08);
+  --jb-d-amber: #9a5b00;
+  --jb-d-amber-hi: #7c4900;
+  --jb-d-danger: #b23b1e;
+
+  --jb-d-line: rgba(27, 26, 22, 0.1);
+  --jb-d-line-card: rgba(27, 26, 22, 0.14);
+  --jb-d-line-glass: rgba(27, 26, 22, 0.14);
+  --jb-d-line-strong: rgba(27, 26, 22, 0.2);
+  --jb-d-line-input: rgba(27, 26, 22, 0.24);
+  --jb-d-line-dashed: rgba(27, 26, 22, 0.28);
+  --jb-d-line-btn: rgba(27, 26, 22, 0.34);
+
+  /* Blue focus ring is visible on cream; the accent green is not. */
+  --jb-d-focus: #2c5fcb;
+
+  --jb-nav-wash: rgba(252, 245, 236, 0.78);
+  --jb-nav-wash-solid: rgba(252, 245, 236, 0.94);
+  --jb-surface-raised: #fffefb;
+
+  /* App stage, light — the exact values the dashboard shipped with, so
+     switching to light is a no-op against the existing design. */
+  --jb-a-stage: #eff0ec;
+  --jb-a-header: #f5f5f5;
+  --jb-a-card: #f5f5f5;
+  --jb-a-card-alt: #fffefb;
+  --jb-a-control: #ecede9;
+  --jb-a-line: #dee0db;
+  --jb-a-line-strong: #c9ccc6;
+  --jb-a-ink: #2a2f28;
+  --jb-a-ink-2: #3e443c;
+  --jb-a-ink-muted: #5c625a;
+  --jb-a-accent: #4dbe55;
+  --jb-a-accent-ink: #0e2e12;
+  --jb-a-accent-2: #2f7d3a;
+  --jb-a-tint: #eef8ef;
+  --jb-a-tint-line: #cbe8ce;
+  --jb-a-blue: #9db6c4;
+  --jb-a-blue-tint: #e8eef2;
+  --jb-a-blue-ink: #3e5a6b;
+  --jb-a-blue-line: #c7d6de;
+
+  --jb-a-invert: #2a2f28;
+  --jb-a-invert-panel: #363c34;
+  --jb-a-invert-ink: #e9eae5;
+  --jb-a-invert-muted: #b4bab0;
+}
+
+/* =========================================================================
+   Cream app palette — global, theme-independent.
+   =========================================================================
+   These drive the signed-in surfaces (/app/*, /employer/*, /admin/*), which
+   are cream-designed and do NOT follow the marketing light/dark toggle. They
+   must stay on :root; scoping them to a theme would leave the app unstyled in
+   the other mode.
+   ------------------------------------------------------------------------- */
+:root {
+  /* ---- Surfaces ---- */
+  --jb-ivory: #fcf5ec;         /* warm Gusto-leaning cream */
+  --jb-surface: #fffefb;
+  --jb-surface-alt: #f3ede1;
+  --jb-surface-sunk: #f7f1e6;
+  --jb-tint-green: #e7f4ec;    /* mint primary tint (Gusto-green family) */
+  --jb-tint-success: #e6f4ec;  /* success tint */
+  --jb-tint-coral: #fdeae4;    /* warm coral secondary tint */
+  --jb-tint-lilac: #ece9f7;    /* Gusto testimonial lilac */
+  --jb-tint-yellow: #fdf1d6;   /* warm highlight */
+
+  /* ---- Ink (text) ---- */
+  --jb-ink: #1b1a16; /* 15.9:1 on ivory */
+  --jb-ink-body: #3e3a33; /* 10.3:1 on ivory */
+  --jb-ink-muted: #5a544a; /* 6.8:1  on ivory */
+  --jb-ink-subtle: #6b6459; /* 5.3:1  on ivory — lightest allowed for text */
+
+  /* ---- Accent ---- */
+  /* Primary accent is Gusto-GREEN (matches the reference: green logo/CTAs/band). */
+  --jb-accent: #1fa46a; /* bright green — DECORATIVE / fills-with-dark-text only */
+  --jb-accent-text: #12724d; /* green-dark — AA (~5.0:1) for small text & links on cream */
+  --jb-accent-strong: #0b5a3c; /* deep green — hover / pressed / dark band */
+  --jb-accent-fill: #0d7050; /* green for WHITE-text CTA fills — AA (~4.6:1) */
+  --jb-accent-on-dark: #6bd6a0; /* light green on --jb-ink (AA) */
+  --jb-focus: #2c5fcb; /* blue focus ring — visible on green AND cream */
+  /* Coral is now the SECONDARY warm accent (Gusto's warm section energy). */
+  --jb-coral: #f45d48; /* bright coral — DECORATIVE / dark-text fills only */
+  --jb-coral-text: #b83a24; /* coral-dark — AA (~5.4:1) small text on cream */
+  --jb-coral-on-dark: #ff9280; /* light coral on --jb-ink (AA) */
+  /* Legacy --jb-green* kept as aliases so existing refs stay green. */
+  --jb-green: #1fa46a;
+  --jb-green-text: #12724d; /* AA on cream */
+  --jb-green-on-dark: #6bd6a0;
+
+  /* ---- Employer accent (differentiates the hiring side) ---- */
+  --jb-employer: #2b4acc;
+  --jb-employer-text: #23409e; /* 6.3:1 on ivory */
+  --jb-employer-tint: #eaeefb;
+  --jb-employer-on-dark: #93aaff;
+
+  /* ---- Dark section ---- */
+  --jb-dark: #1b1a16;
+  --jb-dark-deep: #15140f;
+  --jb-dark-teal: #0e463a; /* Gusto deep teal-green band */
+  --jb-dark-teal-deep: #0a382e;
+  --jb-dark-card: #242219;
+  --jb-dark-border: #34322a;
+  --jb-on-dark: #fbf8f1;
+  --jb-on-dark-muted: #b8b1a4; /* 7.2:1 on --jb-dark */
+
+  /* ---- Borders ---- */
+  --jb-border: #e7e0d2;
+  --jb-border-strong: #d2c9b7;
+  --jb-border-soft: #eee7d9;
+
+  /* ---- Status (never color-only; always paired with icon/text) ---- */
+  --jb-warn-text: #8a5a12;
+  --jb-warn-tint: #fdf3e2;
+  --jb-danger-text: #9c2f24;
+  --jb-danger-tint: #fdeeec;
+
+  /* ---- Type ----
+   * THREE families, no more. The actual typefaces are chosen in exactly one
+   * place — the next/font loaders in src/pages/_app.js — which publishes them
+   * as --jb-face-*. Nothing else in the codebase may name a font family.
+   * The fallbacks below only matter before hydration of the <style> tag.
+   */
+  --jb-font-display: var(--jb-face-display), Georgia, 'Times New Roman', serif; /* Instrument Serif */
+  --jb-font-sans: var(--jb-face-sans), system-ui, -apple-system, sans-serif; /* Hanken Grotesk */
+  --jb-font-mono: var(--jb-face-mono), ui-monospace, SFMono-Regular, monospace; /* JetBrains Mono */
+
+  /* Instrument Serif ships weight 400 only. Anything setting a heavier weight on
+   * --jb-font-display gets a synthetic (smeared) bold from the browser, so
+   * display type stays at 400 and earns emphasis from size, not weight. */
+
+  /* Body never drops below 16px, desktop or mobile. */
+  --jb-text-xs: 0.8125rem; /* 13px — labels/meta only, never body copy */
+  --jb-text-sm: 0.875rem; /* 14px — UI chrome only */
+  --jb-text-base: 1rem; /* 16px — body floor */
+  --jb-text-md: 1.0625rem; /* 17px */
+  --jb-text-lg: 1.1875rem; /* 19px */
+  /* Heading half of the scale. */
+  --jb-text-xl: 1.375rem; /* 22px */
+  --jb-text-2xl: 1.75rem; /* 28px */
+  --jb-text-3xl: 2.125rem; /* 34px */
+  --jb-text-4xl: 2.625rem; /* 42px */
+  --jb-text-5xl: 3.25rem; /* 52px */
+  --jb-text-6xl: 4rem; /* 64px */
+
+  /* Sub-body floor. 11px is the smallest legible size in this system and is
+   * reserved for uppercase, letter-spaced mono eyebrows/labels. Never use it
+   * for sentence-case copy — that floor is --jb-text-xs (13px). */
+  --jb-text-micro: 0.6875rem; /* 11px — uppercase mono labels ONLY */
+
+  /* ---- Space ---- */
+  --jb-space-1: 4px;
+  --jb-space-2: 8px;
+  --jb-space-3: 12px;
+  --jb-space-4: 16px;
+  --jb-space-5: 20px;
+  --jb-space-6: 24px;
+  --jb-space-8: 32px;
+  --jb-space-10: 40px;
+  --jb-space-12: 48px;
+  --jb-space-16: 64px;
+  --jb-space-20: 80px;
+
+  /* ---- Radii ---- */
+  --jb-radius-sm: 8px;
+  --jb-radius: 12px;
+  --jb-radius-lg: 16px;
+  --jb-radius-xl: 24px;
+  --jb-radius-pill: 999px;
+
+  /* ---- Glass (frosted panels refracting flat color shapes; no gradients) ---- */
+  --jb-glass: rgba(255, 255, 255, 0.46);
+  --jb-glass-solid: rgba(255, 255, 255, 0.34); /* inner wells */
+  --jb-glass-edge: rgba(255, 255, 255, 0.85);
+  --jb-glass-blur: blur(20px) saturate(1.35);
+  --jb-glass-shadow: 0 12px 30px -12px rgba(80, 70, 45, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --jb-glass-shadow-sm: 0 7px 18px -9px rgba(80, 70, 45, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  /* Flat accent shapes placed BEHIND glass — solid fills, never gradients. */
+  --jb-shape-green: #7fd3ab;
+  --jb-shape-coral: #f4a48f;
+  --jb-shape-yellow: #f6d98a;
+  --jb-shape-lilac: #c9b8f4;
+
+  /* ---- Shadow ---- */
+  --jb-shadow-sm: 0 1px 2px rgba(27, 26, 22, 0.06);
+  --jb-shadow: 0 12px 24px -14px rgba(27, 26, 22, 0.28);
+  --jb-shadow-lg: 0 30px 60px -28px rgba(27, 26, 22, 0.28);
+  --jb-shadow-pop: 0 30px 60px -30px rgba(27, 26, 22, 0.35);
+
+  /* ---- Layout ---- */
+  --jb-maxw: 1200px;
+  --jb-gutter: 32px;
+
+  /* ---- Motion (150–300ms, transform/opacity only) ---- */
+  --jb-dur-fast: 150ms;
+  --jb-dur: 200ms;
+  --jb-dur-slow: 300ms;
+  --jb-ease: cubic-bezier(0.2, 0.6, 0.2, 1);
+}
+
+@media (max-width: 768px) {
+  :root {
+    --jb-gutter: 20px;
+  }
+}
+
+/* Touch targets stay >=44px and focus is always visible. */
+.jb-focus:focus-visible,
+.jb a:focus-visible,
+.jb button:focus-visible,
+.jb input:focus-visible,
+.jb select:focus-visible,
+.jb summary:focus-visible,
+.jb [tabindex]:focus-visible {
+  outline: 3px solid var(--jb-focus);
+  outline-offset: 2px;
+  border-radius: var(--jb-radius-sm);
+}
+
+.jb-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Skip link — first tab stop on every marketing page. */
+.jb-skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  background: var(--jb-ink);
+  color: var(--jb-on-dark);
+  padding: 12px 20px;
+  border-radius: 0 0 var(--jb-radius-sm) 0;
+  font: 600 var(--jb-text-base) / 1 var(--jb-font-sans);
+}
+.jb-skip:focus {
+  left: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jb *,
+  .jb *::before,
+  .jb *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

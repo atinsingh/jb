@@ -14,19 +14,19 @@ import {
   updateUserPreferences,
 } from '@/services/onboardingApi';
 
-/* ------------------------------------------------------------------ sample --- */
-// Faithful to the design's own DCLogic state — used as graceful fallback when
-// unauthenticated or any request fails. The page always renders fully.
-const SAMPLE = {
-  fileName: 'Sarah_Chen_Resume.pdf',
-  name: 'Sarah Chen',
-  headline: 'Senior Product Designer · ex-Plaid',
-  location: 'San Francisco, CA',
-  skills: ['Design systems', 'Prototyping', 'User research', 'Figma', 'Interaction design', 'Design ops'],
-  selRoles: ['Senior Product Designer', 'Staff Product Designer', 'Design Systems Lead'],
-  selLocs: ['San Francisco', 'Remote (US)'],
-  remote: true,
-  salary: 160,
+/* ----------------------------------------------------------------- defaults --- */
+// Empty initial wizard state. Real values come from the backend (profile +
+// preferences) or from what the user uploads/enters — no fabricated seed data.
+const DEFAULTS = {
+  fileName: '',
+  name: '',
+  headline: '',
+  location: '',
+  skills: [],
+  selRoles: [],
+  selLocs: [],
+  remote: false,
+  salary: 120,
   autoApply: true,
 };
 
@@ -48,22 +48,22 @@ export default function AppOnboarding() {
   // ---- wizard state (mirrors DCLogic) ------------------------------------
   const [step, setStep] = useState(0);
   const [uploaded, setUploaded] = useState(false);
-  const [fileName, setFileName] = useState(SAMPLE.fileName);
-  const [fileSize, setFileSize] = useState('248 KB');
+  const [fileName, setFileName] = useState(DEFAULTS.fileName);
+  const [fileSize, setFileSize] = useState('');
   const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState('');
 
-  const [name, setName] = useState(SAMPLE.name);
-  const [headline, setHeadline] = useState(SAMPLE.headline);
-  const [location, setLocation] = useState(SAMPLE.location);
-  const [skills, setSkills] = useState(SAMPLE.skills);
+  const [name, setName] = useState(DEFAULTS.name);
+  const [headline, setHeadline] = useState(DEFAULTS.headline);
+  const [location, setLocation] = useState(DEFAULTS.location);
+  const [skills, setSkills] = useState(DEFAULTS.skills);
   const [skillDraft, setSkillDraft] = useState('');
 
-  const [selRoles, setSelRoles] = useState(SAMPLE.selRoles);
-  const [selLocs, setSelLocs] = useState(SAMPLE.selLocs);
-  const [remote, setRemote] = useState(SAMPLE.remote);
-  const [salary, setSalary] = useState(SAMPLE.salary);
-  const [autoApply, setAutoApply] = useState(SAMPLE.autoApply);
+  const [selRoles, setSelRoles] = useState(DEFAULTS.selRoles);
+  const [selLocs, setSelLocs] = useState(DEFAULTS.selLocs);
+  const [remote, setRemote] = useState(DEFAULTS.remote);
+  const [salary, setSalary] = useState(DEFAULTS.salary);
+  const [autoApply, setAutoApply] = useState(DEFAULTS.autoApply);
 
   const [saving, setSaving] = useState(false);
 
@@ -80,7 +80,7 @@ export default function AppOnboarding() {
         if (u.location) setLocation(u.location);
         if (Array.isArray(u.skills) && u.skills.length) setSkills(u.skills);
       } catch (e) {
-        // keep sample profile — page still renders faithfully
+        // no profile yet (unauthenticated or new user) — leave fields empty
       }
       try {
         const prefs = await getUserPreferences();
@@ -92,7 +92,7 @@ export default function AppOnboarding() {
         if (typeof p.minSalary === 'number') setSalary(Math.round(p.minSalary / 1000) || p.minSalary);
         if (typeof p.autoApply === 'boolean') setAutoApply(p.autoApply);
       } catch (e) {
-        // keep sample preferences
+        // no saved preferences yet — keep neutral defaults
       }
     })();
     return () => {
@@ -102,7 +102,7 @@ export default function AppOnboarding() {
 
   // seed name from auth user if available (and profile fetch didn't override)
   useEffect(() => {
-    if (user?.name) setName((n) => (n === SAMPLE.name ? user.name : n));
+    if (user?.name) setName((n) => (n === DEFAULTS.name ? user.name : n));
   }, [user]);
 
   // ---- derived -----------------------------------------------------------
@@ -130,8 +130,8 @@ export default function AppOnboarding() {
       if (p.location) setLocation(p.location);
       if (Array.isArray(p.skills) && p.skills.length) setSkills(p.skills);
     } catch (e) {
-      // graceful: keep the sample-parsed profile, surface a soft note
-      setParseError('Could not parse online — using a sample profile you can edit.');
+      // graceful: leave the fields for the user to fill in, surface a soft note
+      setParseError('Could not read your résumé automatically — you can fill in the details below.');
     } finally {
       setParsing(false);
     }
@@ -227,12 +227,6 @@ export default function AppOnboarding() {
     <>
       <Head>
         <title>Set up your copilot — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
       <style jsx global>{`
@@ -301,7 +295,7 @@ export default function AppOnboarding() {
           gridTemplateColumns: '1.05fr 0.95fr',
           minHeight: '100vh',
           background: '#F7F3EA',
-          fontFamily: "'Hanken Grotesk',sans-serif",
+          fontFamily: 'var(--jb-font-sans)',
           color: '#1B1A16',
         }}
       >
@@ -310,14 +304,14 @@ export default function AppOnboarding() {
           {/* top bar: logo + progress + step label */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <Link href="/" style={{ textDecoration: 'none' }}>
-              <span style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 800, letterSpacing: '-0.02em', fontSize: 23, color: '#1B1A16' }}>
+              <span style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, letterSpacing: '-0.02em', fontSize: 23, color: '#1B1A16' }}>
                 Jobocate<span style={{ color: '#1FA463' }}>.</span>
               </span>
             </Link>
             <div style={{ flex: 1, height: 3, borderRadius: 999, background: '#E6DECF', overflow: 'hidden' }}>
               <div style={{ width: progress, height: '100%', background: '#1FA463', transition: 'width 0.35s ease' }} />
             </div>
-            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#9A9286' }}>{stepLabel}</span>
+            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#9A9286' }}>{stepLabel}</span>
           </div>
 
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', maxWidth: 480, width: '100%', margin: '0 auto' }}>
@@ -337,7 +331,7 @@ export default function AppOnboarding() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontFamily: "'JetBrains Mono',monospace",
+                        fontFamily: 'var(--jb-font-mono)',
                         fontSize: 12,
                         fontWeight: 600,
                         color: cur ? '#0C2C1C' : done ? '#fff' : '#9A9286',
@@ -354,7 +348,7 @@ export default function AppOnboarding() {
               })}
             </div>
 
-            <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 38, lineHeight: 1.04, letterSpacing: '-0.01em', margin: '0 0 6px' }}>{HEADS[step].h}</h1>
+            <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 38, lineHeight: 1.04, letterSpacing: '-0.01em', margin: '0 0 6px' }}>{HEADS[step].h}</h1>
             <p style={{ fontSize: 15, color: '#5A544A', margin: '0 0 26px' }}>{HEADS[step].s}</p>
 
             {/* hidden file input */}
@@ -402,7 +396,7 @@ export default function AppOnboarding() {
                 ) : (
                   <div style={{ background: '#FFFEFB', border: '1px solid #CDE9D6', borderRadius: 16, padding: 20 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                      <span style={{ width: 46, height: 46, flexShrink: 0, borderRadius: 11, background: '#EAF6EE', color: '#157A49', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, fontSize: 11 }}>PDF</span>
+                      <span style={{ width: 46, height: 46, flexShrink: 0, borderRadius: 11, background: '#EAF6EE', color: '#157A49', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--jb-font-mono)', fontWeight: 600, fontSize: 11 }}>PDF</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 14.5, fontWeight: 700, color: '#1B1A16' }}>{fileName}</div>
                         <div style={{ fontSize: 12.5, color: '#8A8378' }}>{fileSize} · {parsing ? 'reading…' : 'uploaded just now'}</div>
@@ -448,7 +442,7 @@ export default function AppOnboarding() {
                     {skills.map((label, i) => (
                       <span key={`${label}-${i}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13.5, fontWeight: 500, color: '#1F4733', background: '#EAF6EE', border: '1px solid #CDE9D6', borderRadius: 999, padding: '7px 8px 7px 13px' }}>
                         {label}
-                        <button onClick={() => removeSkill(i)} style={{ width: 18, height: 18, border: 'none', background: '#CDE9D6', color: '#157A49', borderRadius: '50%', cursor: 'pointer', fontSize: 10, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+                        <button onClick={() => removeSkill(i)} style={{ width: 18, height: 18, border: 'none', background: '#CDE9D6', color: '#157A49', borderRadius: '50%', cursor: 'pointer', fontSize: 11, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
                       </span>
                     ))}
                     <input
@@ -498,10 +492,10 @@ export default function AppOnboarding() {
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                     <label style={{ fontSize: 12.5, fontWeight: 600, color: '#46413A' }}>Minimum base salary</label>
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 15, fontWeight: 600, color: '#157A49' }}>${salary}k+</span>
+                    <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 15, fontWeight: 600, color: '#157A49' }}>${salary}k+</span>
                   </div>
                   <input type="range" min="80" max="300" step="5" value={salary} onChange={(e) => setSalary(Number(e.target.value))} style={{ width: '100%' }} />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, color: '#A79E8F', marginTop: 6 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#A79E8F', marginTop: 6 }}>
                     <span>$80k</span>
                     <span>$300k+</span>
                   </div>
@@ -573,17 +567,17 @@ export default function AppOnboarding() {
             </div>
           </div>
 
-          <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#A79E8F' }}>© 2026 Jobocate</div>
+          <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#A79E8F' }}>© 2026 Jobocate</div>
         </div>
 
         {/* ===== BRAND SIDE ===== */}
         <div id="jbob-brand" style={{ position: 'relative', overflow: 'hidden', background: '#15140F', padding: 48, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 85% 8%, rgba(31,164,99,0.34), transparent 55%), radial-gradient(circle at 5% 100%, rgba(31,164,99,0.18), transparent 50%)', pointerEvents: 'none' }} />
 
-          <div style={{ position: 'relative', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#5BD08C' }}>— Setting up your copilot</div>
+          <div style={{ position: 'relative', fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#5BD08C' }}>— Setting up your copilot</div>
 
           <div style={{ position: 'relative' }}>
-            <p style={{ fontFamily: "'Instrument Serif',serif", fontSize: 38, lineHeight: 1.08, color: '#F2EDE2', margin: '0 0 30px', maxWidth: 430 }}>3 steps to your first matches.</p>
+            <p style={{ fontFamily: 'var(--jb-font-display)', fontSize: 38, lineHeight: 1.08, color: '#F2EDE2', margin: '0 0 30px', maxWidth: 430 }}>3 steps to your first matches.</p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 34 }}>
               {BRAND_STEPS.map((label, i) => {
@@ -591,7 +585,7 @@ export default function AppOnboarding() {
                 const cur = i === step;
                 return (
                   <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '15px 17px', background: cur ? '#1E2D24' : '#1A1813', border: `1px solid ${cur ? '#2F5C42' : '#2C2A22'}`, borderRadius: 13 }}>
-                    <span style={{ width: 30, height: 30, flexShrink: 0, borderRadius: '50%', background: done || cur ? '#1FA463' : '#15140F', border: `1.5px solid ${done || cur ? '#1FA463' : '#3A382E'}`, color: done || cur ? '#0C2C1C' : '#6B6456', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, fontSize: 12 }}>
+                    <span style={{ width: 30, height: 30, flexShrink: 0, borderRadius: '50%', background: done || cur ? '#1FA463' : '#15140F', border: `1.5px solid ${done || cur ? '#1FA463' : '#3A382E'}`, color: done || cur ? '#0C2C1C' : '#6B6456', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--jb-font-mono)', fontWeight: 600, fontSize: 12 }}>
                       {done ? '✓' : String(i + 1)}
                     </span>
                     <span style={{ fontSize: 14.5, fontWeight: cur ? 700 : 500, color: cur ? '#FBF8F1' : done ? '#C7D8CC' : '#8A8378' }}>{label}</span>
@@ -601,14 +595,14 @@ export default function AppOnboarding() {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 30, fontWeight: 600, color: '#5BD08C' }}>48h</span>
+              <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 30, fontWeight: 600, color: '#5BD08C' }}>48h</span>
               <span style={{ fontSize: 14, lineHeight: 1.4, color: '#9A9286', maxWidth: 250 }}>Most members get their first interview request within two days of finishing setup.</span>
             </div>
           </div>
 
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#9A9286' }}>
-            <span style={{ color: '#1FA463', letterSpacing: '0.1em' }}>★★★★★</span>
-            Trusted by 100,000+ job seekers
+            <span style={{ color: '#1FA463' }}>✓</span>
+            Free to start · You approve every application
           </div>
         </div>
       </div>

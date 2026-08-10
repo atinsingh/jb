@@ -1,40 +1,111 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { appRoute } from '@/components/app/appRoutes';
+import { employerBillingApi } from '@/services/employerApi';
+import {
+  LoadingState,
+  ErrorState,
+  InlineError,
+} from '@/components/employer/EmployerStates';
 
-// Standalone reusable limit/upsell state. Static sample data ported from the
-// design's DCLogic Component class (renderVals).
+// Descriptive copy for what a full job-slot quota blocks. Not data — UI text.
 const BLOCKED = [
   'New job postings are paused until a slot frees up',
   'Autopilot can’t open pipelines for new reqs',
   'Sourcing campaigns for new roles are on hold',
 ];
 
-const GROWTH = [
-  { label: 'Job slots', value: '5' },
-  { label: 'AI actions', value: '500' },
-  { label: 'Sourcing', value: '150' },
-];
-
-const SCALE = [
-  { label: 'Job slots', value: '20' },
-  { label: 'AI actions', value: '2,500' },
-  { label: 'Sourcing', value: '750' },
-];
+const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+const leversToRows = (levers) =>
+  Array.isArray(levers)
+    ? levers.map(([label, value]) => ({ label, value: String(value) }))
+    : [];
 
 export default function EmployerQuota() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const [current, setCurrent] = useState(null); // { name, rows }
+  const [scale, setScale] = useState(null); // { key, name, rows }
+  const [usage, setUsage] = useState(null);
+
+  const [upgrading, setUpgrading] = useState(false);
+  const [upgradeError, setUpgradeError] = useState(null);
+
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [plansRes, usageRes] = await Promise.all([
+        employerBillingApi.plans(),
+        employerBillingApi.usage(),
+      ]);
+      const plans = Array.isArray(plansRes?.plans) ? plansRes.plans : [];
+      const currentPlan =
+        plans.find((p) => p.current) ||
+        plans.find((p) => p.key === plansRes?.currentPlan) ||
+        null;
+      const scalePlan = plans.find((p) => p.key === 'scale') || null;
+
+      setCurrent(
+        currentPlan
+          ? { name: currentPlan.name, rows: leversToRows(currentPlan.levers) }
+          : null,
+      );
+      setScale(
+        scalePlan
+          ? { key: scalePlan.key, name: scalePlan.name, rows: leversToRows(scalePlan.levers) }
+          : null,
+      );
+      setUsage(usageRes?.usage || null);
+    } catch (err) {
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const used = usage && typeof usage.jobSlotsUsed === 'number' ? usage.jobSlotsUsed : null;
+  const limit = usage && typeof usage.jobSlotsLimit === 'number' ? usage.jobSlotsLimit : null;
+  const atLimit = used != null && limit != null && used >= limit;
+  const slotsText = used != null && limit != null ? `${used} of ${limit} used` : '—';
+
+  const doUpgrade = async () => {
+    if (!scale) return;
+    setUpgrading(true);
+    setUpgradeError(null);
+    try {
+      const res = await employerBillingApi.upgrade({
+        plan: scale.key,
+        billingCycle: 'annual',
+      });
+      // Stripe Checkout grants the plan; returning to the dashboard without
+      // paying would show the old tier.
+      if (res?.checkoutUrl) {
+        window.location.href = res.checkoutUrl;
+        return;
+      }
+      router.push(appRoute('Employer Dashboard.dc.html'));
+    } catch (err) {
+      setUpgradeError(err);
+      setUpgrading(false);
+    }
+  };
+
   return (
     <>
       <Head>
-        <title>Job slots reached — Jobocate for Employers</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
+        <title>Job slots — Jobocate for Employers</title>
       </Head>
 
       <style jsx global>{`
@@ -59,7 +130,7 @@ export default function EmployerQuota() {
             transform: translateY(0) scale(1);
           }
         }
-        #jbquota a.qbtn-primary:hover {
+        #jbquota button.qbtn-primary:hover {
           background: #364fc7 !important;
         }
         #jbquota a.qbtn-ghost:hover {
@@ -74,7 +145,7 @@ export default function EmployerQuota() {
           position: 'relative',
           minHeight: '100vh',
           background: '#F7F3EA',
-          fontFamily: "'Hanken Grotesk',sans-serif",
+          fontFamily: 'var(--jb-font-sans)',
           color: '#1B1A16',
           overflow: 'hidden',
         }}
@@ -142,195 +213,196 @@ export default function EmployerQuota() {
               ✕
             </Link>
 
-            <div
-              style={{
-                width: 60,
-                height: 60,
-                borderRadius: 16,
-                background: '#EDF0FE',
-                color: '#4263EB',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 26,
-                marginBottom: 20,
-              }}
-            >
-              ◓
-            </div>
+            {loading ? (
+              <LoadingState label="Loading plan limits…" />
+            ) : error ? (
+              <ErrorState error={error} onRetry={load} />
+            ) : (
+              <>
+                <div
+                  style={{
+                    width: 60,
+                    height: 60,
+                    borderRadius: 16,
+                    background: '#EDF0FE',
+                    color: '#4263EB',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 26,
+                    marginBottom: 20,
+                  }}
+                >
+                  ◓
+                </div>
 
-            <div
-              style={{
-                fontFamily: "'JetBrains Mono',monospace",
-                fontSize: 10,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                color: '#4263EB',
-                marginBottom: 10,
-              }}
-            >
-              Job slots · 5 of 5 used
-            </div>
-            <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 30, lineHeight: 1.08, margin: '0 0 10px' }}>
-              You&rsquo;ve filled every job slot — nice problem to have.
-            </h1>
-            <p style={{ fontSize: 14.5, lineHeight: 1.6, color: '#5A544A', margin: '0 0 22px' }}>
-              Your Growth plan includes 5 active reqs and all 5 are live. To post{' '}
-              <b style={{ color: '#1B1A16' }}>Senior Data Scientist</b>, free up a slot or move up to Scale.
-            </p>
+                <div
+                  style={{
+                    fontFamily: 'var(--jb-font-mono)',
+                    fontSize: 11,
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                    color: '#4263EB',
+                    marginBottom: 10,
+                  }}
+                >
+                  Job slots · {slotsText}
+                </div>
+                <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 30, lineHeight: 1.08, margin: '0 0 10px' }}>
+                  {atLimit
+                    ? 'You’ve filled every job slot — nice problem to have.'
+                    : 'Keep an eye on your job slots.'}
+                </h1>
+                <p style={{ fontSize: 14.5, lineHeight: 1.6, color: '#5A544A', margin: '0 0 22px' }}>
+                  Your {current?.name || 'current'} plan includes {limit ?? '—'} active reqs
+                  {atLimit ? ' and all are live' : used != null ? `, ${used} in use` : ''}. To post
+                  more, free up a slot{scale ? ` or move up to ${scale.name}` : ''}.
+                </p>
 
-            {/* WHAT'S BLOCKED */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginBottom: 22 }}>
-              {BLOCKED.map((b) => (
-                <div key={b} style={{ display: 'flex', alignItems: 'center', gap: 11, fontSize: 13.5, color: '#5A544A' }}>
-                  <span
+                {/* WHAT'S BLOCKED */}
+                {atLimit && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginBottom: 22 }}>
+                    {BLOCKED.map((b) => (
+                      <div key={b} style={{ display: 'flex', alignItems: 'center', gap: 11, fontSize: 13.5, color: '#5A544A' }}>
+                        <span
+                          style={{
+                            width: 20,
+                            height: 20,
+                            flexShrink: 0,
+                            borderRadius: '50%',
+                            background: '#FBEDE4',
+                            color: '#C9622E',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 11,
+                          }}
+                        >
+                          ○
+                        </span>
+                        {b}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* TIER COMPARE */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
+                  <div style={{ background: '#FBF8F1', border: '1px solid #E1D9C9', borderRadius: 14, padding: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 12 }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: '#1B1A16' }}>{current?.name || '—'}</span>
+                      <span
+                        style={{
+                          fontFamily: 'var(--jb-font-mono)',
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: '#157A49',
+                          background: '#EAF6EE',
+                          border: '1px solid #CDE9D6',
+                          padding: '2px 6px',
+                          borderRadius: 999,
+                        }}
+                      >
+                        CURRENT
+                      </span>
+                    </div>
+                    {(current?.rows || []).map((g) => (
+                      <div
+                        key={g.label}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12.5, color: '#5A544A', marginBottom: 7 }}
+                      >
+                        <span>{g.label}</span>
+                        <span style={{ fontFamily: 'var(--jb-font-mono)', fontWeight: 600, color: '#1B1A16' }}>{g.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ background: '#15140F', border: '1px solid #4263EB', borderRadius: 14, padding: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 12 }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: '#FBF8F1' }}>{scale?.name || 'Scale'}</span>
+                      <span
+                        style={{
+                          fontFamily: 'var(--jb-font-mono)',
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: '#fff',
+                          background: '#4263EB',
+                          padding: '2px 6px',
+                          borderRadius: 999,
+                        }}
+                      >
+                        UPGRADE
+                      </span>
+                    </div>
+                    {(scale?.rows || []).map((s) => (
+                      <div
+                        key={s.label}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12.5, color: '#9A9286', marginBottom: 7 }}
+                      >
+                        <span>{s.label}</span>
+                        <span style={{ fontFamily: 'var(--jb-font-mono)', fontWeight: 600, color: '#5BD08C' }}>{s.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <InlineError error={upgradeError} />
+
+                {/* ACTIONS */}
+                {scale && (
+                  <button
+                    onClick={doUpgrade}
+                    disabled={upgrading}
+                    className="qbtn-primary"
                     style={{
-                      width: 20,
-                      height: 20,
-                      flexShrink: 0,
-                      borderRadius: '50%',
-                      background: '#FBEDE4',
-                      color: '#C9622E',
+                      width: '100%',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: 11,
-                    }}
-                  >
-                    ○
-                  </span>
-                  {b}
-                </div>
-              ))}
-            </div>
-
-            {/* TIER COMPARE */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
-              <div style={{ background: '#FBF8F1', border: '1px solid #E1D9C9', borderRadius: 14, padding: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 12 }}>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: '#1B1A16' }}>Growth</span>
-                  <span
-                    style={{
-                      fontFamily: "'JetBrains Mono',monospace",
-                      fontSize: 8.5,
-                      fontWeight: 600,
-                      color: '#157A49',
-                      background: '#EAF6EE',
-                      border: '1px solid #CDE9D6',
-                      padding: '2px 6px',
-                      borderRadius: 999,
-                    }}
-                  >
-                    CURRENT
-                  </span>
-                </div>
-                {GROWTH.map((g) => (
-                  <div
-                    key={g.label}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12.5, color: '#5A544A', marginBottom: 7 }}
-                  >
-                    <span>{g.label}</span>
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, color: '#1B1A16' }}>{g.value}</span>
-                  </div>
-                ))}
-              </div>
-              <div style={{ background: '#15140F', border: '1px solid #4263EB', borderRadius: 14, padding: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 12 }}>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: '#FBF8F1' }}>Scale</span>
-                  <span
-                    style={{
-                      fontFamily: "'JetBrains Mono',monospace",
-                      fontSize: 8.5,
-                      fontWeight: 600,
-                      color: '#fff',
+                      gap: 8,
                       background: '#4263EB',
-                      padding: '2px 6px',
+                      color: '#fff',
+                      border: 'none',
+                      fontFamily: 'inherit',
+                      fontSize: 15,
+                      fontWeight: 700,
+                      padding: 14,
                       borderRadius: 999,
+                      cursor: upgrading ? 'not-allowed' : 'pointer',
+                      opacity: upgrading ? 0.7 : 1,
+                      marginBottom: 10,
                     }}
                   >
-                    UPGRADE
-                  </span>
-                </div>
-                {SCALE.map((s) => (
-                  <div
-                    key={s.label}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12.5, color: '#9A9286', marginBottom: 7 }}
+                    {upgrading ? 'Upgrading…' : `Upgrade to ${scale.name} →`}
+                  </button>
+                )}
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <Link
+                    href={appRoute('Employer Jobs.dc.html')}
+                    className="qbtn-ghost"
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: '#FFFEFB',
+                      color: '#1B1A16',
+                      fontSize: 14,
+                      fontWeight: 600,
+                      padding: 12,
+                      borderRadius: 999,
+                      textDecoration: 'none',
+                      border: '1px solid #D9D0BE',
+                    }}
                   >
-                    <span>{s.label}</span>
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, color: '#5BD08C' }}>{s.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+                    Manage jobs
+                  </Link>
+                </div>
 
-            {/* ACTIONS */}
-            <Link
-              href={appRoute('Employer Plans.dc.html')}
-              className="qbtn-primary"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                background: '#4263EB',
-                color: '#fff',
-                fontSize: 15,
-                fontWeight: 700,
-                padding: 14,
-                borderRadius: 999,
-                textDecoration: 'none',
-                marginBottom: 10,
-              }}
-            >
-              Upgrade to post more →
-            </Link>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <Link
-                href={appRoute('Employer Dashboard.dc.html')}
-                className="qbtn-ghost"
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: '#FFFEFB',
-                  color: '#1B1A16',
-                  fontSize: 14,
-                  fontWeight: 600,
-                  padding: 12,
-                  borderRadius: 999,
-                  textDecoration: 'none',
-                  border: '1px solid #D9D0BE',
-                }}
-              >
-                Manage jobs
-              </Link>
-              <Link
-                href={appRoute('Employer Dashboard.dc.html')}
-                className="qbtn-ghost"
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 7,
-                  background: '#FFFEFB',
-                  color: '#1B1A16',
-                  fontSize: 14,
-                  fontWeight: 600,
-                  padding: 12,
-                  borderRadius: 999,
-                  textDecoration: 'none',
-                  border: '1px solid #D9D0BE',
-                }}
-              >
-                Close an old req
-              </Link>
-            </div>
-
-            <p style={{ fontSize: 12, color: '#A79E8F', textAlign: 'center', margin: '16px 0 0' }}>
-              Closing a req keeps all its candidates and data — it just frees the slot.
-            </p>
+                <p style={{ fontSize: 12, color: '#A79E8F', textAlign: 'center', margin: '16px 0 0' }}>
+                  Closing a req keeps all its candidates and data — it just frees the slot.
+                </p>
+              </>
+            )}
           </div>
         </div>
       </div>

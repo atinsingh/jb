@@ -3,6 +3,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import axios from 'axios';
 import { Model } from 'mongoose';
 import { Job, JobDocument } from '../../schemas/job.schema';
+import { JobGeoService } from '../../geography/job-geo.service';
+import { extractSkills } from '../../matching/skill-taxonomy';
 
 @Injectable()
 export class GreenhouseMonitorService {
@@ -10,6 +12,7 @@ export class GreenhouseMonitorService {
 
   constructor(
     @InjectModel(Job.name) private jobModel: Model<JobDocument>,
+    private geo: JobGeoService,
   ) {}
 
   async run(boardTokens: string[] = []) {
@@ -21,7 +24,12 @@ export class GreenhouseMonitorService {
 
     for (const board of boards) {
       try {
-        const { data } = await axios.get(`https://boards.greenhouse.io/${board}?format=json`);
+        // Greenhouse's public Job Board API. The old `boards.greenhouse.io/<board>?format=json`
+        // embed URL no longer returns JSON; `boards-api.greenhouse.io` is the current endpoint.
+        // `content=true` includes the full HTML job description.
+        const { data } = await axios.get(
+          `https://boards-api.greenhouse.io/v1/boards/${board}/jobs?content=true`,
+        );
         if (!data?.jobs) continue;
         const jobs = Array.isArray(data.jobs) ? data.jobs : [];
         fetched += jobs.length;
@@ -30,16 +38,33 @@ export class GreenhouseMonitorService {
         for (const job of jobs) {
           const externalId = `greenhouse:${job.id}`;
           const existed = await this.jobModel.exists({ externalId });
+          const companyName = board || job?.offices?.[0]?.name || 'Unknown';
+          const location = job?.location?.name || 'Not specified';
+          const description = job.content || '';
+          const g = this.geo.normalize({ location, description, title: job.title });
           const doc = {
             title: job.title,
-            companyName: board || job?.offices?.[0]?.name || 'Unknown',
-            location: job?.location?.name || 'Not specified',
-            description: job.content || '',
+            companyName,
+            location,
+            description,
             source: 'Greenhouse',
             externalUrl: job.absolute_url,
             canonicalUrl: job.absolute_url,
             externalId,
             scrapedAt: new Date(),
+            skills: extractSkills(`${job.title}\n${description}`),
+            companyLogo: this.geo.deriveLogo(companyName, job.absolute_url),
+            country: g.country,
+            region: g.region,
+            city: g.city,
+            workplaceType: g.workplaceType,
+            remoteScope: g.remoteScope,
+            eligibleCountries: g.eligibleCountries,
+            excludedCountries: g.excludedCountries,
+            sponsorship: g.sponsorship,
+            locationConfidence: g.locationConfidence,
+            needsGeoReview: g.needsGeoReview,
+            geoEvidence: g.geoEvidence,
           };
           await this.jobModel.findOneAndUpdate(
             { externalId },

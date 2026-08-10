@@ -2,8 +2,7 @@
 
 import Head from 'next/head';
 import Link from 'next/link';
-import SiteNav from '@/components/site/SiteNav';
-import SiteFooter from '@/components/site/SiteFooter';
+import PublicLayout from '@/components/layout/PublicLayout';
 import { appRoute } from '@/components/app/appRoutes';
 
 const HOW_STEPS = [
@@ -48,13 +47,7 @@ export default function ResumeBuilder() {
   return (
     <>
       <Head>
-        <title>Resume Builder — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
+        <title>Resume Builder that clears ATS — Jobocate</title>
       </Head>
 
       <style jsx global>{`
@@ -65,7 +58,7 @@ export default function ResumeBuilder() {
           scroll-behavior: smooth;
         }
         #jbresume ::selection {
-          background: #1fa463;
+          background: var(--jb-d-accent);
           color: #f7f3ea;
         }
         @keyframes riseIn {
@@ -83,49 +76,47 @@ export default function ResumeBuilder() {
       <div
         id="jbresume"
         style={{
-          background: '#F7F3EA',
-          color: '#1B1A16',
-          fontFamily: "'Hanken Grotesk',sans-serif",
+          background: 'transparent',
+          color: 'var(--jb-d-ink)',
+          fontFamily: 'var(--jb-font-sans)',
           WebkitFontSmoothing: 'antialiased',
         }}
       >
-        <div style={{ position: 'sticky', top: 0, zIndex: 50, display: 'block' }}>
-          <SiteNav />
-        </div>
+        <PublicLayout>
 
         {/* BREADCRUMB */}
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 32px 0' }}>
-          <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, letterSpacing: '0.08em', color: '#9A9286' }}>
-            <Link href={appRoute('Jobocate Home.dc.html')} style={{ color: '#9A9286', textDecoration: 'none' }}>
+          <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, letterSpacing: '0.08em', color: 'var(--jb-d-ink-55)' }}>
+            <Link href={appRoute('Jobocate Home.dc.html')} style={{ color: 'var(--jb-d-ink-55)', textDecoration: 'none' }}>
               HOME
             </Link>
-            &nbsp;/&nbsp; PRODUCT &nbsp;/&nbsp; <span style={{ color: '#157A49' }}>RESUME BUILDER</span>
+            &nbsp;/&nbsp; PRODUCT &nbsp;/&nbsp; <span style={{ color: 'var(--jb-d-accent)' }}>RESUME BUILDER</span>
           </div>
         </div>
 
         {/* HERO */}
         <section style={{ maxWidth: 1200, margin: '0 auto', padding: '44px 32px 56px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1.02fr 0.98fr', gap: 56, alignItems: 'center' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', gap: 56, alignItems: 'center' }}>
             <div style={{ animation: 'riseIn 0.7s ease both' }}>
               <div
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 9,
-                  border: '1px solid #D9D0BE',
+                  border: '1px solid var(--jb-d-line-btn)',
                   borderRadius: 999,
                   padding: '7px 14px',
                   marginBottom: 24,
                 }}
               >
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#1FA463' }} />
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--jb-d-accent)' }} />
                 <span
                   style={{
-                    fontFamily: "'JetBrains Mono',monospace",
+                    fontFamily: 'var(--jb-font-mono)',
                     fontSize: 11.5,
                     letterSpacing: '0.12em',
                     textTransform: 'uppercase',
-                    color: '#5A544A',
+                    color: 'var(--jb-d-ink-70)',
                   }}
                 >
                   Product — AI Resume Builder
@@ -133,9 +124,9 @@ export default function ResumeBuilder() {
               </div>
               <h1
                 style={{
-                  fontFamily: "'Instrument Serif',serif",
+                  fontFamily: 'var(--jb-font-display)',
                   fontWeight: 400,
-                  fontSize: 74,
+                  fontSize: 'clamp(34px, 7vw, 74px)',
                   lineHeight: 0.98,
                   letterSpacing: '-0.01em',
                   margin: '0 0 22px',
@@ -147,7 +138,7 @@ export default function ResumeBuilder() {
                   beats the bots.
                 </span>
               </h1>
-              <p style={{ fontSize: 19, lineHeight: 1.55, color: '#4B463E', maxWidth: 470, margin: '0 0 32px' }}>
+              <p style={{ fontSize: 19, lineHeight: 1.55, color: 'var(--jb-d-ink-85)', maxWidth: 470, margin: '0 0 32px' }}>
                 Jobocate rewrites and formats your resume to clear ATS filters and land on a human&apos;s desk — tailored to every role in seconds, not hours.
               </p>
               <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', marginBottom: 24 }}>
@@ -157,7 +148,7 @@ export default function ResumeBuilder() {
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 9,
-                    background: '#1B1A16',
+                    background: 'var(--jb-d-footer)',
                     color: '#F7F3EA',
                     fontSize: 16,
                     fontWeight: 600,
@@ -174,7 +165,7 @@ export default function ResumeBuilder() {
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 9,
-                    color: '#1B1A16',
+                    color: 'var(--jb-d-ink)',
                     fontSize: 16,
                     fontWeight: 600,
                     padding: '15px 22px',
@@ -186,8 +177,8 @@ export default function ResumeBuilder() {
                   See a sample
                 </Link>
               </div>
-              <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: '#8A8378' }}>
-                ● Built on <b style={{ color: '#157A49' }}>2M+</b> successful resumes
+              <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 12, color: 'var(--jb-d-ink-65)' }}>
+                ● Scored against <b style={{ color: 'var(--jb-d-accent)' }}>real ATS</b> screening systems
               </div>
             </div>
 
@@ -195,42 +186,42 @@ export default function ResumeBuilder() {
             <div style={{ animation: 'riseIn 0.9s ease both', position: 'relative' }}>
               <div
                 style={{
-                  background: '#FFFEFB',
-                  border: '1px solid #E6DECF',
+                  background: 'var(--jb-d-panel)',
+                  border: '1px solid var(--jb-d-line-card)',
                   borderRadius: 16,
                   boxShadow: '0 30px 60px -28px rgba(27,26,22,0.28)',
                   padding: '30px 32px',
                 }}
               >
-                <div style={{ borderBottom: '1px solid #EEE7D9', paddingBottom: 16, marginBottom: 16 }}>
-                  <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: 26, lineHeight: 1 }}>Sarah Chen</div>
-                  <div style={{ fontSize: 12.5, color: '#8A8378', marginTop: 4 }}>Senior Software Engineer · San Francisco</div>
+                <div style={{ borderBottom: '1px solid var(--jb-d-line-card)', paddingBottom: 16, marginBottom: 16 }}>
+                  <div style={{ fontFamily: 'var(--jb-font-display)', fontSize: 26, lineHeight: 1 }}>Sarah Chen</div>
+                  <div style={{ fontSize: 12.5, color: 'var(--jb-d-ink-65)', marginTop: 4 }}>Senior Software Engineer · San Francisco</div>
                 </div>
                 <div
                   style={{
-                    fontFamily: "'JetBrains Mono',monospace",
-                    fontSize: 10,
+                    fontFamily: 'var(--jb-font-mono)',
+                    fontSize: 11,
                     letterSpacing: '0.08em',
                     textTransform: 'uppercase',
-                    color: '#9A9286',
+                    color: 'var(--jb-d-ink-55)',
                     marginBottom: 9,
                   }}
                 >
                   Experience
                 </div>
-                <div style={{ background: '#EAF6EE', borderRadius: 7, padding: '9px 11px', marginBottom: 7 }}>
+                <div style={{ background: 'var(--jb-d-accent-tint)', borderRadius: 7, padding: '9px 11px', marginBottom: 7 }}>
                   <div style={{ fontSize: 12.5, fontWeight: 600 }}>Led migration to microservices, cutting latency 40%</div>
-                  <div style={{ fontSize: 11, color: '#157A49', marginTop: 2 }}>✓ quantified · ✓ action verb · ✓ keyword: microservices</div>
+                  <div style={{ fontSize: 11, color: 'var(--jb-d-accent)', marginTop: 2 }}>✓ quantified · ✓ action verb · ✓ keyword: microservices</div>
                 </div>
-                <div style={{ height: 8, background: '#F1ECE0', borderRadius: 4, marginBottom: 6, width: '92%' }} />
-                <div style={{ height: 8, background: '#F1ECE0', borderRadius: 4, marginBottom: 16, width: '78%' }} />
+                <div style={{ height: 8, background: 'var(--jb-d-glass)', borderRadius: 4, marginBottom: 6, width: '92%' }} />
+                <div style={{ height: 8, background: 'var(--jb-d-glass)', borderRadius: 4, marginBottom: 16, width: '78%' }} />
                 <div
                   style={{
-                    fontFamily: "'JetBrains Mono',monospace",
-                    fontSize: 10,
+                    fontFamily: 'var(--jb-font-mono)',
+                    fontSize: 11,
                     letterSpacing: '0.08em',
                     textTransform: 'uppercase',
-                    color: '#9A9286',
+                    color: 'var(--jb-d-ink-55)',
                     marginBottom: 9,
                   }}
                 >
@@ -242,8 +233,8 @@ export default function ResumeBuilder() {
                       key={s}
                       style={{
                         fontSize: 11,
-                        background: '#F4EFE4',
-                        border: '1px solid #E6DECF',
+                        background: 'transparent',
+                        border: '1px solid var(--jb-d-line-card)',
                         borderRadius: 999,
                         padding: '4px 10px',
                       }}
@@ -258,7 +249,7 @@ export default function ResumeBuilder() {
                   position: 'absolute',
                   top: -18,
                   right: -14,
-                  background: '#1B1A16',
+                  background: 'var(--jb-d-footer)',
                   color: '#FBF8F1',
                   borderRadius: 14,
                   padding: '12px 16px',
@@ -266,11 +257,11 @@ export default function ResumeBuilder() {
                   textAlign: 'center',
                 }}
               >
-                <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, letterSpacing: '0.08em', color: '#5BD08C' }}>
+                <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', color: 'var(--jb-d-accent)' }}>
                   ATS SCORE
                 </div>
-                <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 26, fontWeight: 600, lineHeight: 1.1 }}>
-                  98<span style={{ fontSize: 13, color: '#9A9286' }}>/100</span>
+                <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 26, fontWeight: 600, lineHeight: 1.1 }}>
+                  98<span style={{ fontSize: 13, color: 'var(--jb-d-ink-55)' }}>/100</span>
                 </div>
               </div>
             </div>
@@ -278,33 +269,33 @@ export default function ResumeBuilder() {
         </section>
 
         {/* STAT BAND */}
-        <section style={{ background: '#F1ECE0', borderTop: '1px solid #E7E0D2', borderBottom: '1px solid #E7E0D2' }}>
+        <section style={{ background: 'var(--jb-d-glass)', borderTop: '1px solid var(--jb-d-line-card)', borderBottom: '1px solid var(--jb-d-line-card)' }}>
           <div
             style={{
               maxWidth: 1200,
               margin: '0 auto',
               padding: '46px 32px',
               display: 'grid',
-              gridTemplateColumns: 'repeat(3,1fr)',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))',
               gap: 24,
             }}
           >
             <div>
-              <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 40, fontWeight: 600, lineHeight: 1 }}>
-                98<span style={{ fontSize: 22, color: '#8A8378' }}>/100</span>
+              <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 'clamp(26px, 5vw, 40px)', fontWeight: 600, lineHeight: 1 }}>
+                0<span style={{ fontSize: 22, color: 'var(--jb-d-ink-65)' }}>–100</span>
               </div>
-              <div style={{ width: 32, height: 3, background: '#1FA463', margin: '12px 0 10px' }} />
-              <div style={{ fontSize: 14, color: '#5A544A' }}>Average ATS score</div>
+              <div style={{ width: 32, height: 3, background: 'var(--jb-d-accent)', margin: '12px 0 10px' }} />
+              <div style={{ fontSize: 14, color: 'var(--jb-d-ink-70)' }}>Live ATS score as you edit</div>
             </div>
             <div>
-              <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 40, fontWeight: 600, lineHeight: 1 }}>3×</div>
-              <div style={{ width: 32, height: 3, background: '#1FA463', margin: '12px 0 10px' }} />
-              <div style={{ fontSize: 14, color: '#5A544A' }}>More recruiter callbacks</div>
+              <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 'clamp(26px, 5vw, 40px)', fontWeight: 600, lineHeight: 1 }}>3</div>
+              <div style={{ width: 32, height: 3, background: 'var(--jb-d-accent)', margin: '12px 0 10px' }} />
+              <div style={{ fontSize: 14, color: 'var(--jb-d-ink-70)' }}>Ways in — PDF, LinkedIn, or fresh</div>
             </div>
             <div>
-              <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 40, fontWeight: 600, lineHeight: 1 }}>60s</div>
-              <div style={{ width: 32, height: 3, background: '#1FA463', margin: '12px 0 10px' }} />
-              <div style={{ fontSize: 14, color: '#5A544A' }}>To tailor for a new role</div>
+              <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 'clamp(26px, 5vw, 40px)', fontWeight: 600, lineHeight: 1 }}>60s</div>
+              <div style={{ width: 32, height: 3, background: 'var(--jb-d-accent)', margin: '12px 0 10px' }} />
+              <div style={{ fontSize: 14, color: 'var(--jb-d-ink-70)' }}>To tailor a version for a role</div>
             </div>
           </div>
         </section>
@@ -314,44 +305,44 @@ export default function ResumeBuilder() {
           <div style={{ maxWidth: 600, marginBottom: 54 }}>
             <div
               style={{
-                fontFamily: "'JetBrains Mono',monospace",
+                fontFamily: 'var(--jb-font-mono)',
                 fontSize: 11.5,
                 letterSpacing: '0.14em',
                 textTransform: 'uppercase',
-                color: '#1FA463',
+                color: 'var(--jb-d-accent)',
                 marginBottom: 16,
               }}
             >
               — How it works
             </div>
-            <h2 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 48, lineHeight: 1.05, margin: 0 }}>
+            <h2 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 'clamp(26px, 5vw, 48px)', lineHeight: 1.05, margin: 0 }}>
               From rough draft to recruiter-ready
             </h2>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 36 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', gap: 36 }}>
             {HOW_STEPS.map((step) => (
-              <div key={step.num} style={{ borderTop: '2px solid #1B1A16', paddingTop: 22 }}>
-                <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: 60, lineHeight: 1, color: '#1FA463', marginBottom: 14 }}>
+              <div key={step.num} style={{ borderTop: '2px solid var(--jb-d-footer)', paddingTop: 22 }}>
+                <div style={{ fontFamily: 'var(--jb-font-display)', fontSize: 'clamp(28px, 6vw, 60px)', lineHeight: 1, color: 'var(--jb-d-accent)', marginBottom: 14 }}>
                   {step.num}
                 </div>
                 <h3 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 10px' }}>{step.title}</h3>
-                <p style={{ fontSize: 15, lineHeight: 1.6, color: '#5A544A', margin: 0 }}>{step.body}</p>
+                <p style={{ fontSize: 15, lineHeight: 1.6, color: 'var(--jb-d-ink-70)', margin: 0 }}>{step.body}</p>
               </div>
             ))}
           </div>
         </section>
 
         {/* CAPABILITY CARDS */}
-        <section style={{ background: '#1B1A16', color: '#F2EDE2' }}>
+        <section style={{ background: 'var(--jb-d-footer)', color: '#F2EDE2' }}>
           <div style={{ maxWidth: 1200, margin: '0 auto', padding: '88px 32px' }}>
             <div style={{ maxWidth: 620, marginBottom: 46 }}>
               <div
                 style={{
-                  fontFamily: "'JetBrains Mono',monospace",
+                  fontFamily: 'var(--jb-font-mono)',
                   fontSize: 11.5,
                   letterSpacing: '0.14em',
                   textTransform: 'uppercase',
-                  color: '#5BD08C',
+                  color: 'var(--jb-d-accent)',
                   marginBottom: 16,
                 }}
               >
@@ -359,9 +350,9 @@ export default function ResumeBuilder() {
               </div>
               <h2
                 style={{
-                  fontFamily: "'Instrument Serif',serif",
+                  fontFamily: 'var(--jb-font-display)',
                   fontWeight: 400,
-                  fontSize: 48,
+                  fontSize: 'clamp(26px, 5vw, 48px)',
                   lineHeight: 1.05,
                   margin: 0,
                   color: '#FBF8F1',
@@ -370,17 +361,17 @@ export default function ResumeBuilder() {
                 More than a template
               </h2>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', gap: 20 }}>
               {CAPABILITIES.map((cap) => (
                 <div
                   key={cap.num}
                   style={{ background: '#242219', border: '1px solid #34322A', borderRadius: 16, padding: 28 }}
                 >
-                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 13, color: '#5BD08C', marginBottom: 18 }}>
+                  <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 13, color: 'var(--jb-d-accent)', marginBottom: 18 }}>
                     {cap.num}
                   </div>
                   <h3 style={{ fontSize: 18, fontWeight: 700, color: '#FBF8F1', margin: '0 0 10px' }}>{cap.title}</h3>
-                  <p style={{ fontSize: 14, lineHeight: 1.55, color: '#B8B1A4', margin: 0 }}>{cap.body}</p>
+                  <p style={{ fontSize: 14, lineHeight: 1.55, color: 'var(--jb-d-ink-65)', margin: 0 }}>{cap.body}</p>
                 </div>
               ))}
             </div>
@@ -389,9 +380,9 @@ export default function ResumeBuilder() {
 
         {/* TESTIMONIAL */}
         <section style={{ maxWidth: 920, margin: '0 auto', padding: '88px 32px', textAlign: 'center' }}>
-          <div style={{ color: '#1FA463', fontSize: 16, letterSpacing: '0.12em', marginBottom: 22 }}>★★★★★</div>
-          <p style={{ fontFamily: "'Instrument Serif',serif", fontSize: 38, lineHeight: 1.25, margin: '0 0 28px' }}>
-            &quot;The resume optimization got me past ATS filters that had been silently blocking me for months.&quot;
+          <div style={{ color: 'var(--jb-d-accent)', fontSize: 16, letterSpacing: '0.12em', marginBottom: 22 }}>A SAMPLE, OPTIMIZED</div>
+          <p style={{ fontFamily: 'var(--jb-font-display)', fontSize: 'clamp(26px, 5vw, 38px)', lineHeight: 1.25, margin: '0 0 28px' }}>
+            &quot;Bullets rewritten and quantified, keywords matched to the role — this is the version that clears the filter and reaches a person.&quot;
           </p>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 13 }}>
             <span
@@ -408,11 +399,11 @@ export default function ResumeBuilder() {
                 fontSize: 15,
               }}
             >
-              MJ
+              SC
             </span>
             <div style={{ textAlign: 'left' }}>
-              <div style={{ fontWeight: 700, fontSize: 15 }}>Marcus Johnson</div>
-              <div style={{ fontSize: 13.5, color: '#7A7367' }}>Product Manager at Stripe</div>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>Sarah Chen — sample profile</div>
+              <div style={{ fontSize: 13.5, color: 'var(--jb-d-ink-65)' }}>Senior Software Engineer · San Francisco</div>
             </div>
           </div>
         </section>
@@ -423,7 +414,7 @@ export default function ResumeBuilder() {
             style={{
               position: 'relative',
               overflow: 'hidden',
-              background: '#15140F',
+              background: 'var(--jb-d-footer)',
               borderRadius: 24,
               padding: '78px 40px',
               textAlign: 'center',
@@ -440,9 +431,9 @@ export default function ResumeBuilder() {
             <div style={{ position: 'relative' }}>
               <h2
                 style={{
-                  fontFamily: "'Instrument Serif',serif",
+                  fontFamily: 'var(--jb-font-display)',
                   fontWeight: 400,
-                  fontSize: 58,
+                  fontSize: 'clamp(27px, 5vw, 58px)',
                   lineHeight: 1.02,
                   color: '#FBF8F1',
                   margin: '0 auto 16px',
@@ -451,7 +442,7 @@ export default function ResumeBuilder() {
               >
                 Get a resume that gets read
               </h2>
-              <p style={{ fontSize: 18, color: '#B8B1A4', maxWidth: 460, margin: '0 auto 32px', lineHeight: 1.55 }}>
+              <p style={{ fontSize: 18, color: 'var(--jb-d-ink-65)', maxWidth: 460, margin: '0 auto 32px', lineHeight: 1.55 }}>
                 Import yours and see your ATS score in under a minute — free.
               </p>
               <Link
@@ -460,8 +451,8 @@ export default function ResumeBuilder() {
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 10,
-                  background: '#1FA463',
-                  color: '#0C2C1C',
+                  background: 'var(--jb-d-accent)',
+                  color: 'var(--jb-d-bg)',
                   fontSize: 17,
                   fontWeight: 700,
                   padding: '17px 32px',
@@ -475,7 +466,7 @@ export default function ResumeBuilder() {
           </div>
         </section>
 
-        <SiteFooter />
+        </PublicLayout>
       </div>
     </>
   );

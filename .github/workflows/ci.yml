@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+# Package managers (matches the Dockerfiles):
+#   - packages/contracts -> npm   (only package-lock.json exists there)
+#   - backend / frontend -> yarn  (yarn.lock is the committed lockfile;
+#                                  Yarn Classic is lenient with peer deps, so
+#                                  no --legacy-peer-deps flag is required)
+
+jobs:
+  backend:
+    name: Backend (typecheck, build, test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # The backend depends on the local @jobocate/contracts workspace via a
+      # file: reference, so it must be built before the backend install/build.
+      - name: Build contracts workspace
+        working-directory: packages/contracts
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: yarn install --frozen-lockfile
+
+      - name: Typecheck
+        working-directory: backend
+        run: yarn typecheck
+
+      - name: Build (nest build)
+        working-directory: backend
+        run: yarn build
+
+      - name: Unit tests (jest)
+        working-directory: backend
+        run: yarn test
+
+  frontend:
+    name: Frontend (build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: yarn install --frozen-lockfile
+
+      - name: Build (next build)
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: yarn build

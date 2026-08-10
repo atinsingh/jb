@@ -18,6 +18,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { EmployerInterviewsService } from './employer-interviews.service';
 import { ScheduleInterviewDto } from './dto/schedule-interview.dto';
 import { UpdateInterviewDto } from './dto/update-interview.dto';
@@ -25,7 +27,8 @@ import { SubmitScorecardDto } from './dto/submit-scorecard.dto';
 
 @ApiTags('employer-interviews')
 @Controller('employer/interviews')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('ROLE_EMPLOYER', 'ROLE_ADMIN')
 export class EmployerInterviewsController {
   constructor(
     private readonly interviewsService: EmployerInterviewsService,

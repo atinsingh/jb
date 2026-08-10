@@ -1,85 +1,13 @@
+'use client';
+
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import Image from 'next/image';
-import { 
-  BriefcaseIcon,
-  MapPinIcon,
-  MagnifyingGlassIcon,
-  StarIcon,
-  ChatBubbleLeftIcon,
-  UserIcon,
-  FunnelIcon,
-  CheckCircleIcon,
-  ClockIcon,
-  XCircleIcon
-} from '@heroicons/react/24/outline';
-import { StarIcon as SolidStarIcon } from '@heroicons/react/24/solid';
-import EmployerLayout from '@/components/layout/EmployerLayout';
-import { employerPipelineApi } from '@/services/employerApi';
+import EmployerSidebar from '@/components/employer/EmployerSidebar';
+import { employerPipelineApi, employerInterviewsApi } from '@/services/employerApi';
+import { LoadingState, ErrorState, EmptyState, InlineError } from '@/components/employer/EmployerStates';
 
-// Function to generate avatar URL with initials
-const getAvatarUrl = (name, size = 128) => {
-  const initials = name
-    .split(' ')
-    .map(part => part[0])
-    .join('')
-    .toUpperCase();
-  
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&background=random&color=fff&size=${size}`;
-};
-
-const SAMPLE_CANDIDATES = [
-  {
-    id: 1,
-    name: 'Alex Johnson',
-    title: 'Senior React Developer',
-    location: 'San Francisco, CA',
-    status: 'New',
-    match: 94,
-    skills: ['React', 'TypeScript', 'Node.js', 'GraphQL', 'Redux'],
-    experience: '5+ years',
-    lastActive: '2 hours ago',
-    avatar: getAvatarUrl('Alex Johnson')
-  },
-  {
-    id: 2,
-    name: 'Sarah Williams',
-    title: 'Senior UX/UI Designer',
-    location: 'New York, NY',
-    status: 'Reviewed',
-    match: 88,
-    skills: ['Figma', 'User Research', 'Prototyping', 'UI/UX', 'Accessibility'],
-    experience: '6+ years',
-    lastActive: '1 day ago',
-    avatar: getAvatarUrl('Sarah Williams')
-  },
-  {
-    id: 3,
-    name: 'Michael Chen',
-    title: 'Product Manager',
-    location: 'Austin, TX',
-    status: 'Interview',
-    match: 92,
-    skills: ['Product Strategy', 'Agile', 'Jira', 'Roadmapping', 'User Stories'],
-    experience: '7+ years',
-    lastActive: '5 hours ago',
-    avatar: getAvatarUrl('Michael Chen')
-  },
-  {
-    id: 4,
-    name: 'Emily Rodriguez',
-    title: 'Full Stack Developer',
-    location: 'Chicago, IL',
-    status: 'New',
-    match: 90,
-    skills: ['JavaScript', 'Python', 'Django', 'React', 'AWS'],
-    experience: '4+ years',
-    lastActive: '3 hours ago',
-    avatar: getAvatarUrl('Emily Rodriguez')
-  },
-];
-
+/* --------------------------------------------------------------- config --- */
 // Map backend pipeline stages to the status labels this page renders.
 const STAGE_TO_STATUS = {
   applied: 'New',
@@ -90,6 +18,26 @@ const STAGE_TO_STATUS = {
   rejected: 'Rejected',
 };
 
+const STATUS_FILTERS = ['all', 'New', 'Reviewed', 'Interview', 'Hired', 'Rejected'];
+
+// Cream-palette badge treatment per status.
+const STATUS_STYLE = {
+  New: { bg: '#F2ECE0', border: '#E6DECF', color: '#5A544A' },
+  Reviewed: { bg: '#EDF0FE', border: '#C7D2FB', color: '#1F2D6B' },
+  Interview: { bg: '#FBF1E2', border: '#EAD9BE', color: '#9A6A2E' },
+  Hired: { bg: '#EAF6EE', border: '#CDE9D6', color: '#157A49' },
+  Rejected: { bg: '#FBEDE4', border: '#EAD0C4', color: '#C9622E' },
+};
+
+const initialsOf = (name) =>
+  (name || '?')
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0])
+    .join('')
+    .toUpperCase() || '?';
+
 // Adapt a backend applicant into this page's candidate shape.
 const adaptApplicant = (a, i) => ({
   id: a._id || i,
@@ -99,86 +47,97 @@ const adaptApplicant = (a, i) => ({
   status: STAGE_TO_STATUS[a.stage] || 'New',
   match: typeof a.aiScore === 'number' ? a.aiScore : 0,
   skills: Array.isArray(a.skills) ? a.skills : [],
-  experience:
-    typeof a.yearsExperience === 'number' ? `${a.yearsExperience}+ years` : '—',
+  experience: typeof a.yearsExperience === 'number' ? `${a.yearsExperience}+ years` : '—',
   lastActive: a.appliedAt ? new Date(a.appliedAt).toLocaleDateString() : 'recently',
-  avatar: getAvatarUrl(a.candidateName || 'Unknown'),
 });
 
-// Status badge component
-const StatusBadge = ({ status }) => {
-  const statusStyles = {
-    New: 'bg-blue-100 text-blue-800',
-    Reviewed: 'bg-purple-100 text-purple-800',
-    Interview: 'bg-yellow-100 text-yellow-800',
-    Hired: 'bg-green-100 text-green-800',
-    Rejected: 'bg-red-100 text-red-800'
-  };
+/* ------------------------------------------------------------- ui atoms --- */
+const monoLabel = { fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9A9286' };
+const blueBtn = { display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: 'inherit', fontSize: 13, fontWeight: 700, color: '#fff', background: '#4263EB', border: 'none', borderRadius: 999, padding: '9px 16px', cursor: 'pointer' };
+const ghostBtn = { fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: '#1B1A16', background: '#FFFEFB', border: '1px solid #D9D0BE', borderRadius: 999, padding: '9px 15px', cursor: 'pointer' };
+const fieldInput = { width: '100%', fontFamily: 'inherit', fontSize: 13.5, color: '#1B1A16', background: '#FBF8F1', border: '1px solid #E1D9C9', borderRadius: 10, padding: '10px 12px' };
 
-  const statusIcons = {
-    New: <ClockIcon className="h-3.5 w-3.5 mr-1" />,
-    Reviewed: <CheckCircleIcon className="h-3.5 w-3.5 mr-1" />,
-    Interview: <ChatBubbleLeftIcon className="h-3.5 w-3.5 mr-1" />,
-    Hired: <SolidStarIcon className="h-3.5 w-3.5 mr-1" />,
-    Rejected: <XCircleIcon className="h-3.5 w-3.5 mr-1" />
-  };
-
+function StatusBadge({ status }) {
+  const s = STATUS_STYLE[status] || STATUS_STYLE.New;
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusStyles[status] || 'bg-gray-100 text-gray-800'}`}>
-      {statusIcons[status]}
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.03em', textTransform: 'uppercase', color: s.color, background: s.bg, border: `1px solid ${s.border}`, padding: '3px 9px', borderRadius: 999 }}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.color }} />
       {status}
     </span>
   );
-};
+}
 
+/* ----------------------------------------------------------- component --- */
 export default function EmployerCandidates() {
-  const [filters, setFilters] = useState({ 
-    search: '', 
-    status: 'all',
-    sort: 'recent',
-    skills: []
-  });
+  const [filters, setFilters] = useState({ search: '', status: 'all', sort: 'recent', skills: [] });
 
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
-  // Live candidates seeded with design samples; overridden on successful fetch.
-  const [candidates, setCandidates] = useState(SAMPLE_CANDIDATES);
+  const [candidates, setCandidates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [scheduling, setScheduling] = useState(false);
+  const [scheduleError, setScheduleError] = useState(null);
 
-  // Fetch live applicant pipeline; on any failure keep the sample fallback.
+  // Fetch the live applicant pipeline. No sample fallback — surface real state only.
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const applicants = await employerPipelineApi.list();
+      const arr = Array.isArray(applicants) ? applicants : [];
+      setCandidates(arr.map(adaptApplicant));
+    } catch (err) {
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const applicants = await employerPipelineApi.list();
-        if (!alive) return;
-        if (Array.isArray(applicants) && applicants.length) {
-          setCandidates(applicants.map(adaptApplicant));
-        }
-      } catch {
-        // keep samples
-      }
-    })();
-    return () => {
-      alive = false;
-    };
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleViewDetails = (candidate) => {
+    setScheduleError(null);
     setSelectedCandidate(candidate);
     setIsDetailOpen(true);
   };
 
+  // Schedule an interview for the selected candidate via the interviews API.
+  const scheduleInterview = async () => {
+    if (!selectedCandidate) return;
+    setScheduling(true);
+    setScheduleError(null);
+    try {
+      const isMongoId = /^[a-f\d]{24}$/i.test(String(selectedCandidate.id));
+      await employerInterviewsApi.create({
+        applicantId: isMongoId ? String(selectedCandidate.id) : undefined,
+        candidateName: selectedCandidate.name,
+        type: 'video',
+      });
+      setIsDetailOpen(false);
+    } catch (err) {
+      setScheduleError(err);
+    } finally {
+      setScheduling(false);
+    }
+  };
+
   const filteredCandidates = candidates
-    .filter(candidate => {
+    .filter((candidate) => {
       if (filters.status !== 'all' && candidate.status !== filters.status) {
         return false;
       }
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
-        if (!candidate.name.toLowerCase().includes(searchLower) &&
-            !candidate.title.toLowerCase().includes(searchLower) &&
-            !candidate.skills.some(skill => skill.toLowerCase().includes(searchLower))) {
+        if (
+          !candidate.name.toLowerCase().includes(searchLower) &&
+          !candidate.title.toLowerCase().includes(searchLower) &&
+          !candidate.skills.some((skill) => skill.toLowerCase().includes(searchLower))
+        ) {
           return false;
         }
       }
@@ -201,367 +160,201 @@ export default function EmployerCandidates() {
   const totalCandidates = candidates.length;
 
   return (
-    <EmployerLayout>
-      <Head><title>Candidates | Jobocate</title></Head>
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="md:flex md:items-center md:justify-between mb-6">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Talent Pool</h1>
-              <p className="mt-1 text-sm text-gray-500">
-                {totalCandidates} candidates • {Object.entries(statusCounts).map(([status, count]) => (
-                  <span key={status} className="mr-3">
-                    <span className="font-medium">{count}</span> {status}
+    <>
+      <Head>
+        <title>Candidates · Jobocate for Employers</title>
+      </Head>
+
+      <style jsx global>{`
+        #emapp ::-webkit-scrollbar { width: 8px; }
+        #emapp ::-webkit-scrollbar-thumb { background: #e1d9c9; border-radius: 8px; }
+        #emapp input:focus, #emapp select:focus, #emapp textarea:focus { outline: none; border-color: #4263eb; box-shadow: 0 0 0 3px rgba(66,99,235,0.14); }
+        #emapp .em-blue-btn:hover { background: #364fc7 !important; }
+        #emapp .em-ghost:hover { background: #f4efe4 !important; }
+        #emapp .em-card:hover { border-color: #d9cfbb; }
+        @keyframes emrise { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes emslide { from { transform: translateX(24px); opacity: 0.6; } to { transform: translateX(0); opacity: 1; } }
+      `}</style>
+
+      <div id="emapp" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16' }}>
+        <EmployerSidebar active="candidates" />
+
+        <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          {/* HEADER */}
+          <header style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: 14, padding: '14px 32px', background: 'rgba(247,243,234,0.85)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #E7E0D2' }}>
+            <span style={{ ...monoLabel, fontSize: 11.5, letterSpacing: '0.1em' }}>Hiring · Candidates</span>
+            <div style={{ flex: 1 }} />
+            <Link href="/employer/candidates/search" className="em-blue-btn" style={blueBtn}>
+              <span aria-hidden>⌕</span> Advanced search
+            </Link>
+          </header>
+
+          <div style={{ padding: '20px 16px 48px', maxWidth: 1080, width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
+            <div style={{ marginBottom: 22 }}>
+              <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 36, lineHeight: 1, margin: '0 0 8px' }}>Candidates</h1>
+              <p style={{ fontSize: 14.5, color: '#5A544A', margin: 0 }}>
+                {totalCandidates} candidate{totalCandidates === 1 ? '' : 's'} in your pipeline
+                {Object.keys(statusCounts).length > 0 && ' · '}
+                {Object.entries(statusCounts).map(([status, count], i, arr) => (
+                  <span key={status}>
+                    <span style={{ fontWeight: 700, color: '#1B1A16' }}>{count}</span> {status}{i < arr.length - 1 ? ' · ' : ''}
                   </span>
                 ))}
               </p>
             </div>
-            <div className="mt-4 md:mt-0 flex space-x-3">
-              <Link 
-                href="/employer/candidates/search" 
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
-              >
-                <MagnifyingGlassIcon className="-ml-1 mr-2 h-5 w-5" />
-                Advanced Search
-              </Link>
-              <button 
-                type="button" 
-                className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
-              >
-                <FunnelIcon className="-ml-1 mr-2 h-5 w-5 text-gray-500" />
-                Filter
-              </button>
-            </div>
-          </div>
 
-          {/* Main content */}
-          <div className="flex flex-col lg:flex-row gap-6">
-            {/* Sidebar filters */}
-            <div className="lg:w-64 space-y-4">
-              <div className="bg-white p-4 rounded-lg shadow">
-                <h3 className="font-medium text-gray-900 mb-3">Filter by</h3>
-                
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                    <div className="space-y-2">
-                      {['all', 'New', 'Reviewed', 'Interview', 'Hired', 'Rejected'].map((status) => (
-                        <div key={status} className="flex items-center">
-                          <input
-                            id={`status-${status}`}
-                            name="status"
-                            type="radio"
-                            className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300"
-                            checked={filters.status === status}
-                            onChange={() => setFilters({...filters, status})}
-                          />
-                          <label htmlFor={`status-${status}`} className="ml-3 text-sm text-gray-700">
-                            {status === 'all' ? 'All Statuses' : status}
-                            {status !== 'all' && statusCounts[status] && (
-                              <span className="text-gray-400 ml-1">({statusCounts[status]})</span>
-                            )}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Sort by</label>
-                    <select
-                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm rounded-md"
-                      value={filters.sort}
-                      onChange={(e) => setFilters({...filters, sort: e.target.value})}
+            {/* TOOLBAR */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 12, marginBottom: 18 }}>
+              <div style={{ position: 'relative', flex: 1, minWidth: 220, width: '100%' }}>
+                <span aria-hidden style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: '#A79E8F', fontSize: 14 }}>⌕</span>
+                <input
+                  type="text"
+                  placeholder="Search candidates, titles, skills…"
+                  value={filters.search}
+                  onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                  style={{ ...fieldInput, background: '#FFFEFB', paddingLeft: 32 }}
+                />
+              </div>
+              <div style={{ display: 'inline-flex', padding: 3, background: '#F2ECE0', border: '1px solid #E6DECF', borderRadius: 999, gap: 3, flexWrap: 'wrap' }}>
+                {STATUS_FILTERS.map((status) => {
+                  const on = filters.status === status;
+                  const label = status === 'all' ? 'All' : status;
+                  const count = status !== 'all' ? statusCounts[status] : totalCandidates;
+                  return (
+                    <button
+                      key={status}
+                      onClick={() => setFilters({ ...filters, status })}
+                      style={{ fontSize: 12, fontWeight: 600, color: on ? '#1B1A16' : '#8A8378', background: on ? '#FFFEFB' : 'transparent', border: 'none', borderRadius: 999, padding: '7px 13px', cursor: 'pointer', boxShadow: on ? '0 1px 3px rgba(27,26,22,0.12)' : 'none', fontFamily: 'inherit' }}
                     >
-                      <option value="recent">Most Recent</option>
-                      <option value="match">Best Match</option>
-                      <option value="experience">Experience</option>
-                    </select>
+                      {label}{count ? <span style={{ color: '#A79E8F', marginLeft: 4 }}>{count}</span> : null}
+                    </button>
+                  );
+                })}
+              </div>
+              <select
+                value={filters.sort}
+                onChange={(e) => setFilters({ ...filters, sort: e.target.value })}
+                style={{ ...fieldInput, width: 'auto', background: '#FFFEFB', cursor: 'pointer' }}
+              >
+                <option value="recent">Most recent</option>
+                <option value="match">Best match</option>
+                <option value="experience">Experience</option>
+              </select>
+            </div>
+
+            {/* LIST */}
+            {loading ? (
+              <LoadingState label="Loading candidates…" />
+            ) : error ? (
+              <ErrorState error={error} onRetry={load} />
+            ) : filteredCandidates.length === 0 ? (
+              <EmptyState icon="○" title="No candidates found" hint="Try adjusting your search or filters to find who you're looking for." />
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {filteredCandidates.map((candidate) => (
+                  <div key={candidate.id} className="em-card" style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 16, padding: 18, transition: 'border-color 0.15s ease' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 14 }}>
+                      <span style={{ width: 46, height: 46, flexShrink: 0, borderRadius: '50%', background: '#EDE7DA', color: '#5A544A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 15 }}>{initialsOf(candidate.name)}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 2, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 15.5, fontWeight: 700, color: '#1B1A16' }}>{candidate.name}</span>
+                          <span style={{ fontSize: 12.5, color: '#A79E8F' }}>· {candidate.experience}</span>
+                          <StatusBadge status={candidate.status} />
+                        </div>
+                        {candidate.title && <div style={{ fontSize: 13, color: '#8A8378' }}>{candidate.title}</div>}
+                        <div style={{ fontSize: 12.5, color: '#A79E8F', marginTop: 1 }}>
+                          {candidate.location ? `${candidate.location} · ` : ''}Active {candidate.lastActive}
+                        </div>
+                        {candidate.skills.length > 0 && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                            {candidate.skills.slice(0, 4).map((skill, index) => (
+                              <span key={index} style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#1F2D6B', background: '#EDF0FE', border: '1px solid #C7D2FB', padding: '3px 9px', borderRadius: 999 }}>{skill}</span>
+                            ))}
+                            {candidate.skills.length > 4 && (
+                              <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#8A8378', background: '#F2ECE0', border: '1px solid #E6DECF', padding: '3px 9px', borderRadius: 999 }}>+{candidate.skills.length - 4}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 12, flexShrink: 0 }}>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 20, fontWeight: 600, color: candidate.match >= 90 ? '#157A49' : candidate.match >= 80 ? '#4263EB' : '#8A8378' }}>{candidate.match}%</div>
+                          <div style={{ ...monoLabel, fontSize: 11, letterSpacing: '0.06em' }}>AI match</div>
+                        </div>
+                        <button onClick={() => handleViewDetails(candidate)} className="em-ghost" style={ghostBtn}>View profile</button>
+                      </div>
+                    </div>
                   </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
+
+      {/* Candidate Detail Drawer */}
+      {isDetailOpen && selectedCandidate && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', justifyContent: 'flex-end' }}>
+          <div onClick={() => setIsDetailOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(27,26,22,0.42)', backdropFilter: 'blur(2px)' }} />
+          <div style={{ position: 'relative', width: '100%', maxWidth: 520, height: '100%', background: '#F7F3EA', borderLeft: '1px solid #E7E0D2', display: 'flex', flexDirection: 'column', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16', animation: 'emslide 0.22s ease' }}>
+            {/* drawer header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 24px', background: 'rgba(247,243,234,0.9)', borderBottom: '1px solid #E7E0D2' }}>
+              <span style={{ ...monoLabel, fontSize: 11, letterSpacing: '0.1em' }}>Candidate detail</span>
+              <div style={{ flex: 1 }} />
+              <button onClick={() => setIsDetailOpen(false)} aria-label="Close" style={{ width: 30, height: 30, borderRadius: 999, background: '#FFFEFB', border: '1px solid #E1D9C9', color: '#5A544A', cursor: 'pointer', fontSize: 15, lineHeight: 1 }}>✕</button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
+                <span style={{ width: 68, height: 68, flexShrink: 0, borderRadius: '50%', background: '#EDE7DA', color: '#5A544A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 22 }}>{initialsOf(selectedCandidate.name)}</span>
+                <div>
+                  <h2 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 28, lineHeight: 1.05, margin: '0 0 4px' }}>{selectedCandidate.name}</h2>
+                  {selectedCandidate.title && <p style={{ fontSize: 14, color: '#8A8378', margin: '0 0 8px' }}>{selectedCandidate.title}</p>}
+                  <StatusBadge status={selectedCandidate.status} />
                 </div>
               </div>
-              
-              <div className="bg-white p-4 rounded-lg shadow">
-                <h3 className="font-medium text-gray-900 mb-3">Skills</h3>
-                <div className="space-y-2">
-                  {['React', 'TypeScript', 'UI/UX', 'Product Management', 'Node.js', 'Python', 'AWS', 'Agile']
-                    .map(skill => (
-                      <div key={skill} className="flex items-center">
-                        <input
-                          id={`skill-${skill}`}
-                          name={`skill-${skill}`}
-                          type="checkbox"
-                          className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
-                        />
-                        <label htmlFor={`skill-${skill}`} className="ml-3 text-sm text-gray-700">
-                          {skill}
-                        </label>
-                      </div>
-                    ))
-                  }
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 18, background: '#EDF0FE', border: '1px solid #C7D2FB', borderRadius: 14, padding: '14px 16px', marginBottom: 20 }}>
+                <div>
+                  <div style={{ ...monoLabel, fontSize: 11, color: '#7C86C6', marginBottom: 3 }}>AI match</div>
+                  <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 22, fontWeight: 600, color: '#1F2D6B' }}>{selectedCandidate.match}%</div>
                 </div>
+                <div style={{ width: 1, alignSelf: 'stretch', background: '#C7D2FB' }} />
+                <div>
+                  <div style={{ ...monoLabel, fontSize: 11, color: '#7C86C6', marginBottom: 3 }}>Experience</div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: '#1F2D6B' }}>{selectedCandidate.experience}</div>
+                </div>
+                <div style={{ width: 1, alignSelf: 'stretch', background: '#C7D2FB' }} />
+                <div>
+                  <div style={{ ...monoLabel, fontSize: 11, color: '#7C86C6', marginBottom: 3 }}>Location</div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: '#1F2D6B' }}>{selectedCandidate.location || '—'}</div>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ ...monoLabel, display: 'block', marginBottom: 10 }}>Skills &amp; expertise</label>
+                {selectedCandidate.skills.length === 0 ? (
+                  <span style={{ fontSize: 13, color: '#A79E8F' }}>No skills listed.</span>
+                ) : (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+                    {selectedCandidate.skills.map((skill, index) => (
+                      <span key={index} style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, color: '#1F2D6B', background: '#EDF0FE', border: '1px solid #C7D2FB', padding: '4px 11px', borderRadius: 999 }}>{skill}</span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
-            
-            {/* Candidate list */}
-            <div className="flex-1">
-              <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-                <div className="px-4 py-3 border-b border-gray-200 sm:px-6">
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <input
-                      type="text"
-                      className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
-                      placeholder="Search candidates..."
-                      value={filters.search}
-                      onChange={(e) => setFilters({...filters, search: e.target.value})}
-                    />
-                  </div>
-                </div>
 
-                <ul className="divide-y divide-gray-200">
-                  {filteredCandidates.length > 0 ? (
-                    filteredCandidates.map((candidate) => (
-                      <li key={candidate.id} className="hover:bg-gray-50 transition-colors duration-150">
-                        <div className="px-4 py-4 sm:px-6">
-                          <div className="flex items-start">
-                            <div className="flex-shrink-0 relative">
-                              <div className="h-14 w-14 rounded-full bg-gray-200 overflow-hidden">
-                                <Image 
-                                  src={candidate.avatar} 
-                                  alt={candidate.name}
-                                  width={56}
-                                  height={56}
-                                  className="h-full w-full object-cover"
-                                  onError={(e) => {
-                                    e.target.onerror = null;
-                                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(candidate.name)}&background=random&color=fff&size=128`;
-                                  }}
-                                />
-                              </div>
-                              <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5">
-                                <div className="h-5 w-5 rounded-full bg-green-500 flex items-center justify-center">
-                                  <div className="h-2 w-2 rounded-full bg-white"></div>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div className="ml-4 flex-1 min-w-0">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <h3 className="text-base font-medium text-gray-900">
-                                    {candidate.name}
-                                    <span className="ml-2 text-sm font-normal text-gray-500">
-                                      • {candidate.experience}
-                                    </span>
-                                  </h3>
-                                  <p className="text-sm text-gray-500">{candidate.title}</p>
-                                </div>
-                                <div className="flex items-center">
-                                  <div className="flex items-center mr-4">
-                                    <SolidStarIcon className="h-4 w-4 text-yellow-400" />
-                                    <span className="ml-1 text-sm font-medium text-gray-700">
-                                      {candidate.match}%
-                                    </span>
-                                  </div>
-                                  <StatusBadge status={candidate.status} />
-                                </div>
-                              </div>
-                              
-                              <div className="mt-2 flex items-center text-sm text-gray-500">
-                                <MapPinIcon className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" />
-                                {candidate.location}
-                                <span className="mx-2">•</span>
-                                <span>Active {candidate.lastActive}</span>
-                              </div>
-                              
-                              <div className="mt-2 flex flex-wrap gap-1.5">
-                                {candidate.skills.slice(0, 3).map((skill, index) => (
-                                  <span 
-                                    key={index} 
-                                    className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700"
-                                  >
-                                    {skill}
-                                  </span>
-                                ))}
-                                {candidate.skills.length > 3 && (
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-                                    +{candidate.skills.length - 3} more
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            
-                            <div className="ml-4 flex flex-col space-y-2">
-                              <button 
-                                onClick={() => handleViewDetails(candidate)}
-                                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
-                              >
-                                View Profile
-                              </button>
-                              <button className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500">
-                                <ChatBubbleLeftIcon className="-ml-0.5 mr-1.5 h-4 w-4" />
-                                Message
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </li>
-                    ))
-                  ) : (
-                    <li className="py-12 text-center">
-                      <UserIcon className="mx-auto h-12 w-12 text-gray-400" />
-                      <h3 className="mt-2 text-sm font-medium text-gray-900">No candidates found</h3>
-                      <p className="mt-1 text-sm text-gray-500">
-                        Try adjusting your search or filter to find what you're looking for.
-                      </p>
-                    </li>
-                  )}
-                </ul>
+            <div style={{ flexShrink: 0, borderTop: '1px solid #E7E0D2', padding: '16px 24px', background: '#FBF8F1' }}>
+              {scheduleError && <InlineError error={scheduleError} />}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 9 }}>
+                <button onClick={() => setIsDetailOpen(false)} className="em-ghost" style={ghostBtn}>Close</button>
+                <button onClick={scheduleInterview} disabled={scheduling} className="em-blue-btn" style={{ ...blueBtn, opacity: scheduling ? 0.6 : 1, cursor: scheduling ? 'wait' : 'pointer' }}>{scheduling ? 'Scheduling…' : 'Schedule interview'}</button>
               </div>
             </div>
           </div>
-          
-          {/* Candidate Detail Panel */}
-          {isDetailOpen && selectedCandidate && (
-            <div className="fixed inset-0 overflow-hidden z-50">
-              <div className="absolute inset-0 overflow-hidden">
-                <div 
-                  className="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
-                  onClick={() => setIsDetailOpen(false)}
-                ></div>
-                <div className="fixed inset-y-0 right-0 pl-10 max-w-full flex">
-                  <div className="w-screen max-w-2xl">
-                    <div className="h-full flex flex-col bg-white shadow-xl overflow-y-scroll">
-                      <div className="py-6 px-4 sm:px-6 bg-gray-50 border-b border-gray-200">
-                        <div className="flex items-start justify-between">
-                          <h2 className="text-lg font-medium text-gray-900">Candidate Details</h2>
-                          <div className="ml-3 h-7 flex items-center">
-                            <button
-                              type="button"
-                              className="bg-white rounded-md text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                              onClick={() => setIsDetailOpen(false)}
-                            >
-                              <span className="sr-only">Close panel</span>
-                              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="flex-1 overflow-y-auto p-6">
-                        <div className="space-y-6">
-                          <div className="flex items-center space-x-6">
-                            <div className="flex-shrink-0">
-                              <div className="h-24 w-24 rounded-full bg-gray-200 overflow-hidden">
-                                <Image 
-                                  src={selectedCandidate.avatar} 
-                                  alt={selectedCandidate.name}
-                                  width={96}
-                                  height={96}
-                                  className="h-full w-full object-cover"
-                                  onError={(e) => {
-                                    e.target.onerror = null;
-                                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedCandidate.name)}&background=random&color=fff&size=128`;
-                                  }}
-                                />
-                              </div>
-                            </div>
-                            <div>
-                              <h3 className="text-2xl font-bold text-gray-900">{selectedCandidate.name}</h3>
-                              <p className="text-lg text-gray-600">{selectedCandidate.title}</p>
-                              <div className="mt-2 flex items-center text-sm text-gray-500">
-                                <MapPinIcon className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" />
-                                {selectedCandidate.location}
-                                <span className="mx-2">•</span>
-                                <span>Active {selectedCandidate.lastActive}</span>
-                              </div>
-                              <div className="mt-2">
-                                <StatusBadge status={selectedCandidate.status} />
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div className="bg-orange-50 p-4 rounded-lg">
-                            <div className="flex items-center">
-                              <SolidStarIcon className="h-5 w-5 text-yellow-400" />
-                              <span className="ml-2 text-sm font-medium text-gray-700">
-                                {selectedCandidate.match}% Match
-                              </span>
-                              <span className="mx-2 text-gray-400">•</span>
-                              <span className="text-sm text-gray-600">
-                                {selectedCandidate.experience} experience
-                              </span>
-                            </div>
-                          </div>
-                          
-                          <div>
-                            <h4 className="text-lg font-medium text-gray-900 mb-3">Skills & Expertise</h4>
-                            <div className="flex flex-wrap gap-2">
-                              {selectedCandidate.skills.map((skill, index) => (
-                                <span 
-                                  key={index} 
-                                  className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-50 text-blue-700"
-                                >
-                                  {skill}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                          
-                          <div>
-                            <h4 className="text-lg font-medium text-gray-900 mb-3">About</h4>
-                            <p className="text-gray-600">
-                              Experienced {selectedCandidate.title.toLowerCase()} with a passion for creating exceptional user experiences. 
-                              Strong background in {selectedCandidate.skills[0].toLowerCase()} and {selectedCandidate.skills[1].toLowerCase()}.
-                            </p>
-                          </div>
-                          
-                          <div>
-                            <h4 className="text-lg font-medium text-gray-900 mb-3">Experience</h4>
-                            <div className="space-y-4">
-                              <div className="border-l-4 border-orange-500 pl-4 py-1">
-                                <h5 className="font-medium text-gray-900">Senior {selectedCandidate.title.split(' ').slice(1).join(' ')}</h5>
-                                <p className="text-sm text-gray-600">Tech Company Inc. • {selectedCandidate.experience}</p>
-                              </div>
-                              <div className="border-l-4 border-gray-200 pl-4 py-1">
-                                <h5 className="font-medium text-gray-700">{selectedCandidate.title.split(' ')[0]} {selectedCandidate.title.split(' ').slice(1).join(' ')}</h5>
-                                <p className="text-sm text-gray-500">Startup Co. • 2 years</p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="flex-shrink-0 border-t border-gray-200 px-4 py-5 sm:px-6">
-                        <div className="flex justify-end space-x-3">
-                          <button
-                            type="button"
-                            className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
-                            onClick={() => setIsDetailOpen(false)}
-                          >
-                            Close
-                          </button>
-                          <button
-                            type="button"
-                            className="inline-flex justify-center rounded-md border border-transparent bg-orange-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
-                          >
-                            Schedule Interview
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
-      </div>
-    </EmployerLayout>
+      )}
+    </>
   );
 }

@@ -6,14 +6,7 @@ import Link from 'next/link';
 import AppSidebar from '@/components/app/AppSidebar';
 import { appRoute } from '@/components/app/appRoutes';
 import { changePassword } from '@/services/securityApi';
-
-// Design sample data ported from the DCLogic Component state.
-const SAMPLE_SESSIONS = [
-  { id: 's1', device: 'MacBook Pro', location: 'San Francisco, CA', when: 'Active now', glyph: '▣', current: true },
-  { id: 's2', device: 'iPhone 15 Pro', location: 'San Francisco, CA', when: '2 hours ago', glyph: '▢', current: false },
-  { id: 's3', device: 'Chrome · Windows', location: 'New York, NY', when: 'Yesterday', glyph: '◰', current: false },
-  { id: 's4', device: 'Firefox · Linux', location: 'Remote', when: '3 days ago', glyph: '◰', current: false },
-];
+import { EmptyState } from '@/components/app/AppStates';
 
 const inputStyle = {
   width: '100%',
@@ -47,12 +40,12 @@ export default function AppSecurity() {
   // --- Two-factor ---
   const [twofa, setTwofa] = useState(false);
 
-  // --- Connected accounts ---
-  const [google, setGoogle] = useState(true);
+  // --- Connected accounts (no fabricated "connected" state) ---
+  const [google, setGoogle] = useState(false);
   const [linkedin, setLinkedin] = useState(false);
 
-  // --- Sessions ---
-  const [sessions, setSessions] = useState(SAMPLE_SESSIONS);
+  // --- Sessions (no session endpoint yet → genuine empty state) ---
+  const [sessions, setSessions] = useState([]);
 
   // --- Data & privacy ---
   const [exported, setExported] = useState(false);
@@ -134,12 +127,6 @@ export default function AppSecurity() {
     <>
       <Head>
         <title>Security &amp; data — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
       <style jsx global>{`
@@ -170,7 +157,7 @@ export default function AppSecurity() {
         }
       `}</style>
 
-      <div id="jbapp" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: "'Hanken Grotesk',sans-serif", color: '#1B1A16' }}>
+      <div id="jbapp" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16' }}>
         <AppSidebar active="settings" />
 
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
@@ -178,11 +165,11 @@ export default function AppSecurity() {
           <header style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: 18, padding: '15px 32px', background: 'rgba(247,243,234,0.85)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #E7E0D2' }}>
             <Link href={appRoute('App Settings.dc.html')} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13.5, fontWeight: 600, color: '#5A544A', textDecoration: 'none' }}>← Back to settings</Link>
             <div style={{ flex: 1 }} />
-            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, color: '#9A9286' }}>Security &amp; data</span>
+            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, color: '#9A9286' }}>Security &amp; data</span>
           </header>
 
           <div style={{ padding: '30px 32px 64px', maxWidth: 720, width: '100%', margin: '0 auto' }}>
-            <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 38, lineHeight: 1, margin: '0 0 24px' }}>Security &amp; data</h1>
+            <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 38, lineHeight: 1, margin: '0 0 24px' }}>Security &amp; data</h1>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {/* CHANGE PASSWORD */}
@@ -242,9 +229,9 @@ export default function AppSecurity() {
                     <div style={{ flex: 1, minWidth: 200 }}>
                       <div style={{ fontSize: 13.5, fontWeight: 600, color: '#1B1A16', marginBottom: 6 }}>Scan with your authenticator app</div>
                       <p style={{ fontSize: 12.5, color: '#8A8378', margin: '0 0 12px' }}>Or enter this key manually:</p>
-                      <div style={{ display: 'inline-block', fontFamily: "'JetBrains Mono',monospace", fontSize: 13, letterSpacing: '0.08em', color: '#1B1A16', background: '#FBF8F1', border: '1px solid #E1D9C9', borderRadius: 8, padding: '7px 12px', marginBottom: 14 }}>JBSW Y3DP EHPK 3PXP</div>
+                      <div style={{ display: 'inline-block', fontFamily: 'var(--jb-font-mono)', fontSize: 13, letterSpacing: '0.08em', color: '#1B1A16', background: '#FBF8F1', border: '1px solid #E1D9C9', borderRadius: 8, padding: '7px 12px', marginBottom: 14 }}>JBSW Y3DP EHPK 3PXP</div>
                       <div style={{ display: 'flex', gap: 9 }}>
-                        <input placeholder="6-digit code" inputMode="numeric" style={{ width: 130, fontFamily: "'JetBrains Mono',monospace", fontSize: 14, color: '#1B1A16', background: '#FBF8F1', border: '1px solid #E1D9C9', borderRadius: 10, padding: '9px 12px' }} />
+                        <input placeholder="6-digit code" inputMode="numeric" style={{ width: 130, fontFamily: 'var(--jb-font-mono)', fontSize: 14, color: '#1B1A16', background: '#FBF8F1', border: '1px solid #E1D9C9', borderRadius: 10, padding: '9px 12px' }} />
                         <button style={{ fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: '#0C2C1C', background: '#1FA463', border: 'none', borderRadius: 999, padding: '9px 16px', cursor: 'pointer' }}>Verify</button>
                       </div>
                     </div>
@@ -258,7 +245,7 @@ export default function AppSecurity() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {providers.map((p) => (
                     <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                      <span style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 10, background: p.iconBg, color: p.iconColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, fontSize: 13 }}>{p.glyph}</span>
+                      <span style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 10, background: p.iconBg, color: p.iconColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--jb-font-mono)', fontWeight: 600, fontSize: 13 }}>{p.glyph}</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 14.5, fontWeight: 600, color: '#1B1A16' }}>{p.name}</div>
                         <div style={{ fontSize: 12.5, color: p.statusColor }}>{p.status}</div>
@@ -278,14 +265,21 @@ export default function AppSecurity() {
                   )}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {sessionRows.map((s) => (
+                  {sessionRows.length === 0 ? (
+                    <EmptyState
+                      icon="🖥️"
+                      title="No active sessions to show"
+                      hint="Devices signed in to your account will appear here."
+                    />
+                  ) : (
+                    sessionRows.map((s) => (
                     <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 0', borderBottom: `1px solid ${s.divider}` }}>
                       <span style={{ width: 36, height: 36, flexShrink: 0, borderRadius: 9, background: '#F4EFE4', color: '#5A544A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15 }}>{s.glyph}</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ fontSize: 14, fontWeight: 600, color: '#1B1A16' }}>{s.device}</span>
                           {s.current && (
-                            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9, fontWeight: 600, color: '#157A49', background: '#EAF6EE', border: '1px solid #CDE9D6', padding: '2px 7px', borderRadius: 999 }}>THIS DEVICE</span>
+                            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, color: '#157A49', background: '#EAF6EE', border: '1px solid #CDE9D6', padding: '2px 7px', borderRadius: 999 }}>THIS DEVICE</span>
                           )}
                         </div>
                         <div style={{ fontSize: 12.5, color: '#8A8378', marginTop: 2 }}>{s.location} · {s.when}</div>
@@ -294,7 +288,8 @@ export default function AppSecurity() {
                         <button onClick={s.signOut} style={{ flexShrink: 0, fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: '#5A544A', background: '#FFFEFB', border: '1px solid #D9D0BE', borderRadius: 999, padding: '7px 14px', cursor: 'pointer' }}>Sign out</button>
                       )}
                     </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
 
@@ -312,14 +307,14 @@ export default function AppSecurity() {
                 <div style={{ marginTop: 22, padding: 20, background: '#FBEDE4', border: '1px solid #EAD0C4', borderRadius: 14 }}>
                   <div style={{ fontSize: 14.5, fontWeight: 700, color: '#7A4326', marginBottom: 5 }}>Delete account</div>
                   <p style={{ fontSize: 13, lineHeight: 1.55, color: '#8A5A3C', margin: '0 0 14px' }}>
-                    This permanently removes your profile, résumés, applications and history. This can&rsquo;t be undone. Type <b style={{ fontFamily: "'JetBrains Mono',monospace" }}>DELETE</b> to confirm.
+                    This permanently removes your profile, résumés, applications and history. This can&rsquo;t be undone. Type <b style={{ fontFamily: 'var(--jb-font-mono)' }}>DELETE</b> to confirm.
                   </p>
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                     <input
                       value={deleteText}
                       onChange={(e) => setDeleteText(e.target.value)}
                       placeholder="DELETE"
-                      style={{ width: 160, fontFamily: "'JetBrains Mono',monospace", fontSize: 14, color: '#1B1A16', background: '#FFFEFB', border: '1px solid #EAD0C4', borderRadius: 10, padding: '10px 13px' }}
+                      style={{ width: 160, fontFamily: 'var(--jb-font-mono)', fontSize: 14, color: '#1B1A16', background: '#FFFEFB', border: '1px solid #EAD0C4', borderRadius: 10, padding: '10px 13px' }}
                     />
                     <button
                       disabled={!canDelete}

@@ -2,8 +2,7 @@
 
 import Head from 'next/head';
 import Link from 'next/link';
-import SiteNav from '@/components/site/SiteNav';
-import SiteFooter from '@/components/site/SiteFooter';
+import PublicLayout from '@/components/layout/PublicLayout';
 import { appRoute } from '@/components/app/appRoutes';
 
 const BLOCKS = [
@@ -33,9 +32,9 @@ const BLOCKS = [
 ];
 
 const RELATED = [
-  { cat: 'RÉSUMÉS', catColor: '#9A6A2E', title: '7 résumé lines that get auto-rejected by ATS', readTime: '6 min', imgBg: '#FBF1E2' },
-  { cat: 'INTERVIEWS', catColor: '#4263EB', title: 'Answer “tell me about yourself” in 90 seconds', readTime: '5 min', imgBg: '#EDF0FE' },
-  { cat: 'STRATEGY', catColor: '#157A49', title: 'The hidden job market is mostly a myth', readTime: '8 min', imgBg: '#F4EFE4' },
+  { cat: 'RÉSUMÉS', catColor: 'var(--jb-d-amber)', title: '7 résumé lines that get auto-rejected by ATS', readTime: '6 min', imgBg: '#FBF1E2' },
+  { cat: 'INTERVIEWS', catColor: '#7cc4ff', title: 'Answer “tell me about yourself” in 90 seconds', readTime: '5 min', imgBg: 'rgba(124,196,255,0.12)' },
+  { cat: 'STRATEGY', catColor: 'var(--jb-d-accent)', title: 'The hidden job market is mostly a myth', readTime: '8 min', imgBg: 'transparent' },
 ];
 
 export default function BlogPost() {
@@ -43,12 +42,6 @@ export default function BlogPost() {
     <>
       <Head>
         <title>The 31% rule: why onboarding is your résumé’s best story — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
       <style jsx global>{`
@@ -59,38 +52,36 @@ export default function BlogPost() {
           box-sizing: border-box;
         }
         #emkt ::selection {
-          background: #1fa463;
+          background: var(--jb-d-accent);
           color: #f7f3ea;
         }
         #emkt .related-card:hover {
-          border-color: #1fa463 !important;
+          border-color: var(--jb-d-accent) !important;
         }
         #emkt .cta-btn:hover {
           background: #1b9159 !important;
         }
       `}</style>
 
-      <div id="emkt" style={{ fontFamily: "'Hanken Grotesk',sans-serif", color: '#1B1A16', background: '#F7F3EA' }}>
-        <div style={{ position: 'sticky', top: 0, zIndex: 50, display: 'block' }}>
-          <SiteNav />
-        </div>
+      <div id="emkt" style={{ fontFamily: 'var(--jb-font-sans)', color: 'var(--jb-d-ink)', background: 'transparent' }}>
+        <PublicLayout>
 
         {/* ARTICLE HEADER */}
         <article style={{ maxWidth: 720, margin: '0 auto', padding: '48px 32px 0' }}>
-          <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, color: '#9A9286', marginBottom: 18 }}>
-            <Link href={appRoute('Blog.dc.html')} style={{ color: '#9A9286', textDecoration: 'none' }}>Blog</Link>
+          <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, color: 'var(--jb-d-ink-55)', marginBottom: 18 }}>
+            <Link href={appRoute('Blog.dc.html')} style={{ color: 'var(--jb-d-ink-55)', textDecoration: 'none' }}>Blog</Link>
             {' / '}
-            <span style={{ color: '#157A49' }}>Strategy</span>
+            <span style={{ color: 'var(--jb-d-accent)' }}>Strategy</span>
           </div>
           <span
             style={{
               display: 'inline-block',
-              fontFamily: "'JetBrains Mono',monospace",
-              fontSize: 9.5,
+              fontFamily: 'var(--jb-font-mono)',
+              fontSize: 11,
               fontWeight: 600,
               letterSpacing: '0.04em',
-              color: '#157A49',
-              background: '#EAF6EE',
+              color: 'var(--jb-d-accent)',
+              background: 'var(--jb-d-accent-tint)',
               border: '1px solid #CDE9D6',
               padding: '3px 9px',
               borderRadius: 999,
@@ -99,18 +90,18 @@ export default function BlogPost() {
           >
             STRATEGY
           </span>
-          <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 46, lineHeight: 1.08, letterSpacing: '-0.01em', margin: '0 0 18px' }}>
+          <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 'clamp(26px, 5vw, 46px)', lineHeight: 1.08, letterSpacing: '-0.01em', margin: '0 0 18px' }}>
             The 31% rule: why onboarding is your résumé’s best story.
           </h1>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 28, borderBottom: '1px solid #E7E0D2' }}>
-            <span style={{ width: 42, height: 42, borderRadius: '50%', background: '#1FA463', color: '#0C2C1C', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13 }}>MB</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 28, borderBottom: '1px solid var(--jb-d-line-card)' }}>
+            <span style={{ width: 42, height: 42, borderRadius: '50%', background: 'var(--jb-d-accent)', color: 'var(--jb-d-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13 }}>MB</span>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 14, fontWeight: 700 }}>Marcus Bell</div>
-              <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, color: '#A79E8F' }}>Career coach · 8 min read · Jun 24, 2026</div>
+              <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, color: 'var(--jb-d-ink-55)' }}>Career coach · 8 min read · Jun 24, 2026</div>
             </div>
             <div style={{ display: 'flex', gap: 7 }}>
-              <span style={{ width: 32, height: 32, border: '1px solid #E1D9C9', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#8A8378', fontWeight: 600 }}>X</span>
-              <span style={{ width: 32, height: 32, border: '1px solid #E1D9C9', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#8A8378', fontWeight: 600 }}>in</span>
+              <span style={{ width: 32, height: 32, border: '1px solid var(--jb-d-line-card)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--jb-d-ink-65)', fontWeight: 600 }}>X</span>
+              <span style={{ width: 32, height: 32, border: '1px solid var(--jb-d-line-card)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--jb-d-ink-65)', fontWeight: 600 }}>in</span>
             </div>
           </div>
         </article>
@@ -119,8 +110,8 @@ export default function BlogPost() {
         <div style={{ maxWidth: 860, margin: '28px auto 0', padding: '0 32px' }}>
           <div
             style={{
-              background: 'repeating-linear-gradient(135deg, #EDF0FE, #EDF0FE 18px, #E4EAFD 18px, #E4EAFD 36px)',
-              border: '1px solid #E6DECF',
+              background: 'repeating-linear-gradient(135deg, rgba(124,196,255,0.12), rgba(124,196,255,0.12) 18px, #E4EAFD 18px, #E4EAFD 36px)',
+              border: '1px solid var(--jb-d-line-card)',
               borderRadius: 18,
               height: 340,
               display: 'flex',
@@ -128,7 +119,7 @@ export default function BlogPost() {
               justifyContent: 'center',
             }}
           >
-            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#8DA2F5' }}>hero image</span>
+            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#7cc4ff' }}>hero image</span>
           </div>
         </div>
 
@@ -137,14 +128,14 @@ export default function BlogPost() {
           {BLOCKS.map((b, i) => {
             if (b.isH) {
               return (
-                <h2 key={i} style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 28, lineHeight: 1.15, margin: '34px 0 12px' }}>
+                <h2 key={i} style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 28, lineHeight: 1.15, margin: '34px 0 12px' }}>
                   {b.text}
                 </h2>
               );
             }
             if (b.isQuote) {
               return (
-                <blockquote key={i} style={{ margin: '24px 0', padding: '4px 0 4px 22px', borderLeft: '3px solid #1FA463', fontFamily: "'Instrument Serif',serif", fontSize: 24, lineHeight: 1.35, color: '#1B1A16' }}>
+                <blockquote key={i} style={{ margin: '24px 0', padding: '4px 0 4px 22px', borderLeft: '3px solid var(--jb-d-accent)', fontFamily: 'var(--jb-font-display)', fontSize: 24, lineHeight: 1.35, color: 'var(--jb-d-ink)' }}>
                   {b.text}
                 </blockquote>
               );
@@ -157,7 +148,7 @@ export default function BlogPost() {
           })}
 
           {/* INLINE CTA */}
-          <div style={{ background: '#EAF6EE', border: '1px solid #CDE9D6', borderRadius: 16, padding: 24, margin: '32px 0', display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
+          <div style={{ background: 'var(--jb-d-accent-tint)', border: '1px solid #CDE9D6', borderRadius: 16, padding: 24, margin: '32px 0', display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 220 }}>
               <div style={{ fontSize: 16, fontWeight: 700, color: '#1F4733', marginBottom: 4 }}>Let your résumé write itself.</div>
               <div style={{ fontSize: 13.5, color: '#3F6B52' }}>Jobocate turns your experience into metric-driven bullets in seconds.</div>
@@ -165,22 +156,29 @@ export default function BlogPost() {
             <Link
               href={appRoute('App Sign Up.dc.html')}
               className="cta-btn"
-              style={{ flexShrink: 0, background: '#1FA463', color: '#0C2C1C', fontSize: 14.5, fontWeight: 700, padding: '12px 22px', borderRadius: 999, textDecoration: 'none' }}
+              style={{ flexShrink: 0, background: 'var(--jb-d-accent)', color: 'var(--jb-d-bg)', fontSize: 14.5, fontWeight: 700, padding: '12px 22px', borderRadius: 999, textDecoration: 'none' }}
             >
               Try it free →
             </Link>
           </div>
         </article>
 
-        {/* AUTHOR BIO */}
+        {/*
+          AUTHOR BIO — was "Marcus Bell, Career coach at Jobocate", who "has
+          coached 2,000+ job seekers into roles at top companies". No such
+          person and no such number. Bylines across the blog now read "Jobocate
+          team"; restore a personal bio only for a real, named author.
+        */}
         <div style={{ maxWidth: 680, margin: '24px auto 0', padding: '0 32px' }}>
-          <div style={{ display: 'flex', gap: 16, background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18, padding: 24 }}>
-            <span style={{ width: 54, height: 54, flexShrink: 0, borderRadius: '50%', background: '#1FA463', color: '#0C2C1C', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 16 }}>MB</span>
+          <div style={{ display: 'flex', gap: 16, background: 'var(--jb-d-panel)', border: '1px solid var(--jb-d-line-card)', borderRadius: 18, padding: 24 }}>
+            <span style={{ width: 54, height: 54, flexShrink: 0, borderRadius: '50%', background: 'var(--jb-d-accent)', color: 'var(--jb-d-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 16 }}>JB</span>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 3 }}>Marcus Bell</div>
-              <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#A79E8F', marginBottom: 9 }}>Career coach at Jobocate</div>
-              <p style={{ fontSize: 13.5, lineHeight: 1.6, color: '#5A544A', margin: 0 }}>
-                Marcus has coached 2,000+ job seekers into roles at top companies. He leads concierge coaching at Jobocate and writes about the search nobody teaches you.
+              <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 3 }}>Jobocate team</div>
+              <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: 'var(--jb-d-ink-55)', marginBottom: 9 }}>Written by the people building the product</div>
+              <p style={{ fontSize: 13.5, lineHeight: 1.6, color: 'var(--jb-d-ink-70)', margin: 0 }}>
+                We write about the parts of the job search nobody teaches you — what
+                actually gets read, what gets filtered, and how to keep control of
+                the process.
               </p>
             </div>
           </div>
@@ -188,20 +186,20 @@ export default function BlogPost() {
 
         {/* RELATED */}
         <section style={{ maxWidth: 1000, margin: '0 auto', padding: '48px 32px 24px' }}>
-          <h2 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 26, lineHeight: 1.1, margin: '0 0 18px' }}>Keep reading</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
+          <h2 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 26, lineHeight: 1.1, margin: '0 0 18px' }}>Keep reading</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', gap: 16 }}>
             {RELATED.map((r, i) => (
               <Link
                 key={i}
                 href={appRoute('Blog Post.dc.html')}
                 className="related-card"
-                style={{ display: 'flex', flexDirection: 'column', background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 16, overflow: 'hidden', textDecoration: 'none' }}
+                style={{ display: 'flex', flexDirection: 'column', background: 'var(--jb-d-panel)', border: '1px solid var(--jb-d-line-card)', borderRadius: 16, overflow: 'hidden', textDecoration: 'none' }}
               >
                 <div style={{ background: r.imgBg, height: 120 }} />
                 <div style={{ padding: 16 }}>
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9, fontWeight: 600, letterSpacing: '0.04em', color: r.catColor }}>{r.cat}</span>
-                  <h3 style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.25, margin: '7px 0 0', color: '#1B1A16' }}>{r.title}</h3>
-                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, color: '#A79E8F', marginTop: 9 }}>{r.readTime}</div>
+                  <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', color: r.catColor }}>{r.cat}</span>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.25, margin: '7px 0 0', color: 'var(--jb-d-ink)' }}>{r.title}</h3>
+                  <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: 'var(--jb-d-ink-55)', marginTop: 9 }}>{r.readTime}</div>
                 </div>
               </Link>
             ))}
@@ -210,16 +208,16 @@ export default function BlogPost() {
 
         {/* NEWSLETTER */}
         <section style={{ maxWidth: 1000, margin: '0 auto', padding: '20px 32px 72px' }}>
-          <div style={{ background: '#15140F', borderRadius: 24, padding: 44, textAlign: 'center' }}>
-            <h2 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 30, lineHeight: 1.08, color: '#FBF8F1', margin: '0 0 10px' }}>Get the next one in your inbox.</h2>
-            <p style={{ fontSize: 14.5, color: '#B8B1A4', margin: '0 auto 22px', maxWidth: 400 }}>One practical job-search email a week.</p>
+          <div style={{ background: 'var(--jb-d-footer)', borderRadius: 24, padding: 44, textAlign: 'center' }}>
+            <h2 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 30, lineHeight: 1.08, color: '#FBF8F1', margin: '0 0 10px' }}>Get the next one in your inbox.</h2>
+            <p style={{ fontSize: 14.5, color: 'var(--jb-d-ink-65)', margin: '0 auto 22px', maxWidth: 400 }}>One practical job-search email a week.</p>
             <div style={{ display: 'flex', gap: 10, maxWidth: 400, margin: '0 auto' }}>
               <input
                 placeholder="you@email.com"
                 style={{ flex: 1, minWidth: 0, background: '#0E0D09', border: '1px solid #2C2A22', borderRadius: 999, padding: '13px 18px', color: '#F2EDE2', fontFamily: 'inherit', fontSize: 14 }}
               />
               <button
-                style={{ background: '#1FA463', color: '#0C2C1C', border: 'none', borderRadius: 999, padding: '0 24px', fontFamily: 'inherit', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
+                style={{ background: 'var(--jb-d-accent)', color: 'var(--jb-d-bg)', border: 'none', borderRadius: 999, padding: '0 24px', fontFamily: 'inherit', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
               >
                 Join
               </button>
@@ -227,7 +225,7 @@ export default function BlogPost() {
           </div>
         </section>
 
-        <SiteFooter />
+        </PublicLayout>
       </div>
     </>
   );

@@ -65,3 +65,15 @@ export const getJobRecommendations = async (minScore) => {
   const qs = params.toString();
   return apiCall(`/api/matching/recommendations${qs ? `?${qs}` : ''}`);
 };
+
+// GET /api/matching/eligible-jobs -> geographically/legally eligible jobs (Stage 1)
+export const getEligibleJobs = async ({ keywords = '', limit = 40 } = {}) => {
+  const params = new URLSearchParams();
+  if (keywords) params.append('keywords', keywords);
+  if (limit) params.append('limit', limit);
+  const qs = params.toString();
+  return apiCall(`/api/matching/eligible-jobs${qs ? `?${qs}` : ''}`);
+};
+
+// GET /api/matching/preview -> real counts of how current preferences shape matching
+export const getMatchPreview = async () => apiCall('/api/matching/preview');

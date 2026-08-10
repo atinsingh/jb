@@ -1,37 +1,50 @@
 import Head from 'next/head';
 import Link from 'next/link';
-import { Navbar } from '@/components/navbar';
-import { Footer } from '@/components/footer';
+import PublicLayout from '@/components/layout/PublicLayout';
 import { motion } from 'framer-motion';
 
 export default function Sitemap() {
   const sitemapSections = [
+    // Every href below resolves to a real file under src/pages. The previous
+    // list advertised /#features, /#how-it-works, /help and the retired
+    // /candidate/* tree — a sitemap of dead links is worse than no sitemap.
     {
       title: 'Main Pages',
       links: [
         { name: 'Home', href: '/' },
+        { name: 'Find Jobs', href: '/jobs' },
+        { name: 'For Employers', href: '/employers' },
+        { name: 'Pricing', href: '/pricing' },
         { name: 'About Us', href: '/about' },
         { name: 'Contact', href: '/contact' },
-        { name: 'Pricing', href: '/pricing' },
-        { name: 'Blog', href: '/blogs' },
       ]
     },
     {
       title: 'Product Features',
       links: [
-        { name: 'Resume Builder', href: '/candidate/resume-builder' },
-        { name: 'Job Matching', href: '/#features' },
-        { name: 'Auto-Apply', href: '/#features' },
-        { name: 'Application Tracker', href: '/candidate/applications' },
-        { name: 'Cover Letter Generator', href: '/candidate/cover-letters' },
+        { name: 'Job Matching', href: '/features/job-matching' },
+        { name: 'Auto-Apply', href: '/features/auto-apply' },
+        { name: 'Resume Builder', href: '/features/resume-builder' },
+        { name: 'Cover Letters', href: '/features/cover-letters' },
+        { name: 'Interview Prep', href: '/features/interview-prep' },
+      ]
+    },
+    {
+      title: 'Resources',
+      links: [
+        { name: 'Blog', href: '/blog' },
+        { name: 'Customer Stories', href: '/customers' },
+        { name: 'Book a Demo', href: '/demo' },
+        { name: 'Enterprise', href: '/enterprise' },
+        { name: 'Security', href: '/security' },
       ]
     },
     {
       title: 'Account',
       links: [
-        { name: 'Log In', href: '/login' },
-        { name: 'Sign Up', href: '/signup' },
-        { name: 'Candidate Dashboard', href: '/candidate/dashboard' },
+        { name: 'Log In', href: '/app/login' },
+        { name: 'Sign Up', href: '/app/signup' },
+        { name: 'Candidate Dashboard', href: '/app/dashboard' },
         { name: 'Employer Dashboard', href: '/employer/dashboard' },
       ]
     },
@@ -42,7 +55,6 @@ export default function Sitemap() {
         { name: 'Terms of Service', href: '/terms' },
         { name: 'Cookie Policy', href: '/cookies' },
         { name: 'GDPR Compliance', href: '/gdpr' },
-        { name: 'Help Center', href: '/help' },
       ]
     },
   ];
@@ -54,11 +66,9 @@ export default function Sitemap() {
         <meta name="description" content="Navigate all pages and features of Jobocate's AI-powered job search platform." />
       </Head>
 
-      <Navbar />
-
-      <main>
+      <PublicLayout>
         {/* Hero Section */}
-        <section className="relative pt-32 pb-16 overflow-hidden bg-gradient-to-b from-primary-50/50 via-white to-white">
+        <section className="relative pt-16 pb-16 overflow-hidden bg-gradient-to-b from-primary-50/50 via-white to-white">
           <div className="absolute inset-0 pointer-events-none">
             <div className="absolute top-20 left-1/4 w-[500px] h-[500px] bg-primary-100/40 rounded-full blur-[100px]" />
             <div className="dot-pattern absolute inset-0 opacity-30" />
@@ -136,9 +146,7 @@ export default function Sitemap() {
             </motion.div>
           </div>
         </section>
-      </main>
-
-      <Footer />
+      </PublicLayout>
     </div>
   );
 }

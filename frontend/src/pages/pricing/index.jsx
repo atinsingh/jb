@@ -3,562 +3,404 @@
 import { useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import SiteNav from '@/components/site/SiteNav';
-import SiteFooter from '@/components/site/SiteFooter';
+import PublicLayout from '@/components/layout/PublicLayout';
 import { appRoute } from '@/components/app/appRoutes';
 
-const FAQ_DATA = [
+/**
+ * Pricing — "Fares".
+ *
+ * Card treatment, guarantees strip, fare-conditions accordion and amber closing
+ * CTA are ported from the approved `Pricing.dc.html` mock.
+ *
+ * The mock shows a two-cabin structure at $0 / $15. The tiers below are the
+ * LIVE ones ($0 / $29 Pro / $59 Premium, annual −33%), which is what the
+ * backend plan entitlements are seeded to and what Stripe would actually
+ * charge. Quoting the mock's prices here would advertise a price we don't bill.
+ * Change these only alongside the plan seed and /app/billing.
+ */
+
+const TIERS = [
   {
-    q: 'What counts as an auto-apply credit?',
-    a: 'One credit = one application submitted on your behalf to a verified company career page. Matching, resume building, and tracking never use credits.',
+    id: 'free',
+    cabin: 'ECONOMY — FREE',
+    name: 'Free',
+    blurb: 'Everything you need to run a focused, controlled search.',
+    note: 'free forever',
+    includesLabel: 'Includes',
+    features: [
+      'AI resume builder',
+      'Smart job matching',
+      '10 auto-apply credits / mo',
+      'Application tracker',
+      'Community support',
+    ],
+    cta: 'Start free',
   },
   {
-    q: 'Can I switch plans or cancel anytime?',
-    a: 'Yes. Upgrade, downgrade, or cancel from your dashboard at any time. Changes take effect at the next billing cycle and unused annual time is prorated.',
+    id: 'pro',
+    cabin: 'BUSINESS — PRO',
+    name: 'Pro',
+    blurb: 'For an active search — more volume, still fully under your control.',
+    featured: true,
+    includesLabel: 'Everything in Free, plus',
+    features: [
+      'Unlimited job matching',
+      '150 auto-apply credits / mo',
+      'AI cover letters',
+      'Per-role personalization',
+      'Interview prep (basic)',
+      'Priority email support',
+    ],
+    cta: 'Start Pro trial',
   },
   {
-    q: 'Is there a student or new-grad discount?',
-    a: 'We offer 50% off Pro for verified students and recent grads in their first year out of school. Reach out from your school email to claim it.',
-  },
-  {
-    q: 'Do you offer refunds?',
-    a: 'If Jobocate is not a fit within your first 14 days on a paid plan, contact us for a full refund — no questions asked.',
-  },
-  {
-    q: 'How does Enterprise pricing work?',
-    a: 'Enterprise is priced per seat with volume tiers, and includes SSO, admin controls, and a dedicated success manager. Talk to sales for a quote tailored to your team size.',
+    id: 'premium',
+    cabin: 'FIRST — PREMIUM',
+    name: 'Premium',
+    blurb: 'The full search, running on your terms.',
+    includesLabel: 'Everything in Pro, plus',
+    features: [
+      'Unlimited auto-apply',
+      'Advanced personalization',
+      'Full AI interview prep',
+      'Salary & offer insights',
+      'Priority application routing',
+      '1:1 onboarding',
+    ],
+    cta: 'Start Premium trial',
   },
 ];
 
-const RAW_MATRIX = [
-  { group: 'Job search' },
-  { label: 'Smart job matching', free: '✓', pro: 'Unlimited', premium: 'Unlimited' },
-  { label: 'Verified-page targeting', free: '✓', pro: '✓', premium: '✓' },
-  { label: 'Saved searches & alerts', free: '3', pro: 'Unlimited', premium: 'Unlimited' },
-  { group: 'Applications' },
-  { label: 'Auto-apply credits / mo', free: '10', pro: '150', premium: 'Unlimited' },
-  { label: 'AI resume builder', free: '✓', pro: '✓', premium: '✓' },
-  { label: 'AI cover letters', free: '—', pro: '✓', premium: '✓' },
-  { label: 'Per-role personalization', free: '—', pro: '✓', premium: 'Advanced' },
-  { group: 'Prep & insight' },
-  { label: 'Interview prep', free: '—', pro: 'Basic', premium: 'Full + feedback' },
-  { label: 'Salary & offer insights', free: '—', pro: '—', premium: '✓' },
-  { label: 'Support', free: 'Community', pro: 'Priority email', premium: '1:1 onboarding' },
+const GUARANTEES = [
+  'NO HIDDEN AUTO-RENEWALS',
+  'CANCEL ANYTIME · TWO CLICKS',
+  'NOTHING SENDS WITHOUT YOUR SAY-SO',
+];
+
+const FAQS = [
+  ['What counts as an auto-apply credit?', 'One credit = one application submitted on your behalf to a verified company career page. Matching, resume building and tracking never use credits.'],
+  ['Can I switch plans or cancel anytime?', 'Yes. Upgrade, downgrade or cancel from your dashboard at any time. Changes take effect at the next billing cycle and unused annual time is prorated.'],
+  ['What happens when I hit the free limit?', 'Your matches keep updating and your tracker keeps working. You only lose the extra auto-apply volume — nothing already filed is affected.'],
+  ['Are there credit packs I should watch for?', 'No. One flat monthly price per tier, cancel in two clicks, and your plan never silently renews at a higher rate.'],
+  ['How does Enterprise pricing work?', 'Enterprise is priced per seat with volume tiers, and includes SSO, admin controls and a dedicated success manager. Talk to sales for a quote tailored to your team.'],
 ];
 
 export default function Pricing() {
   const [annual, setAnnual] = useState(false);
-  const [open, setOpen] = useState(0);
+  const [faq, setFaq] = useState(-1);
 
-  const proPrice = annual ? '$19' : '$29';
-  const premPrice = annual ? '$39' : '$59';
-
-  const baseTiers = [
-    {
-      name: 'Free',
-      tagline: 'Everything to start your search the smart way.',
-      price: '$0',
-      per: '/mo',
-      billNote: 'free forever',
-      cta: 'Start free',
-      includesLabel: 'Includes',
-      features: ['AI resume builder', 'Smart job matching', '10 auto-apply credits / mo', 'Application tracker', 'Community support'],
-      popular: false,
-    },
-    {
-      name: 'Pro',
-      tagline: 'Put the busywork on autopilot.',
-      price: proPrice,
-      per: '/mo',
-      billNote: annual ? 'billed annually · save 33%' : '',
-      cta: 'Start Pro trial',
-      includesLabel: 'Everything in Free, plus',
-      features: ['Unlimited job matching', '150 auto-apply credits / mo', 'AI cover letters', 'Per-role personalization', 'Interview prep (basic)', 'Priority email support'],
-      popular: true,
-    },
-    {
-      name: 'Premium',
-      tagline: 'Maximum volume, maximum signal.',
-      price: premPrice,
-      per: '/mo',
-      billNote: annual ? 'billed annually · save 33%' : '',
-      cta: 'Start Premium trial',
-      includesLabel: 'Everything in Pro, plus',
-      features: ['Unlimited auto-apply', 'Advanced personalization', 'Full AI interview prep', 'Salary & offer insights', 'Priority application routing', '1:1 onboarding'],
-      popular: false,
-    },
-  ];
-
-  const tiers = baseTiers.map((t) =>
-    t.popular
-      ? {
-          ...t,
-          cardBg: '#15140F',
-          fg: '#FBF8F1',
-          muted: '#9A9286',
-          featColor: '#E4DDCE',
-          border: '2px solid #1FA463',
-          shadow: '0 30px 60px -30px rgba(27,26,22,0.45)',
-          badgeShow: 'inline-block',
-          check: '#5BD08C',
-          ctaBg: '#1FA463',
-          ctaColor: '#0C2C1C',
-          ctaBorder: 'none',
-          billNoteColor: t.billNote ? '#5BD08C' : '#9A9286',
-        }
-      : {
-          ...t,
-          cardBg: '#FBF8F1',
-          fg: '#1B1A16',
-          muted: '#8A8378',
-          featColor: '#3B362F',
-          border: '1px solid #E1D9C9',
-          shadow: 'none',
-          badgeShow: 'none',
-          check: '#1FA463',
-          ctaBg: 'transparent',
-          ctaColor: '#1B1A16',
-          ctaBorder: '1px solid #1B1A16',
-          billNoteColor: t.billNote ? '#157A49' : '#8A8378',
-        }
-  );
-
-  const matrix = RAW_MATRIX.map((m) =>
-    m.group
-      ? { isGroup: true, group: m.group }
-      : { isGroup: false, label: m.label, free: m.free, pro: m.pro, premium: m.premium }
-  );
-
-  const monthlyBg = !annual ? '#FBF8F1' : 'transparent';
-  const monthlyColor = !annual ? '#1B1A16' : '#7A7367';
-  const annualBg = annual ? '#FBF8F1' : 'transparent';
-  const annualColor = annual ? '#1B1A16' : '#7A7367';
+  const priceFor = (id) => {
+    if (id === 'free') return '$0';
+    if (id === 'pro') return annual ? '$19' : '$29';
+    return annual ? '$39' : '$59';
+  };
+  const noteFor = (id) =>
+    id === 'free' ? 'free forever' : annual ? 'per month · billed annually' : 'per month · cancel anytime';
 
   return (
     <>
       <Head>
-        <title>Pricing — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
+        <title>Jobocate Pricing — AI Job Search Plans</title>
+        <meta
+          name="description"
+          content="Start free, forever. Upgrade only if the extra volume earns it — no hidden auto-renewals, no credit packs, cancel anytime."
         />
       </Head>
 
-      <style jsx global>{`
-        #jbpricing * {
-          box-sizing: border-box;
-        }
-        html {
-          scroll-behavior: smooth;
-        }
-        #jbpricing ::selection {
-          background: #1fa463;
-          color: #f7f3ea;
-        }
-      `}</style>
+      <PublicLayout>
+        <div className="pr">
+          {/* ---------- HERO ---------- */}
+          <section className="pr__hero">
+            <span className="pr__eyebrow">FARES</span>
+            <h1 className="pr__h1">
+              One search, <span className="jb-em">three cabins.</span>
+            </h1>
+            <p className="pr__lede">
+              Start free, forever. Upgrade only if the extra legroom earns it — cancel anytime, no
+              hidden auto-renewals or credit packs.
+            </p>
 
-      <div
-        id="jbpricing"
-        style={{
-          background: '#F7F3EA',
-          color: '#1B1A16',
-          fontFamily: "'Hanken Grotesk',sans-serif",
-          WebkitFontSmoothing: 'antialiased',
-        }}
-      >
-        <div style={{ position: 'sticky', top: 0, zIndex: 50 }}>
-          <SiteNav />
-        </div>
-
-        {/* HERO */}
-        <section style={{ maxWidth: 1200, margin: '0 auto', padding: '64px 32px 36px', textAlign: 'center' }}>
-          <div
-            style={{
-              fontFamily: "'JetBrains Mono',monospace",
-              fontSize: 11.5,
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-              color: '#1FA463',
-              marginBottom: 18,
-            }}
-          >
-            — Pricing
-          </div>
-          <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 64, lineHeight: 1.02, margin: '0 0 18px' }}>
-            One interview pays for a{' '}
-            <span style={{ background: 'linear-gradient(transparent 56%, rgba(31,164,99,0.32) 56%)' }}>year.</span>
-          </h1>
-          <p style={{ fontSize: 18, lineHeight: 1.55, color: '#4B463E', maxWidth: 520, margin: '0 auto 30px' }}>
-            Start free, upgrade when you&apos;re ready to put the whole search on autopilot. No credit card to begin.
-          </p>
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              background: '#F1ECE0',
-              border: '1px solid #E1D9C9',
-              borderRadius: 999,
-              padding: 5,
-            }}
-          >
-            <button
-              onClick={() => setAnnual(false)}
-              style={{
-                background: monthlyBg,
-                color: monthlyColor,
-                border: 'none',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                fontSize: 14,
-                fontWeight: 600,
-                padding: '9px 20px',
-                borderRadius: 999,
-                transition: 'all 0.2s',
-              }}
-            >
-              Monthly
-            </button>
-            <button
-              onClick={() => setAnnual(true)}
-              style={{
-                background: annualBg,
-                color: annualColor,
-                border: 'none',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                fontSize: 14,
-                fontWeight: 600,
-                padding: '9px 20px',
-                borderRadius: 999,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                transition: 'all 0.2s',
-              }}
-            >
-              Annual{' '}
-              <span
-                style={{
-                  fontFamily: "'JetBrains Mono',monospace",
-                  fontSize: 10,
-                  background: '#1FA463',
-                  color: '#0C2C1C',
-                  padding: '2px 7px',
-                  borderRadius: 999,
-                }}
+            <div className="pr__toggle" role="radiogroup" aria-label="Billing period">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={!annual}
+                className={`pr__tog${!annual ? ' pr__tog--on' : ''}`}
+                onClick={() => setAnnual(false)}
               >
-                -33%
-              </span>
-            </button>
-          </div>
-        </section>
-
-        {/* TIERS */}
-        <section style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 32px 30px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20, alignItems: 'start' }}>
-            {tiers.map((t) => (
-              <div
-                key={t.name}
-                style={{
-                  background: t.cardBg,
-                  border: t.border,
-                  borderRadius: 20,
-                  padding: '32px 28px',
-                  position: 'relative',
-                  boxShadow: t.shadow,
-                }}
+                Monthly
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={annual}
+                className={`pr__tog${annual ? ' pr__tog--on' : ''}`}
+                onClick={() => setAnnual(true)}
               >
-                <div
-                  style={{
-                    display: t.badgeShow,
-                    position: 'absolute',
-                    top: -12,
-                    left: 28,
-                    background: '#1FA463',
-                    color: '#0C2C1C',
-                    fontFamily: "'JetBrains Mono',monospace",
-                    fontSize: 11,
-                    fontWeight: 600,
-                    letterSpacing: '0.06em',
-                    padding: '5px 12px',
-                    borderRadius: 999,
-                  }}
-                >
-                  MOST POPULAR
+                Annual <span className="pr__save">−33%</span>
+              </button>
+            </div>
+          </section>
+
+          {/* ---------- PLANS ---------- */}
+          <section className="pr__plans">
+            {TIERS.map((t) => (
+              <article key={t.id} className={`pr__plan${t.featured ? ' pr__plan--featured' : ''}`}>
+                {t.featured && <span className="pr__pop">MOST POPULAR</span>}
+                <div className="pr__planhead">
+                  <span className="pr__cabin">{t.cabin}</span>
+                  <div className="pr__pricerow">
+                    <span className="pr__price">{priceFor(t.id)}</span>
+                    <span className="pr__pricenote">{noteFor(t.id)}</span>
+                  </div>
+                  <p className="pr__blurb">{t.blurb}</p>
                 </div>
-                <div style={{ fontWeight: 700, fontSize: 18, color: t.fg, marginBottom: 6 }}>{t.name}</div>
-                <div style={{ fontSize: 13.5, color: t.muted, marginBottom: 22, minHeight: 38 }}>{t.tagline}</div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 4 }}>
-                  <span style={{ fontFamily: "'Instrument Serif',serif", fontSize: 54, lineHeight: 1, color: t.fg }}>{t.price}</span>
-                  <span style={{ fontSize: 14, color: t.muted }}>{t.per}</span>
+
+                <div className="pr__features">
+                  <span className="pr__inclabel">{t.includesLabel}</span>
+                  {t.features.map((f) => (
+                    <span key={f} className="pr__feature">
+                      <span className="pr__tick" aria-hidden="true">✓</span>
+                      {f}
+                    </span>
+                  ))}
                 </div>
-                <div
-                  style={{
-                    fontFamily: "'JetBrains Mono',monospace",
-                    fontSize: 11.5,
-                    color: t.billNoteColor,
-                    minHeight: 18,
-                    marginBottom: 24,
-                  }}
-                >
-                  {t.billNote}
-                </div>
+
                 <Link
-                  href={appRoute('App Login.dc.html')}
-                  style={{
-                    display: 'block',
-                    textAlign: 'center',
-                    background: t.ctaBg,
-                    color: t.ctaColor,
-                    border: t.ctaBorder,
-                    fontSize: 15,
-                    fontWeight: 600,
-                    padding: 13,
-                    borderRadius: 999,
-                    textDecoration: 'none',
-                    marginBottom: 26,
-                  }}
+                  href={appRoute('App Sign Up.dc.html')}
+                  className={`pr__cta${t.featured ? ' pr__cta--green' : ' pr__cta--ghost'}`}
                 >
                   {t.cta}
                 </Link>
-                <div
-                  style={{
-                    fontFamily: "'JetBrains Mono',monospace",
-                    fontSize: 10.5,
-                    letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
-                    color: t.muted,
-                    marginBottom: 14,
-                  }}
-                >
-                  {t.includesLabel}
-                </div>
-                {t.features.map((f) => (
-                  <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 11 }}>
-                    <span style={{ color: t.check, fontSize: 14, lineHeight: 1.4, flexShrink: 0 }}>✓</span>
-                    <span style={{ fontSize: 14, lineHeight: 1.4, color: t.featColor }}>{f}</span>
-                  </div>
-                ))}
-              </div>
+              </article>
             ))}
-          </div>
-        </section>
+          </section>
 
-        {/* ENTERPRISE BAND */}
-        <section style={{ maxWidth: 1200, margin: '0 auto', padding: '14px 32px 70px' }}>
-          <div
-            style={{
-              background: '#15140F',
-              borderRadius: 20,
-              padding: '40px 44px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 32,
-              flexWrap: 'wrap',
-              position: 'relative',
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                background: 'radial-gradient(circle at 90% 50%, rgba(31,164,99,0.28), transparent 55%)',
-                pointerEvents: 'none',
-              }}
-            />
-            <div style={{ position: 'relative', maxWidth: 560 }}>
-              <div
-                style={{
-                  fontFamily: "'JetBrains Mono',monospace",
-                  fontSize: 11,
-                  letterSpacing: '0.12em',
-                  textTransform: 'uppercase',
-                  color: '#5BD08C',
-                  marginBottom: 12,
-                }}
-              >
-                — Enterprise & outplacement
+          {/* ---------- ENTERPRISE ---------- */}
+          <section className="pr__entwrap">
+            <div className="pr__ent">
+              <div>
+                <span className="pr__eyebrow">ENTERPRISE & OUTPLACEMENT</span>
+                <h2 className="pr__h3">Move a whole team to their next roles</h2>
+                <p className="pr__blurb">
+                  SSO, seat management, a dedicated success manager and bulk outplacement for
+                  workforce transitions. Custom pricing per seat.
+                </p>
               </div>
-              <h2 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 34, lineHeight: 1.08, color: '#FBF8F1', margin: '0 0 10px' }}>
-                Helping a whole team land on their feet
-              </h2>
-              <p style={{ fontSize: 15, lineHeight: 1.55, color: '#B8B1A4', margin: 0 }}>
-                SSO, seat management, dedicated success manager, and bulk outplacement for workforce transitions. Custom pricing per seat.
-              </p>
+              <Link href={appRoute('Book Demo.dc.html')} className="pr__cta pr__cta--green">
+                Talk to sales →
+              </Link>
             </div>
-            <Link
-              href={appRoute('Enterprise.dc.html')}
-              style={{
-                position: 'relative',
-                flexShrink: 0,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 9,
-                background: '#1FA463',
-                color: '#0C2C1C',
-                fontSize: 16,
-                fontWeight: 700,
-                padding: '15px 28px',
-                borderRadius: 999,
-                textDecoration: 'none',
-              }}
-            >
-              Talk to sales <span style={{ fontSize: 18 }}>→</span>
-            </Link>
-          </div>
-        </section>
+          </section>
 
-        {/* COMPARISON MATRIX */}
-        <section style={{ maxWidth: 1080, margin: '0 auto', padding: '20px 32px 80px' }}>
-          <div style={{ textAlign: 'center', marginBottom: 44 }}>
-            <div
-              style={{
-                fontFamily: "'JetBrains Mono',monospace",
-                fontSize: 11.5,
-                letterSpacing: '0.14em',
-                textTransform: 'uppercase',
-                color: '#1FA463',
-                marginBottom: 14,
-              }}
-            >
-              — Compare plans
-            </div>
-            <h2 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 44, lineHeight: 1.05, margin: 0 }}>
-              Everything, side by side
+          {/* ---------- GUARANTEES ---------- */}
+          <section className="pr__guarantees">
+            {GUARANTEES.map((g) => (
+              <span key={g} className="pr__guarantee">{g}</span>
+            ))}
+          </section>
+
+          {/* ---------- FARE CONDITIONS ---------- */}
+          <section className="pr__faqwrap">
+            <h2 className="pr__h2 pr__h2--center">
+              Fare <span className="jb-em">conditions.</span>
             </h2>
-          </div>
-          <div style={{ border: '1px solid #E1D9C9', borderRadius: 16, overflow: 'hidden', background: '#FBF8F1' }}>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1.6fr 1fr 1fr 1fr',
-                background: '#F1ECE0',
-                borderBottom: '1px solid #E1D9C9',
-                position: 'sticky',
-                top: 72,
-                zIndex: 2,
-              }}
-            >
-              <div
-                style={{
-                  padding: '16px 22px',
-                  fontFamily: "'JetBrains Mono',monospace",
-                  fontSize: 11,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  color: '#9A9286',
-                }}
-              >
-                Feature
-              </div>
-              <div style={{ padding: '16px 18px', fontWeight: 700, fontSize: 14, borderLeft: '1px solid #E1D9C9' }}>Free</div>
-              <div style={{ padding: '16px 18px', fontWeight: 700, fontSize: 14, color: '#157A49', borderLeft: '1px solid #E1D9C9', background: '#EAF6EE' }}>
-                Pro
-              </div>
-              <div style={{ padding: '16px 18px', fontWeight: 700, fontSize: 14, borderLeft: '1px solid #E1D9C9' }}>Premium</div>
-            </div>
-            {matrix.map((m, i) =>
-              m.isGroup ? (
-                <div
-                  key={`g-${i}`}
-                  style={{
-                    padding: '14px 22px',
-                    background: '#F4EFE4',
-                    borderBottom: '1px solid #E1D9C9',
-                    fontFamily: "'JetBrains Mono',monospace",
-                    fontSize: 10.5,
-                    letterSpacing: '0.1em',
-                    textTransform: 'uppercase',
-                    color: '#7A7367',
-                  }}
-                >
-                  {m.group}
-                </div>
-              ) : (
-                <div
-                  key={`r-${i}`}
-                  style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr 1fr 1fr', borderBottom: '1px solid #EEE7D9' }}
-                >
-                  <div style={{ padding: '15px 22px', fontSize: 14, fontWeight: 500 }}>{m.label}</div>
-                  <div style={{ padding: '15px 18px', fontSize: 13.5, color: '#7A7367', borderLeft: '1px solid #EEE7D9' }}>{m.free}</div>
-                  <div
-                    style={{
-                      padding: '15px 18px',
-                      fontSize: 13.5,
-                      color: '#1B1A16',
-                      fontWeight: 600,
-                      borderLeft: '1px solid #EEE7D9',
-                      background: '#F4FAF6',
-                    }}
-                  >
-                    {m.pro}
+            <div className="pr__faqs">
+              {FAQS.map(([q, a], i) => {
+                const open = faq === i;
+                return (
+                  <div key={q} className="pr__faq">
+                    <button
+                      type="button"
+                      className="pr__faqq"
+                      aria-expanded={open}
+                      aria-controls={`pr-faq-${i}`}
+                      onClick={() => setFaq(open ? -1 : i)}
+                    >
+                      <span>{q}</span>
+                      <span className="pr__faqicon" aria-hidden="true">{open ? '−' : '+'}</span>
+                    </button>
+                    {open && <p className="pr__faqa" id={`pr-faq-${i}`}>{a}</p>}
                   </div>
-                  <div style={{ padding: '15px 18px', fontSize: 13.5, color: '#1B1A16', borderLeft: '1px solid #EEE7D9' }}>{m.premium}</div>
-                </div>
-              )
-            )}
-          </div>
-        </section>
-
-        {/* FAQ */}
-        <section style={{ maxWidth: 860, margin: '0 auto', padding: '0 32px 90px' }}>
-          <div style={{ textAlign: 'center', marginBottom: 46 }}>
-            <div
-              style={{
-                fontFamily: "'JetBrains Mono',monospace",
-                fontSize: 11.5,
-                letterSpacing: '0.14em',
-                textTransform: 'uppercase',
-                color: '#1FA463',
-                marginBottom: 14,
-              }}
-            >
-              — Billing FAQ
+                );
+              })}
             </div>
-            <h2 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 44, lineHeight: 1.05, margin: 0 }}>Good to know</h2>
-          </div>
-          <div style={{ borderTop: '1px solid #E1D9C9' }}>
-            {FAQ_DATA.map((item, i) => {
-              const isOpen = open === i;
-              return (
-                <div key={item.q} style={{ borderBottom: '1px solid #E1D9C9' }}>
-                  <button
-                    onClick={() => setOpen((s) => (s === i ? -1 : i))}
-                    style={{
-                      width: '100%',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      padding: '22px 4px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: 20,
-                      fontFamily: 'inherit',
-                    }}
-                  >
-                    <span style={{ fontSize: 18, fontWeight: 600, color: '#1B1A16' }}>{item.q}</span>
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 22, color: '#1FA463', flexShrink: 0, lineHeight: 1 }}>
-                      {isOpen ? '–' : '+'}
-                    </span>
-                  </button>
-                  <div style={{ overflow: 'hidden', maxHeight: isOpen ? '220px' : '0px', transition: 'max-height 0.3s ease' }}>
-                    <p style={{ fontSize: 15, lineHeight: 1.6, color: '#5A544A', margin: 0, padding: '0 4px 24px', maxWidth: 660 }}>{item.a}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
+          </section>
 
-        <SiteFooter />
-      </div>
+          {/* ---------- FINAL ---------- */}
+          <section className="pr__finalwrap">
+            <div className="pr__final">
+              <h2 className="pr__h2">
+                Board free. <span className="jb-em">Upgrade if it earns it.</span>
+              </h2>
+              <Link href={appRoute('App Sign Up.dc.html')} className="pr__cta pr__cta--amber">
+                Chart my route →
+              </Link>
+            </div>
+          </section>
+        </div>
+
+        <style jsx>{`
+          .pr { --pad: 48px; max-width: 1280px; margin: 0 auto; font-family: var(--jb-font-sans); }
+          .pr :global(*) { box-sizing: border-box; }
+
+          .pr__eyebrow {
+            display: block; font-family: var(--jb-font-mono); font-size: 11px; font-weight: 500;
+            letter-spacing: 0.24em; color: var(--jb-d-accent);
+          }
+          .pr__h1 {
+            margin: 0; font-family: var(--jb-font-display); font-weight: 400;
+            font-size: clamp(34px, 5vw, 62px); line-height: 1.02;
+          }
+          .pr__h2 {
+            margin: 0; font-family: var(--jb-font-display); font-weight: 400;
+            font-size: clamp(28px, 3.2vw, 44px); line-height: 1.1;
+          }
+          .pr__h2--center { text-align: center; }
+          .pr__h3 { margin: 0; font-family: var(--jb-font-display); font-weight: 400; font-size: clamp(22px, 2.4vw, 30px); line-height: 1.1; }
+          .pr__lede { margin: 0; max-width: 520px; font-size: 15px; line-height: 1.6; color: var(--jb-d-ink-65); }
+
+          .pr__hero {
+            padding: 64px var(--pad) 24px;
+            display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center;
+          }
+
+          /* ---- billing toggle ---- */
+          .pr__toggle {
+            display: inline-flex; gap: 4px; padding: 4px; margin-top: 8px;
+            background: var(--jb-d-panel); border: 1px solid var(--jb-d-line-card); border-radius: 999px;
+          }
+          .pr__tog {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 10px 20px; min-height: 44px; border-radius: 999px;
+            background: transparent; border: none; cursor: pointer;
+            font-family: var(--jb-font-sans); font-size: 14px; font-weight: 600;
+            color: var(--jb-d-ink-65);
+          }
+          .pr__tog--on { background: var(--jb-d-ink); color: var(--jb-d-bg); }
+          .pr__save {
+            font-family: var(--jb-font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+            background: var(--jb-d-accent); color: var(--jb-d-bg); padding: 3px 7px; border-radius: 999px;
+          }
+
+          /* ---- plans ---- */
+          .pr__plans {
+            padding: 32px var(--pad) 40px;
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 20px;
+            align-items: stretch;
+          }
+          .pr__plan {
+            position: relative;
+            background: var(--jb-d-panel); border: 1px solid var(--jb-d-line-strong);
+            border-radius: 16px; padding: 36px;
+            display: flex; flex-direction: column; gap: 22px;
+          }
+          .pr__plan--featured { background: var(--jb-d-accent-tint); border-color: var(--jb-d-accent); }
+          .pr__pop {
+            position: absolute; top: -13px; left: 36px;
+            background: var(--jb-d-accent); color: var(--jb-d-bg);
+            font-family: var(--jb-font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.14em;
+            padding: 6px 12px; border-radius: 999px;
+          }
+          .pr__planhead { display: flex; flex-direction: column; gap: 8px; }
+          .pr__cabin {
+            font-family: var(--jb-font-mono); font-size: 11px; font-weight: 600;
+            letter-spacing: 0.2em; color: var(--jb-d-ink-65);
+          }
+          .pr__plan--featured .pr__cabin { color: var(--jb-d-accent); }
+          .pr__pricerow { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+          .pr__price { font-family: var(--jb-font-display); font-size: clamp(40px, 5vw, 56px); line-height: 1; }
+          .pr__pricenote { font-size: 14px; color: var(--jb-d-ink-55); }
+          .pr__blurb { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--jb-d-ink-65); }
+
+          .pr__features {
+            display: flex; flex-direction: column; gap: 12px;
+            border-top: 1px solid var(--jb-d-line-card); padding-top: 22px;
+          }
+          .pr__inclabel {
+            font-family: var(--jb-font-mono); font-size: 11px; letter-spacing: 0.12em;
+            text-transform: uppercase; color: var(--jb-d-ink-55);
+          }
+          .pr__feature { display: flex; gap: 10px; font-size: 14px; line-height: 1.5; color: var(--jb-d-ink-85); }
+          .pr__tick { color: var(--jb-d-accent); font-weight: 700; }
+
+          :global(.pr__cta) {
+            margin-top: auto;
+            display: inline-flex; align-items: center; justify-content: center;
+            min-height: 48px; padding: 15px 28px; border-radius: 999px;
+            font-family: var(--jb-font-sans); font-size: 14px; font-weight: 700;
+            text-decoration: none; border: 1.5px solid transparent; text-align: center;
+            transition: background-color 0.18s ease, border-color 0.18s ease;
+          }
+          :global(.pr__cta--green) { background: var(--jb-d-accent); color: var(--jb-d-bg); }
+          :global(.pr__cta--green:hover) { background: var(--jb-d-accent-hi); }
+          :global(.pr__cta--ghost) { border-color: var(--jb-d-line-btn); color: var(--jb-d-ink); }
+          :global(.pr__cta--ghost:hover) { border-color: var(--jb-d-accent); color: var(--jb-d-accent); }
+          :global(.pr__cta--amber) { background: var(--jb-d-amber); color: var(--jb-d-bg); margin-top: 6px; }
+          :global(.pr__cta--amber:hover) { background: var(--jb-d-amber-hi); }
+
+          /* ---- enterprise ---- */
+          .pr__entwrap { padding: 0 var(--pad) 40px; }
+          .pr__ent {
+            background: var(--jb-d-footer); border: 1px solid var(--jb-d-line-card);
+            border-radius: 16px; padding: 40px;
+            display: flex; align-items: center; justify-content: space-between; gap: 32px; flex-wrap: wrap;
+          }
+          .pr__ent > div:first-child { display: flex; flex-direction: column; gap: 10px; max-width: 560px; }
+
+          /* ---- guarantees ---- */
+          .pr__guarantees {
+            margin: 0 var(--pad) 40px; display: flex; justify-content: center; flex-wrap: wrap;
+            border-top: 1px solid var(--jb-d-line-card); border-bottom: 1px solid var(--jb-d-line-card);
+          }
+          .pr__guarantee {
+            font-family: var(--jb-font-mono); font-size: 11px; font-weight: 500; letter-spacing: 0.16em;
+            color: var(--jb-d-ink-65); padding: 14px 28px; border-right: 1px solid var(--jb-d-line);
+          }
+          .pr__guarantee:last-child { border-right: none; }
+
+          /* ---- faq ---- */
+          .pr__faqwrap {
+            max-width: 760px; margin: 0 auto; width: 100%;
+            padding: 24px var(--pad) 56px; display: flex; flex-direction: column; gap: 22px;
+          }
+          .pr__faqs { display: flex; flex-direction: column; gap: 12px; }
+          .pr__faq { background: var(--jb-d-glass-hi); border: 1px solid var(--jb-d-line-card); border-radius: 10px; overflow: hidden; }
+          .pr__faqq {
+            width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+            padding: 18px 22px; min-height: 44px; background: none; border: none; cursor: pointer;
+            text-align: left; font-family: inherit; font-size: 14.5px; font-weight: 600; color: var(--jb-d-ink);
+          }
+          .pr__faqq:hover { background: rgba(242, 236, 219, 0.04); }
+          .pr__faqicon { font-family: var(--jb-font-display); font-size: 20px; color: var(--jb-d-accent); flex: none; }
+          .pr__faqa { margin: 0; padding: 0 22px 18px; font-size: 13.5px; line-height: 1.6; color: var(--jb-d-ink-65); }
+
+          /* ---- final ---- */
+          .pr__finalwrap { padding: 0 var(--pad) 64px; }
+          .pr__final {
+            border: 1px solid var(--jb-d-line-strong);
+            background: radial-gradient(ellipse at 50% 120%, rgba(143, 214, 163, 0.25), transparent 70%);
+            border-radius: 16px; padding: 56px var(--pad);
+            display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center;
+          }
+
+          @media (max-width: 760px) {
+            .pr { --pad: 20px; }
+            .pr__hero { padding: 36px var(--pad) 16px; }
+            .pr__plans { padding: 28px var(--pad) 32px; }
+            .pr__plan { padding: 24px; }
+            .pr__pop { left: 24px; }
+            .pr__ent { padding: 24px; }
+            .pr__guarantees { border: none; gap: 8px; margin: 0 var(--pad) 32px; justify-content: flex-start; }
+            .pr__guarantee {
+              border: 1px solid var(--jb-d-line-strong); border-radius: 999px;
+              padding: 7px 13px; font-size: 11px; letter-spacing: 0.12em;
+            }
+            :global(.pr__cta) { width: 100%; }
+            .pr__final { padding: 36px 24px; }
+          }
+        `}</style>
+      </PublicLayout>
     </>
   );
 }

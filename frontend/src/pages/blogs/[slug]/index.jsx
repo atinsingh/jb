@@ -2,7 +2,7 @@ import React from "react";
 import { blogs } from "@/components/Blog/BlogSection";
 import Image from "next/image";
 import Link from "next/link";
-import Layout from "@/components/layout";
+import Layout from "@/components/layout/PublicLayout";
 
 export async function getStaticPaths() {
   const paths = blogs.map((blog) => ({

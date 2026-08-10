@@ -5,43 +5,21 @@ import Head from 'next/head';
 import Link from 'next/link';
 import AppSidebar from '@/components/app/AppSidebar';
 import { appRoute } from '@/components/app/appRoutes';
+import { LoadingState, EmptyState, ErrorState } from '@/components/app/AppStates';
 import {
   getInterviewApplications,
   getInterviewSessions,
 } from '@/services/interviewApi';
 
-/* ------------------------------------------------ design sample data --- */
-// Faithful fallbacks from the design's Component.renderVals(). Used when the
-// user is unauthenticated or the backend is unavailable, so the page always
-// renders something true to the design.
-
-const SAMPLE_READINESS = [
-  { skill: 'Behavioral (STAR)', score: '9.1', pct: '91%', color: '#1FA463' },
-  { skill: 'Design critique', score: '8.6', pct: '86%', color: '#1FA463' },
-  { skill: 'Systems & craft', score: '7.4', pct: '74%', color: '#C9622E' },
-  { skill: 'Salary negotiation', score: '6.8', pct: '68%', color: '#C9622E' },
+/* ------------------------------------------------ static product content --- */
+// Practice categories are fixed product content (the question bank taxonomy),
+// not user data — they link into the mock-interview builder.
+const CATEGORIES = [
+  { tag: 'BH', title: 'Behavioral', tint: '#EAF6EE', ink: '#157A49' },
+  { tag: 'DC', title: 'Design critique', tint: '#F4EFE4', ink: '#1B1A16' },
+  { tag: 'SY', title: 'Systems design', tint: '#F4EFE4', ink: '#1B1A16' },
+  { tag: 'NG', title: 'Negotiation', tint: '#F4EFE4', ink: '#1B1A16' },
 ];
-
-const SAMPLE_CATEGORIES = [
-  { tag: 'BH', title: 'Behavioral', count: 32, tint: '#EAF6EE', ink: '#157A49' },
-  { tag: 'DC', title: 'Design critique', count: 24, tint: '#F4EFE4', ink: '#1B1A16' },
-  { tag: 'SY', title: 'Systems design', count: 18, tint: '#F4EFE4', ink: '#1B1A16' },
-  { tag: 'NG', title: 'Negotiation', count: 12, tint: '#F4EFE4', ink: '#1B1A16' },
-];
-
-const SAMPLE_FEEDBACK = [
-  { score: '9', color: '#157A49', question: 'Tell me about a time you disagreed with a PM.', tag: 'Strong —', note: 'clear STAR structure and a quantified outcome. Trim the setup by 10 seconds.' },
-  { score: '7', color: '#C9622E', question: 'How would you redesign Stripe Checkout?', tag: 'Good —', note: 'solid framing; spend more time on tradeoffs and edge cases before jumping to solutions.' },
-  { score: '8', color: '#157A49', question: 'Walk me through a project you are proud of.', tag: 'Strong —', note: 'compelling narrative. Add the business impact earlier to hook the interviewer.' },
-];
-
-const SAMPLE_NEXT = {
-  initials: 'St',
-  role: 'Senior Product Designer',
-  meta: 'Stripe · Final round · Mon Jun 29, 2:00 PM',
-  eyebrow: 'Next interview · in 2 days',
-  blurb: "We built a 6-question mock from Stripe's design-interview style. Run it now to walk in sharp.",
-};
 
 /* ------------------------------------------------ helpers --- */
 
@@ -74,14 +52,14 @@ const toNextInterview = (app) => {
 };
 
 export default function AppInterview() {
-  const [next, setNext] = useState(SAMPLE_NEXT);
+  const [next, setNext] = useState(null);
   const [sessionCount, setSessionCount] = useState(null);
+  const [readiness, setReadiness] = useState([]);
+  const [feedback, setFeedback] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Static / design-provided sections (no dedicated backend feed yet).
-  const readiness = SAMPLE_READINESS;
-  const categories = SAMPLE_CATEGORIES;
-  const feedback = SAMPLE_FEEDBACK;
+  const categories = CATEGORIES;
 
   useEffect(() => {
     let alive = true;
@@ -98,8 +76,8 @@ export default function AppInterview() {
           const apps =
             appsRes.value?.applications ||
             (Array.isArray(appsRes.value) ? appsRes.value : []);
-          const mapped = toNextInterview(apps?.[0]);
-          if (mapped) setNext(mapped);
+          // Always set — null when the candidate has no upcoming interview.
+          setNext(toNextInterview(apps?.[0]));
         }
 
         if (sessRes.status === 'fulfilled') {
@@ -110,7 +88,7 @@ export default function AppInterview() {
           if (Array.isArray(sessions)) setSessionCount(sessions.length);
         }
       } catch (e) {
-        /* graceful fallback to sample data */
+        if (alive) setError(e);
       } finally {
         if (alive) setLoading(false);
       }
@@ -122,19 +100,21 @@ export default function AppInterview() {
 
   const headerStat =
     sessionCount != null
-      ? `${sessionCount} sessions · 92 questions practiced`
-      : '14 sessions · 92 questions practiced';
+      ? `${sessionCount} ${sessionCount === 1 ? 'session' : 'sessions'} practiced`
+      : '';
+
+  const heroEyebrow = next?.eyebrow || 'Practice anytime';
+  const heroInitials = next?.initials || 'JB';
+  const heroRole = next?.role || 'Start a mock interview';
+  const heroMeta = next?.meta || 'Tailored to your target role';
+  const heroBlurb =
+    next?.blurb ||
+    'Run an AI mock tailored to your target role — get specific feedback, instantly.';
 
   return (
     <>
       <Head>
         <title>Interview prep — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
       <style jsx global>{`
@@ -172,7 +152,7 @@ export default function AppInterview() {
           display: 'flex',
           minHeight: '100vh',
           background: '#F7F3EA',
-          fontFamily: "'Hanken Grotesk',sans-serif",
+          fontFamily: 'var(--jb-font-sans)',
           color: '#1B1A16',
         }}
       >
@@ -196,7 +176,7 @@ export default function AppInterview() {
           >
             <div
               style={{
-                fontFamily: "'JetBrains Mono',monospace",
+                fontFamily: 'var(--jb-font-mono)',
                 fontSize: 11.5,
                 letterSpacing: '0.1em',
                 textTransform: 'uppercase',
@@ -206,17 +186,19 @@ export default function AppInterview() {
               Toolkit / Interview Prep
             </div>
             <div style={{ flex: 1 }} />
-            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: '#8A8378' }}>
-              {headerStat}
-            </span>
+            {headerStat && (
+              <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 12, color: '#8A8378' }}>
+                {headerStat}
+              </span>
+            )}
           </header>
 
-          <div style={{ padding: '30px 32px 48px', maxWidth: 1180, width: '100%' }}>
+          <div style={{ padding: '30px 32px 48px', width: '100%' }}>
             {/* TITLE */}
             <div style={{ marginBottom: 24 }}>
               <h1
                 style={{
-                  fontFamily: "'Instrument Serif',serif",
+                  fontFamily: 'var(--jb-font-display)',
                   fontWeight: 400,
                   fontSize: 40,
                   lineHeight: 1,
@@ -255,7 +237,7 @@ export default function AppInterview() {
                 <div style={{ position: 'relative' }}>
                   <div
                     style={{
-                      fontFamily: "'JetBrains Mono',monospace",
+                      fontFamily: 'var(--jb-font-mono)',
                       fontSize: 11,
                       letterSpacing: '0.1em',
                       textTransform: 'uppercase',
@@ -263,7 +245,7 @@ export default function AppInterview() {
                       marginBottom: 16,
                     }}
                   >
-                    {next.eyebrow}
+                    {heroEyebrow}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 22 }}>
                     <span
@@ -281,11 +263,11 @@ export default function AppInterview() {
                         fontSize: 17,
                       }}
                     >
-                      {next.initials}
+                      {heroInitials}
                     </span>
                     <div>
-                      <div style={{ fontSize: 19, fontWeight: 700, color: '#FBF8F1' }}>{next.role}</div>
-                      <div style={{ fontSize: 13.5, color: '#9A9286' }}>{next.meta}</div>
+                      <div style={{ fontSize: 19, fontWeight: 700, color: '#FBF8F1' }}>{heroRole}</div>
+                      <div style={{ fontSize: 13.5, color: '#9A9286' }}>{heroMeta}</div>
                     </div>
                   </div>
                   <p
@@ -297,7 +279,7 @@ export default function AppInterview() {
                       maxWidth: 440,
                     }}
                   >
-                    {next.blurb}
+                    {heroBlurb}
                   </p>
                   <div style={{ display: 'flex', gap: 11, flexWrap: 'wrap' }}>
                     <Link
@@ -368,37 +350,46 @@ export default function AppInterview() {
                   }}
                 >
                   <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Readiness</h2>
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#157A49' }}>
-                    Strong
-                  </span>
                 </div>
-                {readiness.map((r) => (
-                  <div key={r.skill} style={{ marginBottom: 14 }}>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        marginBottom: 6,
-                      }}
-                    >
-                      <span style={{ fontSize: 13.5, fontWeight: 600, color: '#46413A' }}>{r.skill}</span>
-                      <span
+                {loading ? (
+                  <LoadingState label="Loading readiness…" />
+                ) : error ? (
+                  <ErrorState error={error} />
+                ) : readiness.length === 0 ? (
+                  <EmptyState
+                    icon="◎"
+                    title="No readiness data yet"
+                    hint="Complete a mock interview to see your readiness by skill."
+                  />
+                ) : (
+                  readiness.map((r) => (
+                    <div key={r.skill} style={{ marginBottom: 14 }}>
+                      <div
                         style={{
-                          fontFamily: "'JetBrains Mono',monospace",
-                          fontSize: 12,
-                          fontWeight: 600,
-                          color: r.color,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          marginBottom: 6,
                         }}
                       >
-                        {r.score}
-                      </span>
+                        <span style={{ fontSize: 13.5, fontWeight: 600, color: '#46413A' }}>{r.skill}</span>
+                        <span
+                          style={{
+                            fontFamily: 'var(--jb-font-mono)',
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: r.color,
+                          }}
+                        >
+                          {r.score}
+                        </span>
+                      </div>
+                      <div style={{ height: 6, borderRadius: 999, background: '#F2ECE0', overflow: 'hidden' }}>
+                        <div style={{ width: r.pct, height: '100%', background: r.color }} />
+                      </div>
                     </div>
-                    <div style={{ height: 6, borderRadius: 999, background: '#F2ECE0', overflow: 'hidden' }}>
-                      <div style={{ width: r.pct, height: '100%', background: r.color }} />
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
 
@@ -451,7 +442,7 @@ export default function AppInterview() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontFamily: "'JetBrains Mono',monospace",
+                        fontFamily: 'var(--jb-font-mono)',
                         fontWeight: 600,
                         fontSize: 12,
                         marginBottom: 14,
@@ -462,7 +453,7 @@ export default function AppInterview() {
                     <div style={{ fontSize: 15, fontWeight: 700, color: '#1B1A16', marginBottom: 4 }}>
                       {c.title}
                     </div>
-                    <div style={{ fontSize: 12.5, color: '#8A8378' }}>{c.count} questions</div>
+                    <div style={{ fontSize: 12.5, color: '#8A8378' }}>Start a set →</div>
                   </Link>
                 ))}
               </div>
@@ -487,51 +478,60 @@ export default function AppInterview() {
                 }}
               >
                 <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Recent session feedback</h2>
-                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: '#8A8378' }}>
-                  Yesterday · 6 questions
-                </span>
               </div>
-              {feedback.map((f, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: 'flex',
-                    gap: 16,
-                    padding: '18px 22px',
-                    borderBottom: '1px solid #F2ECE0',
-                  }}
-                >
-                  <div style={{ flexShrink: 0, width: 46, textAlign: 'center' }}>
-                    <div
-                      style={{
-                        fontFamily: "'JetBrains Mono',monospace",
-                        fontSize: 19,
-                        fontWeight: 600,
-                        color: f.color,
-                        lineHeight: 1,
-                      }}
-                    >
-                      {f.score}
+              {loading ? (
+                <LoadingState label="Loading sessions…" />
+              ) : error ? (
+                <ErrorState error={error} />
+              ) : feedback.length === 0 ? (
+                <EmptyState
+                  icon="✎"
+                  title="No sessions yet"
+                  hint="Run a mock interview and your per-question feedback will appear here."
+                />
+              ) : (
+                feedback.map((f, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      display: 'flex',
+                      gap: 16,
+                      padding: '18px 22px',
+                      borderBottom: '1px solid #F2ECE0',
+                    }}
+                  >
+                    <div style={{ flexShrink: 0, width: 46, textAlign: 'center' }}>
+                      <div
+                        style={{
+                          fontFamily: 'var(--jb-font-mono)',
+                          fontSize: 19,
+                          fontWeight: 600,
+                          color: f.color,
+                          lineHeight: 1,
+                        }}
+                      >
+                        {f.score}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: '#A79E8F',
+                          fontFamily: 'var(--jb-font-mono)',
+                        }}
+                      >
+                        / 10
+                      </div>
                     </div>
-                    <div
-                      style={{
-                        fontSize: 10,
-                        color: '#A79E8F',
-                        fontFamily: "'JetBrains Mono',monospace",
-                      }}
-                    >
-                      / 10
+                    <div style={{ flex: 1, borderLeft: '1px solid #EEE7D9', paddingLeft: 16 }}>
+                      <div style={{ fontSize: 14.5, fontWeight: 600, marginBottom: 5 }}>{f.question}</div>
+                      <div style={{ fontSize: 13, lineHeight: 1.5, color: '#5A544A' }}>
+                        <span style={{ color: '#157A49', fontWeight: 600 }}>{f.tag} </span>
+                        {f.note}
+                      </div>
                     </div>
                   </div>
-                  <div style={{ flex: 1, borderLeft: '1px solid #EEE7D9', paddingLeft: 16 }}>
-                    <div style={{ fontSize: 14.5, fontWeight: 600, marginBottom: 5 }}>{f.question}</div>
-                    <div style={{ fontSize: 13, lineHeight: 1.5, color: '#5A544A' }}>
-                      <span style={{ color: '#157A49', fontWeight: 600 }}>{f.tag} </span>
-                      {f.note}
-                    </div>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </main>

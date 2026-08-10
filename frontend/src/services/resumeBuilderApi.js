@@ -43,17 +43,28 @@ const apiCall = async (endpoint, options = {}) => {
 
 /* -------------------------------------------------- builder configurator --- */
 
-// GET /api/resume-builder/templates -> [{ key, name, twoCol, atsScore, tags }]
-// Optional catalogue of layouts the backend supports. Page merges these onto
-// its baked-in template list so labels/ATS scores stay in sync when available.
-export const getResumeTemplates = async () =>
-  apiCall('/api/resume-builder/templates');
+// Templates are a static catalogue on the frontend (see
+// components/resume/resumeTemplates.jsx). There is no backend templates route —
+// /api/resume-builder/templates was falling through to GET(:id) and breaking —
+// so resolve the local catalogue directly (no network). Kept as a lightweight,
+// serialisable shape (no React component refs).
+const LOCAL_TEMPLATE_CATALOG = [
+  { key: 'classic', name: 'Classic', twoCol: false, tags: ['single column'] },
+  { key: 'modern', name: 'Modern', twoCol: false, tags: ['accent header'] },
+  { key: 'sidebar', name: 'Sidebar', twoCol: true, tags: ['two column'] },
+  { key: 'minimal', name: 'Minimal', twoCol: false, tags: ['monochrome'] },
+  { key: 'elegant', name: 'Elegant', twoCol: false, tags: ['serif'] },
+];
 
-// GET /api/resume-builder/context -> seed data for the live preview
-// (name, title, contact, summary, experience, skills, education). Falls back
-// to the design sample on the page when this fails.
-export const getResumeBuilderContext = async () =>
-  apiCall('/api/resume-builder/context');
+// GET /api/resume-builder/templates -> [{ key, name, twoCol, tags }]
+export const getResumeTemplates = async () => LOCAL_TEMPLATE_CATALOG;
+
+// There is no /api/resume-builder/context route (it was falling through to
+// GET(:id) and breaking). No obvious backend service method exists to seed the
+// preview, so resolve null (no network) — the page falls back to its design
+// sample. (Backlog: add a real builder-context endpoint if seeded previews are
+// wanted.)
+export const getResumeBuilderContext = async () => null;
 
 // GET /api/resume-builder -> existing resumes for this user
 export const listBuilderResumes = async () => apiCall('/api/resume-builder');

@@ -1,28 +1,38 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import EmployerSidebar from '@/components/employer/EmployerSidebar';
+import { LoadingState, ErrorState } from '@/components/employer/EmployerStates';
 import { appRoute } from '@/components/app/appRoutes';
+import { employerNotificationsApi } from '@/services/employerApi';
 
 /* ----------------------------------------------------------------- data --- */
-// Ported from the dc Component.notifData() sample. No backend yet → render
-// the design's own sample notifications.
-const NOTIF_DATA = [
-  { id: 1, type: 'applicants', group: 'today', tag: 'SC', tint: '#EAF6EE', ink: '#157A49', text: 'Sarah Chen applied to Senior Product Designer — 96% match.', time: '12m ago', href: 'Employer Candidate.dc.html', ai: false, baseUnread: true },
-  { id: 2, type: 'ai', group: 'today', tag: '✦', tint: '#15140F', ink: '#5BD08C', text: 'Autopilot advanced 6 applicants and queued 4 actions for review.', time: '1h ago', href: 'Employer Autopilot.dc.html', ai: true, baseUnread: true },
-  { id: 3, type: 'interviews', group: 'today', tag: 'IV', tint: '#EDF0FE', ink: '#4263EB', text: 'Jordan Lee confirmed his 11:00 AM onsite interview.', time: '2h ago', href: 'Employer Interviews.dc.html', ai: false, baseUnread: true },
-  { id: 4, type: 'ai', group: 'today', tag: '✦', tint: '#15140F', ink: '#5BD08C', text: 'Sourcing Agent found 14 new candidates for PM, Growth.', time: '4h ago', href: 'Employer Sourcing Agent.dc.html', ai: true, baseUnread: true },
-  { id: 5, type: 'offers', group: 'today', tag: 'OF', tint: '#EAF6EE', ink: '#157A49', text: 'Priya Nair accepted your offer for Staff Frontend Engineer. 🎉', time: '6h ago', href: 'Employer Offers.dc.html', ai: false, baseUnread: true },
-  { id: 6, type: 'applicants', group: 'earlier', tag: '12', tint: '#EDF0FE', ink: '#4263EB', text: '12 new applicants across your 3 open reqs.', time: 'Yesterday', href: 'Employer Candidates.dc.html', ai: false, baseUnread: false },
-  { id: 7, type: 'interviews', group: 'earlier', tag: 'IV', tint: '#EDF0FE', ink: '#4263EB', text: 'Reminder: Sarah Chen final round Mon Jun 29, 2:00 PM.', time: 'Yesterday', href: 'Employer Interviews.dc.html', ai: false, baseUnread: false },
-  { id: 8, type: 'ai', group: 'earlier', tag: '✦', tint: '#15140F', ink: '#5BD08C', text: 'Copilot generated a scorecard for Sarah Chen — Strong hire.', time: 'Tue', href: 'Employer AI Interview.dc.html', ai: true, baseUnread: false },
-  { id: 9, type: 'offers', group: 'earlier', tag: 'AP', tint: '#FBF1E2', ink: '#9A6A2E', text: 'Your Senior Data Scientist req is awaiting your approval.', time: 'Tue', href: 'Employer Req Approval.dc.html', ai: false, baseUnread: false },
-];
-
 const TYPE_LABELS = { applicants: 'Applicants', interviews: 'Interviews', offers: 'Offers', ai: 'AI agents' };
 const typeLabel = (t) => TYPE_LABELS[t] || t;
+
+// Per-type tint/ink (mirrors the design's row swatches) for live notifications.
+const TYPE_SWATCH = {
+  ai: { tint: '#15140F', ink: '#5BD08C' },
+  applicants: { tint: '#EAF6EE', ink: '#157A49' },
+  interviews: { tint: '#EDF0FE', ink: '#4263EB' },
+  offers: { tint: '#EAF6EE', ink: '#157A49' },
+};
+const swatch = (t) => TYPE_SWATCH[t] || { tint: '#EDF0FE', ink: '#4263EB' };
+
+const timeAgo = (createdAt) => {
+  const then = new Date(createdAt).getTime();
+  if (!then) return '';
+  const s = Math.max(0, Math.round((Date.now() - then) / 1000));
+  if (s < 60) return `${s}s ago`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.round(h / 24);
+  return d === 1 ? 'Yesterday' : `${d}d ago`;
+};
 
 const FILTER_DEFS = [
   { key: 'all', label: 'All' },
@@ -42,9 +52,57 @@ export default function EmployerNotifications() {
   // dc state = { filter: 'all', read: [] }
   const [filter, setFilter] = useState('all');
   const [read, setRead] = useState([]);
+  const [notifs, setNotifs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const markRead = (id) =>
+  // Fetch live notifications. No sample fallback — surface real state only.
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await employerNotificationsApi.list();
+      const list = Array.isArray(res?.notifications) ? res.notifications : [];
+      const readIds = [];
+      const mapped = list.map((n, i) => {
+        const sw = swatch(n.type);
+        const id = n._id || i + 1;
+        if (n.read) readIds.push(id);
+        return {
+          id,
+          type: n.type,
+          group: n.group || 'today',
+          tag: n.tag,
+          tint: sw.tint,
+          ink: sw.ink,
+          text: n.text,
+          time: timeAgo(n.createdAt),
+          href: n.href,
+          ai: !!n.ai,
+          baseUnread: true,
+        };
+      });
+      setNotifs(mapped);
+      setRead(readIds);
+    } catch (err) {
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const markRead = (id) => {
     setRead((r) => (r.includes(id) ? r : r.concat(id)));
+    // Reflect real failure: revert the optimistic read if the write fails.
+    employerNotificationsApi.markRead(id).catch(() => {
+      setRead((r) => r.filter((x) => x !== id));
+    });
+  };
 
   // dc renderVals() derived state
   const {
@@ -56,7 +114,7 @@ export default function EmployerNotifications() {
     groups,
     isEmpty,
   } = useMemo(() => {
-    const all = NOTIF_DATA;
+    const all = notifs;
     const isUnread = (n) => n.baseUnread && !read.includes(n.id);
     const unread = all.filter(isUnread).length;
 
@@ -105,22 +163,20 @@ export default function EmployerNotifications() {
       groups: builtGroups,
       isEmpty: builtGroups.length === 0,
     };
-  }, [filter, read]);
+  }, [filter, read, notifs]);
 
   const markAll = () => {
-    if (unreadCount > 0) setRead(NOTIF_DATA.map((n) => n.id));
+    if (unreadCount <= 0) return;
+    const prev = read;
+    setRead(notifs.map((n) => n.id));
+    // Reflect real failure: restore prior read state if the write fails.
+    employerNotificationsApi.markAllRead().catch(() => setRead(prev));
   };
 
   return (
     <>
       <Head>
         <title>Notifications — Jobocate for Employers</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
       <style jsx global>{`
@@ -148,7 +204,7 @@ export default function EmployerNotifications() {
           display: 'flex',
           minHeight: '100vh',
           background: '#F7F3EA',
-          fontFamily: "'Hanken Grotesk',sans-serif",
+          fontFamily: 'var(--jb-font-sans)',
           color: '#1B1A16',
         }}
       >
@@ -172,7 +228,7 @@ export default function EmployerNotifications() {
           >
             <div
               style={{
-                fontFamily: "'JetBrains Mono',monospace",
+                fontFamily: 'var(--jb-font-mono)',
                 fontSize: 11.5,
                 letterSpacing: '0.1em',
                 textTransform: 'uppercase',
@@ -205,7 +261,7 @@ export default function EmployerNotifications() {
             <div style={{ marginBottom: 20 }}>
               <h1
                 style={{
-                  fontFamily: "'Instrument Serif',serif",
+                  fontFamily: 'var(--jb-font-display)',
                   fontWeight: 400,
                   fontSize: 40,
                   lineHeight: 1,
@@ -244,7 +300,7 @@ export default function EmployerNotifications() {
                 >
                   {f.label}
                   {f.showCount && (
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: f.countColor }}>
+                    <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: f.countColor }}>
                       {f.count}
                     </span>
                   )}
@@ -253,12 +309,18 @@ export default function EmployerNotifications() {
             </div>
 
             {/* GROUPS */}
+            {loading ? (
+              <LoadingState label="Loading notifications…" />
+            ) : error ? (
+              <ErrorState error={error} onRetry={load} />
+            ) : (
+            <>
             {groups.map((g) => (
               <div key={g.label} style={{ marginBottom: 26 }}>
                 <div
                   style={{
-                    fontFamily: "'JetBrains Mono',monospace",
-                    fontSize: 10.5,
+                    fontFamily: 'var(--jb-font-mono)',
+                    fontSize: 11,
                     letterSpacing: '0.1em',
                     textTransform: 'uppercase',
                     color: '#9A9286',
@@ -295,7 +357,7 @@ export default function EmployerNotifications() {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          fontFamily: "'JetBrains Mono',monospace",
+                          fontFamily: 'var(--jb-font-mono)',
                           fontWeight: 600,
                           fontSize: 12,
                         }}
@@ -310,8 +372,8 @@ export default function EmployerNotifications() {
                           {n.isAI && (
                             <span
                               style={{
-                                fontFamily: "'JetBrains Mono',monospace",
-                                fontSize: 8.5,
+                                fontFamily: 'var(--jb-font-mono)',
+                                fontSize: 11,
                                 fontWeight: 600,
                                 letterSpacing: '0.04em',
                                 color: '#157A49',
@@ -327,8 +389,8 @@ export default function EmployerNotifications() {
                         </div>
                         <div
                           style={{
-                            fontFamily: "'JetBrains Mono',monospace",
-                            fontSize: 10.5,
+                            fontFamily: 'var(--jb-font-mono)',
+                            fontSize: 11,
                             color: '#A79E8F',
                             marginTop: 3,
                           }}
@@ -365,8 +427,12 @@ export default function EmployerNotifications() {
                   textAlign: 'center',
                 }}
               >
-                <p style={{ fontSize: 14.5, color: '#8A8378', margin: 0 }}>No notifications in this filter.</p>
+                <p style={{ fontSize: 14.5, color: '#8A8378', margin: 0 }}>
+                  {notifs.length === 0 ? "You're all caught up. No notifications yet." : 'No notifications in this filter.'}
+                </p>
               </div>
+            )}
+            </>
             )}
           </div>
         </main>

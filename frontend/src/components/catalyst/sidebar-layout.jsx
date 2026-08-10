@@ -49,7 +49,7 @@ export function SidebarLayout({ navbar, sidebar, children, isCollapsed = false }
 
 
   return (
-    <div className="relative isolate flex h-svh overflow-hidden w-full bg-white dark:bg-zinc-900 max-lg:flex-col lg:bg-white dark:lg:bg-zinc-950">
+    <div className="relative isolate flex min-h-screen w-full overflow-hidden bg-zinc-50 dark:bg-zinc-950 max-lg:flex-col lg:bg-white dark:lg:bg-zinc-950">
       {/* Sidebar on desktop - only visible on lg and above */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 hidden lg:block transition-all duration-300 ${isCollapsed ? 'lg:w-16' : 'lg:w-64'}`}
@@ -67,9 +67,9 @@ export function SidebarLayout({ navbar, sidebar, children, isCollapsed = false }
       </div>
 
       {/* Navbar on mobile */}
-      <header className="flex items-center justify-between px-4 lg:hidden">
-        <div className="py-2.5">
-          <NavbarItem onClick={() => setShowSidebar(true)} aria-label="Open navigation">
+      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-zinc-200/80 bg-white/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:border-zinc-800 dark:bg-zinc-900/95 lg:hidden">
+        <div className="flex items-center">
+          <NavbarItem onClick={() => setShowSidebar(true)} aria-label="Open navigation" className="rounded-full border border-zinc-200 bg-white p-2 shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
             <OpenMenuIcon />
           </NavbarItem>
         </div>
@@ -78,7 +78,7 @@ export function SidebarLayout({ navbar, sidebar, children, isCollapsed = false }
 
       {/* Navbar on desktop */}
       <header
-        className={`hidden lg:flex items-center justify-end  py-2.5 transition-all duration-300 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 ${isCollapsed ? 'lg:ml-6' : 'lg:ml-52'}`}
+        className={`hidden lg:flex items-center justify-end px-4 py-3 transition-all duration-300 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 border-b border-zinc-200 dark:border-zinc-800 dark:bg-zinc-900/95 ${isCollapsed ? 'lg:ml-6' : 'lg:ml-52'}`}
       >
         {navbar}
       </header>
@@ -87,7 +87,7 @@ export function SidebarLayout({ navbar, sidebar, children, isCollapsed = false }
       <main
         className={`flex flex-1 flex-col pb-2 lg:min-w-0 lg:pt-2 lg:pr-2 transition-all duration-300 ${isCollapsed ? 'lg:ml-12' : 'lg:ml-8'}`}
       >
-        <div className="grow min-h-0 overflow-y-auto bg-gray-50 dark:bg-zinc-900">
+        <div className="grow min-h-0 overflow-y-auto bg-zinc-50 dark:bg-zinc-900">
           {children}
         </div>
       </main>

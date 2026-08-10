@@ -10,44 +10,11 @@ import {
   regenerateGeneratedSection,
   saveGeneratedResume,
 } from '@/services/resumeGenerateApi';
+import { ErrorState, EmptyState } from '@/components/app/AppStates';
 
-/* ----------------------------------------------------------- sample data ---
-   Faithful port of the dc Component's class methods. Used as the graceful
-   fallback whenever the backend is unavailable or the user is unauthenticated. */
-
-const SAMPLE_SUMMARIES = [
-  'Senior Product Designer with 7+ years shaping 0→1 fintech and B2B SaaS. Led the Plaid onboarding redesign that lifted activation 31% across 2M users and built the design system adopted by 40+ engineers. Now focused on raising the craft bar on Stripe Checkout.',
-  'Product designer who pairs systems thinking with measurable impact. At Plaid, drove a +31% activation lift and scaled a design system across six teams. Excited to bring that rigor and accessibility focus to Stripe’s payment surfaces.',
-];
-
-const SAMPLE_EXP_SETS = [
-  [
-    'Led the end-to-end onboarding redesign, lifting activation 31% across 2M users.',
-    'Built and scaled the design system adopted by 40+ engineers across six teams.',
-    'Cut time-to-first-payment 24% through iterative, experiment-driven flows.',
-  ],
-  [
-    'Owned the 0→1 onboarding redesign; activation up 31% (2M users).',
-    'Established the company-wide design system — 40+ engineers, six teams adopted it.',
-    'Drove a 24% reduction in time-to-first-payment via rigorous A/B testing.',
-  ],
-];
-
-const SAMPLE_SKILL_SETS = [
-  ['Design systems', '0→1 product', 'Prototyping', 'User research', 'Figma', 'Experimentation', 'Fintech', 'Design ops'],
-  ['Design systems', 'Interaction design', 'Accessibility', 'Motion', 'Figma', 'Data-informed design', 'B2B SaaS', 'Cross-functional leadership'],
-];
-
-const KEYWORDS = [
-  { label: 'Design systems', on: true }, { label: 'Checkout', on: false }, { label: 'Payments', on: false },
-  { label: '0→1', on: true }, { label: 'Prototyping', on: true }, { label: 'Accessibility', on: true },
-  { label: 'Experimentation', on: true }, { label: 'Figma', on: true }, { label: 'B2B SaaS', on: true },
-  { label: 'Data-informed', on: true }, { label: 'Motion', on: true }, { label: 'Cross-functional', on: true },
-  { label: 'Design system governance', on: true },
-];
-
-const DEFAULT_JD =
-  'Stripe is hiring a Senior Product Designer for Checkout. You will own end-to-end design for high-impact payment flows, partner closely with engineering and research, push craft and accessibility, and contribute to our design system. We value 0→1 product experience, experimentation, motion, and data-informed decisions in B2B SaaS.';
+/* --------------------------------------------------------- static options ---
+   The generated résumé content (summary / experience / skills / keywords) all
+   comes from the backend. Only the input option lists below are static UI. */
 
 const SOURCE_OPTS = [
   { key: 'profile', label: 'My profile' },
@@ -71,8 +38,8 @@ const SHIMMER_ROWS = [
 
 export default function AppResumeGenerate() {
   // ---- inputs ----
-  const [role, setRole] = useState('Senior Product Designer');
-  const [jd, setJd] = useState(DEFAULT_JD);
+  const [role, setRole] = useState('');
+  const [jd, setJd] = useState('');
   const [source, setSource] = useState('profile');
   const [tone, setTone] = useState('confident');
   const [seniority, setSeniority] = useState('senior');
@@ -81,12 +48,7 @@ export default function AppResumeGenerate() {
   const [phase, setPhase] = useState('input');
   const [error, setError] = useState(null);
 
-  // ---- generated draft (version indices used for sample-data fallback) ----
-  const [vSummary, setVSummary] = useState(0);
-  const [vExp, setVExp] = useState(0);
-  const [vSkills, setVSkills] = useState(0);
-
-  // ---- live draft content (set from backend when available) ----
+  // ---- live draft content (set from backend) ----
   const [draft, setDraft] = useState(null); // { summary, experience[], skills[], keywords[], coverage }
 
   // ---- acceptance state ----
@@ -97,18 +59,19 @@ export default function AppResumeGenerate() {
   const timer = useRef(null);
   useEffect(() => () => clearTimeout(timer.current), []);
 
-  // Sample-data resolvers (mirror the dc class' renderVals fallbacks)
-  const sampleSummary = SAMPLE_SUMMARIES[vSummary % SAMPLE_SUMMARIES.length];
-  const sampleExp = SAMPLE_EXP_SETS[vExp % SAMPLE_EXP_SETS.length];
-  const sampleSkills = SAMPLE_SKILL_SETS[vSkills % SAMPLE_SKILL_SETS.length];
+  // ---- draft content (all sourced from the backend) ----
+  const summaryText = draft?.summary || '';
+  const expBullets = Array.isArray(draft?.experience) ? draft.experience : [];
+  const skills = Array.isArray(draft?.skills) ? draft.skills : [];
 
-  const summaryText = draft?.summary || sampleSummary;
-  const expBullets = (draft?.experience && draft.experience.length ? draft.experience : sampleExp);
-  const skills = (draft?.skills && draft.skills.length ? draft.skills : sampleSkills);
-
-  const keywordList = (draft?.keywords && draft.keywords.length ? draft.keywords : KEYWORDS);
+  const keywordList = Array.isArray(draft?.keywords) ? draft.keywords : [];
   const matched = keywordList.filter((k) => k.on).length;
-  const coverage = draft?.coverage != null ? draft.coverage : Math.round((matched / keywordList.length) * 100);
+  const coverage =
+    draft?.coverage != null
+      ? draft.coverage
+      : keywordList.length
+      ? Math.round((matched / keywordList.length) * 100)
+      : 0;
 
   const acceptedCount = (aSummary ? 1 : 0) + (aExp ? 1 : 0) + (aSkills ? 1 : 0);
 
@@ -117,10 +80,12 @@ export default function AppResumeGenerate() {
     setError(null);
     setPhase('drafting');
     setASummary(false);
-    setASExpReset();
+    setAExp(false);
+    setASkills(false);
     clearTimeout(timer.current);
 
     let backendDraft = null;
+    let failed = null;
     try {
       const res = await generateResume({
         role,
@@ -147,22 +112,16 @@ export default function AppResumeGenerate() {
         };
       }
     } catch (e) {
-      // Graceful fallback — keep the design's own sample data, render faithfully.
-      setError(null);
-      backendDraft = null;
+      failed = e;
     }
 
-    // Keep the design's drafting animation timing (1.8s) before showing the draft.
+    // Keep the drafting animation timing (1.8s) before showing the result.
     timer.current = setTimeout(() => {
+      if (failed) setError(failed);
       setDraft(backendDraft);
       setPhase('done');
     }, 1800);
   };
-
-  function setASExpReset() {
-    setAExp(false);
-    setASkills(false);
-  }
 
   const regenerateAll = () => draftThenDone();
   const editInputs = () => setPhase('input');
@@ -187,25 +146,16 @@ export default function AppResumeGenerate() {
     if (section === 'summary') {
       if (typeof content === 'string' && content) {
         setDraft((d) => ({ ...(d || {}), summary: content }));
-      } else {
-        setVSummary((v) => (v + 1) % SAMPLE_SUMMARIES.length);
-        setDraft((d) => (d ? { ...d, summary: null } : d));
       }
       setASummary(false);
     } else if (section === 'experience') {
       if (Array.isArray(content) && content.length) {
         setDraft((d) => ({ ...(d || {}), experience: content }));
-      } else {
-        setVExp((v) => (v + 1) % SAMPLE_EXP_SETS.length);
-        setDraft((d) => (d ? { ...d, experience: null } : d));
       }
       setAExp(false);
     } else if (section === 'skills') {
       if (Array.isArray(content) && content.length) {
         setDraft((d) => ({ ...(d || {}), skills: content }));
-      } else {
-        setVSkills((v) => (v + 1) % SAMPLE_SKILL_SETS.length);
-        setDraft((d) => (d ? { ...d, skills: null } : d));
       }
       setASkills(false);
     }
@@ -235,8 +185,8 @@ export default function AppResumeGenerate() {
 
   // ----------------------------------------------------------- subcomponents ---
   const AcceptedPill = () => (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: "'JetBrains Mono',monospace", fontSize: 10, fontWeight: 600, color: '#157A49' }}>
-      <span style={{ width: 16, height: 16, borderRadius: '50%', background: '#1FA463', color: '#0C2C1C', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9 }}>✓</span>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, color: '#157A49' }}>
+      <span style={{ width: 16, height: 16, borderRadius: '50%', background: '#1FA463', color: '#0C2C1C', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>✓</span>
       ACCEPTED
     </span>
   );
@@ -280,12 +230,6 @@ export default function AppResumeGenerate() {
     <>
       <Head>
         <title>Generate résumé · AI generator — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
       <style jsx global>{`
@@ -332,7 +276,7 @@ export default function AppResumeGenerate() {
         }
       `}</style>
 
-      <div id="jbapp" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: "'Hanken Grotesk',sans-serif", color: '#1B1A16' }}>
+      <div id="jbapp" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16' }}>
         <AppSidebar active="resume" />
 
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
@@ -340,7 +284,7 @@ export default function AppResumeGenerate() {
           <header style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: 18, padding: '15px 32px', background: 'rgba(247,243,234,0.85)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #E7E0D2' }}>
             <Link href={appRoute('App Resume.dc.html')} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13.5, fontWeight: 600, color: '#5A544A', textDecoration: 'none' }}>← Back to résumé</Link>
             <div style={{ flex: 1 }} />
-            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, color: '#9A9286' }}>AI generator</span>
+            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, color: '#9A9286' }}>AI generator</span>
           </header>
 
           <div style={{ padding: '32px 32px 64px', maxWidth: 760, width: '100%', margin: '0 auto' }}>
@@ -348,8 +292,8 @@ export default function AppResumeGenerate() {
             {/* ===== INPUT ===== */}
             {isInput && (
               <div>
-                <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#1FA463', marginBottom: 8 }}>Generate from a role</div>
-                <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 36, lineHeight: 1.04, margin: '0 0 6px' }}>Draft a résumé in seconds.</h1>
+                <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#1FA463', marginBottom: 8 }}>Generate from a role</div>
+                <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 36, lineHeight: 1.04, margin: '0 0 6px' }}>Draft a résumé in seconds.</h1>
                 <p style={{ fontSize: 15, color: '#8A8378', margin: '0 0 26px' }}>Give us the target role and we’ll write a tailored draft from your experience — then you accept, tweak, or regenerate each section.</p>
 
                 <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18, padding: 26, display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -419,7 +363,7 @@ export default function AppResumeGenerate() {
             {isDrafting && (
               <div style={{ padding: '60px 20px', textAlign: 'center', animation: 'rbpop 0.2s ease' }}>
                 <div style={{ width: 52, height: 52, margin: '0 auto 24px', borderRadius: '50%', border: '3px solid #E6DECF', borderTopColor: '#1FA463', animation: 'spin 0.8s linear infinite' }} />
-                <h2 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 28, lineHeight: 1.1, margin: '0 0 10px' }}>Drafting your résumé…</h2>
+                <h2 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 28, lineHeight: 1.1, margin: '0 0 10px' }}>Drafting your résumé…</h2>
                 <p style={{ fontSize: 14, color: '#8A8378', margin: '0 0 30px' }}>Reading the JD, matching your experience, and writing metric-driven bullets.</p>
                 <div style={{ maxWidth: 440, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 11 }}>
                   {SHIMMER_ROWS.map((r, i) => (
@@ -434,13 +378,22 @@ export default function AppResumeGenerate() {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20, flexWrap: 'wrap' }}>
                   <div style={{ flex: 1, minWidth: 200 }}>
-                    <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#157A49', marginBottom: 5 }}>Draft ready</div>
-                    <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 30, lineHeight: 1.05, margin: 0 }}>{role} · Stripe</h1>
+                    <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#157A49', marginBottom: 5 }}>Draft ready</div>
+                    <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 30, lineHeight: 1.05, margin: 0 }}>{role || 'Your résumé draft'}</h1>
                   </div>
                   <button onClick={regenerateAll} style={{ fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: '#157A49', background: '#EAF6EE', border: '1px solid #CDE9D6', borderRadius: 999, padding: '9px 15px', cursor: 'pointer' }}>↻ Regenerate all</button>
                   <button onClick={editInputs} style={{ fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: '#5A544A', background: '#FFFEFB', border: '1px solid #D9D0BE', borderRadius: 999, padding: '9px 15px', cursor: 'pointer' }}>Edit inputs</button>
                 </div>
 
+                {error ? (
+                  <ErrorState error={error} />
+                ) : !draft ? (
+                  <EmptyState
+                    title="No draft generated"
+                    hint="We couldn't generate a résumé. Adjust your inputs and try again."
+                  />
+                ) : (
+                <>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
                   {/* SUMMARY */}
@@ -456,10 +409,10 @@ export default function AppResumeGenerate() {
                   {/* EXPERIENCE */}
                   <div style={{ background: '#FFFEFB', border: `1.5px solid ${expBorder}`, borderRadius: 16, padding: 22 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <span style={{ fontSize: 15, fontWeight: 700 }}>Experience — Plaid</span>
+                      <span style={{ fontSize: 15, fontWeight: 700 }}>Experience</span>
                       {aExp && <AcceptedPill />}
                     </div>
-                    <div style={{ fontSize: 12.5, color: '#8A8378', marginBottom: 14 }}>Senior Product Designer · 2021 — Present · rewritten with metrics</div>
+                    <div style={{ fontSize: 12.5, color: '#8A8378', marginBottom: 14 }}>AI-rewritten bullets with quantified impact</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                       {expBullets.map((b, i) => (
                         <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 11 }}>
@@ -486,10 +439,11 @@ export default function AppResumeGenerate() {
                   </div>
 
                   {/* KEYWORDS / COVERAGE */}
+                  {keywordList.length > 0 && (
                   <div style={{ background: '#FBF9F2', border: '1px solid #E6DECF', borderRadius: 16, padding: 22 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
                       <span style={{ fontSize: 15, fontWeight: 700 }}>JD keyword coverage</span>
-                      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 18, fontWeight: 600, color: '#157A49' }}>{coverage}%</span>
+                      <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 18, fontWeight: 600, color: '#157A49' }}>{coverage}%</span>
                     </div>
                     <div style={{ height: 7, borderRadius: 999, background: '#EFE8DA', overflow: 'hidden', marginBottom: 16 }}>
                       <div style={{ width: `${coverage}%`, height: '100%', background: '#1FA463' }} />
@@ -501,18 +455,21 @@ export default function AppResumeGenerate() {
                         </span>
                       ))}
                     </div>
-                    <div style={{ fontSize: 12.5, color: '#8A8378', marginTop: 14 }}>Add the 2 missing keywords to push coverage toward 100% — we’ve flagged them in clay.</div>
+                    <div style={{ fontSize: 12.5, color: '#8A8378', marginTop: 14 }}>Add the {keywordList.length - matched} missing keyword{keywordList.length - matched === 1 ? '' : 's'} to push coverage toward 100% — flagged in clay.</div>
                   </div>
+                  )}
 
                 </div>
 
                 {/* FOOTER */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 24 }}>
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, color: '#8A8378' }}>{acceptedCount} / 3 sections accepted</span>
+                  <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, color: '#8A8378' }}>{acceptedCount} / 3 sections accepted</span>
                   <div style={{ flex: 1 }} />
                   <Link href={appRoute('App Resume Library.dc.html')} onClick={handleSave} style={{ fontFamily: 'inherit', fontSize: 14, fontWeight: 600, color: '#1B1A16', background: '#FFFEFB', border: '1px solid #D9D0BE', borderRadius: 999, padding: '13px 20px', textDecoration: 'none' }}>Save to library</Link>
                   <Link href={appRoute('App Resume.dc.html')} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 14.5, fontWeight: 700, color: '#0C2C1C', background: '#1FA463', borderRadius: 999, padding: '13px 22px', textDecoration: 'none' }}>Open in editor →</Link>
                 </div>
+                </>
+                )}
               </div>
             )}
 

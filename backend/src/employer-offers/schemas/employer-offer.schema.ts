@@ -1,17 +1,22 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
 export type EmployerOfferDocument = EmployerOffer & Document;
 
 @Schema({ timestamps: true })
 export class EmployerOffer {
-  @Prop({ type: Types.ObjectId, ref: 'EmployerJob', required: false })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'EmployerJob', required: false })
   jobId?: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'EmployerApplicant', required: false })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'EmployerApplicant', required: false })
   applicantId?: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
+  // Real candidate (User) the offer is for. Resolved from the linked
+  // EmployerApplicant on create; drives the candidate-side notification.
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: false, index: true })
+  candidateId?: Types.ObjectId;
+
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true, index: true })
   ownerId: Types.ObjectId;
 
   @Prop({ default: '' })
@@ -48,5 +53,5 @@ export class EmployerOffer {
 
 export const EmployerOfferSchema = SchemaFactory.createForClass(EmployerOffer);
 
-EmployerOfferSchema.index({ ownerId: 1 });
-EmployerOfferSchema.index({ status: 1 });
+// ownerId and status are already single-field indexed via @Prop({ index: true }).
+EmployerOfferSchema.index({ ownerId: 1, status: 1 });

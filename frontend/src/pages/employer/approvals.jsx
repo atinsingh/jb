@@ -1,56 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import EmployerSidebar from '@/components/employer/EmployerSidebar';
+import { LoadingState, EmptyState, ErrorState, InlineError } from '@/components/employer/EmployerStates';
 import { appRoute } from '@/components/app/appRoutes';
+import { employerApprovalsApi } from '@/services/employerApi';
 
-/* ----------------------------------------------------------- sample data --- */
-// Mirrors the dc Component.reqData() sample approval workflow.
-const REQ_DATA = {
-  req1: {
-    title: 'Senior Data Scientist',
-    team: 'Data · Risk',
-    location: 'Remote (US)',
-    type: 'Full-time',
-    level: 'Senior',
-    requester: 'Elena Cruz',
-    reqInitials: 'EC',
-    reqAccent: 'indigo',
-    fields: [
-      { label: 'Headcount', value: '1' },
-      { label: 'Budget', value: '$185–220k' },
-      { label: 'Start by', value: 'Q3 2026' },
-    ],
-    chain: [
-      { name: 'Elena Cruz', role: 'Hiring Manager · requester', state: 'done', note: 'Backfill for a departing IC; critical for the risk-model roadmap.' },
-      { name: 'Dana Whitfield', role: 'Senior Recruiter', state: 'current' },
-      { name: 'Priya Shah', role: 'Finance / HR', state: 'pending' },
-    ],
-  },
-  req2: {
-    title: 'Product Marketing Manager',
-    team: 'Marketing',
-    location: 'New York · Hybrid',
-    type: 'Full-time',
-    level: 'Mid–Senior',
-    requester: 'Tom Baker',
-    reqInitials: 'TB',
-    reqAccent: 'indigo',
-    fields: [
-      { label: 'Headcount', value: '1' },
-      { label: 'Budget', value: '$140–165k' },
-      { label: 'Start by', value: 'Q4 2026' },
-    ],
-    chain: [
-      { name: 'Tom Baker', role: 'Hiring Manager · requester', state: 'done', note: 'New role to support the Q4 launch; not a backfill.' },
-      { name: 'Dana Whitfield', role: 'Senior Recruiter', state: 'current' },
-      { name: 'Priya Shah', role: 'Finance / HR', state: 'pending' },
-    ],
-  },
-};
-
+/* --------------------------------------------------------------- helpers --- */
 const avatarStyle = (a) => (a === 'green' ? { bg: '#1FA463', color: '#0C2C1C' } : { bg: '#4263EB', color: '#fff' });
 
 const statusFor = (decision) => {
@@ -72,21 +30,76 @@ const DECIDED_MAP = {
   reject: { text: 'You rejected this req. The requester has been notified.', bg: '#FBEDE4', border: '#EAD0C4', iconBg: '#C9622E', iconColor: '#fff', icon: '✕', textColor: '#7A4326' },
 };
 
+// Normalize a backend approval "status" into the local decision keyword.
+const decisionFromStatus = (status) => {
+  if (status === 'approve' || status === 'approved') return 'approve';
+  if (status === 'reject' || status === 'rejected') return 'reject';
+  if (status === 'changes' || status === 'changes_requested') return 'changes';
+  return null;
+};
+
+const initialsOf = (name) =>
+  String(name || '')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase() || '?';
+
+// Map a backend approval into the page's requisition shape.
+const mapApproval = (a) => ({
+  id: a._id,
+  title: a.title,
+  team: a.team,
+  location: a.location,
+  type: a.type,
+  level: a.level,
+  requester: a.requester,
+  reqInitials: initialsOf(a.requester),
+  reqAccent: 'indigo',
+  fields: a.fields || [],
+  chain: a.chain || [],
+  decision: decisionFromStatus(a.status),
+});
+
 /* ----------------------------------------------------------- component --- */
 export default function EmployerApprovals() {
-  const [selected, setSelected] = useState('req1');
+  const [reqs, setReqs] = useState([]);
+  const [selected, setSelected] = useState(null);
   const [note, setNote] = useState('');
-  const [decisions, setDecisions] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [actionError, setActionError] = useState(null);
 
-  const keys = Object.keys(REQ_DATA);
+  // Fetch live approvals. No sample fallback — surface real state only.
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await employerApprovalsApi.list();
+      const arr = Array.isArray(res?.approvals) ? res.approvals : [];
+      const mapped = arr.map(mapApproval);
+      setReqs(mapped);
+      setSelected((prev) => (mapped.some((r) => r.id === prev) ? prev : mapped[0]?.id ?? null));
+    } catch (err) {
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const inbox = keys.map((k) => {
-    const r = REQ_DATA[k];
-    const on = selected === k;
-    const ss = statusFor(decisions[k]);
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const inbox = reqs.map((r) => {
+    const on = selected === r.id;
+    const ss = statusFor(r.decision);
     const av = avatarStyle(r.reqAccent);
     return {
-      key: k,
+      key: r.id,
       title: r.title,
       team: r.team,
       location: r.location,
@@ -103,11 +116,11 @@ export default function EmployerApprovals() {
     };
   });
 
-  const sel = REQ_DATA[selected];
-  const decision = decisions[selected];
+  const sel = reqs.find((r) => r.id === selected) || reqs[0];
+  const decision = sel?.decision;
   const ss = statusFor(decision);
 
-  const chain = sel.chain.map((c, i, arr) => {
+  const chain = (sel?.chain || []).map((c, i, arr) => {
     let state = c.state;
     if (c.state === 'current' && decision) state = decision === 'approve' ? 'done' : 'current';
     const ssx = stepStyle(state);
@@ -135,21 +148,33 @@ export default function EmployerApprovals() {
   const selectReq = (k) => {
     setSelected(k);
     setNote('');
+    setActionError(null);
   };
-  const setDecision = (d) => setDecisions((s) => ({ ...s, [selected]: d }));
 
-  const awaitingCount = keys.filter((k) => !decisions[k]).length;
+  // Submit a decision to the backend; update from the response, surface errors.
+  const setDecision = async (d) => {
+    const id = selected;
+    if (!id) return;
+    setActionError(null);
+    try {
+      const updated = await employerApprovalsApi.decide(id, { decision: d, note });
+      if (updated && (updated._id || updated.status)) {
+        const mapped = mapApproval({ ...updated, _id: updated._id || id });
+        setReqs((s) => s.map((r) => (r.id === id ? { ...r, ...mapped } : r)));
+      } else {
+        await load();
+      }
+    } catch (err) {
+      setActionError(err);
+    }
+  };
+
+  const awaitingCount = reqs.filter((r) => !r.decision).length;
 
   return (
     <>
       <Head>
         <title>Req approvals — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
       <style jsx global>{`
@@ -183,7 +208,7 @@ export default function EmployerApprovals() {
         }
       `}</style>
 
-      <div id="emapp" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: "'Hanken Grotesk',sans-serif", color: '#1B1A16' }}>
+      <div id="emapp" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16' }}>
         <EmployerSidebar active="jobs" />
 
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
@@ -191,21 +216,32 @@ export default function EmployerApprovals() {
           <header style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: 14, padding: '14px 32px', background: 'rgba(247,243,234,0.85)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #E7E0D2' }}>
             <Link href={appRoute('Employer Jobs.dc.html')} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13.5, fontWeight: 600, color: '#5A544A', textDecoration: 'none' }}>← Back to jobs</Link>
             <div style={{ flex: 1 }} />
-            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, color: '#9A9286' }}>Requisition approvals</span>
+            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, color: '#9A9286' }}>Requisition approvals</span>
           </header>
 
           <div style={{ padding: '26px 32px 56px', maxWidth: 1040, width: '100%', margin: '0 auto' }}>
             <div style={{ marginBottom: 18 }}>
-              <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 36, lineHeight: 1, margin: '0 0 6px' }}>Req approvals</h1>
+              <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 36, lineHeight: 1, margin: '0 0 6px' }}>Req approvals</h1>
               <p style={{ fontSize: 14.5, color: '#5A544A', margin: 0 }}>
-                <b style={{ color: '#1B1A16' }}>{awaitingCount} awaiting your approval</b> · sign off before a role can be posted.
+                {loading || error ? (
+                  <>Sign off before a role can be posted.</>
+                ) : (
+                  <><b style={{ color: '#1B1A16' }}>{awaitingCount} awaiting your approval</b> · sign off before a role can be posted.</>
+                )}
               </p>
             </div>
 
+            {loading ? (
+              <LoadingState label="Loading approvals…" />
+            ) : error ? (
+              <ErrorState error={error} onRetry={load} />
+            ) : reqs.length === 0 ? (
+              <EmptyState icon="✓" title="No requisitions awaiting approval" hint="When a hiring manager submits a requisition for sign-off, it will appear here." />
+            ) : (
             <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
               {/* INBOX */}
               <div style={{ width: 300, flexShrink: 0 }}>
-                <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9286', marginBottom: 12 }}>Approval inbox</div>
+                <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9286', marginBottom: 12 }}>Approval inbox</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {inbox.map((r) => (
                     <button
@@ -216,11 +252,11 @@ export default function EmployerApprovals() {
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 }}>
                         <span style={{ fontSize: 14, fontWeight: 700, color: '#1B1A16', flex: 1, minWidth: 0 }}>{r.title}</span>
-                        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 8.5, fontWeight: 600, letterSpacing: '0.03em', color: r.statusColor, background: r.statusBg, border: `1px solid ${r.statusBorder}`, padding: '2px 7px', borderRadius: 999 }}>{r.statusLabel}</span>
+                        <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.03em', color: r.statusColor, background: r.statusBg, border: `1px solid ${r.statusBorder}`, padding: '2px 7px', borderRadius: 999 }}>{r.statusLabel}</span>
                       </div>
                       <div style={{ fontSize: 12, color: '#8A8378', marginBottom: 8 }}>{r.team} · {r.location}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ width: 24, height: 24, flexShrink: 0, borderRadius: '50%', background: r.reqAvatarBg, color: r.reqAvatarColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 9.5 }}>{r.reqInitials}</span>
+                        <span style={{ width: 24, height: 24, flexShrink: 0, borderRadius: '50%', background: r.reqAvatarBg, color: r.reqAvatarColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 11 }}>{r.reqInitials}</span>
                         <span style={{ fontSize: 11.5, color: '#8A8378' }}>Requested by {r.requester}</span>
                       </div>
                     </button>
@@ -233,25 +269,25 @@ export default function EmployerApprovals() {
                 <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18, padding: 26 }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 22 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9A9286', marginBottom: 6 }}>{sel.team}</div>
+                      <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9A9286', marginBottom: 6 }}>{sel.team}</div>
                       <h2 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 4px' }}>{sel.title}</h2>
                       <div style={{ fontSize: 13.5, color: '#8A8378' }}>{sel.location} · {sel.type} · {sel.level}</div>
                     </div>
-                    <span style={{ flexShrink: 0, fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, fontWeight: 600, letterSpacing: '0.03em', color: ss.color, background: ss.bg, border: `1px solid ${ss.border}`, padding: '5px 11px', borderRadius: 999 }}>{ss.label}</span>
+                    <span style={{ flexShrink: 0, fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.03em', color: ss.color, background: ss.bg, border: `1px solid ${ss.border}`, padding: '5px 11px', borderRadius: 999 }}>{ss.label}</span>
                   </div>
 
                   {/* HEADCOUNT / BUDGET */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 24 }}>
                     {sel.fields.map((f) => (
                       <div key={f.label} style={{ background: '#FBF8F1', border: '1px solid #E1D9C9', borderRadius: 12, padding: 14 }}>
-                        <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#9A9286', marginBottom: 6 }}>{f.label}</div>
-                        <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 17, fontWeight: 600, color: '#1B1A16' }}>{f.value}</div>
+                        <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#9A9286', marginBottom: 6 }}>{f.label}</div>
+                        <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 17, fontWeight: 600, color: '#1B1A16' }}>{f.value}</div>
                       </div>
                     ))}
                   </div>
 
                   {/* APPROVAL CHAIN */}
-                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9A9286', marginBottom: 14 }}>Approval chain</div>
+                  <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9A9286', marginBottom: 14 }}>Approval chain</div>
                   <div style={{ display: 'flex', flexDirection: 'column', marginBottom: 24 }}>
                     {chain.map((c, i) => (
                       <div key={i} style={{ display: 'flex', gap: 14 }}>
@@ -262,7 +298,7 @@ export default function EmployerApprovals() {
                         <div style={{ paddingBottom: 20, flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
                             <span style={{ fontSize: 14, fontWeight: 700, color: '#1B1A16' }}>{c.name}</span>
-                            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9, fontWeight: 600, letterSpacing: '0.03em', color: c.badgeColor, background: c.badgeBg, border: `1px solid ${c.badgeBorder}`, padding: '2px 7px', borderRadius: 999 }}>{c.badge}</span>
+                            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.03em', color: c.badgeColor, background: c.badgeBg, border: `1px solid ${c.badgeBorder}`, padding: '2px 7px', borderRadius: 999 }}>{c.badge}</span>
                           </div>
                           <div style={{ fontSize: 12.5, color: '#8A8378' }}>{c.role}</div>
                           {c.hasNote && <div style={{ fontSize: 12.5, color: '#5A544A', marginTop: 6, padding: '9px 12px', background: '#FBF9F4', border: '1px solid #EFE8DA', borderRadius: 9 }}>{c.note}</div>}
@@ -275,6 +311,7 @@ export default function EmployerApprovals() {
                   {!decision && (
                     <div style={{ paddingTop: 20, borderTop: '1px solid #F2ECE0' }}>
                       <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>Your decision</div>
+                      <InlineError error={actionError} />
                       <textarea
                         value={note}
                         onChange={(e) => setNote(e.target.value)}
@@ -299,6 +336,7 @@ export default function EmployerApprovals() {
                 </div>
               </div>
             </div>
+            )}
           </div>
         </main>
       </div>

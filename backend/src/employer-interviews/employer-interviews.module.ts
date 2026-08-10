@@ -6,12 +6,15 @@ import {
   EmployerInterview,
   EmployerInterviewSchema,
 } from './schemas/employer-interview.schema';
+import { EmployerPipelineModule } from '../employer-pipeline/employer-pipeline.module';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: EmployerInterview.name, schema: EmployerInterviewSchema },
     ]),
+    // Provides the EmployerApplicant model used to resolve candidateId.
+    EmployerPipelineModule,
   ],
   controllers: [EmployerInterviewsController],
   providers: [EmployerInterviewsService],

@@ -22,7 +22,7 @@ export default function ResumeLibCard({ item }) {
         border: `1.5px solid ${item.cardBorder}`,
         borderRadius: 16,
         padding: 14,
-        fontFamily: "'Hanken Grotesk',sans-serif",
+        fontFamily: 'var(--jb-font-sans)',
       }}
     >
       {/* THUMBNAIL */}
@@ -76,19 +76,19 @@ export default function ResumeLibCard({ item }) {
 
       <div style={{ fontSize: 12.5, color: '#8A8378', marginBottom: 14 }}>
         {item.template} ·{' '}
-        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, color: item.atsColor }}>ATS {item.ats}</span>
+        <span style={{ fontFamily: 'var(--jb-font-mono)', fontWeight: 600, color: item.atsColor }}>ATS {item.ats}</span>
       </div>
 
       {/* BOTTOM ROW */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         {item.isDefault && (
-          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9, fontWeight: 600, letterSpacing: '0.04em', color: '#157A49', background: '#EAF6EE', border: '1px solid #CDE9D6', padding: '3px 9px', borderRadius: 999 }}>DEFAULT</span>
+          <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', color: '#157A49', background: '#EAF6EE', border: '1px solid #CDE9D6', padding: '3px 9px', borderRadius: 999 }}>DEFAULT</span>
         )}
         {item.tailored && (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: '#5A544A', background: '#F4EFE4', border: '1px solid #E6DECF', padding: '3px 9px', borderRadius: 999 }}>◆ {item.tag}</span>
         )}
         <div style={{ flex: 1 }} />
-        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#A79E8F' }}>{item.edited}</span>
+        <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#A79E8F' }}>{item.edited}</span>
       </div>
 
       {/* COPIED TOAST */}

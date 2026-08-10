@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Jobocate — Autofill (you approve)",
+  "version": "0.1.0",
+  "description": "One-click autofill for job applications from your Jobocate profile. It fills the form and pauses — nothing is ever submitted without you.",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": [
+    "http://localhost:3000/*",
+    "http://localhost:8000/*",
+    "https://*.jobocate.com/*",
+    "https://boards.greenhouse.io/*",
+    "https://job-boards.greenhouse.io/*",
+    "https://jobs.lever.co/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Jobocate Autofill"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://localhost:3000/*", "https://*.jobocate.com/*"],
+      "js": ["content-app.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://boards.greenhouse.io/*",
+        "https://job-boards.greenhouse.io/*",
+        "https://jobs.lever.co/*"
+      ],
+      "js": ["selectors.js", "content-ats.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

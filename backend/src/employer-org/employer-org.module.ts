@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { EmployerOrgController } from './employer-org.controller';
 import { EmployerOrgService } from './employer-org.service';
 import { EmployerOrg, EmployerOrgSchema } from '../schemas/employer-org.schema';
+import { EmailService } from '../common/services/email.service';
 
 @Module({
   imports: [
@@ -11,7 +12,7 @@ import { EmployerOrg, EmployerOrgSchema } from '../schemas/employer-org.schema';
     ]),
   ],
   controllers: [EmployerOrgController],
-  providers: [EmployerOrgService],
+  providers: [EmployerOrgService, EmailService],
   exports: [EmployerOrgService],
 })
 export class EmployerOrgModule {}

@@ -24,12 +24,18 @@ export default function TemplateSettings({ isOpen, onClose, settings, onSettings
     { value: 'indigo', label: 'Indigo', color: 'bg-indigo-600' },
   ];
 
+  /*
+   * Only the faces the app actually loads (see the next/font loaders in
+   * src/pages/_app.js). The previous list offered Inter / Roboto / Playfair
+   * Display / Lato / Montserrat — none of which were ever loaded, so every
+   * option rendered the same browser fallback and "Playfair Display" in
+   * particular rendered Georgia. Legacy `value` keys are kept so resumes
+   * saved under the old options still resolve (see ModernResumePreview).
+   */
   const fonts = [
-    { value: 'inter', label: 'Inter', font: 'font-sans' },
-    { value: 'roboto', label: 'Roboto', font: 'font-sans' },
-    { value: 'playfair', label: 'Playfair Display', font: 'font-serif' },
-    { value: 'lato', label: 'Lato', font: 'font-sans' },
-    { value: 'montserrat', label: 'Montserrat', font: 'font-sans' },
+    { value: 'inter', label: 'Sans (Hanken Grotesk)', font: 'font-sans' },
+    { value: 'playfair', label: 'Serif (Instrument Serif)', font: 'font-serif' },
+    { value: 'mono', label: 'Mono (JetBrains Mono)', font: 'font-mono' },
   ];
 
   const fontSizes = [

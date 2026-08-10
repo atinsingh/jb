@@ -1,10 +1,16 @@
-import { Controller, Post, Body, Logger } from '@nestjs/common';
-import { ApiOperation, ApiTags, ApiQuery } from '@nestjs/swagger';
+import { Controller, Post, Body, Logger, UseGuards } from '@nestjs/common';
+import { ApiOperation, ApiTags, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { GreenhouseMonitorService } from './providers/greenhouse-monitor.service';
 import { LeverMonitorService } from './providers/lever-monitor.service';
 import { WorkdayMonitorService } from './providers/workday-monitor.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 
 @ApiTags('job-monitors')
+@ApiBearerAuth('JWT-auth')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('ROLE_ADMIN')
 @Controller('jobs/monitor')
 export class MonitorController {
   private readonly logger = new Logger(MonitorController.name);

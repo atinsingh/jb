@@ -82,17 +82,27 @@ export class ResumeController {
     this.logger.log(`📄 Parsing resume for user: ${req.user?.email || 'unknown'}`);
     this.logger.debug(`File: ${file.originalname}, Size: ${file.size} bytes`);
 
-    const result = await this.resumeParserService.parseResume(file);
+    const result = await this.resumeParserService.parseResume(
+      file,
+      req.user._id.toString(),
+    );
     this.logger.log(`✅ Resume parsed successfully for user: ${req.user?.email || 'unknown'}`);
 
-    // Update only basic user info (name, email, phone)
-    const updates = {
-      name: result.parsedData.name || req.user.name,
-      email: result.parsedData.email || req.user.email,
-      phone: result.parsedData.phone || req.user.phone,
-    };
+    // Only backfill MISSING profile fields from the resume. Never overwrite the
+    // account's login email (identity) — doing so can collide with another
+    // user's email (E11000) and silently change how the user signs in.
+    const updates: Record<string, string> = {};
+    if (!req.user.name && result.parsedData.name) updates.name = result.parsedData.name;
+    if (!req.user.phone && result.parsedData.phone) updates.phone = result.parsedData.phone;
 
-    const user = await this.resumeService.updateUserProfile(req.user._id.toString(), updates);
+    let user = req.user;
+    if (Object.keys(updates).length) {
+      try {
+        user = await this.resumeService.updateUserProfile(req.user._id.toString(), updates);
+      } catch (e) {
+        this.logger.warn(`Profile backfill skipped: ${e?.message || e}`);
+      }
+    }
 
     return {
       message: 'Resume parsed successfully',

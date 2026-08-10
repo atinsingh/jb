@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import AppSidebar from '@/components/app/AppSidebar';
@@ -10,39 +10,21 @@ import {
   getUserProfile,
   updateUserProfile,
   getEntitlements,
+  uploadProfilePicture,
 } from '@/services/settingsApi';
+import { preferenceSummaryRows } from '@/lib/preferenceSummary';
+import { EmptyState, InlineError } from '@/components/app/AppStates';
 
-/* ------------------------------------------------------ design sample data --- */
+/* --------------------------------------------------- static UI scaffolds ---- */
+// `saves` marks the tabs the header's Save button actually writes. The other
+// two are read-only, so the button is hidden there rather than sitting live
+// above content it cannot affect.
 const TAB_DEFS = [
-  { id: 'profile', label: 'Profile' },
-  { id: 'prefs', label: 'Job preferences' },
-  { id: 'notif', label: 'Notifications' },
-  { id: 'billing', label: 'Plan & billing' },
+  { id: 'profile', label: 'Profile', saves: true },
+  { id: 'prefs', label: 'Job preferences', saves: false },
+  { id: 'notif', label: 'Notifications', saves: true },
+  { id: 'billing', label: 'Plan & billing', saves: false },
 ];
-
-const SAMPLE_PROFILE = {
-  fullName: 'Sarah Chen',
-  headline: 'Senior Product Designer',
-  email: 'sarah.chen@gmail.com',
-  location: 'San Francisco, CA',
-  linkedin: 'linkedin.com/in/sarahchen',
-  initials: 'SC',
-};
-
-const SAMPLE_PREFS = [
-  { label: 'Target roles', desc: 'Titles we match and apply to', value: 'Design · Product' },
-  { label: 'Minimum salary', desc: 'Roles below this are hidden', value: '$170k+' },
-  { label: 'Work arrangement', desc: 'Where you want to work', value: 'Remote · Hybrid' },
-  { label: 'Seniority', desc: 'Level of roles to surface', value: 'Senior · Staff' },
-];
-
-const SAMPLE_BILLING = {
-  planName: 'Pro · $29/mo',
-  renews: 'Renews Jul 27, 2026 · unlimited auto-apply',
-  cardBrand: 'VISA',
-  cardLast4: '4242',
-  cardExp: 'Expires 09/28',
-};
 
 const NOTIF_DEFS = [
   { key: 'matches', label: 'New match alerts', desc: 'When fresh roles above 90% appear.' },
@@ -51,40 +33,53 @@ const NOTIF_DEFS = [
   { key: 'product', label: 'Product updates', desc: 'Occasional news about new Jobocate features.' },
 ];
 
+// Shared field focus ring (replaces the old #jbapp input:focus styled-jsx rule).
+const FIELD =
+  'w-full font-sans text-[14.5px] text-jb-ink bg-jb-paper border border-jb-line-input rounded-[11px] px-3.5 py-[11px] ' +
+  'transition-[box-shadow,border-color] duration-150 focus:outline-none focus:border-jb-green focus:shadow-[0_0_0_3px_rgba(31,164,99,0.15)]';
+
 /* ----------------------------------------------------------------- helpers --- */
 function initialsFrom(name) {
-  if (!name) return 'SC';
+  if (!name) return '';
   const parts = String(name).trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return 'SC';
+  if (!parts.length) return '';
   const first = parts[0][0] || '';
   const last = parts.length > 1 ? parts[parts.length - 1][0] : '';
   return (first + last).toUpperCase() || first.toUpperCase();
 }
 
-function fmtMoney(n) {
-  if (n == null || n === '') return null;
-  const num = Number(n);
-  if (!Number.isFinite(num)) return String(n);
-  if (num >= 1000) return `$${Math.round(num / 1000)}k+`;
-  return `$${num}+`;
-}
-
-function joinList(v) {
-  if (Array.isArray(v)) return v.filter(Boolean).join(' · ');
-  return v || null;
+// Skeleton shimmer block. Dimensions are layout data (inline); the gradient +
+// animation come from the `animate-jb-shimmer` design token.
+function Skel({ w, h, mb = 0, radius = 8 }) {
+  return (
+    <span
+      className="block bg-[linear-gradient(90deg,#F2ECE0_25%,#E9E1D1_37%,#F2ECE0_63%)] bg-[length:720px_100%] animate-jb-shimmer"
+      style={{ width: typeof w === 'number' ? `${w}px` : w, height: h, marginBottom: mb, borderRadius: radius, display: 'block' }}
+    />
+  );
 }
 
 /* ----------------------------------------------------------------- screen --- */
 export default function AppSettings() {
   const [tab, setTab] = useState('profile');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const [profile, setProfile] = useState(SAMPLE_PROFILE);
-  const [prefRows, setPrefRows] = useState(SAMPLE_PREFS);
-  const [billing, setBilling] = useState(SAMPLE_BILLING);
+  const [profile, setProfile] = useState({
+    fullName: '',
+    headline: '',
+    email: '',
+    location: '',
+    linkedin: '',
+  });
+  // The whole preferences document, read through the shared summary helper.
+  // Settings used to keep its own flattened copy under its own field names,
+  // which is exactly how it drifted out of sync with /app/preferences.
+  const [prefs, setPrefs] = useState(null);
+  const [billing, setBilling] = useState(null);
   const [notif, setNotif] = useState({
-    matches: true,
-    interviews: true,
+    matches: false,
+    interviews: false,
     weekly: false,
     product: false,
   });
@@ -92,90 +87,70 @@ export default function AppSettings() {
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [photoError, setPhotoError] = useState(null);
+  const [avatar, setAvatar] = useState('');
+  const fileRef = useRef(null);
 
   // ------------------------------------------------------------- data load ---
   useEffect(() => {
     let cancelled = false;
 
     const load = async () => {
-      // Profile (graceful fallback to design sample on any failure)
+      // Profile — real data only, empty when absent.
       try {
         const res = await getUserProfile();
         const u = res?.user || res || null;
         if (u && !cancelled) {
-          setProfile((prev) => ({
-            fullName: u.name || u.fullName || prev.fullName,
-            headline: u.headline || u.title || prev.headline,
-            email: u.email || prev.email,
-            location: u.location || prev.location,
-            linkedin: u.linkedin || u.linkedinUrl || prev.linkedin,
-            initials: initialsFrom(u.name || u.fullName) || prev.initials,
-          }));
+          setProfile({
+            fullName: u.name || '',
+            headline: u.headline || '',
+            email: u.email || '',
+            location: u.location || '',
+            linkedin: u.linkedin || '',
+          });
+          setAvatar(u.picture || '');
         }
       } catch (e) {
-        /* keep sample profile */
+        if (!cancelled) setError(e);
       }
 
-      // Job preferences -> map onto the design's pref rows
+      // Job preferences -> real values only, empty when the user hasn't set them.
       try {
         const res = await getUserPreferences();
         const p = res?.preferences || res || null;
         if (p && !cancelled) {
-          const rows = [
-            {
-              label: 'Target roles',
-              desc: 'Titles we match and apply to',
-              value: joinList(p.jobTitles || p.targetRoles || p.roles) || SAMPLE_PREFS[0].value,
-            },
-            {
-              label: 'Minimum salary',
-              desc: 'Roles below this are hidden',
-              value: fmtMoney(p.minSalary || p.salaryMin || p.minimumSalary) || SAMPLE_PREFS[1].value,
-            },
-            {
-              label: 'Work arrangement',
-              desc: 'Where you want to work',
-              value:
-                joinList(p.workArrangement || p.workArrangements || p.remotePreference) ||
-                SAMPLE_PREFS[2].value,
-            },
-            {
-              label: 'Seniority',
-              desc: 'Level of roles to surface',
-              value: joinList(p.seniority || p.seniorityLevels || p.experienceLevel) || SAMPLE_PREFS[3].value,
-            },
-          ];
-          setPrefRows(rows);
+          setPrefs(p);
 
-          // Hydrate notification toggles if the backend stores them
-          const np = p.notifications || p.notificationPreferences || null;
+          const np = p.notifications || null;
           if (np) {
-            setNotif((prev) => ({
-              matches: np.matches ?? np.matchAlerts ?? prev.matches,
-              interviews: np.interviews ?? np.interviewReminders ?? prev.interviews,
-              weekly: np.weekly ?? np.weeklySummary ?? prev.weekly,
-              product: np.product ?? np.productUpdates ?? prev.product,
-            }));
+            setNotif({
+              matches: !!np.matches,
+              interviews: !!np.interviews,
+              weekly: !!np.weekly,
+              product: !!np.product,
+            });
           }
         }
       } catch (e) {
-        /* keep sample preferences */
+        if (!cancelled) setError(e);
       }
 
-      // Plan & billing from entitlements
+      // Plan & billing from entitlements — real plan only, empty otherwise.
       try {
         const res = await getEntitlements();
         const planType = res?.planType;
         if (planType && !cancelled) {
           const PRICE = { FREE: '$0/mo', PRO: '$29/mo', ELITE: '$79/mo', INTERVIEW: '$19/mo' };
           const pretty = String(planType).charAt(0) + String(planType).slice(1).toLowerCase();
-          setBilling((prev) => ({
-            ...prev,
+          setBilling({
+            planType,
             planName: `${pretty}${PRICE[planType] ? ` · ${PRICE[planType]}` : ''}`,
-          }));
+          });
         }
       } catch (e) {
-        /* keep sample billing */
+        if (!cancelled) setError(e);
       }
 
       if (!cancelled) setLoading(false);
@@ -191,6 +166,7 @@ export default function AppSettings() {
   const markDirty = () => {
     setDirty(true);
     setSaved(false);
+    setSaveError(null);
   };
 
   const onProfileChange = (key, val) => {
@@ -203,10 +179,15 @@ export default function AppSettings() {
     markDirty();
   };
 
+  // A failed write must never render as "✓ Saved". This previously swallowed
+  // both requests and asserted success unconditionally, which hid the fact that
+  // the profile PATCH was rejected outright for every user.
   const save = async () => {
     if (saving) return;
     setSaving(true);
-    // Best-effort persistence. Never crash the screen on failure.
+    setSaveError(null);
+
+    const failures = [];
     try {
       await updateUserProfile({
         name: profile.fullName,
@@ -215,7 +196,7 @@ export default function AppSettings() {
         linkedin: profile.linkedin,
       });
     } catch (e) {
-      /* ignore — offline or not authenticated */
+      failures.push(`profile (${e.message || 'request failed'})`);
     }
     try {
       await updateUserPreferences({
@@ -227,177 +208,118 @@ export default function AppSettings() {
         },
       });
     } catch (e) {
-      /* ignore */
+      failures.push(`notifications (${e.message || 'request failed'})`);
     }
+
     setSaving(false);
+    if (failures.length) {
+      setSaveError(`Couldn’t save ${failures.join(' and ')}. Your changes are still here — try again.`);
+      setSaved(false);
+      setDirty(true);
+      return;
+    }
     setSaved(true);
     setDirty(false);
   };
 
-  // --------------------------------------------------------------- derived ---
-  const activeLabel = useMemo(
-    () => (TAB_DEFS.find((t) => t.id === tab) || {}).label,
-    [tab]
-  );
-  const saveHint = saving ? 'Saving…' : saved ? '✓ Saved' : dirty ? 'Unsaved changes' : 'All changes saved';
+  const onPickPhoto = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    setPhotoError(null);
+    setUploading(true);
+    try {
+      const res = await uploadProfilePicture(file);
+      setAvatar(res?.pictureUrl || res?.user?.picture || '');
+    } catch (err) {
+      setPhotoError(err.message || 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
 
+  // --------------------------------------------------------------- derived ---
+  const activeTab = useMemo(() => TAB_DEFS.find((t) => t.id === tab) || {}, [tab]);
+  const activeLabel = activeTab.label;
+  const canSaveHere = !!activeTab.saves;
+  const saveHint = saving
+    ? 'Saving…'
+    : saveError
+      ? 'Not saved'
+      : saved
+        ? '✓ Saved'
+        : dirty
+          ? 'Unsaved changes'
+          : '';
+
+  const prefRows = useMemo(() => preferenceSummaryRows(prefs), [prefs]);
+
+  // Email is deliberately read-only: changing it goes through
+  // PATCH /api/users/email, which requires the current password (and is
+  // unavailable to OAuth accounts). An editable box that silently discarded
+  // what you typed was worse than no box.
   const profileFields = [
-    { key: 'fullName', label: 'Full name', value: profile.fullName, span: 'span 1' },
-    { key: 'headline', label: 'Headline', value: profile.headline, span: 'span 1' },
-    { key: 'email', label: 'Email', value: profile.email, span: 'span 1' },
-    { key: 'location', label: 'Location', value: profile.location, span: 'span 1' },
-    { key: 'linkedin', label: 'LinkedIn', value: profile.linkedin, span: 'span 2' },
+    { key: 'fullName', label: 'Full name', value: profile.fullName },
+    { key: 'headline', label: 'Headline', value: profile.headline },
+    { key: 'location', label: 'Location', value: profile.location },
+    { key: 'linkedin', label: 'LinkedIn', value: profile.linkedin },
   ];
 
   return (
     <>
       <Head>
         <title>Settings — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
-      <style jsx global>{`
-        #jbapp ::-webkit-scrollbar {
-          width: 8px;
-          height: 8px;
-        }
-        #jbapp ::-webkit-scrollbar-thumb {
-          background: #e1d9c9;
-          border-radius: 8px;
-        }
-        #jbapp input:focus,
-        #jbapp select:focus {
-          outline: none;
-          border-color: #1fa463;
-          box-shadow: 0 0 0 3px rgba(31, 164, 99, 0.15);
-        }
-        @keyframes jbshimmer {
-          0% {
-            background-position: -360px 0;
-          }
-          100% {
-            background-position: 360px 0;
-          }
-        }
-      `}</style>
-
-      <div
-        id="jbapp"
-        style={{
-          display: 'flex',
-          minHeight: '100vh',
-          background: '#F7F3EA',
-          fontFamily: "'Hanken Grotesk',sans-serif",
-          color: '#1B1A16',
-        }}
-      >
+      <div className="flex min-h-screen bg-jb-cream font-sans text-jb-ink [&_::-webkit-scrollbar]:w-2 [&_::-webkit-scrollbar]:h-2 [&_::-webkit-scrollbar-thumb]:bg-jb-line-3 [&_::-webkit-scrollbar-thumb]:rounded-lg">
         <AppSidebar active="settings" />
 
-        <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        <main className="flex-1 min-w-0 flex flex-col">
           {/* HEADER */}
-          <header
-            style={{
-              position: 'sticky',
-              top: 0,
-              zIndex: 20,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 20,
-              padding: '15px 32px',
-              background: 'rgba(247,243,234,0.85)',
-              backdropFilter: 'blur(10px)',
-              borderBottom: '1px solid #E7E0D2',
-            }}
-          >
-            <div
-              style={{
-                fontFamily: "'JetBrains Mono',monospace",
-                fontSize: 11.5,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                color: '#9A9286',
-              }}
-            >
+          <header className="sticky top-0 z-20 flex items-center gap-5 px-8 py-[15px] bg-[rgba(247,243,234,0.85)] backdrop-blur-[10px] border-b border-jb-line">
+            <div className="font-mono text-[11.5px] tracking-[0.1em] uppercase text-jb-ink-faint">
               Settings / {activeLabel}
             </div>
-            <div style={{ flex: 1 }} />
-            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: '#8A8378' }}>
-              {saveHint}
-            </span>
-            <button
-              onClick={save}
-              disabled={saving}
-              style={{
-                fontFamily: 'inherit',
-                fontSize: 13.5,
-                fontWeight: 700,
-                color: '#0C2C1C',
-                background: '#1FA463',
-                border: 'none',
-                borderRadius: 999,
-                padding: '9px 18px',
-                cursor: saving ? 'default' : 'pointer',
-                opacity: saving ? 0.7 : 1,
-              }}
-            >
-              Save changes
-            </button>
+            <div className="flex-1" />
+            {canSaveHere && saveHint && (
+              <span className={`font-mono text-xs ${saveError ? 'text-jb-danger-ink' : 'text-jb-ink-subtle'}`}>
+                {saveHint}
+              </span>
+            )}
+            {canSaveHere ? (
+              <button
+                onClick={save}
+                disabled={saving || !dirty}
+                className={`font-sans text-[13.5px] font-bold text-jb-green-ink bg-jb-green border-none rounded-full px-[18px] py-[9px] ${saving || !dirty ? 'opacity-55 cursor-default' : 'cursor-pointer'}`}
+              >
+                Save changes
+              </button>
+            ) : (
+              <span className="font-mono text-xs text-jb-ink-ghost">Read-only</span>
+            )}
           </header>
 
-          <div style={{ padding: '30px 32px 48px', maxWidth: 1040, width: '100%' }}>
-            <div style={{ marginBottom: 24 }}>
-              <h1
-                style={{
-                  fontFamily: "'Instrument Serif',serif",
-                  fontWeight: 400,
-                  fontSize: 40,
-                  lineHeight: 1,
-                  letterSpacing: '-0.01em',
-                  margin: 0,
-                }}
-              >
+          <div className="px-8 pt-[30px] pb-12 max-w-[1040px] w-full">
+            <div className="mb-6">
+              <h1 className="font-display font-normal text-[40px] leading-none tracking-[-0.01em] m-0">
                 Settings
               </h1>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '210px 1fr', gap: 32, alignItems: 'start' }}>
+            {error && <InlineError error={error} />}
+
+            <div className="grid grid-cols-[210px_1fr] gap-8 items-start">
               {/* TABS */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 3, position: 'sticky', top: 90 }}>
+              <div className="flex flex-col gap-[3px] sticky top-[90px]">
                 {TAB_DEFS.map((t) => {
                   const on = tab === t.id;
                   return (
                     <button
                       key={t.id}
                       onClick={() => setTab(t.id)}
-                      style={{
-                        textAlign: 'left',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 10,
-                        fontFamily: 'inherit',
-                        fontSize: 14.5,
-                        fontWeight: on ? 700 : 500,
-                        color: on ? '#1B1A16' : '#5A544A',
-                        background: on ? '#F1ECE0' : 'transparent',
-                        border: 'none',
-                        borderRadius: 10,
-                        padding: '11px 14px',
-                        cursor: 'pointer',
-                      }}
+                      className={`text-left flex items-center gap-2.5 font-sans text-[14.5px] border-none rounded-[10px] px-3.5 py-[11px] cursor-pointer ${on ? 'font-bold text-jb-ink bg-jb-soft' : 'font-medium text-jb-ink-muted bg-transparent'}`}
                     >
-                      <span
-                        style={{
-                          width: 6,
-                          height: 6,
-                          borderRadius: '50%',
-                          background: on ? '#1FA463' : 'transparent',
-                        }}
-                      />
+                      <span className={`w-1.5 h-1.5 rounded-full ${on ? 'bg-jb-green' : 'bg-transparent'}`} />
                       {t.label}
                     </button>
                   );
@@ -405,112 +327,91 @@ export default function AppSettings() {
               </div>
 
               {/* PANEL */}
-              <div
-                style={{
-                  background: '#FFFEFB',
-                  border: '1px solid #E6DECF',
-                  borderRadius: 18,
-                  overflow: 'hidden',
-                }}
-              >
+              <div className="bg-jb-paper border border-jb-line-2 rounded-[18px] overflow-hidden">
                 {/* PROFILE */}
                 {tab === 'profile' && (
-                  <div style={{ padding: '28px 30px' }}>
-                    <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px' }}>Profile</h2>
-                    <p style={{ fontSize: 13.5, color: '#8A8378', margin: '0 0 24px' }}>
+                  <div className="px-[30px] py-7">
+                    <h2 className="text-lg font-bold mb-1">Profile</h2>
+                    <p className="text-[13.5px] text-jb-ink-subtle mb-6">
                       This information shapes your matches and tailored applications.
                     </p>
 
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 16,
-                        paddingBottom: 24,
-                        marginBottom: 24,
-                        borderBottom: '1px solid #F2ECE0',
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: 64,
-                          height: 64,
-                          flexShrink: 0,
-                          borderRadius: '50%',
-                          background: '#1FA463',
-                          color: '#0C2C1C',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontWeight: 700,
-                          fontSize: 22,
-                        }}
-                      >
-                        {profile.initials || initialsFrom(profile.fullName)}
-                      </span>
+                    <div className="flex items-center gap-4 pb-6 mb-6 border-b border-jb-soft-2">
+                      {avatar ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={avatar} alt="" className="w-16 h-16 flex-shrink-0 rounded-full object-cover" />
+                      ) : (
+                        <span className="w-16 h-16 flex-shrink-0 rounded-full bg-jb-green text-jb-green-ink flex items-center justify-center font-bold text-[22px]">
+                          {initialsFrom(profile.fullName) || '—'}
+                        </span>
+                      )}
                       <div>
+                        <input
+                          ref={fileRef}
+                          type="file"
+                          accept="image/jpeg,image/png,image/gif,image/webp"
+                          onChange={onPickPhoto}
+                          className="hidden"
+                        />
                         <button
-                          style={{
-                            fontFamily: 'inherit',
-                            fontSize: 13.5,
-                            fontWeight: 600,
-                            color: '#1B1A16',
-                            background: '#FFFEFB',
-                            border: '1px solid #D9D0BE',
-                            borderRadius: 999,
-                            padding: '8px 15px',
-                            cursor: 'pointer',
-                          }}
+                          onClick={() => fileRef.current?.click()}
+                          disabled={uploading}
+                          className={`font-sans text-[13.5px] font-semibold text-jb-ink bg-jb-paper border border-jb-line-input rounded-full px-[15px] py-2 ${uploading ? 'opacity-60 cursor-default' : 'cursor-pointer'}`}
                         >
-                          Upload photo
+                          {uploading ? 'Uploading…' : avatar ? 'Change photo' : 'Upload photo'}
                         </button>
-                        <div style={{ fontSize: 12, color: '#A79E8F', marginTop: 7 }}>
-                          JPG or PNG, up to 4MB.
+                        <div className={`text-xs mt-[7px] ${photoError ? 'text-jb-danger-ink' : 'text-jb-ink-ghost'}`}>
+                          {photoError || 'JPG, PNG, GIF or WEBP, up to 5MB.'}
                         </div>
                       </div>
                     </div>
 
+                    {saveError && (
+                      <div className="text-[13px] text-jb-danger-ink bg-jb-danger-tint border border-jb-danger-line rounded-[10px] px-[13px] py-2.5 mb-[18px]">
+                        {saveError}
+                      </div>
+                    )}
+
                     {loading ? (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
-                        {[0, 1, 2, 3, 4].map((i) => (
-                          <div key={i} style={{ gridColumn: i === 4 ? 'span 2' : 'span 1' }}>
-                            <div style={skel(90, 13, 7)} />
-                            <div style={skel('100%', 42, 0)} />
+                      <div className="grid grid-cols-2 gap-[18px]">
+                        {[0, 1, 2, 3].map((i) => (
+                          <div key={i}>
+                            <Skel w={90} h={13} mb={7} />
+                            <Skel w="100%" h={42} />
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
+                      <div className="grid grid-cols-2 gap-[18px]">
                         {profileFields.map((f) => (
-                          <div key={f.key} style={{ gridColumn: f.span }}>
-                            <label
-                              style={{
-                                display: 'block',
-                                fontSize: 13,
-                                fontWeight: 600,
-                                color: '#46413A',
-                                marginBottom: 7,
-                              }}
-                            >
+                          <div key={f.key}>
+                            <label htmlFor={`profile-${f.key}`} className="block text-[13px] font-semibold text-jb-ink-heading mb-[7px]">
                               {f.label}
                             </label>
                             <input
+                              id={`profile-${f.key}`}
+                              name={f.key}
                               value={f.value || ''}
                               onChange={(e) => onProfileChange(f.key, e.target.value)}
-                              style={{
-                                width: '100%',
-                                fontFamily: 'inherit',
-                                fontSize: 14.5,
-                                color: '#1B1A16',
-                                background: '#FFFEFB',
-                                border: '1px solid #D9D0BE',
-                                borderRadius: 11,
-                                padding: '11px 14px',
-                                transition: 'box-shadow 0.15s, border-color 0.15s',
-                              }}
+                              placeholder={`Add your ${f.label.toLowerCase()}`}
+                              className={FIELD}
                             />
                           </div>
                         ))}
+                      </div>
+                    )}
+
+                    {!loading && (
+                      <div className="mt-[22px] pt-5 border-t border-jb-soft-2">
+                        <label className="block text-[13px] font-semibold text-jb-ink-heading mb-[7px]">
+                          Email
+                        </label>
+                        <div className="flex items-center justify-between gap-4 flex-wrap text-[14.5px] text-jb-ink-muted bg-jb-cream border border-jb-line-2 rounded-[11px] px-3.5 py-[11px]">
+                          <span>{profile.email || '—'}</span>
+                          <span className="text-[12.5px] text-jb-ink-ghost">
+                            Your sign-in address — changing it needs password confirmation.
+                          </span>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -518,121 +419,63 @@ export default function AppSettings() {
 
                 {/* JOB PREFERENCES */}
                 {tab === 'prefs' && (
-                  <div style={{ padding: '28px 30px' }}>
-                    <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px' }}>Job preferences</h2>
-                    <p style={{ fontSize: 13.5, color: '#8A8378', margin: '0 0 24px' }}>
-                      We surface and auto-apply to roles that match these rules.
-                    </p>
-                    {(loading ? SAMPLE_PREFS : prefRows).map((p, i, arr) => (
-                      <div
-                        key={p.label}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 20,
-                          padding: '16px 0',
-                          borderBottom: i < arr.length - 1 ? '1px solid #F2ECE0' : 'none',
-                        }}
+                  <div className="px-[30px] py-7">
+                    <div className="flex items-start justify-between gap-4 mb-[22px] flex-wrap">
+                      <div>
+                        <h2 className="text-lg font-bold mb-1">Job preferences</h2>
+                        <p className="text-[13.5px] text-jb-ink-subtle m-0 max-w-[460px]">
+                          Control which jobs you see and which Jobocate may apply to with your permission — roles, location, work authorization, compensation and auto-apply rules.
+                        </p>
+                      </div>
+                      <Link
+                        href="/app/preferences"
+                        className="flex-shrink-0 inline-flex items-center gap-[7px] text-[13.5px] font-bold text-jb-green-ink bg-jb-green rounded-full px-[18px] py-2.5 no-underline"
                       >
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 14.5, fontWeight: 600, color: '#1B1A16', marginBottom: 3 }}>
-                            {p.label}
-                          </div>
-                          <div style={{ fontSize: 13, color: '#8A8378' }}>{p.desc}</div>
+                        Manage preferences →
+                      </Link>
+                    </div>
+                    {prefRows.map((p, i) => (
+                      <div key={p.key} className={`flex items-center justify-between gap-5 py-[15px] ${i < prefRows.length - 1 ? 'border-b border-jb-soft-2' : ''}`}>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[14.5px] font-semibold text-jb-ink mb-[3px]">{p.label}</div>
+                          <div className="text-[13px] text-jb-ink-subtle">{p.desc}</div>
                         </div>
                         {loading ? (
-                          <span style={skel(96, 32, 0, 999)} />
+                          <Skel w={96} h={32} radius={999} />
+                        ) : p.value ? (
+                          <span className="flex-shrink-0 max-w-[320px] text-[13.5px] font-semibold text-jb-green-text bg-jb-green-tint rounded-full px-[15px] py-2 whitespace-nowrap overflow-hidden text-ellipsis">{p.value}</span>
+                        ) : p.offLabel ? (
+                          <span className="flex-shrink-0 font-mono text-xs font-semibold tracking-[0.06em] uppercase text-jb-ink-subtle bg-[#F1EBDF] border border-[#E0D8C7] rounded-full px-[13px] py-1.5">{p.offLabel}</span>
                         ) : (
-                          <span
-                            style={{
-                              flexShrink: 0,
-                              fontSize: 13.5,
-                              fontWeight: 600,
-                              color: '#157A49',
-                              background: '#EAF6EE',
-                              borderRadius: 999,
-                              padding: '8px 15px',
-                            }}
-                          >
-                            {p.value}
-                          </span>
+                          <Link href="/app/preferences" className="flex-shrink-0 text-[13px] font-semibold text-jb-green-text no-underline">Add {p.label.toLowerCase()} ›</Link>
                         )}
                       </div>
                     ))}
-                    <Link
-                      href={appRoute('App Auto-Apply.dc.html')}
-                      style={{
-                        display: 'inline-block',
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: '#157A49',
-                        textDecoration: 'none',
-                        marginTop: 16,
-                      }}
-                    >
-                      Edit preferences →
-                    </Link>
                   </div>
                 )}
 
                 {/* NOTIFICATIONS */}
                 {tab === 'notif' && (
-                  <div style={{ padding: '28px 30px' }}>
-                    <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px' }}>Notifications</h2>
-                    <p style={{ fontSize: 13.5, color: '#8A8378', margin: '0 0 18px' }}>
+                  <div className="px-[30px] py-7">
+                    <h2 className="text-lg font-bold mb-1">Notifications</h2>
+                    <p className="text-[13.5px] text-jb-ink-subtle mb-[18px]">
                       Choose what reaches your inbox.
                     </p>
                     {NOTIF_DEFS.map((nDef, i) => {
                       const on = notif[nDef.key];
                       return (
-                        <div
-                          key={nDef.key}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: 20,
-                            padding: '16px 0',
-                            borderBottom: i < NOTIF_DEFS.length - 1 ? '1px solid #F2ECE0' : 'none',
-                          }}
-                        >
-                          <div style={{ flex: 1 }}>
-                            <div
-                              style={{ fontSize: 14.5, fontWeight: 600, color: '#1B1A16', marginBottom: 3 }}
-                            >
-                              {nDef.label}
-                            </div>
-                            <div style={{ fontSize: 13, color: '#8A8378' }}>{nDef.desc}</div>
+                        <div key={nDef.key} className={`flex items-center justify-between gap-5 py-4 ${i < NOTIF_DEFS.length - 1 ? 'border-b border-jb-soft-2' : ''}`}>
+                          <div className="flex-1">
+                            <div className="text-[14.5px] font-semibold text-jb-ink mb-[3px]">{nDef.label}</div>
+                            <div className="text-[13px] text-jb-ink-subtle">{nDef.desc}</div>
                           </div>
                           <button
                             onClick={() => toggleNotif(nDef.key)}
                             aria-pressed={on}
-                            style={{
-                              flexShrink: 0,
-                              position: 'relative',
-                              width: 46,
-                              height: 26,
-                              borderRadius: 999,
-                              border: 'none',
-                              cursor: 'pointer',
-                              background: on ? '#1FA463' : '#D2C9B7',
-                              transition: 'background 0.2s',
-                            }}
+                            aria-label={nDef.label}
+                            className={`flex-shrink-0 relative w-[46px] h-[26px] rounded-full border-none cursor-pointer transition-colors duration-200 ${on ? 'bg-jb-green' : 'bg-[#D2C9B7]'}`}
                           >
-                            <span
-                              style={{
-                                position: 'absolute',
-                                top: 3,
-                                left: on ? 23 : 3,
-                                width: 20,
-                                height: 20,
-                                borderRadius: '50%',
-                                background: '#FBF8F1',
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
-                                transition: 'left 0.2s',
-                              }}
-                            />
+                            <span className={`absolute top-[3px] w-5 h-5 rounded-full bg-[#FBF8F1] shadow-[0_1px_3px_rgba(0,0,0,0.25)] transition-[left] duration-200 ${on ? 'left-[23px]' : 'left-[3px]'}`} />
                           </button>
                         </div>
                       );
@@ -642,118 +485,52 @@ export default function AppSettings() {
 
                 {/* BILLING */}
                 {tab === 'billing' && (
-                  <div style={{ padding: '28px 30px' }}>
-                    <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 24px' }}>Plan &amp; billing</h2>
-                    <div
-                      style={{
-                        position: 'relative',
-                        overflow: 'hidden',
-                        background: '#15140F',
-                        borderRadius: 16,
-                        padding: 24,
-                        color: '#F2EDE2',
-                        marginBottom: 22,
-                      }}
-                    >
-                      <div
-                        style={{
-                          position: 'absolute',
-                          inset: 0,
-                          background:
-                            'radial-gradient(circle at 90% 0%, rgba(31,164,99,0.3), transparent 60%)',
-                          pointerEvents: 'none',
-                        }}
-                      />
-                      <div
-                        style={{
-                          position: 'relative',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 20,
-                          flexWrap: 'wrap',
-                        }}
-                      >
-                        <div>
-                          <div
-                            style={{
-                              fontFamily: "'JetBrains Mono',monospace",
-                              fontSize: 11,
-                              letterSpacing: '0.1em',
-                              textTransform: 'uppercase',
-                              color: '#5BD08C',
-                              marginBottom: 8,
-                            }}
+                  <div className="px-[30px] py-7">
+                    <h2 className="text-lg font-bold mb-6">Plan &amp; billing</h2>
+                    {billing?.planName ? (
+                      <div className="relative overflow-hidden bg-jb-deep rounded-2xl p-6 text-[#f2ede2] mb-[22px]">
+                        <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_90%_0%,rgba(31,164,99,0.3),transparent_60%)]" />
+                        <div className="relative flex items-center justify-between gap-5 flex-wrap">
+                          <div>
+                            <div className="font-mono text-[11px] tracking-[0.1em] uppercase text-jb-green-on-dark mb-2">
+                              Current plan
+                            </div>
+                            <div className="font-display text-[28px] text-[#fbf8f1]">
+                              {billing.planName}
+                            </div>
+                          </div>
+                          {/* Was App Offers — the candidate's *job offers* screen. */}
+                          <Link
+                            href={appRoute('App Subscription.dc.html')}
+                            className="bg-jb-green text-jb-green-ink text-sm font-bold px-5 py-3 rounded-full no-underline"
                           >
-                            Current plan
-                          </div>
-                          <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: 28, color: '#FBF8F1' }}>
-                            {billing.planName}
-                          </div>
-                          <div style={{ fontSize: 13, color: '#9A9286', marginTop: 4 }}>{billing.renews}</div>
-                        </div>
-                        <Link
-                          href={appRoute('App Offers.dc.html')}
-                          style={{
-                            background: '#1FA463',
-                            color: '#0C2C1C',
-                            fontSize: 14,
-                            fontWeight: 700,
-                            padding: '12px 20px',
-                            borderRadius: 999,
-                            textDecoration: 'none',
-                          }}
-                        >
-                          Manage plan
-                        </Link>
-                      </div>
-                    </div>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '16px 18px',
-                        border: '1px solid #E6DECF',
-                        borderRadius: 12,
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
-                        <span
-                          style={{
-                            width: 40,
-                            height: 28,
-                            borderRadius: 6,
-                            background: '#F1ECE0',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontFamily: "'JetBrains Mono',monospace",
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: '#5A544A',
-                          }}
-                        >
-                          {billing.cardBrand}
-                        </span>
-                        <div>
-                          <div style={{ fontSize: 14, fontWeight: 600 }}>•••• •••• •••• {billing.cardLast4}</div>
-                          <div style={{ fontSize: 12, color: '#8A8378' }}>{billing.cardExp}</div>
+                            Manage plan
+                          </Link>
                         </div>
                       </div>
-                      <button
-                        style={{
-                          fontFamily: 'inherit',
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: '#157A49',
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Update
-                      </button>
+                    ) : (
+                      <EmptyState
+                        icon="✦"
+                        title="You’re on the Free plan"
+                        hint="Upgrade to unlock unlimited auto-apply, interview prep and more."
+                        action={
+                          <Link
+                            href={appRoute('App Upgrade.dc.html')}
+                            className="inline-flex items-center gap-[7px] mt-1.5 text-sm font-bold text-jb-green-ink bg-jb-green rounded-full px-5 py-[11px] no-underline"
+                          >
+                            View plans →
+                          </Link>
+                        }
+                      />
+                    )}
+
+                    <div className="flex gap-5 flex-wrap">
+                      <Link href={appRoute('App Billing.dc.html')} className="text-[13px] font-semibold text-jb-green-text no-underline">
+                        Billing history →
+                      </Link>
+                      <Link href={appRoute('App Payment Methods.dc.html')} className="text-[13px] font-semibold text-jb-green-text no-underline">
+                        Manage payment methods →
+                      </Link>
                     </div>
                   </div>
                 )}
@@ -764,19 +541,4 @@ export default function AppSettings() {
       </div>
     </>
   );
-}
-
-/* ------------------------------------------------------------ skeleton bit --- */
-function skel(width, height, marginBottom = 0, radius = 8) {
-  return {
-    display: 'block',
-    width: typeof width === 'number' ? `${width}px` : width,
-    height: `${height}px`,
-    marginBottom: `${marginBottom}px`,
-    borderRadius: radius,
-    background:
-      'linear-gradient(90deg, #F2ECE0 25%, #E9E1D1 37%, #F2ECE0 63%)',
-    backgroundSize: '720px 100%',
-    animation: 'jbshimmer 1.2s infinite linear',
-  };
 }

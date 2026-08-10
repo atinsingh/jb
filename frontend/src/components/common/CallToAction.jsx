@@ -21,7 +21,7 @@ export default function CallToAction() {
         <p className="text-gray-600 mb-8">
           We'll help you to grow your career and growth.
         </p>
-        <Link href="/promo">
+        <Link href="/app/signup">
           <button className="flex items-center cursor-pointer gap-2 px-6 py-3 border border-gray-300 rounded-full shadow-sm hover:bg-gray-100 transition mx-auto">
             Get Started <span className="text-xl">→</span>
           </button>

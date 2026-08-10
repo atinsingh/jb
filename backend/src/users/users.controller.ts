@@ -29,6 +29,7 @@ import { ResetPasswordRequestDto } from './dto/reset-password-request.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { memoryStorage } from 'multer';
 import { extname } from 'path';
+import { StorageService } from '../storage';
 
 const fileFilter = (req: any, file: Express.Multer.File, cb: any) => {
   const allowedTypes = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
@@ -51,7 +52,10 @@ const fileFilter = (req: any, file: Express.Multer.File, cb: any) => {
 export class UsersController {
   private readonly logger = new Logger(UsersController.name);
 
-  constructor(private usersService: UsersService) {}
+  constructor(
+    private usersService: UsersService,
+    private readonly storageService: StorageService,
+  ) {}
 
   @Get('profile')
   @UseGuards(JwtAuthGuard)
@@ -69,6 +73,23 @@ export class UsersController {
       message: 'Profile retrieved successfully',
       user,
     };
+  }
+
+  @Get('autofill-payload')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Autofill payload for the browser extension',
+    description:
+      'Returns the candidate profile fields the extension fills into external ATS forms. Only includes information the user has already provided; the extension fills, then pauses for the user to review and submit.',
+  })
+  @ApiResponse({ status: 200, description: 'Autofill payload retrieved' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getAutofillPayload(@Request() req) {
+    const payload = await this.usersService.getAutofillPayload(
+      req.user._id.toString(),
+    );
+    return { payload };
   }
 
   @Patch('profile')
@@ -138,13 +159,14 @@ export class UsersController {
       `Uploading profile picture for user: ${req.user?.email || 'unknown'}`,
     );
 
-    // In a real application, you would upload to cloud storage (S3, Cloudinary, etc.)
-    // For now, we'll store the file path or URL
-    // This is a placeholder - you should implement actual file storage
-    const pictureUrl = `/uploads/profile-pictures/${req.user._id}-${Date.now()}${extname(file.originalname)}`;
+    // Persist the uploaded avatar via the storage abstraction (local disk or
+    // S3 depending on config) and store the served URL on the user.
+    const ext = extname(file.originalname).toLowerCase();
+    const key = `avatars/${req.user._id}${ext}`;
+    const { url: pictureUrl } = await this.storageService.put(key, file.buffer, {
+      contentType: file.mimetype,
+    });
 
-    // TODO: Implement actual file upload to storage service
-    // For now, we'll just save the metadata
     const user = await this.usersService.updateProfilePicture(
       req.user._id.toString(),
       pictureUrl,

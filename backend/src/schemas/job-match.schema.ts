@@ -1,17 +1,17 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
 export type JobMatchDocument = JobMatch & Document;
 
 @Schema({ timestamps: true })
 export class JobMatch {
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
   userId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'Job', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Job', required: true })
   jobId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'JobProfile', required: false })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'JobProfile', required: false })
   profileId?: Types.ObjectId;
 
   @Prop({ required: true, min: 0, max: 100 })
@@ -35,7 +35,7 @@ export class JobMatch {
   })
   interestStatus?: string;
 
-  @Prop({ type: Types.ObjectId, ref: 'User', required: false })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: false })
   assignedAgentId?: Types.ObjectId; // Human or AI agent assigned
 
   @Prop({ enum: ['ai', 'human'], required: false })

@@ -118,5 +118,86 @@ export class JobsService {
     }
     return job;
   }
+
+  // ---------------------------------------------------------------------------
+  // Admin moderation console (ROLE_ADMIN only — guarded at the controller layer)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Paginated moderation list. Unlike searchJobs(), this does NOT hardcode
+   * isActive:true — admins must see inactive/rejected/expired jobs too. `q`
+   * matches title OR companyName case-insensitively. Newest first.
+   */
+  async adminList(params: {
+    lifecycle?: string;
+    moderationStatus?: string;
+    q?: string;
+    page?: number | string;
+    limit?: number | string;
+  }): Promise<{ jobs: JobDocument[]; total: number; page: number; limit: number }> {
+    const page = Math.max(1, parseInt(String(params.page ?? 1), 10) || 1);
+    const limit = Math.max(1, parseInt(String(params.limit ?? 20), 10) || 20);
+    const skip = (page - 1) * limit;
+
+    const filter: Record<string, any> = {};
+    if (params.lifecycle) filter.lifecycle = params.lifecycle;
+    if (params.moderationStatus) filter.moderationStatus = params.moderationStatus;
+    if (params.q) {
+      const rx = new RegExp(params.q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      filter.$or = [{ title: rx }, { companyName: rx }];
+    }
+
+    const jobs = await this.jobModel
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .exec();
+
+    const total = await this.jobModel.countDocuments(filter);
+    return { jobs, total, page, limit };
+  }
+
+  /** Set a job's moderation status (auto_approved | needs_review | approved | rejected). */
+  async adminSetModeration(id: string, moderationStatus: string): Promise<JobDocument> {
+    const job = await this.jobModel.findByIdAndUpdate(
+      id,
+      { $set: { moderationStatus } },
+      { new: true, runValidators: true },
+    );
+    if (!job) {
+      throw new NotFoundException('Job not found');
+    }
+    this.logger.log(`Admin set moderationStatus=${moderationStatus} for job ${id}`);
+    return job;
+  }
+
+  /** Set a job's lifecycle stage (draft | published | paused | expired | ...). */
+  async adminSetLifecycle(id: string, lifecycle: string): Promise<JobDocument> {
+    const job = await this.jobModel.findByIdAndUpdate(
+      id,
+      { $set: { lifecycle } },
+      { new: true, runValidators: true },
+    );
+    if (!job) {
+      throw new NotFoundException('Job not found');
+    }
+    this.logger.log(`Admin set lifecycle=${lifecycle} for job ${id}`);
+    return job;
+  }
+
+  /** Take a job off the marketplace without deleting it. */
+  async adminDeactivate(id: string): Promise<JobDocument> {
+    const job = await this.jobModel.findByIdAndUpdate(
+      id,
+      { $set: { isActive: false } },
+      { new: true },
+    );
+    if (!job) {
+      throw new NotFoundException('Job not found');
+    }
+    this.logger.log(`Admin deactivated job ${id}`);
+    return job;
+  }
 }
 

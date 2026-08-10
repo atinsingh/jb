@@ -30,9 +30,10 @@ const apiCall = async (endpoint, options = {}) => {
 };
 
 // ---------------------------------------------------------------- Entitlement
-// GET /api/entitlement — current plan/entitlement for the signed-in user.
+// GET /api/entitlements — current plan/entitlement for the signed-in user.
+// Backend controller is @Controller('entitlements') (plural).
 // Returns whatever the backend provides (e.g. { planType, status, ... }).
-export const getEntitlement = async () => apiCall('/api/entitlement');
+export const getEntitlement = async () => apiCall('/api/entitlements');
 
 // ---------------------------------------------------------------- Preferences
 // GET /api/users/preferences — user preferences (may carry billing prefs).

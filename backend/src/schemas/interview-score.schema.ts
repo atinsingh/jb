@@ -1,14 +1,14 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
 export type InterviewScoreDocument = InterviewScore & Document;
 
 @Schema({ timestamps: true })
 export class InterviewScore {
-  @Prop({ type: Types.ObjectId, ref: 'InterviewSession', required: true, index: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'InterviewSession', required: true, index: true })
   sessionId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'InterviewTurn', required: true, index: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'InterviewTurn', required: true, index: true })
   turnId: Types.ObjectId; // The answer turn being scored
 
   @Prop({ type: Object, required: true })

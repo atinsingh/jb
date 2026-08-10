@@ -7,7 +7,7 @@ import { Resume, ResumeSchema } from '../schemas/resume.schema';
 import { Job, JobSchema } from '../schemas/job.schema';
 import { InterviewSession, InterviewSessionSchema } from '../schemas/interview-session.schema';
 import { InterviewTurn, InterviewTurnSchema } from '../schemas/interview-turn.schema';
-import { AiServicesModule } from '../ai-services/ai-services.module';
+import { LLMModule } from '../llm/llm.module';
 
 @Module({
   imports: [
@@ -18,7 +18,7 @@ import { AiServicesModule } from '../ai-services/ai-services.module';
       { name: InterviewSession.name, schema: InterviewSessionSchema },
       { name: InterviewTurn.name, schema: InterviewTurnSchema },
     ]),
-    AiServicesModule,
+    LLMModule,
   ],
   controllers: [InterviewBuddyController],
   providers: [InterviewBuddyService],

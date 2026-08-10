@@ -37,9 +37,9 @@ const apiCall = async (endpoint, options = {}) => {
   return response.json();
 };
 
-// GET /api/jobs/scraper/:jobId -> the scraped job document
+// GET /api/jobs/:jobId -> the scraped job document
 export const getScrapedJobById = async (jobId) => {
-  return apiCall(`/api/jobs/scraper/${jobId}`);
+  return apiCall(`/api/jobs/${jobId}`);
 };
 
 // POST /api/matching/calculate/:jobId -> { match } (score + matched/missing skills)

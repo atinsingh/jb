@@ -136,12 +136,6 @@ export default function AppResetPassword() {
     <>
       <Head>
         <title>Reset password — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
       <style jsx global>{`
@@ -170,7 +164,7 @@ export default function AppResetPassword() {
           gridTemplateColumns: '1fr 1fr',
           minHeight: '100vh',
           background: '#F7F3EA',
-          fontFamily: "'Hanken Grotesk',sans-serif",
+          fontFamily: 'var(--jb-font-sans)',
           color: '#1B1A16',
         }}
       >
@@ -182,7 +176,7 @@ export default function AppResetPassword() {
           >
             <span
               style={{
-                fontFamily: "'Bricolage Grotesque',sans-serif",
+                fontFamily: 'var(--jb-font-display)',
                 fontWeight: 800,
                 letterSpacing: '-0.02em',
                 fontSize: 24,
@@ -220,7 +214,7 @@ export default function AppResetPassword() {
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#1FA463' }} />
               <span
                 style={{
-                  fontFamily: "'JetBrains Mono',monospace",
+                  fontFamily: 'var(--jb-font-mono)',
                   fontSize: 11,
                   letterSpacing: '0.1em',
                   textTransform: 'uppercase',
@@ -236,7 +230,7 @@ export default function AppResetPassword() {
               <div>
                 <h1
                   style={{
-                    fontFamily: "'Instrument Serif',serif",
+                    fontFamily: 'var(--jb-font-display)',
                     fontWeight: 400,
                     fontSize: 44,
                     lineHeight: 1.02,
@@ -316,7 +310,7 @@ export default function AppResetPassword() {
                 </div>
                 <h1
                   style={{
-                    fontFamily: "'Instrument Serif',serif",
+                    fontFamily: 'var(--jb-font-display)',
                     fontWeight: 400,
                     fontSize: 42,
                     lineHeight: 1.03,
@@ -379,7 +373,7 @@ export default function AppResetPassword() {
               <div>
                 <h1
                   style={{
-                    fontFamily: "'Instrument Serif',serif",
+                    fontFamily: 'var(--jb-font-display)',
                     fontWeight: 400,
                     fontSize: 42,
                     lineHeight: 1.03,
@@ -449,7 +443,7 @@ export default function AppResetPassword() {
                   </div>
                   <span
                     style={{
-                      fontFamily: "'JetBrains Mono',monospace",
+                      fontFamily: 'var(--jb-font-mono)',
                       fontSize: 11,
                       fontWeight: 600,
                       color: strengthColor,
@@ -542,7 +536,7 @@ export default function AppResetPassword() {
                 </div>
                 <h1
                   style={{
-                    fontFamily: "'Instrument Serif',serif",
+                    fontFamily: 'var(--jb-font-display)',
                     fontWeight: 400,
                     fontSize: 42,
                     lineHeight: 1.03,
@@ -576,7 +570,7 @@ export default function AppResetPassword() {
             )}
           </div>
 
-          <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#A79E8F' }}>
+          <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#A79E8F' }}>
             © 2026 Jobocate
           </div>
         </div>
@@ -606,7 +600,7 @@ export default function AppResetPassword() {
           <div
             style={{
               position: 'relative',
-              fontFamily: "'JetBrains Mono',monospace",
+              fontFamily: 'var(--jb-font-mono)',
               fontSize: 11,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
@@ -639,7 +633,7 @@ export default function AppResetPassword() {
                   While you were away
                 </span>
                 <span
-                  style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#5BD08C' }}
+                  style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#5BD08C' }}
                 >
                   ● live
                 </span>
@@ -648,7 +642,7 @@ export default function AppResetPassword() {
                 <div style={{ background: '#15140F', borderRadius: 10, padding: 13 }}>
                   <div
                     style={{
-                      fontFamily: "'JetBrains Mono',monospace",
+                      fontFamily: 'var(--jb-font-mono)',
                       fontSize: 24,
                       fontWeight: 600,
                       color: '#FBF8F1',
@@ -661,7 +655,7 @@ export default function AppResetPassword() {
                 <div style={{ background: '#15140F', borderRadius: 10, padding: 13 }}>
                   <div
                     style={{
-                      fontFamily: "'JetBrains Mono',monospace",
+                      fontFamily: 'var(--jb-font-mono)',
                       fontSize: 24,
                       fontWeight: 600,
                       color: '#5BD08C',
@@ -676,7 +670,7 @@ export default function AppResetPassword() {
 
             <p
               style={{
-                fontFamily: "'Instrument Serif',serif",
+                fontFamily: 'var(--jb-font-display)',
                 fontSize: 30,
                 lineHeight: 1.2,
                 color: '#F2EDE2',
@@ -721,8 +715,8 @@ export default function AppResetPassword() {
               color: '#9A9286',
             }}
           >
-            <span style={{ color: '#1FA463', letterSpacing: '0.1em' }}>★★★★★</span>
-            Trusted by 100,000+ job seekers
+            <span style={{ color: '#1FA463' }}>✓</span>
+            Free to start · You approve every application
           </div>
         </div>
       </div>

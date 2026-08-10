@@ -116,13 +116,17 @@ export default function ModernResumePreview({ resumeData, templateSettings = {} 
 
   const spacingStyle = spacingValues[spacing] || spacingValues.normal;
 
-  // Font families
+  // Font families. Every key resolves to one of the three faces the app loads
+  // (see src/pages/_app.js). The legacy sans keys (roboto/lato/montserrat) are
+  // kept so previously-saved resumes keep opening; they all map to the one
+  // sans face, which is what they already rendered in practice.
   const fontFamilyMap = {
-    inter: '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif',
-    roboto: '"Roboto", -apple-system, BlinkMacSystemFont, sans-serif',
-    playfair: '"Playfair Display", Georgia, serif',
-    lato: '"Lato", -apple-system, BlinkMacSystemFont, sans-serif',
-    montserrat: '"Montserrat", -apple-system, BlinkMacSystemFont, sans-serif',
+    inter: 'var(--jb-font-sans)',
+    roboto: 'var(--jb-font-sans)',
+    lato: 'var(--jb-font-sans)',
+    montserrat: 'var(--jb-font-sans)',
+    playfair: 'var(--jb-font-display)',
+    mono: 'var(--jb-font-mono)',
   };
 
   const selectedFont = fontFamilyMap[fontFamily] || fontFamilyMap.inter;

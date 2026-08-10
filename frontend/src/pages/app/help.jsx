@@ -8,7 +8,7 @@ import { appRoute } from '@/components/app/appRoutes';
 import { getHelpArticles, submitArticleFeedback } from '@/services/helpApi';
 
 // ---- Sample data (the design's own bundled content) ----
-const SAMPLE_CATEGORIES = [
+const HELP_CATEGORIES = [
   { key: 'start', name: 'Getting started', desc: 'Set up your account and learn the basics.', tag: 'GS', tint: '#EAF6EE', ink: '#157A49' },
   { key: 'matches', name: 'Matches & applications', desc: 'How matching, applying and tracking work.', tag: 'MA', tint: '#F4EFE4', ink: '#5A544A' },
   { key: 'auto', name: 'Auto-Apply', desc: 'Hands-off applying and your weekly credits.', tag: 'AA', tint: '#E6F6EC', ink: '#157A49' },
@@ -17,7 +17,7 @@ const SAMPLE_CATEGORIES = [
   { key: 'account', name: 'Account', desc: 'Login, security and notification settings.', tag: 'AC', tint: '#F4EFE4', ink: '#5A544A' },
 ];
 
-const SAMPLE_ARTICLES = [
+const HELP_ARTICLES = [
   { id: 'gs1', cat: 'start', title: 'How Jobocate works', body: ['Jobocate is an AI copilot for your job search. It builds your résumé, matches you to roles ranked by fit, applies on your behalf, and preps you for interviews — all from one workspace.', 'Start by uploading a résumé or building one. We turn it into a profile that powers everything else: the better your profile, the sharper your matches.', 'From there, review matches daily, let Auto-Apply handle volume, and track every application in your pipeline.'], related: ['gs2', 'm1'] },
   { id: 'gs2', cat: 'start', title: 'Setting up your profile', body: ['Your profile is the source of truth for matching and applications. Add your experience, top skills, target roles, locations and a salary floor.', 'You can edit any field at any time from Settings. Changes take effect on your next batch of matches.', 'Tip: keep your skills specific — “design systems” and “experimentation” match better than broad terms like “design”.'], related: ['m1', 'r1'] },
   { id: 'm1', cat: 'matches', title: 'How match scores are calculated', body: ['Your match score blends role fit, skills overlap, seniority, location and compensation alignment against each posting. A 96% means almost everything lines up.', 'Scores update as you refine your profile and as new signal arrives from the company. Saving or applying to similar roles nudges future matches.', 'Scores are a guide, not a gate — you can apply to any role regardless of its score.'], related: ['m2', 'gs2'] },
@@ -41,8 +41,8 @@ export default function AppHelp() {
   const [votes, setVotes] = useState({});
 
   // Backend-driven content with graceful fallback to bundled sample data.
-  const [categories, setCategories] = useState(SAMPLE_CATEGORIES);
-  const [articles, setArticles] = useState(SAMPLE_ARTICLES);
+  const [categories, setCategories] = useState(HELP_CATEGORIES);
+  const [articles, setArticles] = useState(HELP_ARTICLES);
 
   useEffect(() => {
     let active = true;
@@ -171,12 +171,6 @@ export default function AppHelp() {
     <>
       <Head>
         <title>Help center — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
       <style jsx global>{`
@@ -221,7 +215,7 @@ export default function AppHelp() {
 
       <div
         id="jbapp"
-        style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: "'Hanken Grotesk',sans-serif", color: '#1B1A16' }}
+        style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16' }}
       >
         <AppSidebar active="" />
 
@@ -240,7 +234,7 @@ export default function AppHelp() {
               borderBottom: '1px solid #E7E0D2',
             }}
           >
-            <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9286' }}>
+            <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9286' }}>
               Help center
             </div>
             <div style={{ flex: 1 }} />
@@ -254,7 +248,7 @@ export default function AppHelp() {
             {showHome && (
               <div>
                 <div style={{ textAlign: 'center', marginBottom: 30 }}>
-                  <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 44, lineHeight: 1.02, margin: '0 0 18px' }}>
+                  <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 44, lineHeight: 1.02, margin: '0 0 18px' }}>
                     How can we help?
                   </h1>
                   <div
@@ -283,7 +277,7 @@ export default function AppHelp() {
                 {/* SEARCH RESULTS */}
                 {vals.isSearch && (
                   <div style={{ animation: 'rbpop 0.2s ease' }}>
-                    <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#8A8378', marginBottom: 14 }}>
+                    <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#8A8378', marginBottom: 14 }}>
                       {vals.resultCount} results for “{query}”
                     </div>
                     {vals.hasResults && (
@@ -318,7 +312,7 @@ export default function AppHelp() {
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                fontFamily: "'JetBrains Mono',monospace",
+                                fontFamily: 'var(--jb-font-mono)',
                                 fontWeight: 600,
                                 fontSize: 11,
                               }}
@@ -377,7 +371,7 @@ export default function AppHelp() {
                               color: c.ink,
                               alignItems: 'center',
                               justifyContent: 'center',
-                              fontFamily: "'JetBrains Mono',monospace",
+                              fontFamily: 'var(--jb-font-mono)',
                               fontWeight: 600,
                               fontSize: 12,
                               marginBottom: 14,
@@ -387,7 +381,7 @@ export default function AppHelp() {
                           </span>
                           <div style={{ fontSize: 15.5, fontWeight: 700, marginBottom: 4 }}>{c.name}</div>
                           <div style={{ fontSize: 12.5, lineHeight: 1.45, color: '#8A8378', marginBottom: 10 }}>{c.desc}</div>
-                          <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, color: '#A79E8F' }}>{c.count} articles</div>
+                          <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#A79E8F' }}>{c.count} articles</div>
                         </button>
                       ))}
                     </div>
@@ -413,9 +407,9 @@ export default function AppHelp() {
                             fontFamily: 'inherit',
                           }}
                         >
-                          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#9A9286', flexShrink: 0, width: 18 }}>{a.num}</span>
+                          <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#9A9286', flexShrink: 0, width: 18 }}>{a.num}</span>
                           <span style={{ flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: 600, color: '#1B1A16' }}>{a.title}</span>
-                          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, color: '#A79E8F', flexShrink: 0 }}>{a.catLabel}</span>
+                          <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#A79E8F', flexShrink: 0 }}>{a.catLabel}</span>
                           <span style={{ color: '#C9BFAC', flexShrink: 0 }}>→</span>
                         </button>
                       ))}
@@ -457,7 +451,7 @@ export default function AppHelp() {
                     <div style={{ fontSize: 15, fontWeight: 700, color: '#FBF8F1' }}>Still stuck?</div>
                     <div style={{ fontSize: 13, color: '#9A9286' }}>Reach a human on the support team — we usually reply within a few hours.</div>
                   </div>
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, fontWeight: 600, color: '#5BD08C', flexShrink: 0 }}>
+                  <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 12, fontWeight: 600, color: '#5BD08C', flexShrink: 0 }}>
                     Contact support →
                   </span>
                 </Link>
@@ -498,14 +492,14 @@ export default function AppHelp() {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontFamily: "'JetBrains Mono',monospace",
+                      fontFamily: 'var(--jb-font-mono)',
                       fontWeight: 600,
                       fontSize: 14,
                     }}
                   >
                     {vals.catTag}
                   </span>
-                  <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 34, lineHeight: 1, margin: 0 }}>{vals.catName}</h1>
+                  <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 34, lineHeight: 1, margin: 0 }}>{vals.catName}</h1>
                 </div>
                 <p style={{ fontSize: 14.5, color: '#8A8378', margin: '0 0 22px' }}>{vals.catDesc}</p>
                 <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 16, overflow: 'hidden' }}>
@@ -560,10 +554,10 @@ export default function AppHelp() {
                 </button>
 
                 <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18, padding: 36 }}>
-                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#157A49', marginBottom: 12 }}>
+                  <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#157A49', marginBottom: 12 }}>
                     {vals.artCatLabel}
                   </div>
-                  <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 34, lineHeight: 1.08, margin: '0 0 22px' }}>{vals.artTitle}</h1>
+                  <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 34, lineHeight: 1.08, margin: '0 0 22px' }}>{vals.artTitle}</h1>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                     {vals.artBody.map((p, i) => (
                       <p key={i} style={{ fontSize: 15.5, lineHeight: 1.7, color: '#46413A', margin: 0 }}>

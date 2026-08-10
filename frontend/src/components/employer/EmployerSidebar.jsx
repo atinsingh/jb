@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { appRoute } from '@/components/app/appRoutes';
 import { useAuth } from '@/context/AuthContext';
+import Logo from '@/components/brand/Logo';
 
 /* Build display initials from a name/email. */
 const initialsFrom = (name = '', email = '') => {
@@ -139,29 +140,26 @@ const DESTINATIONS = [
   { key: 'settings', label: 'Settings', hint: 'Account & billing', dc: 'Employer Settings.dc.html', tag: 'SE', tint: N_TINT, ink: N_INK },
 ];
 
-const NOTIFS = [
-  { tag: 'SC', tint: '#1E2438', ink: '#8DA2F5', text: 'Sarah Chen applied to Senior Product Designer — 96% match.', time: '8m ago', dc: 'Employer Candidates.dc.html' },
-  { tag: 'JL', tint: '#24221B', ink: '#B8B1A4', text: 'Jordan Lee confirmed an interview for Thu 2:00 PM.', time: '1h ago', dc: 'Employer Interviews.dc.html' },
-  { tag: 'PN', tint: '#1E2D24', ink: '#5BD08C', text: 'Priya Nair accepted your offer for Staff Frontend Engineer 🎉', time: '3h ago', dc: 'Employer Offers.dc.html' },
-  { tag: 'AP', tint: '#1E2438', ink: '#8DA2F5', text: '14 new applicants across your 3 open roles.', time: '6h ago', dc: 'Employer Candidates.dc.html' },
-  { tag: 'MS', tint: '#24221B', ink: '#B8B1A4', text: 'New message from Marcus Obi about the PM role.', time: 'Yesterday', dc: 'Employer Messages.dc.html' },
-];
+// Notifications come from a real feed once wired; no fabricated entries.
+const NOTIFS = [];
 
+// Nav items carry no fabricated counts/dots — badges are added only when wired
+// to a real API (none yet), never hardcoded.
 const HIRING = [
   { key: 'dashboard', label: 'Dashboard', dc: 'Employer Dashboard.dc.html', glyph: 'dashboard' },
   { key: 'jobs', label: 'Jobs', dc: 'Employer Jobs.dc.html', glyph: 'jobs' },
-  { key: 'candidates', label: 'Candidates', dc: 'Employer Candidates.dc.html', glyph: 'candidates', badge: '12' },
-  { key: 'interviews', label: 'Interviews', dc: 'Employer Interviews.dc.html', glyph: 'interviews', badge: '3' },
+  { key: 'candidates', label: 'Candidates', dc: 'Employer Candidates.dc.html', glyph: 'candidates' },
+  { key: 'interviews', label: 'Interviews', dc: 'Employer Interviews.dc.html', glyph: 'interviews' },
   { key: 'offers', label: 'Offers', dc: 'Employer Offers.dc.html', glyph: 'offers' },
 ];
 const AI = [
-  { key: 'autopilot', label: 'Autopilot', dc: 'Employer Autopilot.dc.html', glyph: 'sparkle', ai: true, badge: '6 queued' },
+  { key: 'autopilot', label: 'Autopilot', dc: 'Employer Autopilot.dc.html', glyph: 'sparkle', ai: true },
   { key: 'copilot', label: 'Copilot', dc: 'Employer Copilot.dc.html', glyph: 'sparkle', ai: true },
-  { key: 'sourcing', label: 'Sourcing Agent', dc: 'Employer Sourcing Agent.dc.html', glyph: 'sparkle', ai: true, dot: true },
+  { key: 'sourcing', label: 'Sourcing Agent', dc: 'Employer Sourcing Agent.dc.html', glyph: 'sparkle', ai: true },
 ];
 const ENGAGE = [
   { key: 'search', label: 'Talent Search', dc: 'Employer Talent Search.dc.html', glyph: 'search' },
-  { key: 'messages', label: 'Messages', dc: 'Employer Messages.dc.html', glyph: 'messages', dot: true },
+  { key: 'messages', label: 'Messages', dc: 'Employer Messages.dc.html', glyph: 'messages' },
   { key: 'analytics', label: 'Analytics', dc: 'Employer Analytics.dc.html', glyph: 'analytics' },
 ];
 const COMPANY = [
@@ -176,8 +174,12 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
   const user = auth.user || null;
   const displayName = user?.name || user?.email || 'Your account';
   const companyName = user?.companyName || user?.company || '';
-  const planLabel = user?.plan || user?.subscriptionPlan || 'Growth plan';
-  const subLabel = companyName ? `${companyName} · ${planLabel}` : planLabel;
+  // Don't claim a paid plan we can't verify — only show a plan label if the
+  // user record actually carries one.
+  const planLabel = user?.plan || user?.subscriptionPlan || '';
+  const subLabel = companyName
+    ? (planLabel ? `${companyName} · ${planLabel}` : companyName)
+    : (planLabel || 'Recruiter workspace');
   const initials = initialsFrom(user?.name, user?.email);
   const [collapsed, setCollapsed] = useState(false);
   const [mobile, setMobile] = useState(false);
@@ -263,7 +265,7 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
         <span style={{ flexShrink: 0, display: 'flex', color: on ? (ai ? '#5BD08C' : '#8DA2F5') : (ai ? '#5A8A6E' : '#7A7367') }}>{Glyph[it.glyph]}</span>
         {wide && <span style={{ flex: 1 }}>{it.label}</span>}
         {it.badge && wide && (
-          <span style={{ flexShrink: 0, fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, fontWeight: 600, color: '#FFFFFF', background: accent, borderRadius: 999, padding: '2px 7px' }}>{it.badge}</span>
+          <span style={{ flexShrink: 0, fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, color: '#FFFFFF', background: accent, borderRadius: 999, padding: '2px 7px' }}>{it.badge}</span>
         )}
         {showDot && (
           <span style={{ position: 'absolute', top: 8, right: 8, width: 7, height: 7, borderRadius: '50%', background: accent, border: '1.5px solid #15140F' }} />
@@ -281,13 +283,13 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
     if (ai) {
       return (
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: `${mt}px 10px 10px` }}>
-          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#6B6456' }}>{txt}</span>
+          <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#6B6456' }}>{txt}</span>
           <span style={{ color: '#5BD08C', fontSize: 11 }}>✦</span>
         </div>
       );
     }
     return (
-      <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#6B6456', padding: `${mt}px 10px 10px` }}>{txt}</div>
+      <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#6B6456', padding: `${mt}px 10px 10px` }}>{txt}</div>
     );
   };
 
@@ -318,7 +320,7 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
         top: 0,
         alignSelf: 'flex-start',
         flexShrink: 0,
-        fontFamily: "'Hanken Grotesk',sans-serif",
+        fontFamily: 'var(--jb-font-sans)',
         zIndex: 30,
       }}
     >
@@ -368,15 +370,13 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: narrow ? 'center' : 'space-between', gap: 8, padding: '18px 14px 16px' }}>
           {wide && (
             <Link href={appRoute('Employer Dashboard.dc.html')} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 9 }}>
-              <span style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 800, letterSpacing: '-0.02em', fontSize: 23, lineHeight: 1, color: '#FBF8F1' }}>
-                Jobocate<span style={{ color: '#4263EB' }}>.</span>
-              </span>
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 8.5, fontWeight: 600, letterSpacing: '0.12em', color: '#8DA2F5', background: '#1E2438', border: '1px solid #2E3A63', borderRadius: 5, padding: '3px 6px' }}>RECRUITER</span>
+              <Logo theme="dark" size={24} accent="#8DA2F5" />
+              <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.12em', color: '#8DA2F5', background: '#1E2438', border: '1px solid #2E3A63', borderRadius: 5, padding: '3px 6px' }}>RECRUITER</span>
             </Link>
           )}
           {narrow && (
-            <Link href={appRoute('Employer Dashboard.dc.html')} style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 800, fontSize: 22, lineHeight: 1, color: '#FBF8F1' }}>
-              J<span style={{ color: '#4263EB' }}>.</span>
+            <Link href={appRoute('Employer Dashboard.dc.html')} aria-label="Jobocate home" style={{ display: 'flex' }}>
+              <Logo theme="dark" size={26} mark accent="#8DA2F5" />
             </Link>
           )}
           <div style={{ display: 'flex', gap: 6 }}>
@@ -386,7 +386,9 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
             {wide && (
               <button onClick={() => setNotifOpen((n) => !n)} title="Notifications" style={{ ...iconBtn, position: 'relative' }}>
                 ◔
-                <span style={{ position: 'absolute', top: 5, right: 5, width: 6, height: 6, borderRadius: '50%', background: '#4263EB', border: '1.5px solid #1E1C15' }} />
+                {NOTIFS.length > 0 && (
+                  <span style={{ position: 'absolute', top: 5, right: 5, width: 6, height: 6, borderRadius: '50%', background: '#4263EB', border: '1.5px solid #1E1C15' }} />
+                )}
               </button>
             )}
             {!mobile && (
@@ -435,18 +437,14 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
 
           {wide && (
             <Link href={appRoute('Employer Upgrade.dc.html')} style={{ marginTop: 22, padding: 16, border: '1px solid #2C2A22', borderRadius: 14, background: 'linear-gradient(160deg, #1E2A22, #15140F)', display: 'block' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 7 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                 <span style={{ color: '#5BD08C', fontSize: 11 }}>✦</span>
-                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#5BD08C' }}>AI actions</span>
+                <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#5BD08C' }}>AI hiring</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 10 }}>
-                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 22, fontWeight: 600, color: '#FBF8F1' }}>240</span>
-                <span style={{ fontSize: 12, color: '#8A8378' }}>/ 500 this month</span>
+              <div style={{ fontSize: 13.5, lineHeight: 1.5, color: '#D8D2C4', marginBottom: 12 }}>
+                Autopilot, Copilot, and the Sourcing Agent help you screen and reach candidates faster.
               </div>
-              <div style={{ height: 5, borderRadius: 999, background: '#2C2A22', overflow: 'hidden', marginBottom: 12 }}>
-                <div style={{ width: '48%', height: '100%', background: '#1FA463' }} />
-              </div>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: '#8DA2F5' }}>Upgrade <span>→</span></span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: '#8DA2F5' }}>See plans <span>→</span></span>
             </Link>
           )}
 
@@ -483,12 +481,12 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '16px 18px', borderBottom: '1px solid #2C2A22' }}>
               <span style={{ color: '#6B6456', fontSize: 16 }}>⌕</span>
               <input value={query} onChange={(e) => setQuery(e.target.value)} autoFocus placeholder="Search screens & actions…" style={{ flex: 1, background: 'none', border: 'none', fontFamily: 'inherit', fontSize: 16, color: '#FBF8F1' }} />
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#6B6456', border: '1px solid #2C2A22', borderRadius: 5, padding: '2px 6px' }}>ESC</span>
+              <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#6B6456', border: '1px solid #2C2A22', borderRadius: 5, padding: '2px 6px' }}>ESC</span>
             </div>
             <div style={{ maxHeight: '50vh', overflowY: 'auto', padding: 8 }}>
               {filtered.map((r) => (
                 <Link key={r.key} href={appRoute(r.dc)} className="em-pal-row" style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '11px 12px', borderRadius: 10, color: '#E4DECF' }}>
-                  <span style={{ width: 32, height: 32, flexShrink: 0, borderRadius: 8, background: r.tint, color: r.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, fontSize: 11 }}>{r.tag}</span>
+                  <span style={{ width: 32, height: 32, flexShrink: 0, borderRadius: 8, background: r.tint, color: r.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--jb-font-mono)', fontWeight: 600, fontSize: 11 }}>{r.tag}</span>
                   <span style={{ flex: 1 }}>
                     <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: '#FBF8F1' }}>{r.label}</span>
                     <span style={{ display: 'block', fontSize: 12, color: '#8A8378' }}>{r.hint}</span>
@@ -510,18 +508,21 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
           <div onClick={(e) => e.stopPropagation()} style={{ position: 'fixed', left: mobile ? 14 : collapsed ? 84 : 260, top: 84, width: 340, maxWidth: '88vw', background: '#1A1813', border: '1px solid #2C2A22', borderRadius: 16, boxShadow: '0 40px 80px -30px rgba(0,0,0,0.7)', overflow: 'hidden', animation: 'empop 0.18s ease' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px 18px', borderBottom: '1px solid #2C2A22' }}>
               <span style={{ fontSize: 15, fontWeight: 700, color: '#FBF8F1' }}>Notifications</span>
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#8DA2F5' }}>5 new</span>
+              <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#8DA2F5' }}>{NOTIFS.length} new</span>
             </div>
             <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
               {NOTIFS.map((n, i) => (
                 <Link key={i} href={appRoute(n.dc)} className="em-notif-row" style={{ display: 'flex', gap: 12, padding: '13px 18px', borderBottom: '1px solid #221F18' }}>
-                  <span style={{ width: 32, height: 32, flexShrink: 0, borderRadius: 8, background: n.tint, color: n.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, fontSize: 11 }}>{n.tag}</span>
+                  <span style={{ width: 32, height: 32, flexShrink: 0, borderRadius: 8, background: n.tint, color: n.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--jb-font-mono)', fontWeight: 600, fontSize: 11 }}>{n.tag}</span>
                   <span style={{ flex: 1 }}>
                     <span style={{ display: 'block', fontSize: 13.5, lineHeight: 1.45, color: '#E4DECF' }}>{n.text}</span>
-                    <span style={{ display: 'block', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#8A8378', marginTop: 3 }}>{n.time}</span>
+                    <span style={{ display: 'block', fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#8A8378', marginTop: 3 }}>{n.time}</span>
                   </span>
                 </Link>
               ))}
+              {NOTIFS.length === 0 && (
+                <div style={{ padding: '28px 18px', textAlign: 'center', fontSize: 13.5, color: '#8A8378' }}>You’re all caught up — no notifications yet.</div>
+              )}
             </div>
           </div>
         </div>

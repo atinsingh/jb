@@ -1,9 +1,18 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
 import { Application, ApplicationDocument } from '../schemas/application.schema';
 import { MockInterviewSession, MockInterviewSessionDocument } from '../schemas/mock-interview-session.schema';
+import { isQueueEnabled } from '../queue/queue.constants';
+import {
+  QUEUE_CRON,
+  JOB_ANALYTICS,
+  JOBID_ANALYTICS,
+  CRON_ANALYTICS,
+} from '../queue/cron-queue.constants';
 
 export interface ApplicationAnalytics {
   userId: string;
@@ -17,7 +26,7 @@ export interface ApplicationAnalytics {
 }
 
 @Injectable()
-export class AnalyticsService {
+export class AnalyticsService implements OnModuleInit {
   private readonly logger = new Logger(AnalyticsService.name);
 
   constructor(
@@ -25,7 +34,19 @@ export class AnalyticsService {
     private applicationModel: Model<ApplicationDocument>,
     @InjectModel(MockInterviewSession.name)
     private interviewSessionModel: Model<MockInterviewSessionDocument>,
+    // Present only when QUEUE_ENABLED=true; else @Optional → undefined (inline).
+    @Optional() @InjectQueue(QUEUE_CRON) private readonly cronQueue?: Queue,
   ) {}
+
+  /** Register the repeatable monthly-analytics job with a stable jobId when queues own it. */
+  async onModuleInit(): Promise<void> {
+    if (!this.cronQueue) return;
+    await this.cronQueue.add(
+      JOB_ANALYTICS,
+      {},
+      { repeat: { cron: CRON_ANALYTICS }, jobId: JOBID_ANALYTICS },
+    );
+  }
 
   /**
    * Generate analytics for a user
@@ -96,6 +117,16 @@ export class AnalyticsService {
    */
   @Cron('0 0 1 * *')
   async aggregateMonthlyAnalytics() {
+    // Queues own scheduling when enabled → decorator no-ops (avoid double run).
+    if (isQueueEnabled()) return;
+    return this.runAnalyticsOnce();
+  }
+
+  /**
+   * Aggregate monthly analytics — called by both the @Cron handler (queues off)
+   * and the Bull processor (queues on) so both paths do identical work.
+   */
+  async runAnalyticsOnce() {
     this.logger.log('Aggregating monthly analytics...');
 
     // Get all unique user IDs with applications

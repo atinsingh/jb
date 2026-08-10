@@ -1,17 +1,21 @@
 import { API_URL } from '@/config/api';
 
 /**
- * Concierge API helpers.
+ * Concierge API helpers — CANDIDATE-facing only.
  *
  * Follows the same fetch/auth/error convention as services/api.js:
  *  - reads the JWT from localStorage ('authToken' || 'token')
  *  - attaches Authorization: Bearer <token>
  *  - throws Error(message) on non-2xx responses
  *
- * These wrap the backend `agents`, `matching` and `applications`
- * controllers (global prefix `/api`). Every call is wrapped by the
- * caller in try/catch so the Concierge screen can gracefully fall back
- * to its design sample data when the backend is offline / unauthorized.
+ * These wrap candidate-scoped `matching` and `applications` endpoints
+ * (global prefix `/api`). The Concierge screen surfaces real data or an
+ * honest empty/error state — it must NOT fabricate sample data.
+ *
+ * NOTE: the ROLE_AGENT-only `/api/agents/*` endpoints do NOT belong here — a
+ * candidate token is rejected by those routes. Agent tooling lives in
+ * services/agentApi.js. A candidate-facing "who is my concierge / assignment
+ * status" endpoint does not yet exist on the backend (backlog).
  */
 
 const getAuthToken = () => {
@@ -43,23 +47,6 @@ const apiCall = async (endpoint, options = {}) => {
   }
 
   return response.json();
-};
-
-/* -------------------------------------------------- Agents (coach) --- */
-
-// GET /api/agents/assigned-candidates → { candidates, total }
-export const getAssignedCandidates = async () => {
-  return apiCall('/api/agents/assigned-candidates');
-};
-
-// GET /api/agents/assigned-matches → { matches, total }
-export const getAssignedMatches = async () => {
-  return apiCall('/api/agents/assigned-matches');
-};
-
-// GET /api/agents/candidate/:candidateId/profile → { profile }
-export const getCandidateProfile = async (candidateId) => {
-  return apiCall(`/api/agents/candidate/${candidateId}/profile`);
 };
 
 /* ------------------------------------------ Matching (curated roles) --- */

@@ -1,5 +1,5 @@
 import React from 'react';
-import Layout from '@/components/layout';
+import Layout from '@/components/layout/PublicLayout';
 import ForgotPassword from '@/components/form/ForgotPassword';
 
 const ForgotPasswordPage = () => {

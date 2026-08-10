@@ -11,7 +11,6 @@ import {
   UserCircleIcon,
   ClipboardDocumentListIcon,
   BellIcon,
-  Cog8ToothIcon,
   ArrowRightOnRectangleIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -69,7 +68,7 @@ export default function DashboardLayout({ children }) {
   // Determine dashboard home based on user role
   const dashboardHome = user?.role === 'ROLE_EMPLOYER'
     ? '/employer/dashboard'
-    : '/candidate/dashboard';
+    : '/app/dashboard';
 
   const handleSignOut = async () => {
     try {
@@ -79,19 +78,28 @@ export default function DashboardLayout({ children }) {
     }
   };
 
-  // Navigation based on user role
+  // Navigation based on user role.
+  //
+  // Every href here was verified against src/pages. Two classes of dead link
+  // were removed:
+  //   - '/employer/applications' never existed; applications live per-job under
+  //     /employer/jobs/[id]/applications, and the cross-job view is the
+  //     candidate pipeline at /employer/candidates.
+  //   - the whole /candidate/* tree has been retired in favour of /app/*.
+  //     Those paths still 307 via next.config.js, but linking straight at the
+  //     real route avoids a redirect hop on every sidebar click.
   const navigation = user?.role === 'ROLE_EMPLOYER' ? [
     { name: 'Dashboard', href: '/employer/dashboard', icon: HomeModernIcon, current: router.pathname === '/employer/dashboard' },
     { name: 'Jobs', href: '/employer/jobs', icon: BriefcaseIcon, current: router.pathname === '/employer/jobs' },
-    { name: 'Applications', href: '/employer/applications', icon: ClipboardDocumentListIcon, current: router.pathname === '/employer/applications' },
+    { name: 'Candidates', href: '/employer/candidates', icon: ClipboardDocumentListIcon, current: router.pathname === '/employer/candidates' },
   ] : [
-    { name: 'Dashboard', href: '/candidate/dashboard', icon: HomeModernIcon, current: router.pathname === '/candidate/dashboard' },
-    { name: 'My Applications', href: '/candidate/applications', icon: ClipboardDocumentListIcon, current: router.pathname === '/candidate/applications' },
+    { name: 'Dashboard', href: '/app/dashboard', icon: HomeModernIcon, current: router.pathname === '/app/dashboard' },
+    { name: 'My Applications', href: '/app/tracker', icon: ClipboardDocumentListIcon, current: router.pathname === '/app/tracker' },
     { name: 'Matched Jobs', href: '/jobs', icon: BriefcaseIcon, current: router.pathname === '/jobs' },
-    { name: 'AI Resume Builder', href: '/candidate/resume-builder', icon: SparklesIcon, current: router.pathname === '/candidate/resume-builder', isPro: true },
-    { name: 'AI Cover Letter', href: '/candidate/cover-letter', icon: EnvelopeIcon, current: router.pathname === '/candidate/cover-letter', isPro: true },
-    { name: 'Interview Buddy', href: '/candidate/interview-buddy', icon: MicrophoneIcon, current: router.pathname === '/candidate/interview-buddy', isPro: true },
-    { name: 'Job Profiles', href: '/candidate/job-profiles', icon: UserGroupIcon, current: router.pathname === '/candidate/job-profiles' },
+    { name: 'AI Resume Builder', href: '/app/resume-builder', icon: SparklesIcon, current: router.pathname === '/app/resume-builder', isPro: true },
+    { name: 'AI Cover Letter', href: '/app/cover-letter', icon: EnvelopeIcon, current: router.pathname === '/app/cover-letter', isPro: true },
+    { name: 'Interview Buddy', href: '/app/mock-interview', icon: MicrophoneIcon, current: router.pathname === '/app/mock-interview', isPro: true },
+    { name: 'Job Profiles', href: '/app/preferences', icon: UserGroupIcon, current: router.pathname === '/app/preferences' },
   ];
 
   // Get user initials
@@ -246,15 +254,15 @@ export default function DashboardLayout({ children }) {
                     </div>
                   </DropdownButton>
                   <DropdownMenu anchor="top end" className="z-[100] min-w-[200px]">
-                    <DropdownItem href={user?.role === 'ROLE_EMPLOYER' ? '/employer/profile' : '/candidate/profile'}>
+                    <DropdownItem href={user?.role === 'ROLE_EMPLOYER' ? '/employer/profile' : '/app/settings'}>
                       <UserCircleIcon data-slot="icon" />
                       <span>Profile</span>
                     </DropdownItem>
-                    <DropdownItem href={user?.role === 'ROLE_EMPLOYER' ? '/employer/settings' : '/candidate/settings'}>
-                      <Cog8ToothIcon data-slot="icon" />
-                      <span>Settings</span>
-                    </DropdownItem>
-                    <DropdownItem href={user?.role === 'ROLE_EMPLOYER' ? '/employer/subscription' : '/candidate/subscription'}>
+                    {/* "Settings" is gone rather than repointed: it linked to
+                        /employer/settings and /candidate/settings, neither of
+                        which exists, and the only real destination is the
+                        account page "Profile" above already opens. */}
+                    <DropdownItem href={user?.role === 'ROLE_EMPLOYER' ? '/employer/billing' : '/app/subscription'}>
                       <CreditCardIcon data-slot="icon" />
                       <span>Manage Subscription</span>
                     </DropdownItem>

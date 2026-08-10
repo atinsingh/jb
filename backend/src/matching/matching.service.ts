@@ -4,7 +4,8 @@ import { Model } from 'mongoose';
 import { JobMatch, JobMatchDocument } from '../schemas/job-match.schema';
 import { Job, JobDocument } from '../schemas/job.schema';
 import { User, UserDocument } from '../schemas/user.schema';
-import { AiProviderService } from '../ai-services/ai-provider.service';
+import { MatchCalculatorService } from '../llm/features/match-calculator.service';
+import { CoverLetterGeneratorService } from '../llm/features/cover-letter-generator.service';
 import { JobProfilesService } from '../job-profiles/job-profiles.service';
 
 @Injectable()
@@ -15,7 +16,8 @@ export class MatchingService {
     @InjectModel(JobMatch.name) private jobMatchModel: Model<JobMatchDocument>,
     @InjectModel(Job.name) private jobModel: Model<JobDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
-    private aiProviderService: AiProviderService,
+    private matchCalculatorService: MatchCalculatorService,
+    private coverLetterGeneratorService: CoverLetterGeneratorService,
     private jobProfilesService: JobProfilesService,
   ) {}
 
@@ -53,7 +55,8 @@ export class MatchingService {
       const jobRequirements = job.requirements?.join(', ') || 'Not specified';
       const jobDescription = job.description || '';
 
-      const matchResult = await this.aiProviderService.calculateJobMatch(
+      const matchResult = await this.matchCalculatorService.calculateMatch(
+        userId,
         candidateSkills,
         jobRequirements,
         jobDescription,
@@ -182,20 +185,27 @@ export class MatchingService {
 
       const candidateInfo = {
         name: user.name || 'Candidate',
+        email: user.email || '',
         skills: profile.skills || [],
         experience: experienceText,
+        summary: profile.summary || '',
       };
 
       const jobInfo = {
         title: job.title,
         companyName: job.companyName,
         description: job.description || '',
+        requirements: job.requirements || [],
       };
 
-      const coverLetter = await this.aiProviderService.generateCoverLetter(
+      // The modern generator returns structured sections + a finalLetter; the
+      // callers here expect the plain string letter, so map back to finalLetter.
+      const result = await this.coverLetterGeneratorService.generateCoverLetter(
+        userId,
         candidateInfo,
         jobInfo,
       );
+      const coverLetter = result.finalLetter;
       this.logger.log(
         `✅ Cover letter generated for user ${user.email} - job ${job.title} - profile ${profile.profileName}`,
       );

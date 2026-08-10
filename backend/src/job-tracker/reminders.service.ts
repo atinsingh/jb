@@ -1,7 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
 import {
   Reminder,
   ReminderDocument,
@@ -9,9 +11,16 @@ import {
   ReminderType,
 } from '../schemas/reminder.schema';
 import { Application, ApplicationDocument } from '../schemas/application.schema';
+import { isQueueEnabled } from '../queue/queue.constants';
+import {
+  QUEUE_CRON,
+  JOB_REMINDERS,
+  JOBID_REMINDERS,
+  CRON_REMINDERS,
+} from '../queue/cron-queue.constants';
 
 @Injectable()
-export class RemindersService {
+export class RemindersService implements OnModuleInit {
   private readonly logger = new Logger(RemindersService.name);
 
   constructor(
@@ -19,7 +28,19 @@ export class RemindersService {
     private reminderModel: Model<ReminderDocument>,
     @InjectModel(Application.name)
     private applicationModel: Model<ApplicationDocument>,
+    // Present only when QUEUE_ENABLED=true; else @Optional → undefined (inline).
+    @Optional() @InjectQueue(QUEUE_CRON) private readonly cronQueue?: Queue,
   ) {}
+
+  /** Register the repeatable reminders job with a stable jobId when queues own it. */
+  async onModuleInit(): Promise<void> {
+    if (!this.cronQueue) return;
+    await this.cronQueue.add(
+      JOB_REMINDERS,
+      {},
+      { repeat: { cron: CRON_REMINDERS }, jobId: JOBID_REMINDERS },
+    );
+  }
 
   /**
    * Create a reminder
@@ -106,6 +127,16 @@ export class RemindersService {
    */
   @Cron(CronExpression.EVERY_HOUR)
   async processDueReminders() {
+    // Queues own scheduling when enabled → decorator no-ops (avoid double run).
+    if (isQueueEnabled()) return;
+    return this.runRemindersOnce();
+  }
+
+  /**
+   * Process due reminders — called by both the @Cron handler (queues off) and
+   * the Bull processor (queues on) so both paths do identical work.
+   */
+  async runRemindersOnce() {
     this.logger.log('Processing due reminders...');
 
     const now = new Date();

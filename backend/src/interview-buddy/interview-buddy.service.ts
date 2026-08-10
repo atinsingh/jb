@@ -4,7 +4,8 @@ import { Model, Types } from 'mongoose';
 import { Application, ApplicationDocument } from '../schemas/application.schema';
 import { Resume, ResumeDocument } from '../schemas/resume.schema';
 import { Job, JobDocument } from '../schemas/job.schema';
-import { AiProviderService } from '../ai-services/ai-provider.service';
+import { InterviewChatService } from '../llm/features/interview-chat.service';
+import { LLMChatMessage } from '../llm/interfaces/llm-provider.interface';
 import {
   InterviewSession,
   InterviewSessionDocument,
@@ -29,7 +30,7 @@ export class InterviewBuddyService {
     private interviewSessionModel: Model<InterviewSessionDocument>,
     @InjectModel(InterviewTurn.name)
     private interviewTurnModel: Model<InterviewTurnDocument>,
-    private aiProviderService: AiProviderService,
+    private interviewChatService: InterviewChatService,
   ) {}
 
   async getSession(sessionId: string, userId: string) {
@@ -258,11 +259,26 @@ Keep your responses concise, practical, and actionable. Focus on helping them su
     ];
 
     try {
-      // Use AI provider to generate response
-      const response = await this.aiProviderService.generateChatResponse(messages);
+      // Use the modern llm/ interview-chat service to generate a response.
+      const response = await this.interviewChatService.chat(
+        userId,
+        messages as LLMChatMessage[],
+      );
       return response;
     } catch (error: any) {
-      throw new BadRequestException(`Failed to generate response: ${error.message}`);
+      // Graceful degradation: the AI provider may be unavailable (e.g. quota
+      // exhausted). Return a helpful, non-blocking message rather than a 400
+      // so the chat UI stays usable.
+      // eslint-disable-next-line no-console
+      console.warn(`[interview-buddy] AI chat unavailable: ${error?.message || error}`);
+      return (
+        "I'm temporarily unable to reach the AI service, so here's some general guidance while it recovers:\n\n" +
+        '• Structure behavioral answers with STAR — Situation, Task, Action, Result.\n' +
+        '• Lead with the outcome and quantify impact where you can.\n' +
+        '• Tie each answer back to the specific role and company.\n' +
+        '• Keep it to 60–90 seconds and end on what you learned.\n\n' +
+        'Please try again in a moment for a tailored response.'
+      );
     }
   }
 }

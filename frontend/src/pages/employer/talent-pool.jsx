@@ -1,24 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import EmployerSidebar from '@/components/employer/EmployerSidebar';
 import { appRoute } from '@/components/app/appRoutes';
-
-// ---- Sample CRM pool (ported from the dc Component class) ----
-const POOL = [
-  { id: 'p1', initials: 'SC', name: 'Sarah Chen', headline: 'Senior Product Designer · ex-Plaid', skills: ['Design systems', 'Fintech', '0→1'], seg: 'saved', tag: 'SAVED', source: 'Applied · Sr. Designer', added: 'Jun 28', accent: 'green' },
-  { id: 'p2', initials: 'RT', name: 'Rosa Tan', headline: 'PM · Experimentation · ex-Dropbox', skills: ['Growth', 'A/B testing'], seg: 'silver', tag: 'SILVER MEDALIST', source: 'PM, Growth · final round', added: 'May 2024', accent: 'indigo' },
-  { id: 'p3', initials: 'DR', name: 'Diego Ramos', headline: 'Senior Designer · B2B SaaS', skills: ['Design systems', 'Prototyping'], seg: 'saved', tag: 'SAVED', source: 'Sourced', added: 'Jun 20', accent: 'indigo' },
-  { id: 'p4', initials: 'KW', name: 'Kayla Wright', headline: 'Staff Frontend Engineer · ex-Vercel', skills: ['React', 'TypeScript', 'Perf'], seg: 'silver', tag: 'SILVER MEDALIST', source: 'Staff FE · offer declined', added: 'Apr 2024', accent: 'indigo' },
-  { id: 'p5', initials: 'MO', name: 'Marcus Obi', headline: 'Senior PM · Marketplaces', skills: ['Marketplaces', 'Pricing'], seg: 'future', tag: 'FUTURE: PM LEAD', source: 'Applied · PM Growth', added: 'Jun 10', accent: 'indigo' },
-  { id: 'p6', initials: 'LF', name: 'Lena Fischer', headline: 'PM · Growth & Activation', skills: ['Activation', 'Funnels'], seg: 'saved', tag: 'SAVED', source: 'Applied · PM Growth', added: 'Jun 18', accent: 'indigo' },
-  { id: 'p7', initials: 'AB', name: 'Aisha Bello', headline: 'Sr. Product Designer · Marketplaces', skills: ['Design systems', 'Research'], seg: 'silver', tag: 'SILVER MEDALIST', source: 'Sr. Designer · final round', added: 'Jun 2024', accent: 'indigo' },
-  { id: 'p8', initials: 'TK', name: 'Tomas Kovac', headline: 'Staff Designer · Developer Tools', skills: ['Motion', 'Systems'], seg: 'future', tag: 'FUTURE: DESIGN', source: 'Sourced', added: 'May 30', accent: 'indigo' },
-  { id: 'p9', initials: 'JL', name: 'Jordan Lee', headline: 'Product Designer · ex-Square', skills: ['Payments', 'Craft'], seg: 'saved', tag: 'SAVED', source: 'Applied · Sr. Designer', added: 'Jun 25', accent: 'indigo' },
-  { id: 'p10', initials: 'EN', name: 'Elena Novak', headline: 'Frontend Engineer · Fintech', skills: ['React', 'Design eng'], seg: 'future', tag: 'FUTURE: FE', source: 'Sourced', added: 'Jun 5', accent: 'indigo' },
-];
+import { LoadingState, ErrorState, InlineError } from '@/components/employer/EmployerStates';
+import { employerTalentApi, employerJobsApi, employerPipelineApi } from '@/services/employerApi';
 
 function avatarStyle(a) {
   if (a === 'green') return { bg: '#1FA463', color: '#0C2C1C' };
@@ -39,27 +27,67 @@ const SEG_DEFS = [
   { key: 'future', label: 'Future pipeline' },
 ];
 
-const SUGGESTIONS = [
-  { initials: 'RT', name: 'Rosa Tan', reason: 'Silver medalist for PM Growth — matches your new PM, Lead req at 89%.', accent: 'indigo' },
-  { initials: 'KW', name: 'Kayla Wright', reason: 'Declined Staff FE last year — strong fit for the reopened role.', accent: 'indigo' },
-].map((s) => {
-  const a = avatarStyle(s.accent);
-  return { ...s, avatarBg: a.bg, avatarColor: a.color };
-});
+function toCard(c) {
+  const seg = c.segment || 'saved';
+  return {
+    id: c._id,
+    initials: c.initials || (c.name || '').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase(),
+    name: c.name,
+    headline: c.headline || '',
+    skills: Array.isArray(c.skills) ? c.skills : [],
+    seg,
+    tag: c.tag || (seg === 'saved' ? 'SAVED' : seg === 'silver' ? 'SILVER MEDALIST' : 'FUTURE'),
+    source: c.source || '',
+    added: '',
+    accent: seg === 'saved' ? 'green' : 'indigo',
+  };
+}
 
 export default function EmployerTalentPool() {
   const [query, setQuery] = useState('');
   const [segment, setSegment] = useState('all');
   const [added, setAdded] = useState({});
+  const [pool, setPool] = useState([]);
+  const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [actionError, setActionError] = useState(null);
+
+  // Fetch the live talent pool. No sample fallback — surface real state only.
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await employerTalentApi.list({ segment: 'all', search: '' });
+      const candidates = Array.isArray(res?.candidates) ? res.candidates : [];
+      setPool(candidates.map(toCard));
+      // Load the employer's jobs so candidates can be added to a real requisition.
+      try {
+        const jobsRes = await employerJobsApi.list();
+        setJobs(Array.isArray(jobsRes?.jobs) ? jobsRes.jobs : []);
+      } catch {
+        setJobs([]);
+      }
+    } catch (err) {
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const counts = useMemo(
     () => ({
-      all: POOL.length,
-      saved: POOL.filter((p) => p.seg === 'saved').length,
-      silver: POOL.filter((p) => p.seg === 'silver').length,
-      future: POOL.filter((p) => p.seg === 'future').length,
+      all: pool.length,
+      saved: pool.filter((p) => p.seg === 'saved').length,
+      silver: pool.filter((p) => p.seg === 'silver').length,
+      future: pool.filter((p) => p.seg === 'future').length,
     }),
-    []
+    [pool]
   );
 
   const segments = SEG_DEFS.map((s) => {
@@ -77,7 +105,7 @@ export default function EmployerTalentPool() {
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let list = POOL;
+    let list = pool;
     if (segment !== 'all') list = list.filter((p) => p.seg === segment);
     if (q) {
       list = list.filter((p) =>
@@ -102,22 +130,73 @@ export default function EmployerTalentPool() {
         addBorder: isAdded ? '#CDE9D6' : '#C7D2FB',
       };
     });
-  }, [query, segment, added]);
+  }, [query, segment, added, pool]);
 
   const empty = rows.length === 0;
 
-  const toggleAdd = (id) => setAdded((s) => ({ ...s, [id]: !s[id] }));
+  // Add a candidate to the talent pool; persist and update from the response.
+  const addCandidate = async () => {
+    const name = typeof window !== 'undefined' ? window.prompt('Candidate name?') : null;
+    if (!name || !name.trim()) return;
+    setActionError(null);
+    const draft = { name: name.trim(), headline: '', skills: [], segment: 'saved', source: 'Added manually' };
+    try {
+      const created = await employerTalentApi.create(draft);
+      if (created && created._id) setPool((p) => [toCard(created), ...p]);
+    } catch (err) {
+      setActionError(err);
+    }
+  };
+
+  // Add a talent-pool candidate to a real job's applicant pipeline.
+  const addToReq = async (card) => {
+    setActionError(null);
+    if (!jobs.length) {
+      setActionError(new Error('Create a job posting first to add candidates to a requisition.'));
+      return;
+    }
+    let job = jobs[0];
+    if (jobs.length > 1 && typeof window !== 'undefined') {
+      const menu = jobs.map((j, i) => `${i + 1}. ${j.title || 'Untitled role'}`).join('\n');
+      const pick = window.prompt(`Add "${card.name}" to which job?\n\n${menu}\n\nEnter a number:`, '1');
+      if (pick == null) return;
+      const idx = Number(pick) - 1;
+      if (Number.isNaN(idx) || idx < 0 || idx >= jobs.length) {
+        setActionError(new Error('Invalid job selection.'));
+        return;
+      }
+      job = jobs[idx];
+    }
+    try {
+      await employerPipelineApi.create({
+        jobId: job._id,
+        candidateName: card.name,
+        candidateHeadline: card.headline || '',
+        skills: Array.isArray(card.skills) ? card.skills : [],
+        source: 'Talent pool',
+      });
+      setAdded((s) => ({ ...s, [card.id]: true }));
+    } catch (err) {
+      setActionError(err);
+    }
+  };
+
+  // Remove a candidate from the talent pool, then drop it from the list.
+  const removeCandidate = async (id) => {
+    if (typeof window !== 'undefined' && !window.confirm('Remove this candidate from your talent pool?')) return;
+    setActionError(null);
+    try {
+      await employerTalentApi.remove(id);
+      setPool((p) => p.filter((c) => c.id !== id));
+    } catch (err) {
+      setActionError(err);
+    }
+  };
 
   return (
     <>
       <Head>
         <title>Talent pool — Jobocate for Employers</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
       <style jsx global>{`
@@ -143,7 +222,7 @@ export default function EmployerTalentPool() {
 
       <div
         id="emapp"
-        style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: "'Hanken Grotesk',sans-serif", color: '#1B1A16' }}
+        style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16' }}
       >
         <EmployerSidebar active="candidates" />
 
@@ -163,12 +242,13 @@ export default function EmployerTalentPool() {
               borderBottom: '1px solid #E7E0D2',
             }}
           >
-            <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9286' }}>
+            <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9286' }}>
               Candidates / Talent pool
             </div>
             <div style={{ flex: 1 }} />
             <button
               className="emaddbtn"
+              onClick={addCandidate}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: 'inherit', fontSize: 13, fontWeight: 700, color: '#fff', background: '#4263EB', border: 'none', borderRadius: 999, padding: '9px 16px', cursor: 'pointer' }}
             >
               ＋ Add candidate
@@ -177,36 +257,8 @@ export default function EmployerTalentPool() {
 
           <div style={{ padding: '26px 32px 56px', maxWidth: 1080, width: '100%', margin: '0 auto' }}>
             <div style={{ marginBottom: 18 }}>
-              <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 36, lineHeight: 1, margin: '0 0 6px' }}>Talent pool</h1>
+              <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 36, lineHeight: 1, margin: '0 0 6px' }}>Talent pool</h1>
               <p style={{ fontSize: 14.5, color: '#5A544A', margin: 0 }}>Your CRM of saved, silver-medalist and future-pipeline candidates.</p>
-            </div>
-
-            {/* AI RE-ENGAGE */}
-            <div style={{ background: '#15140F', border: '1px solid #2C2A22', borderRadius: 16, padding: '18px 22px', marginBottom: 18 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-                <span style={{ color: '#5BD08C', fontSize: 15 }}>✦</span>
-                <span style={{ fontSize: 14.5, fontWeight: 700, color: '#FBF8F1' }}>Re-engage for new roles</span>
-                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#8A8378' }}>AI suggestions</span>
-              </div>
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                {SUGGESTIONS.map((s) => (
-                  <div
-                    key={s.name}
-                    style={{ flex: 1, minWidth: 280, display: 'flex', alignItems: 'center', gap: 13, background: '#1E1C15', border: '1px solid #2C2A22', borderRadius: 13, padding: 14 }}
-                  >
-                    <span style={{ width: 38, height: 38, flexShrink: 0, borderRadius: '50%', background: s.avatarBg, color: s.avatarColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13 }}>
-                      {s.initials}
-                    </span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 700, color: '#FBF8F1' }}>{s.name}</div>
-                      <div style={{ fontSize: 11.5, lineHeight: 1.4, color: '#9A9286' }}>{s.reason}</div>
-                    </div>
-                    <button style={{ flexShrink: 0, fontFamily: 'inherit', fontSize: 12, fontWeight: 600, color: '#0C2C1C', background: '#1FA463', border: 'none', borderRadius: 999, padding: '7px 13px', cursor: 'pointer' }}>
-                      Invite
-                    </button>
-                  </div>
-                ))}
-              </div>
             </div>
 
             {/* SEARCH + SEGMENTS */}
@@ -228,7 +280,7 @@ export default function EmployerTalentPool() {
                     style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: s.color, background: s.bg, border: `1px solid ${s.border}`, borderRadius: 999, padding: '7px 14px', cursor: 'pointer' }}
                   >
                     {s.label}
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: s.countColor }}>{s.count}</span>
+                    <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: s.countColor }}>{s.count}</span>
                   </button>
                 ))}
               </div>
@@ -248,22 +300,22 @@ export default function EmployerTalentPool() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 2, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 14.5, fontWeight: 700, color: '#1B1A16' }}>{r.name}</span>
-                      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9, fontWeight: 600, letterSpacing: '0.03em', color: r.tagColor, background: r.tagBg, border: `1px solid ${r.tagBorder}`, padding: '2px 8px', borderRadius: 999 }}>
+                      <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.03em', color: r.tagColor, background: r.tagBg, border: `1px solid ${r.tagBorder}`, padding: '2px 8px', borderRadius: 999 }}>
                         {r.tag}
                       </span>
                     </div>
                     <div style={{ fontSize: 12.5, color: '#8A8378' }}>{r.headline}</div>
                     <div style={{ display: 'flex', gap: 5, marginTop: 6, flexWrap: 'wrap' }}>
                       {r.skills.map((sk) => (
-                        <span key={sk} style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, color: '#5A544A', background: '#F2ECE0', border: '1px solid #E6DECF', padding: '2px 7px', borderRadius: 999 }}>
+                        <span key={sk} style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#5A544A', background: '#F2ECE0', border: '1px solid #E6DECF', padding: '2px 7px', borderRadius: 999 }}>
                           {sk}
                         </span>
                       ))}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0, marginRight: 6 }}>
-                    <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#A79E8F' }}>{r.source}</div>
-                    <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, color: '#C9BFAC' }}>{r.added}</div>
+                    <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#A79E8F' }}>{r.source}</div>
+                    <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#C9BFAC' }}>{r.added}</div>
                   </div>
                   <button
                     onClick={() => toggleAdd(r.id)}

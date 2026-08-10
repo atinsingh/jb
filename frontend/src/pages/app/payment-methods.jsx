@@ -12,13 +12,7 @@ import {
   removePaymentMethod,
   setDefaultPaymentMethod,
 } from '@/services/paymentMethodsApi';
-
-// ---- Design's own sample data (fallback when unauthenticated / request fails)
-const SAMPLE_CARDS = [
-  { id: 'c1', brand: 'Visa', brandShort: 'VISA', last4: '4242', exp: '09/27', chipBg: 'linear-gradient(135deg,#1FA463,#157A49)' },
-  { id: 'c2', brand: 'Mastercard', brandShort: 'MC', last4: '8819', exp: '03/26', chipBg: 'linear-gradient(135deg,#C9622E,#9A4A22)' },
-];
-const SAMPLE_DEFAULT = 'c1';
+import { LoadingState, EmptyState, ErrorState } from '@/components/app/AppStates';
 
 // Brand → chip gradient mapping for cards returned by the backend.
 const chipForBrand = (brand) => {
@@ -48,30 +42,34 @@ const normalizeCard = (raw) => ({
 export default function AppPaymentMethods() {
   const { isAuthenticated } = useAuth() || {};
 
-  const [cards, setCards] = useState(SAMPLE_CARDS);
-  const [defaultId, setDefaultId] = useState(SAMPLE_DEFAULT);
+  const [cards, setCards] = useState([]);
+  const [defaultId, setDefaultId] = useState(null);
   const [adding, setAdding] = useState(false);
   const [confirmId, setConfirmId] = useState(null);
   const [nextId, setNextId] = useState(3);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Fetch real cards; gracefully fall back to the design's sample data.
+  // Fetch the user's real cards. No sample fallback — an authenticated user
+  // with no cards on file sees a genuine empty state.
   useEffect(() => {
     let cancelled = false;
-    if (!isAuthenticated) return;
+    if (!isAuthenticated) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     getPaymentMethods()
       .then((data) => {
         if (cancelled) return;
         const list = Array.isArray(data) ? data : data?.paymentMethods || data?.cards || [];
-        if (!list.length) return; // keep sample data so the page always renders
         const normalized = list.map(normalizeCard);
         setCards(normalized);
         const def = normalized.find((c) => c.isDefault);
-        setDefaultId(def ? def.id : normalized[0].id);
+        setDefaultId(def ? def.id : normalized[0] ? normalized[0].id : null);
       })
-      .catch(() => {
-        /* keep sample data — never crash */
+      .catch((e) => {
+        if (!cancelled) setError(e);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -120,7 +118,7 @@ export default function AppPaymentMethods() {
 
   const input = {
     width: '100%',
-    fontFamily: "'JetBrains Mono',monospace",
+    fontFamily: 'var(--jb-font-mono)',
     fontSize: 14,
     color: '#1B1A16',
     background: '#FBF8F1',
@@ -134,12 +132,6 @@ export default function AppPaymentMethods() {
     <>
       <Head>
         <title>Payment methods — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
       <style jsx global>{`
@@ -171,7 +163,7 @@ export default function AppPaymentMethods() {
         }
       `}</style>
 
-      <div id="jbapp" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: "'Hanken Grotesk',sans-serif", color: '#1B1A16' }}>
+      <div id="jbapp" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16' }}>
         <AppSidebar active="settings" />
 
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
@@ -179,27 +171,34 @@ export default function AppPaymentMethods() {
           <header style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: 18, padding: '15px 32px', background: 'rgba(247,243,234,0.85)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #E7E0D2' }}>
             <Link href={appRoute('App Settings.dc.html')} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13.5, fontWeight: 600, color: '#5A544A', textDecoration: 'none' }}>← Back to settings</Link>
             <div style={{ flex: 1 }} />
-            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, color: '#9A9286' }}>Plan &amp; billing</span>
+            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, color: '#9A9286' }}>Plan &amp; billing</span>
           </header>
 
           <div style={{ padding: '30px 32px 64px', maxWidth: 720, width: '100%', margin: '0 auto' }}>
-            <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 38, lineHeight: 1, margin: '0 0 6px' }}>Payment methods</h1>
+            <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 38, lineHeight: 1, margin: '0 0 6px' }}>Payment methods</h1>
             <p style={{ fontSize: 15, color: '#5A544A', margin: '0 0 24px' }}>Cards on file for your subscription. Your default is charged automatically.</p>
 
             {/* CARD LIST */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
-              {cards.map((c) => {
+              {loading ? (
+                <LoadingState label="Loading payment methods…" />
+              ) : error ? (
+                <ErrorState error={error} onRetry={() => window.location.reload()} />
+              ) : cards.length === 0 ? (
+                <EmptyState icon="💳" title="No payment methods" hint="Add a card below to manage your subscription billing." />
+              ) : (
+                cards.map((c) => {
                 const isDefault = c.id === defaultId;
                 const confirming = confirmId === c.id;
                 const border = isDefault ? '#CDE9D6' : '#E6DECF';
                 return (
                   <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 16, background: '#FFFEFB', border: `1px solid ${border}`, borderRadius: 16, padding: '18px 20px' }}>
-                    <span style={{ width: 50, height: 34, flexShrink: 0, borderRadius: 7, background: c.chipBg, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, fontSize: 11, letterSpacing: '0.04em' }}>{c.brandShort}</span>
+                    <span style={{ width: 50, height: 34, flexShrink: 0, borderRadius: 7, background: c.chipBg, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--jb-font-mono)', fontWeight: 600, fontSize: 11, letterSpacing: '0.04em' }}>{c.brandShort}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 14.5, fontWeight: 600, color: '#1B1A16' }}>•••• {c.last4}</span>
+                        <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 14.5, fontWeight: 600, color: '#1B1A16' }}>•••• {c.last4}</span>
                         {isDefault && (
-                          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9, fontWeight: 600, letterSpacing: '0.04em', color: '#157A49', background: '#EAF6EE', border: '1px solid #CDE9D6', padding: '3px 8px', borderRadius: 999 }}>DEFAULT</span>
+                          <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', color: '#157A49', background: '#EAF6EE', border: '1px solid #CDE9D6', padding: '3px 8px', borderRadius: 999 }}>DEFAULT</span>
                         )}
                       </div>
                       <div style={{ fontSize: 12.5, color: '#8A8378', marginTop: 2 }}>{c.brand} · expires {c.exp}</div>
@@ -221,7 +220,8 @@ export default function AppPaymentMethods() {
                     )}
                   </div>
                 );
-              })}
+                })
+              )}
             </div>
 
             {/* ADD PAYMENT METHOD */}
@@ -231,7 +231,7 @@ export default function AppPaymentMethods() {
 
             {adding && (
               <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18, padding: 24, animation: 'rbpop 0.25s ease' }}>
-                <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9A9286', marginBottom: 16 }}>New card</div>
+                <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9A9286', marginBottom: 16 }}>New card</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
                   <div>
                     <label style={label}>Card number</label>
@@ -249,7 +249,7 @@ export default function AppPaymentMethods() {
                   </div>
                   <div>
                     <label style={label}>Name on card</label>
-                    <input defaultValue="Sarah Chen" style={{ ...input, fontFamily: 'inherit' }} />
+                    <input placeholder="Name on card" style={{ ...input, fontFamily: 'inherit' }} />
                   </div>
                   <div>
                     <label style={label}>Country</label>

@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { JobMatchingService } from './job-matching.service';
-import { AiServicesModule } from '../ai-services/ai-services.module';
+import { LLMModule } from '../llm/llm.module';
 
 @Module({
-  imports: [AiServicesModule],
+  imports: [LLMModule],
   providers: [JobMatchingService],
   exports: [JobMatchingService],
 })

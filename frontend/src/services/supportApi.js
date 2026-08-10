@@ -1,53 +1,20 @@
-import { API_URL } from '@/config/api';
-
-// ---------------------------------------------------------------- auth helper
-const getAuthToken = () => {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('authToken') || localStorage.getItem('token');
-  }
-  return null;
-};
-
-// Shared fetch wrapper following the api.js convention (token auto-attached,
-// JSON body, throw on !ok). Kept local so we never modify api.js.
-const apiCall = async (endpoint, options = {}) => {
-  const token = getAuthToken();
-  const headers = {
-    'Content-Type': 'application/json',
-    ...options.headers,
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Request failed' }));
-    throw new Error(error.message || 'Request failed');
-  }
-  return response.json();
-};
-
 // ---------------------------------------------------------------- Support
-// Support is ticket-driven. If a backend support endpoint exists it is consumed
-// here; otherwise the page falls back to its bundled sample tickets so it always
-// renders. All calls are best-effort and the page swallows failures gracefully.
+// There is no support-ticket backend yet. Rather than POST/GET against
+// /api/users/support/* (which 404s), these resolve locally so the page never
+// errors: the request list stays empty and submissions are accepted without a
+// broken network call.
+//
+// Backlog: wire a real support backend (or email/helpdesk integration) so
+// tickets are actually persisted and answered. Until then the page's success
+// screen should be read as "we received your details" only once that exists.
 
-// GET /api/users/support/tickets — the signed-in user's support requests.
-export const getMyTickets = async () => apiCall('/api/users/support/tickets');
+// GET /api/users/support/tickets — no backend: resolve to an empty list so the
+// page shows its honest empty state instead of an error.
+export const getMyTickets = async () => [];
 
-// POST /api/users/support/tickets — open a new request.
-// { category, subject, message, priority }
-export const createTicket = async ({ category, subject, message, priority }) =>
-  apiCall('/api/users/support/tickets', {
-    method: 'POST',
-    body: JSON.stringify({ category, subject, message, priority }),
-  });
+// POST /api/users/support/tickets — no backend sink: accept gracefully as a
+// no-op. Returns no id so the page keeps its own local reference number.
+export const createTicket = async (_payload) => ({ ok: false, persisted: false });
 
-// POST /api/users/support/tickets/:id/reply — add a reply to a thread.
-export const replyToTicket = async (ticketId, text) =>
-  apiCall(`/api/users/support/tickets/${encodeURIComponent(ticketId)}/reply`, {
-    method: 'POST',
-    body: JSON.stringify({ text }),
-  });
+// POST /api/users/support/tickets/:id/reply — no backend: no-op.
+export const replyToTicket = async (_ticketId, _text) => ({ ok: false, persisted: false });

@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, Types, Schema as MongooseSchema } from 'mongoose';
 
 export type SubscriptionStatus = 'active' | 'canceled' | 'past_due' | 'incomplete' | 'incomplete_expired' | 'trialing' | 'unpaid' | 'paused';
 export type BillingCycle = 'monthly' | 'yearly';
@@ -8,10 +8,10 @@ export type UserSubscriptionDocument = HydratedDocument<UserSubscription>;
 
 @Schema({ timestamps: true, collection: 'user_subscriptions' })
 export class UserSubscription {
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true, unique: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true, unique: true })
   userId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'SubscriptionPlan', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'SubscriptionPlan', required: true })
   planId: Types.ObjectId;
 
   @Prop()

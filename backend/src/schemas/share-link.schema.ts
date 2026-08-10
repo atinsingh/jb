@@ -1,11 +1,11 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
 export type ShareLinkDocument = ShareLink & Document;
 
 @Schema({ timestamps: true })
 export class ShareLink {
-    @Prop({ type: Types.ObjectId, ref: 'Resume', required: true })
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Resume', required: true })
     resumeId: Types.ObjectId;
 
     @Prop({ required: true, unique: true })

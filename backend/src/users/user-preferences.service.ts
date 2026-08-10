@@ -24,11 +24,15 @@ export class UserPreferencesService {
   }
 
   async update(userId: string, dto: UpdatePreferencesDto) {
+    // Must query by ObjectId to match getOrCreate() — the userId path is
+    // stored as an ObjectId, so filtering by the raw string targets a
+    // DIFFERENT (duplicate) document and silently loses the update.
+    const _id = new Types.ObjectId(userId);
     const update: any = { ...dto };
     return this.prefsModel.findOneAndUpdate(
-      { userId },
-      { $set: update },
-      { upsert: true, new: true },
+      { userId: _id },
+      { $set: update, $setOnInsert: { userId: _id } },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
     );
   }
 }

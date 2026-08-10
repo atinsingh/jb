@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { LLMRoutingService, LLMFeature } from '../llm-routing.service';
 import { LLMQuotaService } from '../llm-quota.service';
 import { ClaimsReviewService } from '../claims-review.service';
@@ -12,11 +13,22 @@ import { z } from 'zod';
 export class CoverLetterGeneratorService {
   private readonly logger = new Logger(CoverLetterGeneratorService.name);
 
+  // Quota is opt-in via LLM_ENFORCE_QUOTA (default false), matching the sibling
+  // feature-services. Legacy cover-letter generation (now routed here from
+  // matching/job-matching) had no quota, and FREE seeds ai_credits_per_month=0,
+  // so unconditional enforcement would ForbiddenException every FREE user.
+  private readonly enforceQuotaEnabled: boolean;
+
   constructor(
     private readonly routingService: LLMRoutingService,
     private readonly quotaService: LLMQuotaService,
     private readonly claimsReviewService: ClaimsReviewService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.enforceQuotaEnabled =
+      (this.configService.get<string>('LLM_ENFORCE_QUOTA') || 'false')
+        .toLowerCase() === 'true';
+  }
 
   /**
    * Generate cover letter with structured sections
@@ -37,8 +49,10 @@ export class CoverLetterGeneratorService {
       requirements?: string[];
     },
   ): Promise<CoverLetterResponse> {
-    // Check quota
-    await this.quotaService.enforceQuota(userId, LLMFeature.GENERATE_COVER_LETTER);
+    // Check quota (opt-in via LLM_ENFORCE_QUOTA)
+    if (this.enforceQuotaEnabled) {
+      await this.quotaService.enforceQuota(userId, LLMFeature.GENERATE_COVER_LETTER);
+    }
 
     const provider = this.routingService.getProviderForFeature(
       LLMFeature.GENERATE_COVER_LETTER,

@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/context/AuthContext';
 import { appRoute } from '@/components/app/appRoutes';
+import Logo from '@/components/brand/Logo';
 import { API_URL } from '@/config/api';
 
 // Password strength scoring (ported from the design's DCLogic.strength)
@@ -32,13 +33,25 @@ export default function AppSignUp() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const seeker = role === 'seeker';
-  const accent = seeker ? '#1FA463' : '#4263EB';
-  const accentText = seeker ? '#0C2C1C' : '#FFFFFF';
-  const focusRing = seeker ? 'rgba(31,164,99,0.15)' : 'rgba(66,99,235,0.15)';
+  // Arriving from the employer sign-in flow (/app/signup?as=employer) preselects
+  // the employer role and skips straight to the form.
+  useEffect(() => {
+    if (router.query.as === 'employer') {
+      setRole('employer');
+      setStage('form');
+    }
+  }, [router.query.as]);
 
+  const seeker = role === 'seeker';
   const isRoleStage = stage === 'role';
   const isFormStage = stage === 'form';
+
+  // Accent is one of two known brand colours (seeker green / employer blue), so
+  // we branch static Tailwind classes rather than compute colours at runtime.
+  const accentBtn = seeker ? 'bg-jb-green text-jb-green-ink' : 'bg-[#4263EB] text-white';
+  const accentFocus = seeker
+    ? 'focus:border-jb-green focus:shadow-[0_0_0_3px_rgba(31,164,99,0.15)]'
+    : 'focus:border-[#4263EB] focus:shadow-[0_0_0_3px_rgba(66,99,235,0.15)]';
 
   // ----- role-select cards -----
   const choiceDefs = [
@@ -47,22 +60,18 @@ export default function AppSignUp() {
   ];
   const choices = choiceDefs.map((c) => {
     const on = role === c.key;
-    const acc = c.key === 'seeker' ? '#1FA463' : '#4263EB';
-    const tint = c.key === 'seeker' ? '#EAF6EE' : '#EDF0FE';
-    const ink = c.key === 'seeker' ? '#157A49' : '#4263EB';
+    const s = c.key === 'seeker';
     return {
       key: c.key,
       title: c.title,
       desc: c.desc,
       glyph: c.glyph,
-      bg: on ? (c.key === 'seeker' ? '#F4FBF6' : '#F5F7FE') : '#FFFEFB',
-      border: on ? acc : '#E6DECF',
-      hoverBorder: acc,
-      ring: on ? '0 0 0 3px ' + (c.key === 'seeker' ? 'rgba(31,164,99,0.16)' : 'rgba(66,99,235,0.16)') : 'none',
-      iconBg: tint,
-      iconColor: ink,
-      radioBorder: on ? acc : '#D2C9B7',
-      radioBg: on ? acc : 'transparent',
+      cardClass: [
+        on ? (s ? 'bg-[#F4FBF6] border-jb-green' : 'bg-[#F5F7FE] border-[#4263EB]') : 'bg-jb-paper border-jb-line-2',
+        on ? (s ? 'shadow-[0_0_0_3px_rgba(31,164,99,0.16)]' : 'shadow-[0_0_0_3px_rgba(66,99,235,0.16)]') : '',
+      ].join(' '),
+      iconClass: s ? 'bg-jb-green-tint text-jb-green-text' : 'bg-[#EDF0FE] text-[#4263EB]',
+      radioClass: on ? (s ? 'border-jb-green bg-jb-green' : 'border-[#4263EB] bg-[#4263EB]') : 'border-[#D2C9B7] bg-transparent',
       check: on ? '✓' : '',
       pick: () => setRole(c.key),
     };
@@ -70,11 +79,11 @@ export default function AppSignUp() {
 
   // ----- password strength -----
   const score = passwordStrength(password);
-  const palette = ['#E1D9C9', '#C9622E', '#D89A3E', '#5BD08C', '#1FA463'];
+  // Filled-bar colour by score; index 0 is unused (empty state uses the track).
+  const barPalette = ['bg-jb-line-3', 'bg-[#C9622E]', 'bg-[#D89A3E]', 'bg-jb-green-on-dark', 'bg-jb-green'];
   const labels = ['', 'Weak', 'Fair', 'Good', 'Strong'];
-  const strengthBars = [0, 1, 2, 3].map((i) => ({ color: i < score ? palette[score] : '#E6DECF' }));
   const strengthLabel = labels[score] || 'Weak';
-  const strengthColor = score >= 3 ? '#157A49' : score === 0 ? '#A79E8F' : '#C9622E';
+  const strengthColor = score >= 3 ? 'text-jb-green-text' : score === 0 ? 'text-jb-ink-ghost' : 'text-jb-amber-ink';
 
   // ----- role-adaptive copy -----
   const roleLabel = seeker ? 'Job seeker' : 'Employer';
@@ -84,20 +93,19 @@ export default function AppSignUp() {
     : 'Set up your team and post your first role in minutes.';
   const ssoSecond = seeker ? 'LinkedIn' : 'Microsoft';
   const nameLabel = seeker ? 'Full name' : 'Your name';
-  const namePlaceholder = seeker ? 'Sarah Chen' : 'Dana Whitfield';
+  const namePlaceholder = 'Your name';
   const emailLabel = seeker ? 'Email' : 'Work email';
   const emailPlaceholder = seeker ? 'you@email.com' : 'you@company.com';
   const ctaLabel = 'Create account';
 
   // ----- brand panel (role adaptive) -----
   const brandGlow = seeker
-    ? 'radial-gradient(circle at 82% 8%, rgba(31,164,99,0.32), transparent 55%), radial-gradient(circle at 8% 100%, rgba(31,164,99,0.18), transparent 50%)'
-    : 'radial-gradient(circle at 82% 8%, rgba(66,99,235,0.34), transparent 55%), radial-gradient(circle at 8% 100%, rgba(66,99,235,0.18), transparent 50%)';
-  const brandKickerColor = seeker ? '#5BD08C' : '#8DA2F5';
-  const brandKicker = seeker ? 'Join 100k+ job seekers' : 'Join 5,000+ hiring teams';
+    ? 'bg-[radial-gradient(circle_at_82%_8%,rgba(31,164,99,0.32),transparent_55%),radial-gradient(circle_at_8%_100%,rgba(31,164,99,0.18),transparent_50%)]'
+    : 'bg-[radial-gradient(circle_at_82%_8%,rgba(66,99,235,0.34),transparent_55%),radial-gradient(circle_at_8%_100%,rgba(66,99,235,0.18),transparent_50%)]';
+  const kickerColor = seeker ? 'text-jb-green-on-dark' : 'text-[#8DA2F5]';
+  const perkIcon = seeker ? 'bg-[#1E2D24] text-jb-green-on-dark' : 'bg-[#1E2436] text-[#8DA2F5]';
+  const brandKicker = seeker ? 'Free to start' : 'Free to post your first role';
   const brandHeadline = seeker ? 'Set it up once. Wake up to interviews.' : 'Post once. Wake up to a shortlist.';
-  const perkIconBg = seeker ? '#1E2D24' : '#1E2436';
-  const perkIconColor = seeker ? '#5BD08C' : '#8DA2F5';
   const perks = seeker
     ? ['AI résumé & tailored cover letters', 'Daily matches ranked by real fit', 'Auto-apply to verified careers pages', 'Interview prep that actually helps']
     : ['Autopilot screens & ranks every applicant', 'AI sourcing finds passive talent', 'AI interviews + auto-generated scorecards', 'One-tap approval on every action'];
@@ -106,7 +114,9 @@ export default function AppSignUp() {
   const stat1Label = seeker ? 'ranked matches' : 'applicants to shortlist';
   const stat2 = seeker ? '48h' : '3×';
   const stat2Label = seeker ? 'to first interview' : 'faster time-to-hire';
-  const brandFootnote = seeker ? '4.9 average · 12,000+ reviews' : 'Trusted by talent teams at fast-growing companies';
+  const brandFootnote = seeker
+    ? 'Free forever tier · you approve every application'
+    : 'Post your first role free · no card required';
 
   // ----- backend wiring -----
   const handleSignup = async (e) => {
@@ -143,180 +153,59 @@ export default function AppSignUp() {
     }
   };
 
+  const fieldClass =
+    'w-full font-sans text-[15px] text-jb-ink bg-jb-paper border border-jb-line-input rounded-xl px-[15px] py-3 ' +
+    'placeholder:text-jb-ink-ghost transition-[box-shadow,border-color] duration-150 focus:outline-none ' + accentFocus;
+  const oauthBtnClass =
+    'flex-1 flex items-center justify-center gap-[9px] bg-jb-paper border border-jb-line-input rounded-xl p-3 ' +
+    'cursor-pointer font-sans text-sm font-semibold text-jb-ink';
+
   return (
     <>
       <Head>
         <title>Sign up — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
-      <style jsx global>{`
-        #jbsignup * {
-          box-sizing: border-box;
-        }
-        #jbsignup input::placeholder {
-          color: #a79e8f;
-        }
-        #jbsignup input:focus {
-          outline: none;
-          border-color: ${accent};
-          box-shadow: 0 0 0 3px ${focusRing};
-        }
-        @keyframes riseIn {
-          from {
-            transform: translateY(16px);
-          }
-          to {
-            transform: translateY(0);
-          }
-        }
-        @keyframes rbpop {
-          from {
-            opacity: 0;
-            transform: translateY(8px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        @media (max-width: 880px) {
-          #jbsignup {
-            grid-template-columns: 1fr !important;
-          }
-          #jbsignup .jb-brand-side {
-            display: none !important;
-          }
-        }
-      `}</style>
-
-      <div
-        id="jbsignup"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          minHeight: '100vh',
-          background: '#F7F3EA',
-          fontFamily: "'Hanken Grotesk',sans-serif",
-          color: '#1B1A16',
-        }}
-      >
+      <div className="grid grid-cols-1 min-[880px]:grid-cols-2 min-h-screen bg-jb-cream font-sans text-jb-ink">
         {/* FORM SIDE */}
-        <div style={{ display: 'flex', flexDirection: 'column', padding: '36px 56px' }}>
-          <Link href={appRoute('Jobocate Home.dc.html')} style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none' }}>
-            <span style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 800, letterSpacing: '-0.02em', fontSize: 24, color: '#1B1A16' }}>
-              Jobocate<span style={{ color: '#1FA463' }}>.</span>
-            </span>
+        <div className="flex flex-col px-6 py-9 sm:px-14">
+          <Link href={appRoute('Jobocate Home.dc.html')} className="flex items-center gap-[9px] no-underline">
+            {/* Same wordmark unification as /app/login. */}
+            <Logo size={26} />
           </Link>
 
-          <div
-            style={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              maxWidth: 420,
-              width: '100%',
-              margin: '0 auto',
-              padding: '24px 0',
-              animation: 'riseIn 0.6s ease both',
-            }}
-          >
+          <div className="flex-1 flex flex-col justify-center w-full max-w-[420px] mx-auto py-6 animate-rise-in">
             {/* ===== STAGE 1: ROLE SELECT ===== */}
             {isRoleStage && (
               <div>
-                <div
-                  style={{
-                    display: 'inline-flex',
-                    alignSelf: 'flex-start',
-                    alignItems: 'center',
-                    gap: 8,
-                    border: '1px solid #D9D0BE',
-                    borderRadius: 999,
-                    padding: '6px 13px',
-                    marginBottom: 20,
-                  }}
-                >
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#1FA463' }} />
-                  <span
-                    style={{
-                      fontFamily: "'JetBrains Mono',monospace",
-                      fontSize: 11,
-                      letterSpacing: '0.1em',
-                      textTransform: 'uppercase',
-                      color: '#5A544A',
-                    }}
-                  >
+                <div className="inline-flex self-start items-center gap-2 border border-jb-line-input rounded-full px-[13px] py-1.5 mb-5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-jb-green" />
+                  <span className="font-mono text-[11px] tracking-[0.1em] uppercase text-jb-ink-muted">
                     Free to start
                   </span>
                 </div>
-                <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 42, lineHeight: 1.03, letterSpacing: '-0.01em', margin: '0 0 8px' }}>
+                <h1 className="font-display font-normal text-[42px] leading-[1.03] tracking-[-0.01em] mb-2">
                   What brings you here?
                 </h1>
-                <p style={{ fontSize: 15, color: '#5A544A', margin: '0 0 26px' }}>
+                <p className="text-[15px] text-jb-ink-muted mb-[26px]">
                   Choose how you&rsquo;ll use Jobocate &mdash; you can switch later.
                 </p>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
+                <div className="flex flex-col gap-[13px]">
                   {choices.map((c) => (
                     <button
                       key={c.key}
                       onClick={c.pick}
-                      style={{
-                        position: 'relative',
-                        textAlign: 'left',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 16,
-                        background: c.bg,
-                        border: `1.5px solid ${c.border}`,
-                        boxShadow: c.ring,
-                        borderRadius: 16,
-                        padding: 20,
-                        cursor: 'pointer',
-                        fontFamily: 'inherit',
-                      }}
+                      className={`relative text-left flex items-center gap-4 border-[1.5px] rounded-2xl p-5 cursor-pointer font-sans ${c.cardClass}`}
                     >
-                      <span
-                        style={{
-                          width: 48,
-                          height: 48,
-                          flexShrink: 0,
-                          borderRadius: 13,
-                          background: c.iconBg,
-                          color: c.iconColor,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: 22,
-                        }}
-                      >
+                      <span className={`w-12 h-12 flex-shrink-0 rounded-[13px] flex items-center justify-center text-[22px] ${c.iconClass}`}>
                         {c.glyph}
                       </span>
-                      <span style={{ flex: 1 }}>
-                        <span style={{ display: 'block', fontSize: 17, fontWeight: 700, color: '#1B1A16', marginBottom: 3 }}>{c.title}</span>
-                        <span style={{ display: 'block', fontSize: 13.5, lineHeight: 1.45, color: '#8A8378' }}>{c.desc}</span>
+                      <span className="flex-1">
+                        <span className="block text-[17px] font-bold text-jb-ink mb-[3px]">{c.title}</span>
+                        <span className="block text-[13.5px] leading-[1.45] text-jb-ink-subtle">{c.desc}</span>
                       </span>
-                      <span
-                        style={{
-                          flexShrink: 0,
-                          width: 24,
-                          height: 24,
-                          borderRadius: '50%',
-                          border: `1.5px solid ${c.radioBorder}`,
-                          background: c.radioBg,
-                          color: '#fff',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: 13,
-                        }}
-                      >
+                      <span className={`flex-shrink-0 w-6 h-6 rounded-full border-[1.5px] text-white flex items-center justify-center text-[13px] ${c.radioClass}`}>
                         {c.check}
                       </span>
                     </button>
@@ -325,29 +214,13 @@ export default function AppSignUp() {
 
                 <button
                   onClick={() => setStage('form')}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 9,
-                    width: '100%',
-                    background: accent,
-                    color: accentText,
-                    fontSize: 16,
-                    fontWeight: 700,
-                    padding: 15,
-                    borderRadius: 999,
-                    border: 'none',
-                    cursor: 'pointer',
-                    marginTop: 24,
-                    fontFamily: 'inherit',
-                  }}
+                  className={`flex items-center justify-center gap-[9px] w-full text-base font-bold p-[15px] rounded-full border-none cursor-pointer mt-6 font-sans ${accentBtn}`}
                 >
-                  Continue <span style={{ fontSize: 17 }}>&rarr;</span>
+                  Continue <span className="text-[17px]">&rarr;</span>
                 </button>
-                <p style={{ fontSize: 14, color: '#5A544A', textAlign: 'center', margin: '18px 0 0' }}>
+                <p className="text-sm text-jb-ink-muted text-center mt-[18px]">
                   Already have an account?{' '}
-                  <Link href={appRoute('App Login.dc.html')} style={{ color: '#157A49', fontWeight: 600, textDecoration: 'none' }}>
+                  <Link href={appRoute('App Login.dc.html')} className="text-jb-green-text font-semibold no-underline">
                     Log in
                   </Link>
                 </p>
@@ -356,227 +229,98 @@ export default function AppSignUp() {
 
             {/* ===== STAGE 2: FORM ===== */}
             {isFormStage && (
-              <form onSubmit={handleSignup} style={{ animation: 'rbpop 0.25s ease' }}>
+              <form onSubmit={handleSignup} className="animate-rb-pop">
                 <button
                   type="button"
                   onClick={() => setStage('role')}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 7,
-                    fontFamily: 'inherit',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: '#5A544A',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: 0,
-                    marginBottom: 18,
-                  }}
+                  className="inline-flex items-center gap-[7px] font-sans text-[13px] font-semibold text-jb-ink-muted bg-transparent border-none cursor-pointer p-0 mb-[18px]"
                 >
                   &larr; {roleLabel}
                 </button>
 
-                <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 38, lineHeight: 1.03, letterSpacing: '-0.01em', margin: '0 0 8px' }}>
+                <h1 className="font-display font-normal text-[38px] leading-[1.03] tracking-[-0.01em] mb-2">
                   {heading}
                 </h1>
-                <p style={{ fontSize: 15, color: '#5A544A', margin: '0 0 22px' }}>{subhead}</p>
+                <p className="text-[15px] text-jb-ink-muted mb-[22px]">{subhead}</p>
 
-                <div style={{ display: 'flex', gap: 11, marginBottom: 20 }}>
-                  <button
-                    type="button"
-                    onClick={() => handleOAuth('google')}
-                    style={{
-                      flex: 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 9,
-                      background: '#FFFEFB',
-                      border: '1px solid #D9D0BE',
-                      borderRadius: 12,
-                      padding: 12,
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                      fontSize: 14,
-                      fontWeight: 600,
-                      color: '#1B1A16',
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: 18,
-                        height: 18,
-                        borderRadius: '50%',
-                        background: 'conic-gradient(from -45deg, #EA4335, #FBBC05, #34A853, #4285F4, #EA4335)',
-                      }}
-                    />
+                <div className="flex gap-[11px] mb-5">
+                  <button type="button" onClick={() => handleOAuth('google')} className={oauthBtnClass}>
+                    <span className="w-[18px] h-[18px] rounded-full bg-[conic-gradient(from_-45deg,#EA4335,#FBBC05,#34A853,#4285F4,#EA4335)]" />
                     Google
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOAuth(seeker ? 'linkedin' : 'microsoft')}
-                    style={{
-                      flex: 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 9,
-                      background: '#FFFEFB',
-                      border: '1px solid #D9D0BE',
-                      borderRadius: 12,
-                      padding: 12,
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                      fontSize: 14,
-                      fontWeight: 600,
-                      color: '#1B1A16',
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: 18,
-                        height: 18,
-                        borderRadius: 4,
-                        background: '#0A66C2',
-                        color: '#fff',
-                        fontFamily: "'JetBrains Mono',monospace",
-                        fontSize: 11,
-                        fontWeight: 600,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
+                  <button type="button" onClick={() => handleOAuth(seeker ? 'linkedin' : 'microsoft')} className={oauthBtnClass}>
+                    <span className="w-[18px] h-[18px] rounded bg-[#0A66C2] text-white font-mono text-[11px] font-semibold flex items-center justify-center">
                       in
                     </span>
                     {ssoSecond}
                   </button>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
-                  <span style={{ flex: 1, height: 1, background: '#E1D9C9' }} />
-                  <span
-                    style={{
-                      fontFamily: "'JetBrains Mono',monospace",
-                      fontSize: 11,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.08em',
-                      color: '#A79E8F',
-                    }}
-                  >
+                <div className="flex items-center gap-3.5 mb-5">
+                  <span className="flex-1 h-px bg-jb-line-3" />
+                  <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-jb-ink-ghost">
                     or with email
                   </span>
-                  <span style={{ flex: 1, height: 1, background: '#E1D9C9' }} />
+                  <span className="flex-1 h-px bg-jb-line-3" />
                 </div>
 
-                <label style={{ fontSize: 13, fontWeight: 600, color: '#46413A', marginBottom: 7, display: 'block' }}>{nameLabel}</label>
+                <label htmlFor="signup-name" className="block text-[13px] font-semibold text-jb-ink-heading mb-[7px]">{nameLabel}</label>
                 <input
+                  id="signup-name"
+                  name="name"
+                  autoComplete="name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder={namePlaceholder}
-                  style={{
-                    width: '100%',
-                    fontFamily: 'inherit',
-                    fontSize: 15,
-                    color: '#1B1A16',
-                    background: '#FFFEFB',
-                    border: '1px solid #D9D0BE',
-                    borderRadius: 12,
-                    padding: '12px 15px',
-                    marginBottom: 16,
-                  }}
+                  className={`${fieldClass} mb-4`}
                 />
 
-                <label style={{ fontSize: 13, fontWeight: 600, color: '#46413A', marginBottom: 7, display: 'block' }}>{emailLabel}</label>
+                <label htmlFor="signup-email" className="block text-[13px] font-semibold text-jb-ink-heading mb-[7px]">{emailLabel}</label>
                 <input
+                  id="signup-email"
+                  name="email"
+                  autoComplete="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder={emailPlaceholder}
-                  style={{
-                    width: '100%',
-                    fontFamily: 'inherit',
-                    fontSize: 15,
-                    color: '#1B1A16',
-                    background: '#FFFEFB',
-                    border: '1px solid #D9D0BE',
-                    borderRadius: 12,
-                    padding: '12px 15px',
-                    marginBottom: 16,
-                  }}
+                  className={`${fieldClass} mb-4`}
                 />
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
-                  <label style={{ fontSize: 13, fontWeight: 600, color: '#46413A' }}>Password</label>
+                <div className="flex items-center justify-between mb-[7px]">
+                  <label htmlFor="signup-password" className="text-[13px] font-semibold text-jb-ink-heading">Password</label>
                   <button
                     type="button"
                     onClick={() => setShowPwd((v) => !v)}
-                    style={{
-                      fontFamily: 'inherit',
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: '#157A49',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: 0,
-                    }}
+                    className="font-sans text-[13px] font-semibold text-jb-green-text bg-transparent border-none cursor-pointer p-0"
                   >
                     {showPwd ? 'Hide' : 'Show'}
                   </button>
                 </div>
                 <input
+                  id="signup-password"
+                  name="password"
+                  autoComplete="new-password"
                   type={showPwd ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="At least 8 characters"
-                  style={{
-                    width: '100%',
-                    fontFamily: 'inherit',
-                    fontSize: 15,
-                    color: '#1B1A16',
-                    background: '#FFFEFB',
-                    border: '1px solid #D9D0BE',
-                    borderRadius: 12,
-                    padding: '12px 15px',
-                    marginBottom: 10,
-                  }}
+                  className={`${fieldClass} mb-2.5`}
                 />
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 22 }}>
-                  <div style={{ flex: 1, display: 'flex', gap: 5 }}>
-                    {strengthBars.map((b, i) => (
-                      <span key={i} style={{ flex: 1, height: 5, borderRadius: 999, background: b.color }} />
+                <div className="flex items-center gap-2.5 mb-[22px]">
+                  <div className="flex-1 flex gap-[5px]">
+                    {[0, 1, 2, 3].map((i) => (
+                      <span key={i} className={`flex-1 h-[5px] rounded-full ${i < score ? barPalette[score] : 'bg-jb-line-2'}`} />
                     ))}
                   </div>
-                  <span
-                    style={{
-                      fontFamily: "'JetBrains Mono',monospace",
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: strengthColor,
-                      minWidth: 54,
-                      textAlign: 'right',
-                    }}
-                  >
+                  <span className={`font-mono text-[11px] font-semibold min-w-[54px] text-right ${strengthColor}`}>
                     {strengthLabel}
                   </span>
                 </div>
 
                 {error && (
-                  <div
-                    style={{
-                      fontSize: 13,
-                      color: '#C9622E',
-                      background: '#FBEFE7',
-                      border: '1px solid #F0D7C5',
-                      borderRadius: 12,
-                      padding: '11px 14px',
-                      marginBottom: 16,
-                    }}
-                  >
+                  <div className="text-[13px] text-jb-amber-ink bg-[#FBEFE7] border border-[#F0D7C5] rounded-xl px-3.5 py-[11px] mb-4">
                     {error}
                   </div>
                 )}
@@ -584,130 +328,68 @@ export default function AppSignUp() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 9,
-                    width: '100%',
-                    background: accent,
-                    color: accentText,
-                    fontSize: 16,
-                    fontWeight: 700,
-                    padding: 15,
-                    borderRadius: 999,
-                    border: 'none',
-                    cursor: submitting ? 'default' : 'pointer',
-                    opacity: submitting ? 0.7 : 1,
-                    fontFamily: 'inherit',
-                  }}
+                  className={`flex items-center justify-center gap-[9px] w-full text-base font-bold p-[15px] rounded-full border-none font-sans ${accentBtn} ${submitting ? 'opacity-70 cursor-default' : 'cursor-pointer'}`}
                 >
-                  {submitting ? 'Creating…' : ctaLabel} <span style={{ fontSize: 18 }}>&rarr;</span>
+                  {submitting ? 'Creating…' : ctaLabel} <span className="text-[18px]">&rarr;</span>
                 </button>
 
-                <p style={{ fontSize: 12.5, lineHeight: 1.5, color: '#8A8378', textAlign: 'center', margin: '16px 0 0' }}>
+                <p className="text-[12.5px] leading-[1.5] text-jb-ink-subtle text-center mt-4">
                   By continuing you agree to our{' '}
-                  <a href="#" style={{ color: '#5A544A', fontWeight: 600, textDecoration: 'none' }}>
-                    Terms
-                  </a>{' '}
+                  <a href="#" className="text-jb-ink-muted font-semibold no-underline">Terms</a>{' '}
                   and{' '}
-                  <a href="#" style={{ color: '#5A544A', fontWeight: 600, textDecoration: 'none' }}>
-                    Privacy Policy
-                  </a>
-                  .
+                  <a href="#" className="text-jb-ink-muted font-semibold no-underline">Privacy Policy</a>.
                 </p>
               </form>
             )}
           </div>
 
-          <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#A79E8F' }}>&copy; 2026 Jobocate</div>
+          <div className="font-mono text-[11px] text-jb-ink-ghost">&copy; 2026 Jobocate</div>
         </div>
 
-        {/* BRAND SIDE */}
-        <div
-          className="jb-brand-side"
-          style={{
-            position: 'relative',
-            overflow: 'hidden',
-            background: '#15140F',
-            padding: 48,
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div style={{ position: 'absolute', inset: 0, background: brandGlow, pointerEvents: 'none' }} />
+        {/* BRAND SIDE — hidden below 880px so the form gets the full width. */}
+        <div className="relative overflow-hidden bg-jb-deep p-12 hidden min-[880px]:flex min-[880px]:flex-col min-[880px]:justify-between">
+          <div className={`absolute inset-0 pointer-events-none ${brandGlow}`} />
 
-          <div
-            style={{
-              position: 'relative',
-              fontFamily: "'JetBrains Mono',monospace",
-              fontSize: 11,
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-              color: brandKickerColor,
-            }}
-          >
+          <div className={`relative font-mono text-[11px] tracking-[0.14em] uppercase ${kickerColor}`}>
             &mdash; {brandKicker}
           </div>
 
-          <div style={{ position: 'relative' }}>
-            <p style={{ fontFamily: "'Instrument Serif',serif", fontSize: 38, lineHeight: 1.1, color: '#F2EDE2', margin: '0 0 28px', maxWidth: 440 }}>
+          <div className="relative">
+            <p className="font-display text-[38px] leading-[1.1] text-[#f2ede2] mb-7 max-w-[440px]">
               {brandHeadline}
             </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 11, marginBottom: 30 }}>
+            <div className="flex flex-col gap-[11px] mb-[30px]">
               {perks.map((p) => (
-                <div key={p} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span
-                    style={{
-                      width: 26,
-                      height: 26,
-                      flexShrink: 0,
-                      borderRadius: '50%',
-                      background: perkIconBg,
-                      color: perkIconColor,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 12,
-                    }}
-                  >
+                <div key={p} className="flex items-center gap-3">
+                  <span className={`w-[26px] h-[26px] flex-shrink-0 rounded-full flex items-center justify-center text-xs ${perkIcon}`}>
                     &#10003;
                   </span>
-                  <span style={{ fontSize: 14.5, color: '#E4DECF' }}>{p}</span>
+                  <span className="text-[14.5px] text-[#e4decf]">{p}</span>
                 </div>
               ))}
             </div>
 
-            <div
-              style={{
-                background: '#1E1C15',
-                border: '1px solid #2C2A22',
-                borderRadius: 16,
-                padding: 18,
-                boxShadow: '0 30px 60px -28px rgba(0,0,0,0.6)',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: '#FBF8F1' }}>{statTitle}</span>
-                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: brandKickerColor }}>&#9679; avg</span>
+            <div className="bg-[#1e1c15] border border-[#2c2a22] rounded-2xl p-[18px] shadow-[0_30px_60px_-28px_rgba(0,0,0,0.6)]">
+              <div className="flex items-center justify-between mb-3.5">
+                <span className="text-[13px] font-bold text-[#fbf8f1]">{statTitle}</span>
+                <span className={`font-mono text-[11px] ${kickerColor}`}>&#9679; avg</span>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div style={{ background: '#15140F', borderRadius: 10, padding: 13 }}>
-                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 24, fontWeight: 600, color: '#FBF8F1' }}>{stat1}</div>
-                  <div style={{ fontSize: 12, color: '#8A8378' }}>{stat1Label}</div>
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="bg-jb-deep rounded-[10px] p-[13px]">
+                  <div className="font-mono text-2xl font-semibold text-[#fbf8f1]">{stat1}</div>
+                  <div className="text-xs text-jb-ink-subtle">{stat1Label}</div>
                 </div>
-                <div style={{ background: '#15140F', borderRadius: 10, padding: 13 }}>
-                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 24, fontWeight: 600, color: brandKickerColor }}>{stat2}</div>
-                  <div style={{ fontSize: 12, color: '#8A8378' }}>{stat2Label}</div>
+                <div className="bg-jb-deep rounded-[10px] p-[13px]">
+                  <div className={`font-mono text-2xl font-semibold ${kickerColor}`}>{stat2}</div>
+                  <div className="text-xs text-jb-ink-subtle">{stat2Label}</div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#9A9286' }}>
-            <span style={{ color: '#1FA463', letterSpacing: '0.1em' }}>&#9733;&#9733;&#9733;&#9733;&#9733;</span>
+          <div className="relative flex items-center gap-2 text-[13px] text-jb-ink-faint">
+            <span className="text-jb-green tracking-[0.1em]">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
             {brandFootnote}
           </div>
         </div>

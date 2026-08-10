@@ -6,41 +6,14 @@ import Link from 'next/link';
 import AppSidebar from '@/components/app/AppSidebar';
 import { appRoute } from '@/components/app/appRoutes';
 import { listCoverLetters } from '@/services/coverLetterApi';
+import { LoadingState, EmptyState, ErrorState } from '@/components/app/AppStates';
 
 // ---------------------------------------------------------------------------
-// Sample data — faithful port of the design's Component.meta() + initialBodies()
+// Build the meta map + bodies from the user's real cover letters.
 // ---------------------------------------------------------------------------
-const SAMPLE_META = {
-  stripe: {
-    id: 'stripe', company: 'Stripe', role: 'Senior Product Designer', team: 'Design',
-    focus: 'Checkout', value: 'craft and measurable impact',
-    logo: 'St', logoBg: '#EAF6EE', logoFg: '#157A49', status: 'Final', edited: 'Edited Jun 18',
-  },
-  figma: {
-    id: 'figma', company: 'Figma', role: 'Product Designer, Design Systems', team: 'Design Systems',
-    focus: 'the component platform', value: 'tools that empower other designers',
-    logo: 'Fi', logoBg: '#F4EFE4', logoFg: '#1B1A16', status: 'Draft', edited: 'Edited Jun 22',
-  },
-  linear: {
-    id: 'linear', company: 'Linear', role: 'Design Engineer', team: 'Design Engineering',
-    focus: 'the app’s interaction quality', value: 'speed and obsessive polish',
-    logo: 'Li', logoBg: '#F4EFE4', logoFg: '#1B1A16', status: 'Draft', edited: 'Edited Jun 24',
-  },
-};
-
-const SAMPLE_BODIES = {
-  stripe:
-    "Dear Stripe Design team,\n\nI've spent the last seven years shaping 0→1 fintech and B2B SaaS products, most recently leading the onboarding redesign at Plaid that lifted activation 31% across 2M users. Stripe's focus on craft and measurable impact is exactly where I do my best work.\n\nI'd bring deep design-systems experience — I built the system adopted by 40+ engineers at Plaid — and a bias for shipping tested, data-backed work. I'd love to help raise the bar on Checkout.\n\nBest,\nSarah Chen",
-  figma:
-    "Dear Figma Design Systems team,\n\nI've admired Figma for years — it's the tool my teams live in. The Product Designer, Design Systems role is the rare opening where what I love doing and what you need line up almost exactly.\n\nAt Plaid I built and scaled the design system adopted by 40+ engineers across six teams, balancing consistency with the flexibility product teams actually need. I'd bring that same systems thinking to the component platform.\n\nBest,\nSarah Chen",
-  linear:
-    "Dear Linear team,\n\nLinear sets the bar for interaction quality, and that's exactly the kind of work I care most about. I'm excited about the Design Engineer role and the chance to work where design and front-end meet.\n\nI prototype in code, sweat motion and detail, and have shipped 0→1 fintech products end to end. I'd love to help keep the app's polish obsessive as it grows.\n\nBest,\nSarah Chen",
-};
-
-// Build the meta map + bodies from real backend data, falling back to sample.
 function normalize(records) {
   if (!Array.isArray(records) || records.length === 0) {
-    return { meta: SAMPLE_META, bodies: SAMPLE_BODIES, order: Object.keys(SAMPLE_META) };
+    return { meta: {}, bodies: {}, order: [] };
   }
   const meta = {};
   const bodies = {};
@@ -67,25 +40,31 @@ function normalize(records) {
   return { meta, bodies, order };
 }
 
-// compose(): faithful port of Component.compose(id, tone, length)
+// compose(): generic cover-letter scaffold built from the letter's own
+// metadata. Uses bracketed placeholders instead of fabricated achievements.
 function compose(meta, id, tone, length) {
-  const m = meta[id];
-  const greeting = 'Dear ' + m.company + ' ' + m.team + ' team,';
+  const m = meta[id] || {};
+  const company = m.company || 'the company';
+  const team = m.team || 'Hiring';
+  const role = m.role || 'this role';
+  const value = m.value || 'your mission';
+  const focus = m.focus || 'your work';
+  const greeting = 'Dear ' + company + ' ' + team + ' team,';
   const intro = {
-    confident: "I've spent seven years shipping 0→1 fintech and B2B SaaS products that move real numbers, and " + m.company + "'s focus on " + m.value + " is exactly where I do my best work.",
-    warm: "I've followed " + m.company + "'s work for a long time, and the " + m.role + " role feels like the rare opening where what I love doing and what you need line up.",
-    concise: "I'm applying for the " + m.role + " role. In short: I ship measurable, well-crafted product design — and " + m.company + " is where I want to do it next.",
+    confident: "I'm excited to apply for the " + role + " role at " + company + ". Your focus on " + value + " is exactly the kind of work I want to do.",
+    warm: "I've admired " + company + "'s work for a while, and the " + role + " role feels like a natural fit for what I love doing.",
+    concise: "I'm applying for the " + role + " role at " + company + " — in short, I bring the skills and drive this team needs.",
   }[tone];
-  const b1 = "Most recently I led the onboarding redesign at Plaid that lifted activation 31% across two million users — equal parts systems thinking and relentless attention to craft.";
-  const b2 = "I also built the design system adopted by 40+ engineers across six teams, so I know how to keep " + m.focus + " coherent as it scales.";
-  const b3 = "Beyond the metrics, I care about " + m.value + ", and I'd bring that bias to " + m.company + " from day one.";
+  const b1 = "[Describe a recent accomplishment, with a specific result, that shows the impact you'd bring to " + company + ".]";
+  const b2 = "[Connect your experience to " + focus + " and explain why it matters for this role.]";
+  const b3 = "[Share what draws you to " + value + " and how you'd contribute from day one.]";
   const close = {
-    confident: "I'd love to show you how I'd raise the bar on " + m.focus + ".",
+    confident: "I'd love to show you how I'd raise the bar on " + focus + ".",
     warm: "I'd be thrilled to talk about how I could help the team.",
     concise: "Happy to dive into specifics whenever works.",
   }[tone];
   const mids = length === 'brief' ? [b1] : (length === 'detailed' ? [b1, b2, b3] : [b1, b2]);
-  return [greeting, intro, ...mids, close, 'Best,\nSarah Chen'].join('\n\n');
+  return [greeting, intro, ...mids, close, 'Best,\n[Your name]'].join('\n\n');
 }
 
 const statusStyle = (s) =>
@@ -105,31 +84,33 @@ const LENGTHS = [
 ];
 
 export default function AppCoverLetter() {
-  // data: { meta, bodies, order } — starts on sample, replaced by backend on success
+  // data: { meta, bodies, order } — the user's real cover letters
   const [data, setData] = useState(() => normalize(null));
-  const [selected, setSelected] = useState('stripe');
+  const [selected, setSelected] = useState(null);
   const [tone, setTone] = useState('confident');
   const [length, setLength] = useState('standard');
-  const [bodies, setBodies] = useState(SAMPLE_BODIES);
+  const [bodies, setBodies] = useState({});
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const saveTimer = useRef(null);
 
-  // ---- backend fetch with graceful fallback to the design's sample data ----
+  // ---- backend fetch ----
   useEffect(() => {
     let alive = true;
     listCoverLetters()
       .then((records) => {
         if (!alive) return;
         const norm = normalize(records);
-        // Only adopt backend data if it actually returned letters.
-        if (norm.order.length && norm !== SAMPLE_META) {
-          setData(norm);
-          setBodies(norm.bodies);
-          setSelected(norm.order[0]);
-        }
+        setData(norm);
+        setBodies(norm.bodies);
+        setSelected(norm.order[0] || null);
       })
-      .catch(() => {
-        /* unauthenticated or request failed — keep faithful sample data */
+      .catch((e) => {
+        if (alive) setError(e);
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
       });
     return () => {
       alive = false;
@@ -162,16 +143,16 @@ export default function AppCoverLetter() {
     setBody(selected, compose(data.meta, selected, tone, key));
   };
 
-  const m = data.meta[selected] || Object.values(data.meta)[0];
+  const m = data.meta[selected] || Object.values(data.meta)[0] || {};
 
   // ---- AI suggestion edits (port of editParas + suggestions) ----
   const editParas = (transform) => {
     const paras = (bodies[selected] || '').split('\n\n');
     setBody(selected, transform(paras.slice()).join('\n\n'));
   };
-  const metricPara = "Earlier, I cut time-to-first-payment by 24% at Plaid — proof I optimize for outcomes, not just output.";
-  const valuesPara = "What draws me to " + m.company + " specifically is " + m.value + " — it's how I already try to work.";
-  const conciseIntro = "I'm applying for the " + m.role + " role at " + m.company + ", where I believe my design-systems and fintech background fit cleanly.";
+  const metricPara = "[Add a sentence here quantifying a specific result you achieved.]";
+  const valuesPara = "What draws me to " + (m.company || 'this company') + " specifically is " + (m.value || 'your mission') + " — it's how I already try to work.";
+  const conciseIntro = "I'm applying for the " + (m.role || 'this role') + " role at " + (m.company || 'this company') + ", where I believe my background is a strong fit.";
 
   const suggestions = [
     { label: 'Add a metric', apply: () => editParas((p) => { const i = Math.max(1, p.length - 2); p.splice(i, 0, metricPara); return p; }) },
@@ -194,20 +175,14 @@ export default function AppCoverLetter() {
   const savedColor = saving ? '#9A6A2E' : '#157A49';
   const savedDot = saving ? '#C9622E' : '#1FA463';
 
-  const mono = "'JetBrains Mono',monospace";
-  const segLabel = { fontFamily: mono, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9A9286' };
+  const mono = 'var(--jb-font-mono)';
+  const segLabel = { fontFamily: mono, fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9A9286' };
   const segWrap = { display: 'inline-flex', padding: 3, background: '#F2ECE0', border: '1px solid #E6DECF', borderRadius: 999, gap: 3 };
 
   return (
     <>
       <Head>
         <title>Cover letters — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
       <style jsx global>{`
@@ -238,7 +213,7 @@ export default function AppCoverLetter() {
 
       <div
         id="jbapp"
-        style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#F7F3EA', fontFamily: "'Hanken Grotesk',sans-serif", color: '#1B1A16' }}
+        style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#F7F3EA', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16' }}
       >
         <AppSidebar active="resume" />
 
@@ -252,11 +227,21 @@ export default function AppCoverLetter() {
             <Link href={appRoute('App Resume.dc.html')} style={{ fontSize: 13, fontWeight: 600, color: '#157A49', textDecoration: 'none' }}>Resume builder →</Link>
           </header>
 
+          {loading ? (
+            <LoadingState label="Loading your cover letters…" />
+          ) : error ? (
+            <ErrorState error={error} />
+          ) : letters.length === 0 ? (
+            <EmptyState
+              title="No cover letters yet"
+              hint="Generate one from a role to start tailoring your applications."
+            />
+          ) : (
           <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
             {/* ===== LEFT: LETTER LIST ===== */}
             <div style={{ width: 320, flexShrink: 0, borderRight: '1px solid #E7E0D2', background: '#FBF8F1', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
               <div style={{ flexShrink: 0, padding: '20px 18px 14px' }}>
-                <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 26, lineHeight: 1, margin: '0 0 4px' }}>Cover letters</h1>
+                <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 26, lineHeight: 1, margin: '0 0 4px' }}>Cover letters</h1>
                 <p style={{ fontSize: 13, color: '#8A8378', margin: 0 }}>{letters.length} letters · drafted by AI, edited by you</p>
               </div>
               <div style={{ flex: 1, overflowY: 'auto', padding: '0 12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -280,10 +265,10 @@ export default function AppCoverLetter() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 9 }}>
                       <span style={{ width: 34, height: 34, flexShrink: 0, borderRadius: 9, background: l.logoBg, color: l.logoFg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13 }}>{l.logo}</span>
                       <span style={{ flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: 700, color: '#1B1A16', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.company}</span>
-                      <span style={{ flexShrink: 0, fontFamily: mono, fontSize: 9, fontWeight: 600, letterSpacing: '0.04em', color: l.statusColor, background: l.statusBg, border: `1px solid ${l.statusBorder}`, padding: '3px 7px', borderRadius: 999 }}>{l.status}</span>
+                      <span style={{ flexShrink: 0, fontFamily: mono, fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', color: l.statusColor, background: l.statusBg, border: `1px solid ${l.statusBorder}`, padding: '3px 7px', borderRadius: 999 }}>{l.status}</span>
                     </div>
                     <div style={{ fontSize: 12.5, color: '#5A544A', marginBottom: 5 }}>{l.role}</div>
-                    <div style={{ fontFamily: mono, fontSize: 10.5, color: '#A79E8F' }}>{l.edited}</div>
+                    <div style={{ fontFamily: mono, fontSize: 11, color: '#A79E8F' }}>{l.edited}</div>
                   </button>
                 ))}
                 <Link
@@ -351,7 +336,7 @@ export default function AppCoverLetter() {
                   />
 
                   <div style={{ marginTop: 18 }}>
-                    <div style={{ fontFamily: mono, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9A9286', marginBottom: 10 }}>AI suggestions</div>
+                    <div style={{ fontFamily: mono, fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9A9286', marginBottom: 10 }}>AI suggestions</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 9 }}>
                       {suggestions.map((s) => (
                         <button
@@ -376,6 +361,7 @@ export default function AppCoverLetter() {
               </div>
             </div>
           </div>
+          )}
         </main>
       </div>
     </>

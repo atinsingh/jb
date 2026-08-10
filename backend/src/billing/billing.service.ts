@@ -13,6 +13,7 @@ import { User, UserDocument } from '../schemas/user.schema';
 import { SubscriptionPlan, SubscriptionPlanDocument } from '../schemas/subscription-plan.schema';
 import { UserSubscription, UserSubscriptionDocument } from '../schemas/user-subscription.schema';
 import { UsageRecord, UsageRecordDocument } from '../schemas/usage-record.schema';
+import { EmployerBillingService } from '../employer-billing/employer-billing.service';
 import { CreateCheckoutSessionDto, CancelSubscriptionDto } from './dto';
 
 // Define types locally to avoid dependency on contracts package initially
@@ -32,8 +33,23 @@ export class BillingService {
     @InjectModel(UserSubscription.name) private subscriptionModel: Model<UserSubscriptionDocument>,
     @InjectModel(UsageRecord.name) private usageModel: Model<UsageRecordDocument>,
     private configService: ConfigService,
+    private employerBilling: EmployerBillingService,
   ) {
-    this.stripe = new Stripe(this.configService.get<string>('STRIPE_SECRET_KEY', ''), {
+    const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY', '');
+    if (!stripeSecretKey) {
+      this.logger.warn(
+        '⚠️  STRIPE_SECRET_KEY is not set — billing is INERT. Checkout, portal, ' +
+          'cancellation and webhook signature verification will all fail until ' +
+          'STRIPE_SECRET_KEY (and STRIPE_WEBHOOK_SECRET) are provided via env.',
+      );
+    }
+    if (!this.configService.get<string>('STRIPE_WEBHOOK_SECRET', '')) {
+      this.logger.warn(
+        '⚠️  STRIPE_WEBHOOK_SECRET is not set — incoming Stripe webhooks cannot be ' +
+          'verified and subscription state will NOT sync until it is provided.',
+      );
+    }
+    this.stripe = new Stripe(stripeSecretKey, {
       apiVersion: '2023-10-16',
     });
     this.frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000');
@@ -260,6 +276,15 @@ export class BillingService {
 
     this.logger.log({ eventType: event.type, eventId: event.id }, 'Processing Stripe webhook');
 
+    // Candidate and employer subscriptions share one endpoint (one URL, one
+    // signing secret to operate). Employer objects are tagged with
+    // `metadata.audience = 'employer'` at checkout, so route on that before the
+    // candidate handlers — which would otherwise log "missing userId" and drop
+    // the event.
+    if (await this.delegateEmployerEvent(event)) {
+      return { received: true };
+    }
+
     switch (event.type) {
       case 'checkout.session.completed':
         await this.handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
@@ -287,6 +312,37 @@ export class BillingService {
     }
 
     return { received: true };
+  }
+
+  /**
+   * Hand an employer-tagged event to EmployerBillingService.
+   *
+   * Returns true when the event was employer-owned and has been dealt with, so
+   * the caller skips the candidate handlers. Subscription objects carry the
+   * metadata directly; invoices don't, so they are matched by customer id
+   * inside `recordInvoice`.
+   */
+  private async delegateEmployerEvent(event: Stripe.Event): Promise<boolean> {
+    switch (event.type) {
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated':
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object as Stripe.Subscription;
+        if (subscription.metadata?.audience !== 'employer') return false;
+        await this.employerBilling.applyStripeSubscription(subscription);
+        return true;
+      }
+      case 'invoice.payment_succeeded': {
+        const invoice = event.data.object as Stripe.Invoice;
+        if (invoice.subscription_details?.metadata?.audience !== 'employer') {
+          return false;
+        }
+        await this.employerBilling.recordInvoice(invoice);
+        return true;
+      }
+      default:
+        return false;
+    }
   }
 
   private async handleCheckoutCompleted(session: Stripe.Checkout.Session): Promise<void> {

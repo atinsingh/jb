@@ -25,6 +25,15 @@ const FeatureKeys = {
   AGENT_TYPE: 'agent_type',
   SUPPORT_LEVEL: 'support_level',
   INTERVIEW_SESSIONS_PER_MONTH: 'interview_sessions_per_month',
+  // Employer "AI Recruiter" allowance. NOTE: this key is intentionally NOT
+  // seeded into the candidate PlanEntitlement collection below. Employer users
+  // authenticate as ROLE_EMPLOYER and their AI allowance is provisioned per
+  // employer plan on their EmployerSubscription (aiActionsLimit / aiActionsUsed
+  // — see employer-billing PLAN_LIMITS: free 25, starter 200, growth 500,
+  // scale 2000, enterprise 10000; new employers default to free/25). The key
+  // is declared here only for discoverability; LLMQuotaService resolves it
+  // against EmployerSubscription, not this candidate entitlement seed.
+  EMPLOYER_AI_CREDITS_PER_MONTH: 'employer_ai_credits_per_month',
 };
 
 interface PlanConfig {

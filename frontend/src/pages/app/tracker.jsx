@@ -5,6 +5,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import AppSidebar from '@/components/app/AppSidebar';
 import { appRoute } from '@/components/app/appRoutes';
+import { LoadingState, EmptyState, ErrorState } from '@/components/app/AppStates';
 import { getMyApplications } from '@/services/trackerApi';
 
 /* -------------------------------------------------------------------------- */
@@ -38,52 +39,9 @@ const COLUMNS = [
   },
 ];
 
-/* The design's own sample board — used as graceful fallback whenever the       */
-/* backend is unavailable or the user is not authenticated.                     */
-const SAMPLE_COLUMNS = [
-  {
-    key: 'applied',
-    title: 'Applied',
-    count: 247,
-    color: '#1B1A16',
-    cards: [
-      { id: 's1', logo: 'Re', company: 'Retool', role: 'Frontend Engineer', bg: '#F4EFE4', fg: '#1B1A16', meta: 'Auto-applied', metaColor: '#157A49', metaBg: '#EAF6EE', date: '2h ago' },
-      { id: 's2', logo: 'Pl', company: 'Plaid', role: 'Senior PM, Payments', bg: '#F4EFE4', fg: '#1B1A16', meta: 'Applied', metaColor: '#5A544A', metaBg: '#F1ECE0', date: 'Jun 25' },
-      { id: 's3', logo: 'Br', company: 'Brex', role: 'Product Designer II', bg: '#F4EFE4', fg: '#1B1A16', meta: 'Applied', metaColor: '#5A544A', metaBg: '#F1ECE0', date: 'Jun 24' },
-    ],
-  },
-  {
-    key: 'review',
-    title: 'In review',
-    count: 52,
-    color: '#C9622E',
-    cards: [
-      { id: 's4', logo: 'No', company: 'Notion', role: 'Design Systems Lead', bg: '#F4EFE4', fg: '#1B1A16', meta: 'Viewed', metaColor: '#C9622E', metaBg: '#FBEEE5', date: 'Jun 23' },
-      { id: 's5', logo: 'Va', company: 'Vanta', role: 'Staff Product Designer', bg: '#F4EFE4', fg: '#1B1A16', meta: 'Recruiter screen', metaColor: '#C9622E', metaBg: '#FBEEE5', date: 'Jun 22' },
-    ],
-  },
-  {
-    key: 'interviewing',
-    title: 'Interviewing',
-    count: 18,
-    color: '#1FA463',
-    cards: [
-      { id: 's6', logo: 'St', company: 'Stripe', role: 'Senior Product Designer', bg: '#EAF6EE', fg: '#157A49', meta: 'Final round', metaColor: '#157A49', metaBg: '#EAF6EE', date: 'Jun 29' },
-      { id: 's7', logo: 'Fi', company: 'Figma', role: 'Product Manager, Growth', bg: '#F4EFE4', fg: '#1B1A16', meta: 'Round 2', metaColor: '#157A49', metaBg: '#EAF6EE', date: 'Jul 1' },
-      { id: 's8', logo: 'Li', company: 'Linear', role: 'Senior Frontend Eng', bg: '#F4EFE4', fg: '#1B1A16', meta: 'Tech screen', metaColor: '#157A49', metaBg: '#EAF6EE', date: 'Jul 2' },
-    ],
-  },
-  {
-    key: 'offers',
-    title: 'Offers',
-    count: 3,
-    color: '#5BD08C',
-    cards: [
-      { id: 's9', logo: 'Ra', company: 'Ramp', role: 'Senior PM, Platform', bg: '#EAF6EE', fg: '#157A49', meta: '✦ Offer', metaColor: '#0C2C1C', metaBg: '#9BE3B6', date: '$225k' },
-      { id: 's10', logo: 'He', company: 'Height', role: 'Lead Designer', bg: '#F4EFE4', fg: '#1B1A16', meta: '✦ Offer', metaColor: '#0C2C1C', metaBg: '#9BE3B6', date: '$205k' },
-    ],
-  },
-];
+// Empty board derived from the static column config — the starting state
+// before real applications load (and when the user has none).
+const emptyColumns = () => COLUMNS.map((c) => ({ ...c, count: 0, cards: [] }));
 
 /* ------------------------------------------------------------------ helpers */
 const initials = (name) => {
@@ -126,7 +84,9 @@ const formatDate = (value) => {
 const isOfferColumn = (key) => key === 'offers';
 const isReviewColumn = (key) => key === 'review';
 
-// Map one backend application record into a board card.
+// Map one backend application record into a board card. The colour fields are
+// per-record data (driven by which column the app lands in), so they ride as
+// inline style on the card rather than as static utilities.
 const toCard = (app, columnKey) => {
   const company =
     app.companyName || app.company || app.job?.company || app.job?.companyName || 'Company';
@@ -153,22 +113,23 @@ const toCard = (app, columnKey) => {
 /* ----------------------------------------------------------------- skeleton */
 function SkeletonColumn({ col }) {
   return (
-    <div style={{ width: 300, flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '0 4px 14px' }}>
-        <span style={{ width: 9, height: 9, borderRadius: '50%', background: col.color }} />
-        <span style={{ fontSize: 14, fontWeight: 700 }}>{col.title}</span>
+    <div className="w-[300px] flex-shrink-0 flex flex-col">
+      <div className="flex items-center gap-[9px] px-1 pb-3.5">
+        {/* col.color is data → inline */}
+        <span className="w-[9px] h-[9px] rounded-full" style={{ background: col.color }} />
+        <span className="text-sm font-bold">{col.title}</span>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, background: '#F1ECE0', border: '1px solid #E7E0D2', borderRadius: 16, padding: 10, minHeight: 160 }}>
+      <div className="flex flex-col gap-2.5 bg-jb-soft border border-jb-line rounded-2xl p-2.5 min-h-[160px]">
         {[0, 1].map((i) => (
-          <div key={i} style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 13, padding: 14 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 11 }}>
-              <span style={{ width: 36, height: 36, borderRadius: 9, background: '#EFE9DC' }} className="jb-shimmer" />
-              <div style={{ flex: 1 }}>
-                <div style={{ height: 11, width: '70%', borderRadius: 6, background: '#EFE9DC', marginBottom: 7 }} className="jb-shimmer" />
-                <div style={{ height: 9, width: '45%', borderRadius: 6, background: '#EFE9DC' }} className="jb-shimmer" />
+          <div key={i} className="bg-jb-paper border border-jb-line-2 rounded-[13px] p-3.5">
+            <div className="flex items-center gap-[11px] mb-[11px]">
+              <span className="w-9 h-9 rounded-[9px] bg-[#EFE9DC] animate-jb-pulse" />
+              <div className="flex-1">
+                <div className="h-[11px] w-[70%] rounded-md bg-[#EFE9DC] mb-[7px] animate-jb-pulse" />
+                <div className="h-[9px] w-[45%] rounded-md bg-[#EFE9DC] animate-jb-pulse" />
               </div>
             </div>
-            <div style={{ height: 16, width: '40%', borderRadius: 999, background: '#EFE9DC' }} className="jb-shimmer" />
+            <div className="h-4 w-[40%] rounded-full bg-[#EFE9DC] animate-jb-pulse" />
           </div>
         ))}
       </div>
@@ -178,11 +139,10 @@ function SkeletonColumn({ col }) {
 
 /* ----------------------------------------------------------------- the page */
 export default function AppTracker() {
-  const [columns, setColumns] = useState(SAMPLE_COLUMNS);
+  const [columns, setColumns] = useState(emptyColumns);
   const [view, setView] = useState('board'); // 'board' | 'list'
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
-  const [usingSample, setUsingSample] = useState(true);
   const [error, setError] = useState(null);
 
   const loadApplications = useCallback(async () => {
@@ -196,14 +156,6 @@ export default function AppTracker() {
           ? res
           : [];
 
-      if (!apps.length) {
-        // No real data yet — keep the faithful sample board so the screen
-        // always renders something meaningful, but mark it as a demo.
-        setColumns(SAMPLE_COLUMNS);
-        setUsingSample(true);
-        return;
-      }
-
       const buckets = COLUMNS.map((c) => ({ ...c, cards: [] }));
       const indexByKey = Object.fromEntries(buckets.map((b, i) => [b.key, i]));
 
@@ -215,12 +167,10 @@ export default function AppTracker() {
 
       const next = buckets.map((b) => ({ ...b, count: b.cards.length }));
       setColumns(next);
-      setUsingSample(false);
     } catch (err) {
-      // Graceful fallback to the design's sample data — never crash the screen.
-      setError(err?.message || 'Could not load applications');
-      setColumns(SAMPLE_COLUMNS);
-      setUsingSample(true);
+      // Never fall back to fabricated data — surface the error, keep board empty.
+      setError(err || new Error('Could not load applications'));
+      setColumns(emptyColumns());
     } finally {
       setLoading(false);
     }
@@ -242,7 +192,7 @@ export default function AppTracker() {
     }));
   }, [columns, query]);
 
-  const totalApplied = usingSample ? 247 : columns.reduce((sum, c) => sum + (c.count || c.cards.length), 0);
+  const totalApplied = columns.reduce((sum, c) => sum + (c.count || c.cards.length), 0);
   const activeConversations = (columns.find((c) => c.key === 'interviewing')?.count) ??
     (columns.find((c) => c.key === 'interviewing')?.cards.length ?? 0);
 
@@ -254,150 +204,84 @@ export default function AppTracker() {
     [filteredColumns]
   );
 
+  const viewBtn = (on) =>
+    `font-sans text-[13px] font-semibold cursor-pointer border-none rounded-full px-[15px] py-[7px] ${on ? 'text-jb-green-ink bg-jb-paper shadow-[0_1px_2px_rgba(0,0,0,0.05)]' : 'text-jb-ink-subtle bg-transparent'}`;
+
   return (
     <>
       <Head>
         <title>Application tracker — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
-      <style jsx global>{`
-        #jbapp ::-webkit-scrollbar {
-          width: 8px;
-          height: 8px;
-        }
-        #jbapp ::-webkit-scrollbar-thumb {
-          background: #e1d9c9;
-          border-radius: 8px;
-        }
-        #jbboard::-webkit-scrollbar {
-          height: 10px;
-        }
-        #jbapp input:focus {
-          outline: none;
-        }
-        .jb-card {
-          transition: border-color 0.15s ease, transform 0.15s ease;
-        }
-        .jb-card:hover {
-          border-color: #d2c9b7 !important;
-          transform: translateY(-1px);
-        }
-        @keyframes jbshimmer {
-          0% {
-            opacity: 0.55;
-          }
-          50% {
-            opacity: 1;
-          }
-          100% {
-            opacity: 0.55;
-          }
-        }
-        .jb-shimmer {
-          animation: jbshimmer 1.3s ease-in-out infinite;
-        }
-      `}</style>
-
-      <div id="jbapp" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: "'Hanken Grotesk',sans-serif", color: '#1B1A16' }}>
+      <div className="flex min-h-screen bg-jb-cream font-sans text-jb-ink [&_::-webkit-scrollbar]:w-2 [&_::-webkit-scrollbar]:h-2 [&_::-webkit-scrollbar-thumb]:bg-jb-line-3 [&_::-webkit-scrollbar-thumb]:rounded-lg">
         <AppSidebar active="tracker" />
 
-        <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        <main className="flex-1 min-w-0 flex flex-col">
           {/* HEADER */}
-          <header style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: 20, padding: '15px 32px', background: 'rgba(247,243,234,0.85)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #E7E0D2' }}>
-            <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9286' }}>Workspace / Applications</div>
-            <div style={{ flex: 1 }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: '#FFFEFB', border: '1px solid #E1D9C9', borderRadius: 999, padding: '9px 15px', width: 260 }}>
-              <span style={{ color: '#A79E8F', fontSize: 14 }}>⌕</span>
+          <header className="sticky top-0 z-20 flex items-center flex-wrap gap-3 px-5 py-[15px] bg-[rgba(247,243,234,0.85)] backdrop-blur-[10px] border-b border-jb-line">
+            <div className="font-mono text-[11.5px] tracking-[0.1em] uppercase text-jb-ink-faint">Workspace / Applications</div>
+            <div className="flex-1 min-w-[12px]" />
+            {/* flexible width + minWidth:0 so the search box shrinks on narrow
+                viewports instead of forcing the header wider than the screen */}
+            <div className="flex items-center gap-[9px] bg-jb-paper border border-jb-line-3 rounded-full px-[15px] py-[9px] flex-[1_1_160px] max-w-[260px] min-w-0">
+              <span className="text-jb-ink-ghost text-sm">⌕</span>
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Filter applications…"
-                style={{ flex: 1, border: 'none', background: 'none', fontFamily: 'inherit', fontSize: 14, color: '#1B1A16', minWidth: 0 }}
+                aria-label="Filter applications"
+                className="flex-1 border-none bg-transparent font-sans text-sm text-jb-ink min-w-0 focus:outline-none"
               />
             </div>
-            <div style={{ display: 'flex', background: '#F1ECE0', border: '1px solid #E1D9C9', borderRadius: 999, padding: 3 }}>
-              <button
-                onClick={() => setView('board')}
-                style={{
-                  fontFamily: 'inherit',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  border: 'none',
-                  borderRadius: 999,
-                  padding: '7px 15px',
-                  color: view === 'board' ? '#0C2C1C' : '#8A8378',
-                  background: view === 'board' ? '#FFFEFB' : 'transparent',
-                  boxShadow: view === 'board' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
-                }}
-              >
-                Board
-              </button>
-              <button
-                onClick={() => setView('list')}
-                style={{
-                  fontFamily: 'inherit',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  border: 'none',
-                  borderRadius: 999,
-                  padding: '7px 15px',
-                  color: view === 'list' ? '#0C2C1C' : '#8A8378',
-                  background: view === 'list' ? '#FFFEFB' : 'transparent',
-                  boxShadow: view === 'list' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
-                }}
-              >
-                List
-              </button>
+            <div className="flex bg-jb-soft border border-jb-line-3 rounded-full p-[3px]">
+              <button onClick={() => setView('board')} className={viewBtn(view === 'board')}>Board</button>
+              <button onClick={() => setView('list')} className={viewBtn(view === 'list')}>List</button>
             </div>
           </header>
 
           {/* TITLE */}
-          <div style={{ padding: '30px 32px 20px', maxWidth: 1180, width: '100%' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24, marginBottom: 2 }}>
+          <div className="px-8 pt-[30px] pb-5 w-full">
+            <div className="flex items-end justify-between gap-6 mb-0.5">
               <div>
-                <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 40, lineHeight: 1, letterSpacing: '-0.01em', margin: '0 0 8px' }}>Application tracker</h1>
-                <p style={{ fontSize: 15.5, color: '#5A544A', margin: 0 }}>
+                <h1 className="font-display font-normal text-[40px] leading-none tracking-[-0.01em] mb-2">Application tracker</h1>
+                <p className="text-[15.5px] text-jb-ink-muted m-0">
                   {totalApplied} application{totalApplied === 1 ? '' : 's'} ·{' '}
-                  <span style={{ color: '#157A49', fontWeight: 600 }}>{activeConversations} active conversation{activeConversations === 1 ? '' : 's'}</span>
+                  <span className="text-jb-green-text font-semibold">{activeConversations} active conversation{activeConversations === 1 ? '' : 's'}</span>
                 </p>
               </div>
             </div>
-
-            {/* graceful, non-blocking notice when running on sample data */}
-            {!loading && usingSample && (
-              <div style={{ marginTop: 14, display: 'inline-flex', alignItems: 'center', gap: 9, fontSize: 12.5, color: '#8A6A33', background: '#FBF1DF', border: '1px solid #EBD9B5', borderRadius: 999, padding: '6px 13px' }}>
-                <span>●</span>
-                <span>{error ? `Showing sample board — ${error}` : 'Showing a sample board. Connect your account to see live applications.'}</span>
-              </div>
-            )}
           </div>
 
+          {/* ERROR STATE */}
+          {!loading && error && (
+            <div className="px-8 pt-3 pb-10 w-full">
+              <div className="bg-jb-paper border border-jb-line-2 rounded-2xl">
+                <ErrorState error={error} onRetry={loadApplications} />
+              </div>
+            </div>
+          )}
+
           {/* BOARD VIEW */}
-          {view === 'board' && (
-            <div id="jbboard" style={{ flex: 1, overflowX: 'auto', padding: '12px 32px 40px' }}>
-              <div style={{ display: 'flex', gap: 14, minWidth: 'min-content' }}>
+          {!error && view === 'board' && (
+            // minWidth:0 lets this flex child shrink below its content width so
+            // overflowX:auto actually scrolls the board instead of widening the
+            // whole page (horizontal-scroll bug on mobile).
+            <div className="flex-1 min-w-0 overflow-x-auto px-8 pt-3 pb-10 [&::-webkit-scrollbar]:h-2.5">
+              <div className="flex gap-3.5 min-w-min">
                 {loading
                   ? COLUMNS.map((col) => <SkeletonColumn key={col.key} col={col} />)
                   : filteredColumns.map((col) => (
-                      <div key={col.key} style={{ width: 300, flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '0 4px 14px' }}>
-                          <span style={{ width: 9, height: 9, borderRadius: '50%', background: col.color }} />
-                          <span style={{ fontSize: 14, fontWeight: 700 }}>{col.title}</span>
-                          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: '#8A8378' }}>{col.count ?? col.cards.length}</span>
-                          <div style={{ flex: 1 }} />
-                          <Link href={appRoute('App Matches.dc.html')} title="Add application" style={{ color: '#A79E8F', fontSize: 18, lineHeight: 1, textDecoration: 'none' }}>+</Link>
+                      <div key={col.key} className="w-[300px] flex-shrink-0 flex flex-col">
+                        <div className="flex items-center gap-[9px] px-1 pb-3.5">
+                          <span className="w-[9px] h-[9px] rounded-full" style={{ background: col.color }} />
+                          <span className="text-sm font-bold">{col.title}</span>
+                          <span className="font-mono text-xs text-jb-ink-subtle">{col.count ?? col.cards.length}</span>
+                          <div className="flex-1" />
+                          <Link href={appRoute('App Matches.dc.html')} title="Add application" className="text-jb-ink-ghost text-[18px] leading-none no-underline">+</Link>
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, background: '#F1ECE0', border: '1px solid #E7E0D2', borderRadius: 16, padding: 10, minHeight: 160 }}>
+                        <div className="flex flex-col gap-2.5 bg-jb-soft border border-jb-line rounded-2xl p-2.5 min-h-[160px]">
                           {col.cards.length === 0 ? (
-                            <div style={{ padding: '26px 12px', textAlign: 'center', fontSize: 12.5, color: '#A79E8F' }}>
+                            <div className="px-3 py-[26px] text-center text-[12.5px] text-jb-ink-ghost">
                               {query ? 'No matches here' : 'Nothing yet'}
                             </div>
                           ) : (
@@ -405,19 +289,18 @@ export default function AppTracker() {
                               <Link
                                 key={c.id}
                                 href={appRoute('App Application Detail.dc.html')}
-                                className="jb-card"
-                                style={{ display: 'block', background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 13, padding: 14, textDecoration: 'none', color: 'inherit' }}
+                                className="block bg-jb-paper border border-jb-line-2 rounded-[13px] p-3.5 no-underline text-inherit transition-[border-color,transform] duration-150 hover:border-jb-line-input hover:-translate-y-px"
                               >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 11 }}>
-                                  <span style={{ width: 36, height: 36, flexShrink: 0, borderRadius: 9, background: c.bg, color: c.fg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13 }}>{c.logo}</span>
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ fontWeight: 600, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.role}</div>
-                                    <div style={{ fontSize: 12, color: '#8A8378' }}>{c.company}</div>
+                                <div className="flex items-center gap-[11px] mb-[11px]">
+                                  <span className="w-9 h-9 flex-shrink-0 rounded-[9px] flex items-center justify-center font-bold text-[13px]" style={{ background: c.bg, color: c.fg }}>{c.logo}</span>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-semibold text-sm whitespace-nowrap overflow-hidden text-ellipsis">{c.role}</div>
+                                    <div className="text-xs text-jb-ink-subtle">{c.company}</div>
                                   </div>
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: c.metaColor, background: c.metaBg, padding: '3px 9px', borderRadius: 999 }}>{c.meta}</span>
-                                  {c.date && <span style={{ fontSize: 11.5, color: '#A79E8F' }}>{c.date}</span>}
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-mono text-[11px] px-[9px] py-[3px] rounded-full" style={{ color: c.metaColor, background: c.metaBg }}>{c.meta}</span>
+                                  {c.date && <span className="text-[11.5px] text-jb-ink-ghost">{c.date}</span>}
                                 </div>
                               </Link>
                             ))
@@ -430,41 +313,41 @@ export default function AppTracker() {
           )}
 
           {/* LIST VIEW */}
-          {view === 'list' && (
-            <div style={{ flex: 1, padding: '12px 32px 40px', maxWidth: 1180, width: '100%' }}>
+          {!error && view === 'list' && (
+            <div className="flex-1 px-8 pt-3 pb-10 w-full">
               {loading ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div className="flex flex-col gap-2.5">
                   {[0, 1, 2, 3, 4].map((i) => (
-                    <div key={i} style={{ height: 64, borderRadius: 13, background: '#FFFEFB', border: '1px solid #E6DECF' }} className="jb-shimmer" />
+                    <div key={i} className="h-16 rounded-[13px] bg-jb-paper border border-jb-line-2 animate-jb-pulse" />
                   ))}
                 </div>
               ) : flatList.length === 0 ? (
-                <div style={{ padding: '60px 20px', textAlign: 'center', color: '#8A8378' }}>
-                  <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: 26, color: '#1B1A16', marginBottom: 8 }}>Nothing here yet</div>
-                  <p style={{ fontSize: 14.5, margin: '0 0 20px' }}>
+                <div className="px-5 py-[60px] text-center text-jb-ink-subtle">
+                  <div className="font-display text-[26px] text-jb-ink mb-2">Nothing here yet</div>
+                  <p className="text-[14.5px] mb-5">
                     {query ? 'No applications match your filter.' : 'Applications you submit will show up in your pipeline.'}
                   </p>
-                  <Link href={appRoute('App Matches.dc.html')} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#1FA463', color: '#0C2C1C', fontSize: 14.5, fontWeight: 700, padding: '12px 22px', borderRadius: 999, textDecoration: 'none' }}>Browse matches →</Link>
+                  <Link href={appRoute('App Matches.dc.html')} className="inline-flex items-center gap-2 bg-jb-green text-jb-green-ink text-[14.5px] font-bold px-[22px] py-3 rounded-full no-underline">Browse matches →</Link>
                 </div>
               ) : (
-                <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 16, overflow: 'hidden' }}>
+                <div className="bg-jb-paper border border-jb-line-2 rounded-2xl overflow-hidden">
                   {flatList.map((c, i) => (
                     <Link
                       key={c.id}
                       href={appRoute('App Application Detail.dc.html')}
-                      style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', borderBottom: i < flatList.length - 1 ? '1px solid #F2ECE0' : 'none', textDecoration: 'none', color: 'inherit' }}
+                      className={`flex items-center gap-3.5 px-[18px] py-3.5 no-underline text-inherit ${i < flatList.length - 1 ? 'border-b border-jb-soft-2' : ''}`}
                     >
-                      <span style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 9, background: c.bg, color: c.fg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13 }}>{c.logo}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: 14.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.role}</div>
-                        <div style={{ fontSize: 12.5, color: '#8A8378' }}>{c.company}</div>
+                      <span className="w-[38px] h-[38px] flex-shrink-0 rounded-[9px] flex items-center justify-center font-bold text-[13px]" style={{ background: c.bg, color: c.fg }}>{c.logo}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-[14.5px] whitespace-nowrap overflow-hidden text-ellipsis">{c.role}</div>
+                        <div className="text-[12.5px] text-jb-ink-subtle">{c.company}</div>
                       </div>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: '#5A544A' }}>
-                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: c.columnColor }} />
+                      <span className="inline-flex items-center gap-[7px] text-[12.5px] text-jb-ink-muted">
+                        <span className="w-2 h-2 rounded-full" style={{ background: c.columnColor }} />
                         {c.columnTitle}
                       </span>
-                      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: c.metaColor, background: c.metaBg, padding: '3px 9px', borderRadius: 999 }}>{c.meta}</span>
-                      {c.date && <span style={{ fontSize: 11.5, color: '#A79E8F', width: 64, textAlign: 'right' }}>{c.date}</span>}
+                      <span className="font-mono text-[11px] px-[9px] py-[3px] rounded-full" style={{ color: c.metaColor, background: c.metaBg }}>{c.meta}</span>
+                      {c.date && <span className="text-[11.5px] text-jb-ink-ghost w-16 text-right">{c.date}</span>}
                     </Link>
                   ))}
                 </div>

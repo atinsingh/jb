@@ -3,42 +3,50 @@
 import { useEffect, useMemo, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
+import useMarketingTheme from '@/components/site/useMarketingTheme';
 import AppSidebar from '@/components/app/AppSidebar';
 import { appRoute } from '@/components/app/appRoutes';
+import { LoadingState, EmptyState, ErrorState } from '@/components/app/AppStates';
 import {
   getMyMatches,
   getMyApplications,
   getUserPreferences,
   getJobRecommendations,
 } from '@/services/dashboardApi';
+import { listResumes } from '@/services/resumeApi';
 
-/* ----------------------------------------------------- design sample data --- */
-const SAMPLE_STATS = [
-  { label: 'Applied', value: '247', delta: '+6', sub: 'this week', bg: '#FFFEFB', border: '#E6DECF', labelColor: '#8A8378', deltaColor: '#157A49', valueColor: '#1B1A16', subColor: '#8A8378' },
-  { label: 'Interviews', value: '18', delta: '+3', sub: '2 upcoming', bg: '#FFFEFB', border: '#E6DECF', labelColor: '#8A8378', deltaColor: '#157A49', valueColor: '#1B1A16', subColor: '#8A8378' },
-  { label: 'Avg. match', value: '94%', delta: '↑ 4%', sub: 'last 30 days', bg: '#EAF6EE', border: '#CDE9D6', labelColor: '#1FA463', deltaColor: '#157A49', valueColor: '#157A49', subColor: '#5A8C6E' },
-  { label: 'Response rate', value: '31%', delta: '3× avg', sub: 'vs 11% typical', bg: '#FFFEFB', border: '#E6DECF', labelColor: '#8A8378', deltaColor: '#C9622E', valueColor: '#1B1A16', subColor: '#8A8378' },
+/* ------------------------------------------- static UI config (no user data) */
+// Presentational metadata for the KPI cards — labels and palette only. Values
+// are always computed from live data (empty => '—').
+const STAT_META = [
+  { label: 'Applied', icon: '↗', chipBg: 'var(--jb-a-card)', chipInk: '#8A7C5A', bg: 'var(--jb-a-card-alt)', border: 'var(--jb-a-line)', labelColor: 'var(--jb-a-ink-muted)', deltaColor: 'var(--jb-a-accent-2)', valueColor: 'var(--jb-a-ink)', subColor: 'var(--jb-a-ink-muted)' },
+  { label: 'Interviews', icon: '◷', chipBg: 'var(--jb-a-card)', chipInk: '#8A7C5A', bg: 'var(--jb-a-card-alt)', border: 'var(--jb-a-line)', labelColor: 'var(--jb-a-ink-muted)', deltaColor: 'var(--jb-a-accent-2)', valueColor: 'var(--jb-a-ink)', subColor: 'var(--jb-a-ink-muted)' },
+  { label: 'Avg. match', icon: '◎', chipBg: '#DCEFE3', chipInk: 'var(--jb-a-accent-2)', bg: 'var(--jb-a-tint)', border: '#CDE9D6', labelColor: '#1FA463', deltaColor: 'var(--jb-a-accent-2)', valueColor: 'var(--jb-a-accent-2)', subColor: '#5A8C6E' },
+  { label: 'Response rate', icon: '⤴', chipBg: 'var(--jb-a-card)', chipInk: '#8A7C5A', bg: 'var(--jb-a-card-alt)', border: 'var(--jb-a-line)', labelColor: 'var(--jb-a-ink-muted)', deltaColor: '#C9622E', valueColor: 'var(--jb-a-ink)', subColor: 'var(--jb-a-ink-muted)' },
 ];
+const emptyStats = () => STAT_META.map((m) => ({ ...m, value: '—', delta: '', sub: '' }));
 
-const SAMPLE_MATCHES = [
-  { logo: 'St', company: 'Stripe', role: 'Senior Product Designer', location: 'Remote', salary: '$170–210k', match: '96%', bg: '#EAF6EE', fg: '#157A49' },
-  { logo: 'Fi', company: 'Figma', role: 'Product Manager, Growth', location: 'SF · Hybrid', salary: '$185–220k', match: '93%', bg: '#F4EFE4', fg: '#1B1A16' },
-  { logo: 'Li', company: 'Linear', role: 'Senior Frontend Engineer', location: 'Remote', salary: '$180–215k', match: '91%', bg: '#F4EFE4', fg: '#1B1A16' },
-  { logo: 'No', company: 'Notion', role: 'Design Systems Lead', location: 'NYC · Hybrid', salary: '$190–230k', match: '89%', bg: '#F4EFE4', fg: '#1B1A16' },
+// Pipeline stage labels + colors are fixed UI; counts/percentages are data.
+const PIPE_META = [
+  { stage: 'Applied', color: 'var(--jb-a-ink)' },
+  { stage: 'In review', color: '#C9622E' },
+  { stage: 'Interviewing', color: '#1FA463' },
+  { stage: 'Offers', color: '#5BD08C' },
 ];
+const emptyPipeline = () => PIPE_META.map((p) => ({ ...p, count: '0', pct: '0%' }));
 
-const SAMPLE_PIPELINE = [
-  { stage: 'Applied', count: '247', pct: '100%', color: '#1B1A16' },
-  { stage: 'In review', count: '52', pct: '52%', color: '#C9622E' },
-  { stage: 'Interviewing', count: '18', pct: '24%', color: '#1FA463' },
-  { stage: 'Offers', count: '3', pct: '8%', color: '#5BD08C' },
-];
+// Title-case a name so an all-caps stored value ("DHARMENDRA") reads nicely.
+const titleCase = (s) =>
+  String(s || '')
+    .toLowerCase()
+    .replace(/\b([a-z])/g, (m) => m.toUpperCase());
 
-const SAMPLE_ACTIVITY = [
-  { logo: 'Va', company: 'Vanta', role: 'Staff Product Designer', time: '3:12 AM', bg: '#F4EFE4', fg: '#1B1A16' },
-  { logo: 'Ra', company: 'Ramp', role: 'Senior PM, Platform', time: '2:48 AM', bg: '#F4EFE4', fg: '#1B1A16' },
-  { logo: 'Re', company: 'Retool', role: 'Frontend Engineer', time: '1:55 AM', bg: '#F4EFE4', fg: '#1B1A16' },
-];
+const timeGreeting = () => {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
+};
 
 /* ------------------------------------------------------------- helpers --- */
 const initials = (name = '') => {
@@ -69,7 +77,7 @@ const formatSalary = (job) => {
   return '—';
 };
 
-const PALETTE = ['#F4EFE4', '#EAF6EE', '#F4EFE4', '#F4EFE4'];
+const PALETTE = ['var(--jb-a-card)', 'var(--jb-a-tint)', 'var(--jb-a-card)', 'var(--jb-a-card)'];
 
 // Normalize a backend match record into the design's row shape.
 const toMatchRow = (m, i) => {
@@ -84,8 +92,8 @@ const toMatchRow = (m, i) => {
     location,
     salary: formatSalary(job),
     match: formatMatch(m),
-    bg: i === 0 ? '#EAF6EE' : PALETTE[i % PALETTE.length],
-    fg: i === 0 ? '#157A49' : '#1B1A16',
+    bg: i === 0 ? 'var(--jb-a-tint)' : PALETTE[i % PALETTE.length],
+    fg: i === 0 ? 'var(--jb-a-accent-2)' : 'var(--jb-a-ink)',
   };
 };
 
@@ -107,8 +115,8 @@ const toActivityRow = (a) => {
     company,
     role,
     time: time || 'recently',
-    bg: '#F4EFE4',
-    fg: '#1B1A16',
+    bg: 'var(--jb-a-card)',
+    fg: 'var(--jb-a-ink)',
   };
 };
 
@@ -126,13 +134,15 @@ const matchStatus = (status, group) => {
 
 /* ------------------------------------------------------------ component --- */
 export default function AppDashboard() {
-  const [stats, setStats] = useState(SAMPLE_STATS);
-  const [matches, setMatches] = useState(SAMPLE_MATCHES);
-  const [pipeline, setPipeline] = useState(SAMPLE_PIPELINE);
-  const [activity, setActivity] = useState(SAMPLE_ACTIVITY);
+  const [stats, setStats] = useState(emptyStats);
+  const [matches, setMatches] = useState([]);
+  const [pipeline, setPipeline] = useState(emptyPipeline);
+  const [activity, setActivity] = useState([]);
   const [userName, setUserName] = useState('');
   const [loading, setLoading] = useState(true);
-  const [live, setLive] = useState(false);
+  const [error, setError] = useState(null);
+  const [resumeCount, setResumeCount] = useState(0);
+  const [hasPrefs, setHasPrefs] = useState(false);
 
   const today = useMemo(
     () => new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
@@ -153,16 +163,34 @@ export default function AppDashboard() {
         /* ignore */
       }
 
-      const [matchesRes, recsRes, appsRes, prefsRes] = await Promise.allSettled([
+      const [matchesRes, recsRes, appsRes, prefsRes, resumesRes] = await Promise.allSettled([
         getMyMatches({ minScore: 60 }),
         getJobRecommendations(60),
         getMyApplications({ limit: 200 }),
         getUserPreferences(),
+        listResumes(),
       ]);
 
       if (cancelled) return;
 
-      let gotData = false;
+      // Onboarding signals for the "Get started" card.
+      if (resumesRes.status === 'fulfilled') {
+        const list = Array.isArray(resumesRes.value) ? resumesRes.value : resumesRes.value?.resumes || [];
+        setResumeCount(list.length);
+      }
+      if (prefsRes.status === 'fulfilled') {
+        const p = prefsRes.value?.preferences || prefsRes.value || {};
+        setHasPrefs(!!((p.titles && p.titles.length) || (p.locations && p.locations.length)));
+      }
+
+      // If every data call rejected, surface an error rather than a blank page.
+      const dataCalls = [matchesRes, recsRes, appsRes, prefsRes];
+      if (dataCalls.every((r) => r.status === 'rejected')) {
+        const firstErr = dataCalls.find((r) => r.status === 'rejected');
+        setError(firstErr?.reason || new Error('Could not load your dashboard'));
+        setLoading(false);
+        return;
+      }
 
       // --- Matches / recommendations ---
       const rawMatches =
@@ -171,72 +199,62 @@ export default function AppDashboard() {
         (recsRes.status === 'fulfilled' &&
           (recsRes.value?.recommendations || recsRes.value)) ||
         null;
-      const matchList = Array.isArray(rawMatches) ? rawMatches : null;
-      if (matchList && matchList.length) {
-        setMatches(matchList.slice(0, 4).map(toMatchRow));
-        gotData = true;
-      }
+      const matchList = Array.isArray(rawMatches) ? rawMatches : [];
+      setMatches(matchList.slice(0, 4).map(toMatchRow));
 
       // --- Applications -> pipeline + activity + stats ---
       const rawApps =
         appsRes.status === 'fulfilled' &&
         (appsRes.value?.applications || (Array.isArray(appsRes.value) ? appsRes.value : null));
-      const appList = Array.isArray(rawApps) ? rawApps : null;
+      const appList = Array.isArray(rawApps) ? rawApps : [];
       const appsTotal =
-        (appsRes.status === 'fulfilled' && appsRes.value?.total) ||
-        (appList ? appList.length : 0);
+        (appsRes.status === 'fulfilled' && appsRes.value?.total) || appList.length;
 
-      if (appList && appList.length) {
-        gotData = true;
-        const counts = {
-          applied: appList.length,
-          review: appList.filter((a) => matchStatus(a.status, 'review')).length,
-          interview: appList.filter((a) => matchStatus(a.status, 'interview')).length,
-          offer: appList.filter((a) => matchStatus(a.status, 'offer')).length,
-        };
-        const total = counts.applied || 1;
-        setPipeline([
-          { stage: 'Applied', count: String(counts.applied), pct: '100%', color: '#1B1A16' },
-          { stage: 'In review', count: String(counts.review), pct: pct(counts.review, total), color: '#C9622E' },
-          { stage: 'Interviewing', count: String(counts.interview), pct: pct(counts.interview, total), color: '#1FA463' },
-          { stage: 'Offers', count: String(counts.offer), pct: pct(counts.offer, total), color: '#5BD08C' },
-        ]);
+      const counts = {
+        applied: appList.length,
+        review: appList.filter((a) => matchStatus(a.status, 'review')).length,
+        interview: appList.filter((a) => matchStatus(a.status, 'interview')).length,
+        offer: appList.filter((a) => matchStatus(a.status, 'offer')).length,
+      };
+      const total = counts.applied || 1;
 
-        const recent = [...appList]
-          .sort((a, b) => new Date(b.appliedAt || b.createdAt || 0) - new Date(a.appliedAt || a.createdAt || 0))
-          .slice(0, 3)
-          .map(toActivityRow);
-        if (recent.length) setActivity(recent);
+      setPipeline([
+        { ...PIPE_META[0], count: String(counts.applied), pct: counts.applied ? '100%' : '0%' },
+        { ...PIPE_META[1], count: String(counts.review), pct: pct(counts.review, total) },
+        { ...PIPE_META[2], count: String(counts.interview), pct: pct(counts.interview, total) },
+        { ...PIPE_META[3], count: String(counts.offer), pct: pct(counts.offer, total) },
+      ]);
 
-        const matchCount = matchList ? matchList.length : 0;
-        const avgMatch = matchList && matchList.length
-          ? Math.round(
-              matchList.reduce((acc, m) => {
-                const v = Number(m?.matchScore ?? m?.score ?? m?.overallScore ?? 0);
-                return acc + (v <= 1 ? v * 100 : v);
-              }, 0) / matchList.length
-            )
-          : null;
+      const recent = [...appList]
+        .sort((a, b) => new Date(b.appliedAt || b.createdAt || 0) - new Date(a.appliedAt || a.createdAt || 0))
+        .slice(0, 3)
+        .map(toActivityRow);
+      setActivity(recent);
 
-        setStats([
-          { ...SAMPLE_STATS[0], value: String(appsTotal || counts.applied), delta: `+${counts.applied}`, sub: 'total' },
-          { ...SAMPLE_STATS[1], value: String(counts.interview), delta: `+${counts.interview}`, sub: `${counts.offer} offers` },
-          { ...SAMPLE_STATS[2], value: avgMatch != null ? `${avgMatch}%` : SAMPLE_STATS[2].value, sub: `${matchCount} matches` },
-          { ...SAMPLE_STATS[3], value: counts.applied ? `${pct(counts.review + counts.interview + counts.offer, total)}` : SAMPLE_STATS[3].value, sub: 'response rate' },
-        ]);
-      }
+      const matchCount = matchList.length;
+      const avgMatch = matchList.length
+        ? Math.round(
+            matchList.reduce((acc, m) => {
+              const v = Number(m?.matchScore ?? m?.score ?? m?.overallScore ?? 0);
+              return acc + (v <= 1 ? v * 100 : v);
+            }, 0) / matchList.length
+          )
+        : null;
 
-      // Touch prefs result (graceful — no UI dependency, just confirms wiring).
-      if (prefsRes.status === 'fulfilled' && prefsRes.value?.preferences) {
-        gotData = true;
-      }
+      const responded = counts.review + counts.interview + counts.offer;
+      setStats([
+        { ...STAT_META[0], value: String(appsTotal || counts.applied), delta: counts.applied ? `+${counts.applied}` : '', sub: 'total' },
+        { ...STAT_META[1], value: String(counts.interview), delta: counts.interview ? `+${counts.interview}` : '', sub: `${counts.offer} offers` },
+        { ...STAT_META[2], value: avgMatch != null ? `${avgMatch}%` : '—', delta: '', sub: `${matchCount} matches` },
+        { ...STAT_META[3], value: counts.applied ? pct(responded, total) : '—', delta: '', sub: 'response rate' },
+      ]);
 
+      if (!cancelled) setLoading(false);
+    })().catch((err) => {
       if (!cancelled) {
-        setLive(gotData);
+        setError(err || new Error('Could not load your dashboard'));
         setLoading(false);
       }
-    })().catch(() => {
-      if (!cancelled) setLoading(false);
     });
 
     return () => {
@@ -244,335 +262,330 @@ export default function AppDashboard() {
     };
   }, []);
 
-  const greeting = userName ? `Good morning, ${userName.split(' ')[0]}.` : 'Good morning.';
+  const firstName = titleCase((userName || '').split(' ')[0]);
+  const greeting = firstName ? `${timeGreeting()}, ${firstName}.` : `${timeGreeting()}.`;
   const matchesNew = matches.length;
+
+  // "Get started" onboarding — shown while the workspace is essentially empty.
+  const appliedCount = activity.length;
+  const isNew = !loading && !error && appliedCount === 0 && matches.length === 0;
+  const steps = [
+    { key: 'resume', label: 'Add your résumé', hint: 'Import or build one', done: resumeCount > 0, href: '/app/resume-library' },
+    { key: 'prefs', label: 'Set job preferences', hint: 'Titles, locations, salary', done: hasPrefs, href: '/app/settings' },
+    { key: 'matches', label: 'Review your matches', hint: 'Roles ranked by fit', done: matches.length > 0, href: appRoute('App Matches.dc.html') },
+    { key: 'auto', label: 'Turn on Auto-Apply', hint: 'Apply on autopilot', done: appliedCount > 0, href: appRoute('App Auto-Apply.dc.html') },
+  ];
+  const stepsDone = steps.filter((s) => s.done).length;
+
+  const { theme, toggle: toggleTheme } = useMarketingTheme();
+
+  /* ---- design tokens (Jobocate App.dc.html) ---- */
+  /* Every value resolves through --jb-a-* so the stage follows the product
+     theme. Light mode restores the exact hexes this object used to hold, so
+     the existing design is unchanged; dark mode is the new variant. */
+  const T = {
+    stage: 'var(--jb-a-stage)', card: 'var(--jb-a-card)',
+    line: 'var(--jb-a-line)', line2: 'var(--jb-a-line-strong)',
+    ink: 'var(--jb-a-ink)', ink2: 'var(--jb-a-ink-2)', muted: 'var(--jb-a-ink-muted)',
+    dark: 'var(--jb-a-invert)', darkPanel: 'var(--jb-a-invert-panel)',
+    darkLine: 'var(--jb-a-line)', darkText: 'var(--jb-a-invert-ink)', darkMuted: 'var(--jb-a-invert-muted)',
+    green: 'var(--jb-a-accent)', greenInk: 'var(--jb-a-accent-ink)', green2: 'var(--jb-a-accent-2)',
+    tint: 'var(--jb-a-tint)', tintLine: 'var(--jb-a-tint-line)',
+    blue: 'var(--jb-a-blue)', blueTint: 'var(--jb-a-blue-tint)',
+    blueInk: 'var(--jb-a-blue-ink)', blueLine: 'var(--jb-a-blue-line)',
+    serif: 'var(--jb-font-display)', mono: 'var(--jb-font-mono)',
+  };
+
+  // Honest data only — real values when present, empty states otherwise. Never
+  // fabricate sample rows/counts (this dashboard used to; that's a trust bug).
+  const hasMatches = Array.isArray(matches) && matches.length > 0;
+  const recJobs = (matches || []).slice(0, 3).map((m) => ({
+    initial: (m.logo || (m.company || '?').slice(0, 2)).toString().toUpperCase(),
+    role: m.role, company: m.company,
+    meta: [m.location, m.salary].filter((x) => x && x !== '—').join('  ·  '),
+    fit: m.match || '—',
+    skills: m.skills && m.skills.length ? m.skills : [],
+  }));
+
+  const hasActivity = Array.isArray(activity) && activity.length > 0;
+  const overnight = (activity || []).map((a) => ({ glyph: '✓', accent: T.green, line: `Applied to ${a.role} at ${a.company}` }));
+
+  const funnelRows = pipeline.map((p, i) => ({
+    label: p.stage, count: p.count || '0', width: p.pct || '0%', color: [T.ink, T.blue, T.green, T.green2][i] || T.green,
+  }));
+
+  // Weekly outcomes from real stats/pipeline; '—'/0 when not available.
+  const val = (v) => (v && v !== '—' ? v : '—');
+  const weekly = [
+    { label: 'Applications sent', value: val(stats[0]?.value) },
+    { label: 'Interviews booked', value: pipeline[2]?.count ?? '0' },
+    { label: 'Offers received', value: pipeline[3]?.count ?? '0' },
+  ];
+  const responseRate = val(stats[3]?.value);
+
+  // Real counts for the hero + narrative (from pipeline, not fabricated).
+  const appsCount = Number(pipeline[0]?.count) || 0;
+  const interviewsCount = Number(pipeline[2]?.count) || 0;
+  const offersCount = Number(pipeline[3]?.count) || 0;
+  const heroSub = appsCount > 0
+    ? `You've applied to ${appsCount} role${appsCount === 1 ? '' : 's'}${interviewsCount ? ` — ${interviewsCount} in the interview stage` : ''}. ${offersCount ? `${offersCount} offer${offersCount === 1 ? '' : 's'} on the table.` : 'Keep the momentum going.'}`
+    : "Let's get your search moving — add a résumé, set your preferences, and review your matches.";
+
+  const busy = loading;
 
   return (
     <>
       <Head>
         <title>Dashboard — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
       <style jsx global>{`
-        #jbapp * {
-          box-sizing: border-box;
+        #jbapp * { box-sizing: border-box; }
+        #jbapp a, #jbapp a:hover { color: inherit; text-decoration: none; }
+        #jbapp ::-webkit-scrollbar { width: 10px; height: 10px; }
+        #jbapp ::-webkit-scrollbar-thumb { background: #c9ccc6; border-radius: 10px; }
+        #jbapp button:focus-visible { outline: 2px solid #2f7d3a; outline-offset: 2px; }
+        @keyframes jpslide { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+        @media (prefers-reduced-motion: reduce) { #jbapp * { animation: none !important; } }
+        @media (max-width: 1100px) {
+          #jbapp .jp-hero, #jbapp .jp-actions, #jbapp .jp-main { grid-template-columns: 1fr !important; }
         }
-        #jbapp ::-webkit-scrollbar {
-          width: 8px;
-          height: 8px;
-        }
-        #jbapp ::-webkit-scrollbar-thumb {
-          background: #e1d9c9;
-          border-radius: 8px;
-        }
-        #jbapp input:focus {
-          outline: none;
-        }
-        @keyframes jbskel {
-          0% {
-            opacity: 0.55;
-          }
-          50% {
-            opacity: 1;
-          }
-          100% {
-            opacity: 0.55;
-          }
-        }
-        @media (max-width: 980px) {
-          #jbapp .jb-stats {
-            grid-template-columns: repeat(2, 1fr) !important;
-          }
-          #jbapp .jb-two-col {
-            grid-template-columns: 1fr !important;
-          }
-          #jbapp .jb-activity {
-            grid-template-columns: 1fr !important;
-          }
+        @media (max-width: 760px) {
+          #jbapp .jp-week { flex-direction: column; }
+          #jbapp .jp-week > div { border-right: none !important; border-bottom: 1px solid ${T.line}; }
+          #jbapp .jp-topsearch { display: none !important; }
         }
       `}</style>
 
-      <div
-        id="jbapp"
-        style={{
-          display: 'flex',
-          minHeight: '100vh',
-          background: '#F7F3EA',
-          fontFamily: "'Hanken Grotesk',sans-serif",
-          color: '#1B1A16',
-        }}
-      >
+      <div id="jbapp" style={{ display: 'flex', minHeight: '100vh', height: '100vh', overflow: 'hidden', background: T.stage, fontFamily: 'var(--jb-font-sans)', color: T.ink }}>
         <AppSidebar active="dashboard" />
 
-        <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          {/* TOPBAR */}
-          <header
-            style={{
-              position: 'sticky',
-              top: 0,
-              zIndex: 20,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 20,
-              padding: '15px 32px',
-              background: 'rgba(247,243,234,0.85)',
-              backdropFilter: 'blur(10px)',
-              borderBottom: '1px solid #E7E0D2',
-            }}
-          >
-            <div
-              style={{
-                fontFamily: "'JetBrains Mono',monospace",
-                fontSize: 11.5,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                color: '#9A9286',
-              }}
-            >
-              Workspace / Dashboard
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          {/* ░░ TOP BAR ░░ */}
+          <header style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 22, height: 60, padding: '0 28px', background: 'var(--jb-a-header)', borderBottom: `1px solid ${T.line}` }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 9, minWidth: 0 }}>
+              <span style={{ fontFamily: T.mono, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: T.muted }}>Workspace</span>
+              <span aria-hidden style={{ color: '#BEBEBE' }}>/</span>
+              <span style={{ fontSize: 16, fontWeight: 700 }}>Dashboard</span>
             </div>
             <div style={{ flex: 1 }} />
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 9,
-                background: '#FFFEFB',
-                border: '1px solid #E1D9C9',
-                borderRadius: 999,
-                padding: '9px 15px',
-                width: 280,
-              }}
-            >
-              <span style={{ color: '#A79E8F', fontSize: 14 }}>⌕</span>
-              <input
-                placeholder="Search roles, companies…"
-                style={{ flex: 1, border: 'none', background: 'none', fontFamily: 'inherit', fontSize: 14, color: '#1B1A16', minWidth: 0 }}
-              />
-              <span
-                style={{
-                  fontFamily: "'JetBrains Mono',monospace",
-                  fontSize: 10,
-                  color: '#A79E8F',
-                  border: '1px solid #E1D9C9',
-                  borderRadius: 5,
-                  padding: '1px 5px',
-                }}
-              >
-                ⌘K
-              </span>
+            <div className="jp-topsearch" style={{ display: 'flex', alignItems: 'center', gap: 10, height: 36, width: 300, padding: '0 12px', background: 'var(--jb-a-control)', border: `1px solid ${T.line}`, borderRadius: 10, color: T.muted, fontSize: 14 }}>
+              <span aria-hidden>⌕</span><span style={{ flex: 1 }}>Search jobs, companies, tasks</span>
+              <span style={{ fontFamily: T.mono, fontSize: 11, border: `1px solid ${T.line2}`, borderRadius: 5, padding: '1px 5px' }}>⌘K</span>
             </div>
             <button
+              type="button"
+              onClick={toggleTheme}
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
               style={{
-                position: 'relative',
-                width: 40,
-                height: 40,
-                flexShrink: 0,
-                border: '1px solid #E1D9C9',
-                background: '#FFFEFB',
-                borderRadius: 999,
-                cursor: 'pointer',
-                fontSize: 16,
-                color: '#46413A',
+                width: 36, height: 36, flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'var(--jb-a-control)', border: `1px solid ${T.line}`,
+                borderRadius: 10, cursor: 'pointer', color: T.muted, fontFamily: 'inherit',
               }}
             >
-              ◔
-              <span
-                style={{
-                  position: 'absolute',
-                  top: 8,
-                  right: 9,
-                  width: 7,
-                  height: 7,
-                  borderRadius: '50%',
-                  background: '#1FA463',
-                  border: '1.5px solid #F7F3EA',
-                }}
-              />
+              {theme === 'dark' ? (
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="4.2" />
+                  <path d="M12 2.4v2.2M12 19.4v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2.4 12h2.2M19.4 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M20.4 13.6A8.4 8.4 0 1 1 10.4 3.6a6.6 6.6 0 0 0 10 10Z" />
+                </svg>
+              )}
             </button>
-            <Link
-              href={appRoute('App Auto-Apply.dc.html')}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 7,
-                background: '#1B1A16',
-                color: '#F7F3EA',
-                fontSize: 13.5,
-                fontWeight: 600,
-                padding: '10px 16px',
-                borderRadius: 999,
-                textDecoration: 'none',
-              }}
-            >
-              Upgrade ✦
+            <div style={{ position: 'relative', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--jb-a-control)', border: `1px solid ${T.line}`, borderRadius: 10, fontSize: 14, color: 'var(--jb-a-ink-2)' }}>
+              ◔<span style={{ position: 'absolute', top: -5, right: -5, minWidth: 18, height: 18, padding: '0 4px', borderRadius: 999, background: T.green, color: T.greenInk, fontFamily: T.mono, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #F5F5F5' }}>3</span>
+            </div>
+            <Link href="/app/settings" title="Account" style={{ display: 'flex', alignItems: 'center', gap: 9, height: 36, padding: '3px 11px 3px 3px', background: 'var(--jb-a-control)', border: `1px solid ${T.line}`, borderRadius: 999 }}>
+              <span aria-hidden style={{ width: 28, height: 28, borderRadius: '50%', background: T.green, color: T.greenInk, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12 }}>{initials(userName) || '··'}</span>
+              <span style={{ fontSize: 13.5, fontWeight: 600 }}>{firstName || 'You'}</span>
             </Link>
           </header>
 
-          <div style={{ padding: '30px 32px 48px', maxWidth: 1180, width: '100%' }}>
-            {/* GREETING */}
-            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24, marginBottom: 26, flexWrap: 'wrap' }}>
-              <div>
-                <div
-                  style={{
-                    fontFamily: "'JetBrains Mono',monospace",
-                    fontSize: 11.5,
-                    letterSpacing: '0.1em',
-                    textTransform: 'uppercase',
-                    color: '#1FA463',
-                    marginBottom: 10,
-                  }}
-                >
-                  {today}
-                </div>
-                <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 42, lineHeight: 1, letterSpacing: '-0.01em', margin: 0 }}>
-                  {greeting}
-                </h1>
-                <p style={{ fontSize: 16, color: '#5A544A', margin: '10px 0 0' }}>
-                  Your copilot applied to <b style={{ color: '#1B1A16' }}>{activity.length} roles</b> overnight. {matchesNew} fresh matches are waiting.
-                </p>
-              </div>
-              <Link
-                href={appRoute('App Matches.dc.html')}
-                style={{
-                  flexShrink: 0,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 9,
-                  background: '#1FA463',
-                  color: '#0C2C1C',
-                  fontSize: 15,
-                  fontWeight: 700,
-                  padding: '14px 22px',
-                  borderRadius: 999,
-                  textDecoration: 'none',
-                }}
-              >
-                Review matches <span>→</span>
-              </Link>
-            </div>
+          {/* ░░ STAGE ░░ */}
+          <div id="jpstage" style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: T.stage }}>
+            <div style={{ width: '100%', padding: '28px 32px 56px', display: 'flex', flexDirection: 'column', gap: 26 }}>
 
-            {/* STAT CARDS */}
-            <div className="jb-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 14 }}>
-              {(loading ? SAMPLE_STATS : stats).map((s, i) => (
-                <div key={s.label + i} style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: 16, padding: 20 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', color: s.labelColor }}>{s.label}</span>
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, fontWeight: 600, color: s.deltaColor }}>{s.delta}</span>
-                  </div>
-                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 38, fontWeight: 600, lineHeight: 1, letterSpacing: '-0.02em', color: s.valueColor, animation: loading ? 'jbskel 1.2s ease-in-out infinite' : 'none' }}>{s.value}</div>
-                  <div style={{ fontSize: 13, color: s.subColor, marginTop: 8 }}>{s.sub}</div>
-                </div>
-              ))}
-            </div>
+              <>
+                  {error && (
+                    <div style={{ padding: '12px 16px', background: '#FBEFE9', border: '1px solid #F0CDBD', borderRadius: 12, fontSize: 13.5, color: '#8A4A2E' }}>
+                      We couldn’t reach your live data just now.{' '}
+                      <button type="button" onClick={() => window.location.reload()} style={{ marginLeft: 4, background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', color: 'inherit', font: 'inherit' }}>Retry</button>
+                    </div>
+                  )}
+                  {/* HERO: greeting + auto-apply status */}
+                  <div className="jp-hero" style={{ display: 'grid', gridTemplateColumns: '1.15fr 1fr', gap: 22 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 10, padding: '26px 28px', background: T.card, border: `1px solid ${T.line}`, borderRadius: 16 }}>
+                      <span style={{ fontFamily: T.mono, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: T.muted }}>{today}</span>
+                      <h1 style={{ margin: 0, fontFamily: T.serif, fontSize: 42, lineHeight: 1.08, fontWeight: 400 }}>{greeting}</h1>
+                      <span style={{ fontSize: 16, lineHeight: 1.6, color: T.ink2, maxWidth: '52ch' }}>{heroSub}</span>
+                    </div>
 
-            {/* TWO COLUMN */}
-            <div className="jb-two-col" style={{ display: 'grid', gridTemplateColumns: '1.55fr 1fr', gap: 14 }}>
-              {/* TODAY'S MATCHES */}
-              <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18, overflow: 'hidden' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 22px', borderBottom: '1px solid #EEE7D9' }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                    <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Today&apos;s top matches</h2>
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#1FA463' }}>● {matches.length} new</span>
+                    {/* Auto-apply status — honest: it isn't running until the user sets it up */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 18, padding: '22px 24px', background: T.dark, border: `1px solid ${T.darkLine}`, borderRadius: 16, color: T.darkText }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '4px 10px', borderRadius: 999, background: T.darkPanel, border: `1px solid ${T.darkLine}` }}>
+                          <span aria-hidden style={{ width: 7, height: 7, borderRadius: '50%', background: T.darkMuted }} />
+                          <span style={{ fontFamily: T.mono, fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: T.darkMuted }}>Auto-Apply off</span>
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 15.5, lineHeight: 1.6, color: T.darkText }}>
+                        Let Jobocate apply to strong-fit roles for you, within rules you set — seniority, location, salary floor, and a daily cap. Every application pauses for your review before it’s sent.
+                      </div>
+                      <div style={{ flex: 1 }} />
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <Link href={appRoute('App Auto-Apply.dc.html')} style={{ flex: 1, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, background: T.green, color: T.greenInk, fontSize: 14, fontWeight: 700 }}>Set up Auto-Apply</Link>
+                        <Link href="/app/settings" style={{ height: 40, padding: '0 14px', display: 'flex', alignItems: 'center', border: `1px solid var(--jb-a-ink-muted)`, borderRadius: 10, color: T.darkText, fontSize: 14, fontWeight: 600 }}>Preferences</Link>
+                      </div>
+                    </div>
                   </div>
-                  <Link href={appRoute('App Matches.dc.html')} style={{ fontSize: 13.5, fontWeight: 600, color: '#157A49', textDecoration: 'none' }}>See all →</Link>
-                </div>
-                {matches.length === 0 ? (
-                  <div style={{ padding: '34px 22px', textAlign: 'center', fontSize: 13.5, color: '#8A8378' }}>No matches yet — we&apos;ll surface roles as soon as they land.</div>
-                ) : (
-                  matches.map((job, i) => (
-                    <div key={job.role + i} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '15px 22px', borderBottom: '1px solid #F2ECE0' }}>
-                      <span style={{ width: 44, height: 44, flexShrink: 0, borderRadius: 11, background: job.bg, color: job.fg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 15 }}>{job.logo}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 3 }}>{job.role}</div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: '#8A8378', flexWrap: 'wrap' }}>
-                          <span>{job.company}</span><span>·</span><span>{job.location}</span><span>·</span><span>{job.salary}</span>
+
+                  {/* GET SET UP — real onboarding checklist driven by your actual data */}
+                  {stepsDone < steps.length && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
+                        <h2 style={{ margin: 0, fontFamily: T.serif, fontSize: 26, fontWeight: 400 }}>Get set up</h2>
+                        <span style={{ fontSize: 14, color: T.muted }}>{stepsDone} of {steps.length} done — finish these to unlock better matches.</span>
+                      </div>
+                      <div className="jp-actions" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+                        {steps.map((s, i) => (
+                          <div key={s.key} style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '20px 22px', background: T.card, border: `1px solid ${s.done ? T.tintLine : T.line2}`, borderLeft: `4px solid ${s.done ? T.green : T.line2}`, borderRadius: 16 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span aria-hidden style={{ width: 22, height: 22, flexShrink: 0, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, background: s.done ? T.green : 'var(--jb-a-control)', color: s.done ? T.greenInk : T.muted, border: `1px solid ${s.done ? T.green : T.line2}` }}>{s.done ? '✓' : i + 1}</span>
+                              <span style={{ fontSize: 16, fontWeight: 700 }}>{s.label}</span>
+                            </div>
+                            <div style={{ fontSize: 14, color: T.ink2 }}>{s.hint}</div>
+                            <div style={{ flex: 1 }} />
+                            {s.done ? (
+                              <span style={{ fontFamily: T.mono, fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: T.green2 }}>Done</span>
+                            ) : (
+                              <Link href={s.href} style={{ alignSelf: 'flex-start', height: 38, padding: '0 16px', display: 'flex', alignItems: 'center', borderRadius: 9, background: T.green, color: T.greenInk, fontSize: 14, fontWeight: 700 }}>Start</Link>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* WEEKLY OUTCOMES STRIP */}
+                  <div className="jp-week" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch', background: T.card, border: `1px solid ${T.line}`, borderRadius: 16, overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2, padding: '24px 26px', borderRight: `1px solid ${T.line}`, minWidth: 170 }}>
+                      <span style={{ fontFamily: T.mono, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: T.muted }}>This week</span>
+                      <span style={{ fontSize: 16, fontWeight: 700 }}>Outcomes, not volume</span>
+                    </div>
+                    {weekly.map((w) => (
+                      <div key={w.label} style={{ flex: 1, minWidth: 120, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3, padding: '24px 26px', borderRight: `1px solid ${T.line}` }}>
+                        <span style={{ fontSize: 14, color: T.muted }}>{w.label}</span>
+                        <span style={{ fontFamily: T.mono, fontSize: 26, fontWeight: 600 }}>{w.value}</span>
+                      </div>
+                    ))}
+                    <div style={{ flex: 1.25, minWidth: 150, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3, padding: '24px 26px', background: T.tint }}>
+                      <span style={{ fontSize: 14 }}>Response rate</span>
+                      <span style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                        <span style={{ fontFamily: T.mono, fontSize: 26, fontWeight: 600, color: T.green2 }}>{responseRate}</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* MAIN: recommended + right column */}
+                  <div className="jp-main" style={{ display: 'grid', gridTemplateColumns: '1.55fr 1fr', gap: 22, alignItems: 'start' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
+                        <h2 style={{ margin: 0, fontFamily: T.serif, fontSize: 26, fontWeight: 400 }}>Recommended for you</h2>
+                        <span style={{ fontSize: 14, color: T.muted }}>Estimated fit is a signal, not a guarantee.</span>
+                      </div>
+                      {!hasMatches && !busy && (
+                        <div style={{ padding: '32px 24px', background: T.card, border: `1px dashed ${T.line2}`, borderRadius: 16, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+                          <div style={{ fontSize: 17, fontWeight: 700 }}>No matches yet</div>
+                          <div style={{ fontSize: 14.5, color: T.ink2, maxWidth: '46ch', lineHeight: 1.55 }}>Add your résumé and set your job preferences — titles, locations, and salary — and we’ll rank roles by fit here.</div>
+                          <Link href="/app/settings" style={{ marginTop: 4, height: 40, padding: '0 18px', display: 'flex', alignItems: 'center', borderRadius: 10, background: T.green, color: T.greenInk, fontSize: 14, fontWeight: 700 }}>Set preferences</Link>
                         </div>
-                      </div>
-                      <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                        <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 15, fontWeight: 600, color: '#157A49' }}>{job.match}</div>
-                        <div style={{ fontSize: 10.5, color: '#8A8378', fontFamily: "'JetBrains Mono',monospace" }}>match</div>
-                      </div>
-                      <Link href={appRoute('App Apply.dc.html')} style={{ flexShrink: 0, background: '#1B1A16', color: '#F7F3EA', fontSize: 12.5, fontWeight: 600, padding: '9px 15px', borderRadius: 999, textDecoration: 'none' }}>Apply</Link>
+                      )}
+                      {recJobs.map((j, i) => (
+                        <div key={i} style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 16, overflow: 'hidden' }}>
+                          <div style={{ display: 'flex', gap: 16, padding: '20px 22px' }}>
+                            <span aria-hidden style={{ width: 46, height: 46, flexShrink: 0, borderRadius: 12, background: 'var(--jb-a-tint)', color: T.green2, border: `1px solid var(--jb-a-tint-line)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 16 }}>{j.initial}</span>
+                            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: 18, fontWeight: 700 }}>{j.role}</span>
+                                <span style={{ fontSize: 15, color: T.ink2 }}>{j.company}</span>
+                              </div>
+                              <div style={{ fontSize: 14, color: T.ink2 }}>{j.meta}</div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                {j.skills.map((s) => (
+                                  <span key={s} style={{ fontSize: 12.5, padding: '3px 9px', borderRadius: 999, background: 'var(--jb-a-control)', color: T.ink2, border: `1px solid ${T.line}` }}>{s}</span>
+                                ))}
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10, flexShrink: 0 }}>
+                              <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontFamily: T.mono, fontSize: 24, fontWeight: 600, color: T.green2 }}>{j.fit}</div>
+                                <div style={{ fontSize: 12, color: T.muted }}>estimated fit</div>
+                              </div>
+                              <div style={{ display: 'flex', gap: 7 }}>
+                                <Link href={appRoute('App Matches.dc.html')} style={{ height: 38, padding: '0 16px', display: 'flex', alignItems: 'center', borderRadius: 9, background: T.green, color: T.greenInk, fontSize: 14, fontWeight: 700 }}>Apply</Link>
+                                <button type="button" title="Save" style={{ width: 38, height: 38, border: `1px solid ${T.line2}`, borderRadius: 9, background: 'transparent', cursor: 'pointer', fontSize: 13 }}>♡</button>
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 22px', borderTop: `1px solid var(--jb-a-control)`, background: T.stage, fontSize: 13.5, fontWeight: 600, color: T.ink2 }}>
+                            <span aria-hidden>›</span><span>Why this matches</span><span style={{ flex: 1 }} /><span style={{ fontSize: 13, fontWeight: 400, color: T.muted }}>Skills + seniority + location all align</span>
+                          </div>
+                        </div>
+                      ))}
+                      <Link href={appRoute('App Matches.dc.html')} style={{ alignSelf: 'flex-start', height: 42, padding: '0 18px', display: 'flex', alignItems: 'center', border: `1px solid ${T.line2}`, borderRadius: 10, background: T.card, fontSize: 14.5, fontWeight: 600 }}>See all matches</Link>
                     </div>
-                  ))
-                )}
-              </div>
 
-              {/* RIGHT RAIL */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {/* PIPELINE */}
-                <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18, padding: '20px 22px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-                    <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Pipeline</h2>
-                    <Link href={appRoute('App Tracker.dc.html')} style={{ fontSize: 13, fontWeight: 600, color: '#157A49', textDecoration: 'none' }}>Track →</Link>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                      {/* Funnel */}
+                      <div style={{ padding: '20px 22px', background: T.card, border: `1px solid ${T.line}`, borderRadius: 16, display: 'flex', flexDirection: 'column', gap: 18 }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}><h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>Application funnel</h3><span style={{ flex: 1 }} /><span style={{ fontSize: 13, color: T.muted }}>Last 30 days</span></div>
+                        {funnelRows.map((f) => (
+                          <div key={f.label}>
+                            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 14 }}><span style={{ fontWeight: 600 }}>{f.label}</span><span style={{ flex: 1 }} /><span style={{ fontFamily: T.mono, fontWeight: 600 }}>{f.count}</span></div>
+                            <div style={{ height: 12, marginTop: 5, borderRadius: 4, background: 'var(--jb-a-control)', overflow: 'hidden' }}><div style={{ height: '100%', borderRadius: 4, width: f.width, minWidth: 8, background: f.color }} /></div>
+                          </div>
+                        ))}
+                        <Link href="/app/tracker" style={{ height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${T.line2}`, borderRadius: 9, fontSize: 13.5, fontWeight: 600 }}>View pipeline</Link>
+                      </div>
+
+                      {/* Search health — real snapshot from your pipeline */}
+                      <div style={{ padding: '20px 22px', background: T.card, border: `1px solid ${T.line}`, borderRadius: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                        <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>Search health</h3>
+                        <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.6, color: T.ink2 }}>
+                          {appsCount > 0
+                            ? <>You’ve applied to <strong>{appsCount}</strong> role{appsCount === 1 ? '' : 's'}, with a <strong>{responseRate}</strong> response rate and <strong>{interviewsCount}</strong> in the interview stage. Keep applying to strong-fit roles to improve your odds.</>
+                            : <>No applications yet. Set your preferences and start applying — your response rate and pipeline health will show up here.</>}
+                        </p>
+                        <span style={{ fontSize: 12.5, color: T.muted }}>Based on your activity, not guarantees.</span>
+                      </div>
+
+                      {/* Recent activity (dark) */}
+                      <div style={{ padding: '20px 22px', background: T.dark, border: `1px solid ${T.darkLine}`, borderRadius: 16, display: 'flex', flexDirection: 'column', gap: 16, color: T.darkText }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}><h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--jb-a-header)' }}>Recent activity</h3></div>
+                        {hasActivity ? (
+                          overnight.map((a, i) => (
+                            <div key={i} style={{ display: 'flex', gap: 10, fontSize: 14 }}><span aria-hidden style={{ color: a.accent }}>{a.glyph}</span><span style={{ flex: 1 }}>{a.line}</span></div>
+                          ))
+                        ) : (
+                          <div style={{ fontSize: 14, color: T.darkMuted, lineHeight: 1.55 }}>No activity yet. Applications you send will show up here.</div>
+                        )}
+                        <Link href="/app/tracker" style={{ height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid var(--jb-a-ink-muted)`, borderRadius: 10, color: T.darkText, fontSize: 14, fontWeight: 600 }}>Open full activity log</Link>
+                      </div>
+                    </div>
                   </div>
-                  {pipeline.map((p, i) => (
-                    <div key={p.stage + i} style={{ marginBottom: 15 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                        <span style={{ fontSize: 13.5, fontWeight: 600, color: '#46413A' }}>{p.stage}</span>
-                        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 13, fontWeight: 600 }}>{p.count}</span>
-                      </div>
-                      <div style={{ height: 6, borderRadius: 999, background: '#F2ECE0', overflow: 'hidden' }}>
-                        <div style={{ width: p.pct, height: '100%', background: p.color }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
 
-                {/* NEXT INTERVIEW */}
-                <div style={{ position: 'relative', overflow: 'hidden', background: '#15140F', borderRadius: 18, padding: 22, color: '#F2EDE2' }}>
-                  <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 90% 0%, rgba(31,164,99,0.3), transparent 60%)', pointerEvents: 'none' }} />
-                  <div style={{ position: 'relative' }}>
-                    <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#5BD08C', marginBottom: 14 }}>Next up · in 2 days</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-                      <span style={{ width: 42, height: 42, flexShrink: 0, borderRadius: 11, background: '#EAF6EE', color: '#157A49', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 15 }}>St</span>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: 15, color: '#FBF8F1' }}>Sr. Product Designer</div>
-                        <div style={{ fontSize: 12.5, color: '#9A9286' }}>Stripe · Final round</div>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: 13, color: '#B8B1A4', marginBottom: 18 }}>Mon, Jun 29 · 2:00 PM with the design team.</div>
-                    <Link href={appRoute('App Interview.dc.html')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#1FA463', color: '#0C2C1C', fontSize: 14, fontWeight: 700, padding: 12, borderRadius: 999, textDecoration: 'none' }}>Prep with AI →</Link>
-                  </div>
-                </div>
-              </div>
-            </div>
+                  {busy && (
+                    <div style={{ fontSize: 13, color: T.muted, fontFamily: T.mono }}>Refreshing your data…</div>
+                  )}
+              </>
 
-            {/* AUTO-APPLY ACTIVITY */}
-            <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18, marginTop: 14, overflow: 'hidden' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 22px', borderBottom: '1px solid #EEE7D9' }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                  <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Overnight auto-apply activity</h2>
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#1FA463' }}>● {activity.length} sent</span>
-                </div>
-                <Link href={appRoute('App Auto-Apply.dc.html')} style={{ fontSize: 13.5, fontWeight: 600, color: '#157A49', textDecoration: 'none' }}>View queue →</Link>
-              </div>
-              {activity.length === 0 ? (
-                <div style={{ padding: '34px 22px', textAlign: 'center', fontSize: 13.5, color: '#8A8378' }}>No auto-apply activity yet.</div>
-              ) : (
-                <div className="jb-activity" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 1, background: '#F2ECE0' }}>
-                  {activity.map((a, i) => (
-                    <div key={a.role + i} style={{ background: '#FFFEFB', padding: '16px 22px', display: 'flex', alignItems: 'center', gap: 13 }}>
-                      <span style={{ width: 36, height: 36, flexShrink: 0, borderRadius: 9, background: a.bg, color: a.fg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13 }}>{a.logo}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: 13.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.role}</div>
-                        <div style={{ fontSize: 12, color: '#8A8378' }}>{a.company} · {a.time}</div>
-                      </div>
-                      <span style={{ flexShrink: 0, fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, fontWeight: 600, color: '#157A49', background: '#EAF6EE', padding: '4px 9px', borderRadius: 999 }}>✓ Sent</span>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
-        </main>
+        </div>
       </div>
     </>
   );

@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import SiteNav from '@/components/site/SiteNav';
-import SiteFooter from '@/components/site/SiteFooter';
+import PublicLayout from '@/components/layout/PublicLayout';
 
 const DOC_DATA = {
   terms: {
@@ -209,12 +208,6 @@ export default function LegalDoc() {
     <>
       <Head>
         <title>{cur.title} — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
       <style jsx global>{`
@@ -225,12 +218,12 @@ export default function LegalDoc() {
           box-sizing: border-box;
         }
         #emkt ::selection {
-          background: #1fa463;
+          background: var(--jb-d-accent);
           color: #f7f3ea;
         }
         #emkt .legal-toc-link:hover {
-          color: #157a49 !important;
-          border-left-color: #1fa463 !important;
+          color: var(--jb-d-accent) !important;
+          border-left-color: var(--jb-d-accent) !important;
         }
         #emkt .legal-contact-link:hover {
           text-decoration: underline !important;
@@ -240,18 +233,16 @@ export default function LegalDoc() {
       <div
         id="emkt"
         style={{
-          fontFamily: "'Hanken Grotesk', sans-serif",
-          color: '#1B1A16',
-          background: '#F7F3EA',
+          fontFamily: 'var(--jb-font-sans)',
+          color: 'var(--jb-d-ink)',
+          background: 'transparent',
           WebkitFontSmoothing: 'antialiased',
         }}
       >
-        <div style={{ position: 'sticky', top: 0, zIndex: 50, display: 'block' }}>
-          <SiteNav />
-        </div>
+        <PublicLayout>
 
         {/* DOC SWITCHER */}
-        <div style={{ borderBottom: '1px solid #E7E0D2', background: '#F7F3EA' }}>
+        <div style={{ borderBottom: '1px solid var(--jb-d-line-card)', background: 'transparent' }}>
           <div
             style={{
               maxWidth: 1100,
@@ -265,11 +256,11 @@ export default function LegalDoc() {
           >
             <span
               style={{
-                fontFamily: "'JetBrains Mono',monospace",
-                fontSize: 10.5,
+                fontFamily: 'var(--jb-font-mono)',
+                fontSize: 11,
                 letterSpacing: '0.1em',
                 textTransform: 'uppercase',
-                color: '#9A9286',
+                color: 'var(--jb-d-ink-55)',
                 marginRight: 6,
               }}
             >
@@ -285,8 +276,8 @@ export default function LegalDoc() {
                     fontFamily: 'inherit',
                     fontSize: 13,
                     fontWeight: 600,
-                    color: on ? '#0C2C1C' : '#46413A',
-                    background: on ? '#1FA463' : '#FFFEFB',
+                    color: on ? 'var(--jb-d-bg)' : 'var(--jb-d-ink-85)',
+                    background: on ? 'var(--jb-d-accent)' : 'var(--jb-d-panel)',
                     border: `1px solid ${on ? '#1FA463' : '#E1D9C9'}`,
                     borderRadius: 999,
                     padding: '7px 15px',
@@ -315,11 +306,11 @@ export default function LegalDoc() {
           <nav style={{ position: 'sticky', top: 96 }}>
             <div
               style={{
-                fontFamily: "'JetBrains Mono',monospace",
-                fontSize: 10,
+                fontFamily: 'var(--jb-font-mono)',
+                fontSize: 11,
                 letterSpacing: '0.1em',
                 textTransform: 'uppercase',
-                color: '#9A9286',
+                color: 'var(--jb-d-ink-55)',
                 marginBottom: 14,
               }}
             >
@@ -330,7 +321,7 @@ export default function LegalDoc() {
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 2,
-                borderLeft: '1px solid #E1D9C9',
+                borderLeft: '1px solid var(--jb-d-line-card)',
               }}
             >
               {cur.sections.map((s) => (
@@ -341,7 +332,7 @@ export default function LegalDoc() {
                   style={{
                     fontSize: 13.5,
                     lineHeight: 1.4,
-                    color: '#5A544A',
+                    color: 'var(--jb-d-ink-70)',
                     textDecoration: 'none',
                     padding: '7px 0 7px 16px',
                     marginLeft: -1,
@@ -358,11 +349,11 @@ export default function LegalDoc() {
           <article>
             <div
               style={{
-                fontFamily: "'JetBrains Mono',monospace",
+                fontFamily: 'var(--jb-font-mono)',
                 fontSize: 11,
                 letterSpacing: '0.08em',
                 textTransform: 'uppercase',
-                color: '#1FA463',
+                color: 'var(--jb-d-accent)',
                 marginBottom: 12,
               }}
             >
@@ -370,24 +361,24 @@ export default function LegalDoc() {
             </div>
             <h1
               style={{
-                fontFamily: "'Instrument Serif',serif",
+                fontFamily: 'var(--jb-font-display)',
                 fontWeight: 400,
-                fontSize: 44,
+                fontSize: 'clamp(26px, 5vw, 44px)',
                 lineHeight: 1.05,
                 margin: '0 0 10px',
               }}
             >
               {cur.title}
             </h1>
-            <p style={{ fontSize: 14, color: '#8A8378', margin: '0 0 8px' }}>{cur.intro}</p>
+            <p style={{ fontSize: 14, color: 'var(--jb-d-ink-65)', margin: '0 0 8px' }}>{cur.intro}</p>
             <div
               style={{
-                fontFamily: "'JetBrains Mono',monospace",
+                fontFamily: 'var(--jb-font-mono)',
                 fontSize: 12,
-                color: '#A79E8F',
+                color: 'var(--jb-d-ink-55)',
                 paddingBottom: 28,
                 marginBottom: 8,
-                borderBottom: '1px solid #E7E0D2',
+                borderBottom: '1px solid var(--jb-d-line-card)',
               }}
             >
               Last updated · {cur.updated}
@@ -397,7 +388,7 @@ export default function LegalDoc() {
               <section key={s.id} id={s.id} style={{ paddingTop: 24, marginBottom: 8 }}>
                 <h2
                   style={{
-                    fontFamily: "'Instrument Serif',serif",
+                    fontFamily: 'var(--jb-font-display)',
                     fontWeight: 400,
                     fontSize: 26,
                     lineHeight: 1.15,
@@ -426,20 +417,20 @@ export default function LegalDoc() {
               style={{
                 marginTop: 32,
                 padding: 22,
-                background: '#FFFEFB',
-                border: '1px solid #E6DECF',
+                background: 'var(--jb-d-panel)',
+                border: '1px solid var(--jb-d-line-card)',
                 borderRadius: 14,
               }}
             >
               <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 5 }}>
                 Questions about this document?
               </div>
-              <p style={{ fontSize: 13.5, lineHeight: 1.55, color: '#5A544A', margin: 0 }}>
+              <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--jb-d-ink-70)', margin: 0 }}>
                 Contact{' '}
                 <a
                   href="mailto:legal@jobocate.com"
                   className="legal-contact-link"
-                  style={{ color: '#157A49', fontWeight: 600, textDecoration: 'none' }}
+                  style={{ color: 'var(--jb-d-accent)', fontWeight: 600, textDecoration: 'none' }}
                 >
                   legal@jobocate.com
                 </a>{' '}
@@ -449,7 +440,7 @@ export default function LegalDoc() {
           </article>
         </div>
 
-        <SiteFooter />
+        </PublicLayout>
       </div>
     </>
   );

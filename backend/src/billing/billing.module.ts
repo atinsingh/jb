@@ -13,6 +13,7 @@ import {
   UserSubscriptionSchema,
 } from '../schemas/user-subscription.schema';
 import { UsageRecord, UsageRecordSchema } from '../schemas/usage-record.schema';
+import { EmployerBillingModule } from '../employer-billing/employer-billing.module';
 
 @Module({
   imports: [
@@ -23,6 +24,10 @@ import { UsageRecord, UsageRecordSchema } from '../schemas/usage-record.schema';
       { name: UsageRecord.name, schema: UsageRecordSchema },
     ]),
     ConfigModule,
+    // Supplies EmployerBillingService so the shared webhook endpoint can route
+    // employer-tagged Stripe events. EmployerBillingModule does not import this
+    // module back, so there is no cycle.
+    EmployerBillingModule,
   ],
   controllers: [BillingController],
   providers: [BillingService],

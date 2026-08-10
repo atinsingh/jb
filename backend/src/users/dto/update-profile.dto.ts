@@ -17,6 +17,16 @@ export class UpdateProfileDto {
   @IsOptional()
   location?: string;
 
+  @ApiProperty({ description: 'Short professional headline', required: false })
+  @IsString()
+  @IsOptional()
+  headline?: string;
+
+  @ApiProperty({ description: 'LinkedIn profile URL', required: false })
+  @IsString()
+  @IsOptional()
+  linkedin?: string;
+
   @ApiProperty({ description: 'Professional summary', required: false })
   @IsString()
   @IsOptional()

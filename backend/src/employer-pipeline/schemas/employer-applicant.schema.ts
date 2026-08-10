@@ -1,17 +1,17 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 
 export type EmployerApplicantDocument = EmployerApplicant & Document;
 
 @Schema({ timestamps: true })
 export class EmployerApplicant {
-  @Prop({ type: Types.ObjectId, ref: 'EmployerJob', required: true, index: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'EmployerJob', required: true, index: true })
   jobId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'User', index: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', index: true })
   ownerId?: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'User', required: false })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: false })
   candidateId?: Types.ObjectId;
 
   @Prop({ default: '' })
@@ -73,3 +73,11 @@ export const EmployerApplicantSchema =
 
 EmployerApplicantSchema.index({ ownerId: 1, jobId: 1 });
 EmployerApplicantSchema.index({ ownerId: 1, stage: 1 });
+
+// Idempotency for the candidate-apply bridge: one applicant per (job, candidate).
+// Partial so employer manual-adds without a linked candidateId are never subject
+// to the uniqueness constraint (and don't collide on a null candidateId).
+EmployerApplicantSchema.index(
+  { jobId: 1, candidateId: 1 },
+  { unique: true, partialFilterExpression: { candidateId: { $exists: true } } },
+);

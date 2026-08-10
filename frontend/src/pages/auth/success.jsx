@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/context/AuthContext';
 
@@ -6,8 +6,15 @@ const AuthSuccess = () => {
   const router = useRouter();
   const { setAuthData } = useAuth();
   const [message, setMessage] = useState({ title: 'Completing sign in...', subtitle: 'Please wait...' });
+  // Guard so the OAuth token is processed exactly once. Without this the effect
+  // re-runs on every router change (router.replace mutates the router object),
+  // re-entering with no token in the URL and looping on the redirect.
+  const processedRef = useRef(false);
 
   useEffect(() => {
+    if (processedRef.current) return;
+    processedRef.current = true;
+
     const processAuth = async () => {
       console.log('🔵 [Auth Success] Page loaded');
       console.log('🔵 [Auth Success] Full URL:', window.location.href);
@@ -166,7 +173,11 @@ const AuthSuccess = () => {
     };
   
     processAuth();
-  }, [router, setAuthData]);
+    // Run once on mount only. Depending on `router` would re-fire this effect
+    // on the post-login navigation and loop. router/setAuthData are stable
+    // enough to use via closure here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-white to-purple-50">

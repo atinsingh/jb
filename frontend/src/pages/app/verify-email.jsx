@@ -12,10 +12,6 @@ import {
   resendVerificationCode,
 } from '@/services/verifyEmailApi';
 
-// Design's own sample data — rendered faithfully when unauthenticated or on error.
-const SAMPLE_EMAIL = 'sarah.chen@gmail.com';
-const SAMPLE_NAME = 'Sarah';
-
 export default function AppVerifyEmail() {
   const router = useRouter();
   const { user } = useAuth();
@@ -24,8 +20,8 @@ export default function AppVerifyEmail() {
   const [verified, setVerified] = useState(false);
   const [checking, setChecking] = useState(false);
   const [cooldown, setCooldown] = useState(0);
-  const [email, setEmail] = useState(SAMPLE_EMAIL);
-  const [name, setName] = useState(SAMPLE_NAME);
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
 
   const boxRefs = useRef([]);
   const verifyTimer = useRef(null);
@@ -46,7 +42,7 @@ export default function AppVerifyEmail() {
         if (!cancelled && u?.email) setEmail(u.email);
         if (!cancelled && u?.name) setName(String(u.name).split(' ')[0]);
       } catch {
-        // Unauthenticated or backend offline — keep sample/auth values.
+        // Unauthenticated or backend offline — keep whatever auth already knows.
       }
     })();
 
@@ -129,7 +125,6 @@ export default function AppVerifyEmail() {
   };
 
   const pending = !verified;
-  const idleHint = !checking;
   const canResend = cooldown === 0;
   const cooling = cooldown > 0;
 
@@ -137,12 +132,6 @@ export default function AppVerifyEmail() {
     <>
       <Head>
         <title>Verify your email — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
       <style jsx global>{`
@@ -176,7 +165,7 @@ export default function AppVerifyEmail() {
         style={{
           minHeight: '100vh',
           background: '#F7F3EA',
-          fontFamily: "'Hanken Grotesk',sans-serif",
+          fontFamily: 'var(--jb-font-sans)',
           color: '#1B1A16',
           display: 'flex',
           flexDirection: 'column',
@@ -191,7 +180,7 @@ export default function AppVerifyEmail() {
         >
           <span
             style={{
-              fontFamily: "'Bricolage Grotesque',sans-serif",
+              fontFamily: 'var(--jb-font-display)',
               fontWeight: 800,
               letterSpacing: '-0.02em',
               fontSize: 24,
@@ -235,7 +224,7 @@ export default function AppVerifyEmail() {
               </div>
               <h1
                 style={{
-                  fontFamily: "'Instrument Serif',serif",
+                  fontFamily: 'var(--jb-font-display)',
                   fontWeight: 400,
                   fontSize: 32,
                   lineHeight: 1.06,
@@ -245,8 +234,8 @@ export default function AppVerifyEmail() {
                 Verify your email
               </h1>
               <p style={{ fontSize: 14.5, lineHeight: 1.55, color: '#5A544A', margin: '0 0 28px' }}>
-                We sent a 6-digit code to <b style={{ color: '#1B1A16' }}>{email}</b>. Enter it below to confirm
-                it&apos;s you.
+                We sent a 6-digit code to <b style={{ color: '#1B1A16' }}>{email || 'your email'}</b>. Enter it
+                below to confirm it&apos;s you.
               </p>
 
               <div style={{ display: 'flex', gap: 9, justifyContent: 'center', marginBottom: 10 }}>
@@ -265,7 +254,7 @@ export default function AppVerifyEmail() {
                       width: 52,
                       height: 62,
                       textAlign: 'center',
-                      fontFamily: "'JetBrains Mono',monospace",
+                      fontFamily: 'var(--jb-font-mono)',
                       fontSize: 24,
                       fontWeight: 600,
                       color: '#1B1A16',
@@ -292,19 +281,6 @@ export default function AppVerifyEmail() {
                   Verifying…
                 </div>
               )}
-              {idleHint && (
-                <div
-                  style={{
-                    fontFamily: "'JetBrains Mono',monospace",
-                    fontSize: 11,
-                    color: '#A79E8F',
-                    marginBottom: 16,
-                  }}
-                >
-                  Demo · enter any 6 digits
-                </div>
-              )}
-
               <button
                 onClick={openMail}
                 style={{
@@ -348,7 +324,7 @@ export default function AppVerifyEmail() {
                   </button>
                 )}
                 {cooling && (
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", color: '#A79E8F' }}>
+                  <span style={{ fontFamily: 'var(--jb-font-mono)', color: '#A79E8F' }}>
                     Resend in {cooldown}s
                   </span>
                 )}
@@ -385,7 +361,7 @@ export default function AppVerifyEmail() {
               </div>
               <h1
                 style={{
-                  fontFamily: "'Instrument Serif',serif",
+                  fontFamily: 'var(--jb-font-display)',
                   fontWeight: 400,
                   fontSize: 34,
                   lineHeight: 1.05,
@@ -395,7 +371,7 @@ export default function AppVerifyEmail() {
                 Email verified.
               </h1>
               <p style={{ fontSize: 15, lineHeight: 1.55, color: '#5A544A', margin: '0 0 28px' }}>
-                You&apos;re all set, {name}. Let&apos;s get your search running.
+                You&apos;re all set{name ? `, ${name}` : ''}. Let&apos;s get your search running.
               </p>
               <Link
                 href={appRoute('App Dashboard.dc.html')}
@@ -422,7 +398,7 @@ export default function AppVerifyEmail() {
 
         <div
           style={{
-            fontFamily: "'JetBrains Mono',monospace",
+            fontFamily: 'var(--jb-font-mono)',
             fontSize: 11,
             color: '#A79E8F',
             marginTop: 26,

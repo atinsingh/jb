@@ -1,14 +1,16 @@
-import { Injectable, NotFoundException, Logger, ConflictException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, ConflictException, ForbiddenException, Inject, forwardRef, Optional } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
+import { QUEUE_PDF, JOB_GENERATE_PDF } from '../queue/queue.constants';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Resume, ResumeDocument } from '../schemas/resume.schema';
 import { User, UserDocument } from '../schemas/user.schema';
-import { AiProviderService } from '../ai-services/ai-provider.service';
+import { LLMRoutingService, LLMFeature } from '../llm/llm-routing.service';
 import { ResumeParserService } from '../resume/resume-parser.service';
 import { ResumeService } from '../resume/resume.service';
 import { CreateResumeDto, RegenerateSectionDto } from './dto/create-resume.dto';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import { StorageService } from '../storage';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { ResumeVersion, ResumeVersionDocument } from '../schemas/resume-version.schema';
 import { ShareLink, ShareLinkDocument } from '../schemas/share-link.schema';
@@ -16,11 +18,19 @@ import { UpdateResumeDto, CreateShareLinkDto } from './dto/resume-operations.dto
 import { v4 as uuidv4 } from 'uuid';
 import * as bcrypt from 'bcryptjs';
 import { JwtService } from '@nestjs/jwt';
+import { HtmlSanitizerService } from '../ingestion/pipeline/html-sanitizer.service';
 
 @Injectable()
 export class ResumeBuilderService {
   private readonly logger = new Logger(ResumeBuilderService.name);
-  private readonly uploadsDir = path.join(process.cwd(), 'uploads', 'resumes');
+
+  // Resume fields that the preview components render as raw HTML
+  // (dangerouslySetInnerHTML). These are the stored-XSS sinks and must be
+  // sanitized on every write. Scalar fields plus per-item fields inside the
+  // experience/education/projects arrays.
+  private static readonly HTML_SCALAR_FIELDS = ['summary', 'profileSummary'];
+  private static readonly HTML_ARRAY_FIELDS = ['experience', 'education', 'projects'];
+  private static readonly HTML_ITEM_FIELDS = ['description', 'responsibilities', 'desc'];
 
   constructor(
     @InjectModel(Resume.name)
@@ -31,19 +41,51 @@ export class ResumeBuilderService {
     private resumeVersionModel: Model<ResumeVersionDocument>,
     @InjectModel(ShareLink.name)
     private shareLinkModel: Model<ShareLinkDocument>,
-    private aiProviderService: AiProviderService,
+    private readonly llmRoutingService: LLMRoutingService,
     private resumeParserService: ResumeParserService,
     private jwtService: JwtService,
-  ) {
-    this.ensureUploadsDirectory();
-  }
+    private readonly storageService: StorageService,
+    private readonly htmlSanitizer: HtmlSanitizerService,
+    // Background PDF queue. `@Optional()` → undefined when QUEUE_ENABLED !== 'true'
+    // (queue not registered), which is the signal to run generation inline.
+    @Optional() @InjectQueue(QUEUE_PDF) private readonly pdfQueue?: Queue,
+  ) {}
 
-  private async ensureUploadsDirectory() {
-    try {
-      await fs.mkdir(this.uploadsDir, { recursive: true });
-    } catch (error) {
-      this.logger.error('Failed to create uploads directory:', error);
+  /**
+   * Strip scripts/handlers from the rich-text fields a resume renders as raw
+   * HTML. Mutates and returns the given payload in place. Called from every
+   * write path (create/update/autosave/import) so a malicious `<img onerror>`
+   * can never reach the preview page, the PDF renderer, or a public share link.
+   */
+  private sanitizeResumeHtml<T extends Record<string, any>>(data: T): T {
+    if (!data || typeof data !== 'object') return data;
+
+    for (const field of ResumeBuilderService.HTML_SCALAR_FIELDS) {
+      if (typeof data[field] === 'string') {
+        (data as any)[field] = this.htmlSanitizer.sanitize(data[field]);
+      }
     }
+
+    for (const field of ResumeBuilderService.HTML_ARRAY_FIELDS) {
+      if (Array.isArray(data[field])) {
+        (data as any)[field] = data[field].map((item: any) => {
+          if (!item || typeof item !== 'object') return item;
+          for (const key of ResumeBuilderService.HTML_ITEM_FIELDS) {
+            if (typeof item[key] === 'string') {
+              item[key] = this.htmlSanitizer.sanitize(item[key]);
+            }
+          }
+          if (Array.isArray(item.achievements)) {
+            item.achievements = item.achievements.map((a: any) =>
+              typeof a === 'string' ? this.htmlSanitizer.sanitize(a) : a,
+            );
+          }
+          return item;
+        });
+      }
+    }
+
+    return data;
   }
 
   async findAll(userId: string): Promise<ResumeDocument[]> {
@@ -93,7 +135,7 @@ export class ResumeBuilderService {
       };
     }
 
-    const resume = new this.resumeModel(resumeData);
+    const resume = new this.resumeModel(this.sanitizeResumeHtml(resumeData));
     return resume.save();
   }
 
@@ -108,10 +150,10 @@ export class ResumeBuilderService {
     }
 
     // Parse uploaded resume
-    const parseResult = await this.resumeParserService.parseResume(file);
+    const parseResult = await this.resumeParserService.parseResume(file, userId);
 
     // Create resume from parsed data
-    const resume = new this.resumeModel({
+    const resume = new this.resumeModel(this.sanitizeResumeHtml({
       userId: new Types.ObjectId(userId),
       template,
       name: `Resume - ${parseResult.parsedData.name || 'Imported'}`,
@@ -122,18 +164,103 @@ export class ResumeBuilderService {
       skills: parseResult.parsedData.skills || [],
       experience: parseResult.parsedData.experience || [],
       education: parseResult.parsedData.education || [],
-    });
+    }));
 
     return resume.save();
+  }
+
+  // Section fields the importer is allowed to persist onto a resume.
+  private static readonly IMPORT_SECTION_KEYS = [
+    'fullName', 'email', 'phone', 'location', 'website', 'linkedin', 'github',
+    'summary', 'profileSummary', 'skills', 'experience', 'education',
+    'certifications', 'projects', 'languages', 'customSections',
+  ];
+
+  /**
+   * Create a resume from already-parsed structured data plus the original
+   * file's source metadata. Powers the "Keep Original Format" / "Rewrite with
+   * AI" import modes — the resume then appears in the library with filename,
+   * format, size and import date.
+   */
+  async importResume(userId: string, body: any): Promise<ResumeDocument> {
+    const user = await this.userModel.findById(userId).exec();
+    if (!user) throw new NotFoundException('User not found');
+
+    const defaultName = body?.source?.originalFilename
+      ? String(body.source.originalFilename).replace(/\.[^.]+$/, '')
+      : 'Imported Resume';
+
+    const data: any = {
+      userId: new Types.ObjectId(userId),
+      template: body.template || 'modern',
+      name: body.name || defaultName,
+      creationMethod: body.importMode === 'ai_rewrite' ? 'ai_rewrite' : 'imported',
+      status: body.status || 'needs_review',
+      targetRole: body.targetRole,
+      targetCompany: body.targetCompany,
+      tags: Array.isArray(body.tags) ? body.tags : [],
+      source: body.source
+        ? {
+            ...body.source,
+            importedAt: body.source.importedAt ? new Date(body.source.importedAt) : new Date(),
+            importMode: body.importMode || body.source.importMode || 'keep_format',
+          }
+        : null,
+    };
+
+    for (const k of ResumeBuilderService.IMPORT_SECTION_KEYS) {
+      if (body[k] !== undefined) data[k] = body[k];
+    }
+
+    const resume = new this.resumeModel(this.sanitizeResumeHtml(data));
+    const saved = await resume.save();
+    if (body.isPrimary) return this.setPrimary(saved._id.toString(), userId);
+    return saved;
+  }
+
+  /** Clone a resume into a brand-new, independent resume (own version history). */
+  async duplicate(id: string, userId: string, name?: string): Promise<ResumeDocument> {
+    const src = await this.findOne(id, userId);
+    const obj: any = src.toObject();
+    ['_id', '__v', 'createdAt', 'updatedAt', 'publicUrl', 'isPublic', 'pdfUrl', 'pdfPath'].forEach(
+      (k) => delete obj[k],
+    );
+    obj.name = name || `${src.name} (copy)`;
+    obj.version = 1;
+    obj.isPrimary = false;
+    obj.creationMethod = 'duplicate';
+    obj.sourceResumeId = src._id;
+    obj.archivedAt = undefined;
+    if (obj.status === 'archived') obj.status = 'draft';
+    const copy = new this.resumeModel(obj);
+    return copy.save();
+  }
+
+  /** Mark one resume primary and clear the flag on all the user's others. */
+  async setPrimary(id: string, userId: string): Promise<ResumeDocument> {
+    const uid = new Types.ObjectId(userId);
+    await this.resumeModel.updateMany({ userId: uid }, { $set: { isPrimary: false } }).exec();
+    const resume = await this.resumeModel
+      .findOneAndUpdate({ _id: id, userId: uid }, { $set: { isPrimary: true } }, { new: true })
+      .exec();
+    if (!resume) throw new NotFoundException('Resume not found');
+    return resume;
   }
 
   async update(id: string, userId: string, updates: Partial<Resume>): Promise<ResumeDocument> {
     const resume = await this.findOne(id, userId);
 
+    // Keep archivedAt in sync with the status field for library filtering.
+    if ((updates as any).status === 'archived' && !resume.archivedAt) {
+      (updates as any).archivedAt = new Date();
+    } else if ((updates as any).status && (updates as any).status !== 'archived') {
+      (updates as any).archivedAt = undefined;
+    }
+
     // Prevent direct version manipulation via generic update
     delete updates.version;
 
-    Object.assign(resume, updates);
+    Object.assign(resume, this.sanitizeResumeHtml(updates as any));
     return resume.save();
   }
 
@@ -151,7 +278,7 @@ export class ResumeBuilderService {
 
     if (updateDto.content) {
       // Update each field present in content
-      Object.assign(resume, updateDto.content);
+      Object.assign(resume, this.sanitizeResumeHtml(updateDto.content as any));
     }
 
     // Increment version
@@ -231,7 +358,15 @@ export class ResumeBuilderService {
     shareLink.views += 1;
     await shareLink.save();
 
-    return this.resumeModel.findById(shareLink.resumeId).exec();
+    // Sanitize on read too: resumes created before write-sanitization landed may
+    // still hold raw HTML, and this is the one endpoint that serves them to an
+    // unauthenticated audience. Return a lean object so we don't persist over
+    // the stored doc here.
+    const resume = await this.resumeModel.findById(shareLink.resumeId).lean().exec();
+    if (!resume) {
+      throw new NotFoundException('Resume not found or link expired');
+    }
+    return this.sanitizeResumeHtml(resume) as unknown as ResumeDocument;
   }
 
   async regenerateSection(
@@ -309,46 +444,35 @@ Provide enhanced education entries with:
     const prompt = sectionPrompts[regenerateDto.section] || `Generate content for the ${regenerateDto.section} section based on the candidate's profile.`;
 
     try {
-      const openai = (this.aiProviderService as any).openai;
-      const anthropic = (this.aiProviderService as any).anthropic;
-      const provider = (this.aiProviderService as any).provider || 'openai';
+      // Route through the modern llm/ stack using the REWRITE_BULLETS feature
+      // config. `getProviderForFeature` returns the configured provider (or
+      // MockProvider when no API key is present).
+      const provider = this.llmRoutingService.getProviderForFeature(
+        LLMFeature.REWRITE_BULLETS,
+      );
+      const config = this.llmRoutingService.getFeatureConfig(
+        LLMFeature.REWRITE_BULLETS,
+      );
 
-      let response: any;
+      const response = await provider.chat({
+        messages: [
+          {
+            role: 'system',
+            content: `You are a professional resume writer. Generate optimized, ATS-friendly content for resume sections. Return only the content, no explanations.`,
+          },
+          { role: 'user', content: prompt },
+        ],
+        model: config.model,
+        temperature: config.temperature,
+        maxTokens: config.maxTokens,
+      });
 
-      if (provider === 'openai' && openai) {
-        response = await openai.chat.completions.create({
-          model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content: `You are a professional resume writer. Generate optimized, ATS-friendly content for resume sections. Return only the content, no explanations.`,
-            },
-            { role: 'user', content: prompt },
-          ],
-          temperature: 0.7,
-          max_tokens: 1000,
-        });
-
-        if (response?.choices?.[0]?.message?.content) {
-          return response.choices[0].message.content.trim();
-        }
-      } else if (provider === 'anthropic' && anthropic) {
-        response = await anthropic.messages.create({
-          model: 'claude-3-haiku-20240307',
-          max_tokens: 1000,
-          messages: [
-            {
-              role: 'user',
-              content: `You are a professional resume writer. Generate optimized, ATS-friendly content for resume sections. Return only the content, no explanations.\n\n${prompt}`,
-            },
-          ],
-        });
-
-        if (response?.content?.[0]?.text) {
-          return response.content[0].text.trim();
-        }
+      if (response?.content) {
+        return response.content.trim();
       }
 
+      // Preserve the prior behavior of hard-failing when nothing usable comes
+      // back (this flow has no soft fallback).
       throw new Error('AI generation failed');
     } catch (error) {
       this.logger.error(`Error regenerating ${regenerateDto.section}:`, error);
@@ -454,14 +578,14 @@ Provide enhanced education entries with:
       await browser.close();
       browser = null;
 
-      // Save PDF
-      const filename = `resume-${resume._id}-${Date.now()}.pdf`;
-      const filepath = path.join(this.uploadsDir, filename);
+      // Persist PDF via the storage abstraction and return its storage key.
+      const key = `resumes/${resume._id}/${Date.now()}.pdf`;
+      await this.storageService.put(key, Buffer.from(pdfBuffer), {
+        contentType: 'application/pdf',
+      });
+      this.logger.debug(`PDF saved to storage key: ${key}`);
 
-      await fs.writeFile(filepath, pdfBuffer);
-      this.logger.debug(`PDF saved to: ${filepath}`);
-
-      return filepath;
+      return key;
     } catch (error) {
       if (browser) {
         try {
@@ -486,9 +610,9 @@ Provide enhanced education entries with:
 
     if (resume.pdfPath) {
       try {
-        await fs.unlink(resume.pdfPath);
+        await this.storageService.delete(resume.pdfPath);
       } catch (error) {
-        this.logger.warn(`Failed to delete PDF file: ${resume.pdfPath}`, error);
+        this.logger.warn(`Failed to delete PDF object: ${resume.pdfPath}`, error);
       }
     }
 
@@ -506,6 +630,41 @@ Provide enhanced education entries with:
     }
 
     return resume.pdfPath;
+  }
+
+  /**
+   * Full inline PDF work: render via Puppeteer, persist the storage key + pdfUrl
+   * on the resume doc, and save. Called directly by the inline fallback and by
+   * the Bull processor when queues are enabled.
+   */
+  async generateAndPersistPdf(
+    resumeId: string,
+    userId: string,
+  ): Promise<{ pdfUrl: string; pdfPath: string }> {
+    const resume = await this.findOne(resumeId, userId);
+    const pdfPath = await this.generatePDF(resume, userId);
+    resume.pdfPath = pdfPath;
+    resume.pdfUrl = `/api/resume-builder/${resume._id}/pdf`;
+    await resume.save();
+    return { pdfUrl: resume.pdfUrl, pdfPath };
+  }
+
+  /**
+   * Producer for the `POST :id/generate-pdf` route.
+   * - Queue registered (QUEUE_ENABLED=true) → enqueue and return { queued, jobId }.
+   *   The processor persists pdfPath/pdfUrl; the frontend keeps polling GET :id/pdf.
+   * - No queue (@Optional undefined, dev default) → run inline, identical to before.
+   */
+  async requestPdfGeneration(
+    resumeId: string,
+    userId: string,
+  ): Promise<{ queued: boolean; jobId?: string | number; pdfUrl?: string; message: string }> {
+    if (this.pdfQueue) {
+      const job = await this.pdfQueue.add(JOB_GENERATE_PDF, { resumeId, userId });
+      return { queued: true, jobId: job.id, message: 'PDF generation queued' };
+    }
+    const { pdfUrl } = await this.generateAndPersistPdf(resumeId, userId);
+    return { queued: false, pdfUrl, message: 'PDF generated successfully' };
   }
 }
 

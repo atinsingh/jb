@@ -2,6 +2,14 @@
 
 AI-powered job search application with Google and LinkedIn OAuth authentication.
 
+## 📖 Developer documentation (start here)
+
+These are the current, authoritative docs — trust them over the older scattered `*.md` files where they conflict:
+
+- **[docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md)** — architecture, how to run, env vars, the backend/frontend maps, gotchas, and how to fix/extend common things.
+- **[docs/SECURITY.md](docs/SECURITY.md)** — security model, the hardening audit + fixes, and the release checklist.
+- **[docs/product/parity-gaps-spec.md](docs/product/parity-gaps-spec.md)** — competitive product roadmap (Chrome-extension autofill, referrals).
+
 ## 🚀 Quick Start with Docker
 
 **Prerequisites**: Install [Docker Desktop](https://www.docker.com/products/docker-desktop/)

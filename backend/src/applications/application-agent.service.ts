@@ -1,12 +1,16 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
 import { Model } from 'mongoose';
+import { QUEUE_AUTO_APPLY, JOB_AUTO_APPLY } from '../queue/queue.constants';
 import { Application, ApplicationDocument } from '../schemas/application.schema';
 import { User, UserDocument } from '../schemas/user.schema';
 import { Job, JobDocument } from '../schemas/job.schema';
 import { MatchingService } from '../matching/matching.service';
 import { UserPreferencesService } from '../users/user-preferences.service';
 import { ApplicationEventsService } from './application-events.service';
+import { ApplicationsService } from './applications.service';
 
 @Injectable()
 export class ApplicationAgentService {
@@ -21,10 +25,51 @@ export class ApplicationAgentService {
     private matchingService: MatchingService,
     private readonly userPreferencesService: UserPreferencesService,
     private readonly applicationEventsService: ApplicationEventsService,
+    private readonly applicationsService: ApplicationsService,
+    // Background auto-apply queue. `@Optional()` → undefined when QUEUE_ENABLED !== 'true'
+    // (dev/test default), so the producer transparently falls back to inline work.
+    @Optional() @InjectQueue(QUEUE_AUTO_APPLY) private readonly autoApplyQueue?: Queue,
   ) {
     this.autoApplicationEnabled = process.env.AUTO_APPLICATION_ENABLED === 'true';
     this.minMatchScore = parseInt(process.env.MIN_MATCH_SCORE_FOR_AUTO_APPLY || '75', 10);
     this.maxApplicationsPerDay = parseInt(process.env.MAX_APPLICATIONS_PER_DAY || '20', 10);
+  }
+
+  /**
+   * Producer for `POST /applications/auto-apply`.
+   * - Queue registered (QUEUE_ENABLED=true) → enqueue ONE batch job `{ userId, jobIds }`
+   *   and return `{ queued: true, jobId }` (202-style) so the slow per-job loop
+   *   (match calc + LLM cover-letter + pipeline bridge) runs off the request path.
+   * - No queue (@Optional undefined, dev/test default) → run inline, identical shape
+   *   to before: `{ message, applications, count }`.
+   *
+   * One job per batch (not per jobId) on purpose: `autoApply` shares per-user state
+   * across the batch — a single user lookup and the daily-application-limit counter
+   * (`maxApplicationsPerDay`). Fanning out per jobId would fragment that accounting
+   * and race the daily cap. Empty-`jobIds` validation stays in the controller so it
+   * 400s before either path.
+   */
+  async requestAutoApply(
+    userId: string,
+    jobIds: string[],
+  ): Promise<{
+    queued: boolean;
+    jobId?: string | number;
+    message: string;
+    applications?: ApplicationDocument[];
+    count?: number;
+  }> {
+    if (this.autoApplyQueue) {
+      const job = await this.autoApplyQueue.add(JOB_AUTO_APPLY, { userId, jobIds });
+      return { queued: true, jobId: job.id, message: 'Auto-application queued' };
+    }
+    const applications = await this.autoApply(userId, jobIds);
+    return {
+      queued: false,
+      message: 'Auto-application completed',
+      applications,
+      count: applications.length,
+    };
   }
 
   async autoApply(userId: string, jobIds: string[]): Promise<ApplicationDocument[]> {
@@ -120,6 +165,8 @@ export class ApplicationAgentService {
           message: `Queued ${job.title} at ${job.companyName}`,
           meta: { jobId },
         });
+        // Cross-surface bridge: mirror into the employer pipeline + notify.
+        await this.applicationsService.bridgeApplicationToPipeline(saved);
         applications.push(application);
         applicationsToday++;
 

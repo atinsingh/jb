@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { AiProviderService } from '../ai-services/ai-provider.service';
+import { MatchCalculatorService } from '../llm/features/match-calculator.service';
+import { CoverLetterGeneratorService } from '../llm/features/cover-letter-generator.service';
 
 export interface Candidate {
   skills?: string[];
@@ -28,15 +29,23 @@ export interface MatchResult {
 
 @Injectable()
 export class JobMatchingService {
-  constructor(private aiProviderService: AiProviderService) {}
+  constructor(
+    private matchCalculatorService: MatchCalculatorService,
+    private coverLetterGeneratorService: CoverLetterGeneratorService,
+  ) {}
 
-  async calculateMatch(candidate: Candidate, job: Job): Promise<MatchResult> {
+  async calculateMatch(
+    userId: string,
+    candidate: Candidate,
+    job: Job,
+  ): Promise<MatchResult> {
     try {
       const candidateSkills = candidate.skills || [];
       const jobRequirements = job.requirements?.join(', ') || 'Not specified';
       const jobDescription = job.description || '';
 
-      const matchResult = await this.aiProviderService.calculateJobMatch(
+      const matchResult = await this.matchCalculatorService.calculateMatch(
+        userId,
         candidateSkills,
         jobRequirements,
         jobDescription,
@@ -84,13 +93,14 @@ export class JobMatchingService {
   }
 
   async getRecommendations(
+    userId: string,
     candidate: Candidate,
     jobs: Job[],
     minScore: number = 60,
   ): Promise<Array<MatchResult & { job: Job }>> {
     const recommendations: Array<MatchResult & { job: Job }> = [];
     for (const job of jobs) {
-      const match = await this.calculateMatch(candidate, job);
+      const match = await this.calculateMatch(userId, candidate, job);
       if (match.matchScore >= minScore) {
         recommendations.push({ job, ...match });
       }
@@ -99,23 +109,33 @@ export class JobMatchingService {
     return recommendations;
   }
 
-  async generateCoverLetter(candidate: Candidate, job: Job): Promise<string> {
+  async generateCoverLetter(
+    userId: string,
+    candidate: Candidate,
+    job: Job,
+  ): Promise<string> {
     try {
       const candidateInfo = {
         name: candidate.name || 'Candidate',
+        email: candidate.email || '',
         skills: candidate.skills || [],
         experience: candidate.summary || '',
+        summary: candidate.summary || '',
       };
       const jobInfo = {
         title: job.title || '',
         companyName: job.companyName || '',
         description: job.description || '',
+        requirements: job.requirements || [],
       };
-      const coverLetter = await this.aiProviderService.generateCoverLetter(
+      // Map the structured generator response back to the plain-string letter
+      // the callers expect.
+      const result = await this.coverLetterGeneratorService.generateCoverLetter(
+        userId,
         candidateInfo,
         jobInfo,
       );
-      return coverLetter;
+      return result.finalLetter;
     } catch (error) {
       console.error('Cover letter generation error:', error);
       throw new Error('Failed to generate cover letter');
@@ -123,13 +143,14 @@ export class JobMatchingService {
   }
 
   async batchMatch(
+    userId: string,
     candidate: Candidate,
     jobs: Job[],
   ): Promise<Array<MatchResult & { jobId: string }>> {
     const matches: Array<MatchResult & { jobId: string }> = [];
     for (const job of jobs) {
       try {
-        const match = await this.calculateMatch(candidate, job);
+        const match = await this.calculateMatch(userId, candidate, job);
         matches.push({
           jobId: job._id?.toString() || job.id?.toString() || '',
           ...match,

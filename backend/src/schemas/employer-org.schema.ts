@@ -1,11 +1,11 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
 export type EmployerOrgDocument = EmployerOrg & Document;
 
 @Schema({ timestamps: true })
 export class EmployerOrg {
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true, unique: true, index: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true, unique: true })
   ownerId: Types.ObjectId;
 
   @Prop({ default: '' })
@@ -14,7 +14,7 @@ export class EmployerOrg {
   @Prop({
     type: [
       {
-        userId: { type: Types.ObjectId, ref: 'User' },
+        userId: { type: MongooseSchema.Types.ObjectId, ref: 'User' },
         email: String,
         name: String,
         role: {
@@ -59,4 +59,4 @@ export class EmployerOrg {
 
 export const EmployerOrgSchema = SchemaFactory.createForClass(EmployerOrg);
 
-EmployerOrgSchema.index({ ownerId: 1 }, { unique: true });
+// ownerId already has a unique index via @Prop({ unique: true }).

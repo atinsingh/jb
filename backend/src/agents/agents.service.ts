@@ -14,13 +14,10 @@ import { ApplicationsService } from '../applications/applications.service';
 import { MatchingService } from '../matching/matching.service';
 import { UpdateApplicationDto } from './dto/update-application.dto';
 import { AppLoggerService } from '../common/logger/logger.service';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import { StorageService } from '../storage';
 
 @Injectable()
 export class AgentsService {
-  private proofUploadDir: string;
-
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(JobMatch.name) private jobMatchModel: Model<JobMatchDocument>,
@@ -31,19 +28,9 @@ export class AgentsService {
     private applicationsService: ApplicationsService,
     private matchingService: MatchingService,
     private readonly logger: AppLoggerService,
+    private readonly storageService: StorageService,
   ) {
     this.logger.setContext('AgentsService');
-    this.proofUploadDir = process.env.PROOF_UPLOAD_PATH || './uploads/proof';
-    this.initializeStorage();
-  }
-
-  async initializeStorage() {
-    try {
-      await fs.mkdir(this.proofUploadDir, { recursive: true });
-      this.logger.debug('Proof upload directory initialized');
-    } catch (error) {
-      this.logger.error('Failed to create proof upload directory:', error);
-    }
   }
 
   async getCandidateProfile(
@@ -226,13 +213,18 @@ export class AgentsService {
       );
     }
 
-    // Save files and get URLs
+    // Save files via the storage abstraction and collect their served URLs.
     const proofUrls: string[] = [];
     for (const file of files) {
-      const fileName = `${applicationId}-${Date.now()}-${file.originalname}`;
-      const filePath = path.join(this.proofUploadDir, fileName);
-      await fs.writeFile(filePath, file.buffer);
-      proofUrls.push(`/uploads/proof/${fileName}`);
+      const key = `proof/${applicationId}/${Date.now()}-${file.originalname}`;
+      const { url } = await this.storageService.put(key, file.buffer);
+      // For S3 the object is private, so hand back a signed URL; for local the
+      // returned url is already publicly served at /uploads/.
+      const proofUrl =
+        this.storageService.getDriverName() === 's3'
+          ? await this.storageService.getSignedUrl(key)
+          : url;
+      proofUrls.push(proofUrl);
     }
 
     // Update application with proof documents

@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Navbar } from '../../components/navbar';
-import { Footer } from '../../components/footer';
+import PublicLayout from '@/components/layout/PublicLayout';
+import { API_URL } from '@/config/api';
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -14,15 +14,43 @@ const Contact = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [error, setError] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError(null);
     setIsSubmitting(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsSubmitting(false);
-    setIsSubmitted(true);
-    setFormData({ name: '', email: '', subject: '', message: '' });
+
+    try {
+      const res = await fetch(`${API_URL}/api/leads/contact`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name.trim(),
+          email: formData.email.trim(),
+          subject: formData.subject.trim() || undefined,
+          message: formData.message.trim(),
+        }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        const detail = Array.isArray(body.message) ? body.message[0] : body.message;
+        throw new Error(detail || 'Request failed');
+      }
+
+      setIsSubmitted(true);
+      setFormData({ name: '', email: '', subject: '', message: '' });
+    } catch (err) {
+      // Only claim the message was received once the server says so.
+      setError(
+        err.message === 'Failed to fetch'
+          ? "We couldn't reach our servers. Please retry, or email hello@jobocate.com directly."
+          : err.message || 'Something went wrong. Please try again.',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (e) => {
@@ -36,8 +64,8 @@ const Contact = () => {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
         </svg>
       ),
-      title: 'Email Us',
-      description: 'Our team typically responds within 24 hours',
+      title: 'Email the team',
+      description: 'Reach us directly. Most replies land within one business day.',
       value: 'hello@jobocate.com',
       link: 'mailto:hello@jobocate.com',
     },
@@ -47,8 +75,8 @@ const Contact = () => {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
         </svg>
       ),
-      title: 'Live Chat',
-      description: 'Available Mon-Fri, 9am-6pm EST',
+      title: 'Live chat',
+      description: 'Open Monday to Friday, 9am to 6pm EST.',
       value: 'Start a conversation',
       link: '#',
     },
@@ -60,29 +88,29 @@ const Contact = () => {
         </svg>
       ),
       title: 'Office',
-      description: 'Come visit us at our HQ',
+      description: 'Where the team is based.',
       value: 'San Francisco, CA',
       link: '#',
     },
   ];
 
   const faqs = [
-    { q: 'How quickly can I expect a response?', a: 'We aim to respond to all inquiries within 24 business hours.' },
-    { q: 'Do you offer enterprise solutions?', a: 'Yes! Contact us for custom enterprise pricing and features.' },
-    { q: 'Can I schedule a demo?', a: 'Absolutely! Select "Request Demo" as your subject and we\'ll set up a personalized walkthrough.' },
+    { q: 'How soon will I hear back?', a: 'We reply to most messages within one business day.' },
+    { q: 'Do you work with employers hiring at scale?', a: 'Yes. Pick "Partnership Opportunity" and tell us about your hiring, and we\'ll follow up with options.' },
+    { q: 'Can I see a walkthrough first?', a: 'Choose "Request Demo" as your subject and we\'ll set up a live walkthrough of how matching and auto-apply work.' },
   ];
 
   return (
     <div className="bg-white text-gray-900 overflow-hidden">
       <Head>
-        <title>Contact Us - Jobocate | Get in Touch</title>
-        <meta name="description" content="Have questions about Jobocate? We're here to help. Reach out to our team for support, partnerships, or general inquiries." />
+        <title>Contact Jobocate | Support, Billing & Partnerships</title>
+        <meta name="description" content="Reach the Jobocate team about your AI job search, matches, billing, or a partnership. Send a note and get a reply, usually within one business day." />
       </Head>
 
-      <Navbar />
+      <PublicLayout>
 
       {/* Hero Section */}
-      <section className="relative pt-32 pb-16 overflow-hidden bg-gradient-to-b from-primary-50/50 via-white to-white">
+      <section className="relative pt-16 pb-16 overflow-hidden bg-gradient-to-b from-primary-50/50 via-white to-white">
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-20 left-1/4 w-[400px] h-[400px] bg-primary-100/40 rounded-full blur-[100px]" />
           <div className="dot-pattern absolute inset-0 opacity-30" />
@@ -95,16 +123,16 @@ const Contact = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
           >
-            <span className="text-primary-600 text-sm font-semibold uppercase tracking-wider">We're Here to Help</span>
+            <span className="text-primary-600 text-sm font-semibold uppercase tracking-wider">Support and questions</span>
 
             <h1 className="text-5xl sm:text-6xl md:text-7xl font-display font-bold leading-[1.1] tracking-tight mt-4 mb-6">
-              <span className="text-gray-900">Get in</span>{' '}
-              <span className="gradient-text">Touch</span>
+              <span className="text-gray-900">Contact</span>{' '}
+              <span className="gradient-text">Jobocate</span>
             </h1>
 
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Have a question, feedback, or partnership inquiry? 
-              We'd love to hear from you. Our team is ready to help.
+              Questions about your matches, an application, or billing?
+              Send a note and a real person on the team will read it and reply.
             </p>
           </motion.div>
         </div>
@@ -148,8 +176,8 @@ const Contact = () => {
               transition={{ duration: 0.6 }}
             >
               <h2 className="text-3xl md:text-4xl font-display font-bold mb-6">
-                <span className="text-gray-900">Send Us a</span>{' '}
-                <span className="gradient-text">Message</span>
+                <span className="text-gray-900">Send us a</span>{' '}
+                <span className="gradient-text">message</span>
               </h2>
 
               {isSubmitted ? (
@@ -163,8 +191,8 @@ const Contact = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
-                  <h3 className="text-2xl font-semibold text-gray-900 mb-2">Message Sent!</h3>
-                  <p className="text-gray-600 mb-6">Thank you for reaching out. We'll get back to you within 24 hours.</p>
+                  <h3 className="text-2xl font-semibold text-gray-900 mb-2">Message sent</h3>
+                  <p className="text-gray-600 mb-6">Thanks for reaching out. We'll reply to the email you gave us, usually within one business day.</p>
                   <button 
                     onClick={() => setIsSubmitted(false)}
                     className="text-primary-600 hover:text-primary-700 font-medium"
@@ -176,7 +204,7 @@ const Contact = () => {
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="grid sm:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Your Name</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Your name</label>
                       <input
                         type="text"
                         name="name"
@@ -188,7 +216,7 @@ const Contact = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Email address</label>
                       <input
                         type="email"
                         name="email"
@@ -210,13 +238,13 @@ const Contact = () => {
                       required
                       className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all duration-200"
                     >
-                      <option value="">Select a topic</option>
-                      <option value="general">General Inquiry</option>
-                      <option value="support">Technical Support</option>
-                      <option value="billing">Billing Question</option>
+                      <option value="">What's this about?</option>
+                      <option value="general">General question</option>
+                      <option value="support">Technical support</option>
+                      <option value="billing">Billing question</option>
                       <option value="partnership">Partnership Opportunity</option>
                       <option value="demo">Request Demo</option>
-                      <option value="feedback">Feedback</option>
+                      <option value="feedback">Product feedback</option>
                     </select>
                   </div>
 
@@ -229,9 +257,18 @@ const Contact = () => {
                       required
                       rows={5}
                       className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all duration-200 resize-none"
-                      placeholder="Tell us how we can help..."
+                      placeholder="Tell us what you need, and add any details that help us answer."
                     />
                   </div>
+
+                  {error && (
+                    <p
+                      role="alert"
+                      className="px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700"
+                    >
+                      {error}
+                    </p>
+                  )}
 
                   <motion.button
                     type="submit"
@@ -249,7 +286,7 @@ const Contact = () => {
                         Sending...
                       </span>
                     ) : (
-                      'Send Message'
+                      'Send message'
                     )}
                   </motion.button>
                 </form>
@@ -265,7 +302,7 @@ const Contact = () => {
             >
               <h2 className="text-3xl md:text-4xl font-display font-bold mb-6">
                 <span className="text-gray-900">Quick</span>{' '}
-                <span className="gradient-text">Answers</span>
+                <span className="gradient-text">answers</span>
               </h2>
 
               <div className="space-y-4 mb-12">
@@ -279,7 +316,7 @@ const Contact = () => {
 
               {/* Additional Info */}
               <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">Looking for More?</h3>
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">Find your answer faster</h3>
                 <div className="space-y-4">
                   <Link 
                     href="/#faq" 
@@ -292,7 +329,7 @@ const Contact = () => {
                     </div>
                     <div>
                       <p className="font-medium text-gray-900">Full FAQ</p>
-                      <p className="text-sm text-gray-500">Browse all common questions</p>
+                      <p className="text-sm text-gray-500">Answers on matching, auto-apply, and billing</p>
                     </div>
                   </Link>
                   <Link 
@@ -305,8 +342,8 @@ const Contact = () => {
                       </svg>
                     </div>
                     <div>
-                      <p className="font-medium text-gray-900">Blog & Resources</p>
-                      <p className="text-sm text-gray-500">Career tips and product updates</p>
+                      <p className="font-medium text-gray-900">Blog and resources</p>
+                      <p className="text-sm text-gray-500">Job-search guides and product updates</p>
                     </div>
                   </Link>
                 </div>
@@ -331,25 +368,25 @@ const Contact = () => {
             transition={{ duration: 0.6 }}
           >
             <h2 className="text-4xl md:text-5xl font-display font-bold text-white mb-6">
-              Ready to Transform Your Job Search?
+              Run your job search on your terms
             </h2>
             <p className="text-xl text-gray-300 mb-10 max-w-2xl mx-auto">
-              Join 100,000+ job seekers already using Jobocate to land interviews faster.
+              Get matched to roles you're actually eligible for, with tailored applications you approve before anything is sent.
             </p>
-            <Link href="/signup">
+            <Link href="/app/signup">
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="px-10 py-5 bg-primary-500 hover:bg-primary-600 text-white font-bold text-xl rounded-full transition-all duration-300"
               >
-                Get Started Free →
+                Start free →
               </motion.button>
             </Link>
           </motion.div>
         </div>
       </section>
 
-      <Footer />
+      </PublicLayout>
     </div>
   );
 };

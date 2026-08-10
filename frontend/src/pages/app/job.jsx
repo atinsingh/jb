@@ -6,82 +6,23 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import AppSidebar from '@/components/app/AppSidebar';
 import { appRoute } from '@/components/app/appRoutes';
+import { LoadingState, EmptyState, ErrorState } from '@/components/app/AppStates';
 import { getScrapedJobById, calculateJobMatch, markJobAsInterested } from '@/services/jobApi';
-
-/* ---------------------------------------------------------------- sample --- */
-/* Mirrors the design's DCLogic renderVals() — used as graceful fallback when
-   unauthenticated or when the backend request fails. The page always renders. */
-const SAMPLE = {
-  id: null,
-  initials: 'St',
-  title: 'Senior Product Designer',
-  company: 'Stripe',
-  location: 'Remote (US)',
-  type: 'Full-time',
-  salary: '$170–210k',
-  matchScore: 96,
-  posted: '4 days ago',
-  applicants: '47 so far',
-  hiringTeam: 'Actively reviewing',
-  why:
-    'Your design-systems leadership and fintech background at Plaid line up almost perfectly with what Stripe is hiring for. Two small gaps are easy to address in your application.',
-  matched: ['Design systems', '0→1 product', 'Fintech domain', 'Prototyping', 'Cross-functional leadership'],
-  gaps: ['Payments depth', 'Direct people management'],
-  intro:
-    'Stripe is hiring a Senior Product Designer to raise the craft bar on Checkout — the surface millions of businesses use to get paid. You’ll own end-to-end design for high-impact flows, partner closely with engineering and research, and help evolve the design system that keeps Stripe’s products coherent at scale.',
-  sections: [
-    {
-      title: 'What you’ll do',
-      items: [
-        'Own end-to-end design for core Checkout flows, from problem framing to shipped, measured outcomes.',
-        'Partner daily with engineering and research to turn ambiguous problems into crisp, tested solutions.',
-        'Push the craft bar — interaction detail, motion, and accessibility — on surfaces seen by millions.',
-        'Contribute components and patterns back to Stripe’s shared design system.',
-      ],
-    },
-    {
-      title: 'What we’re looking for',
-      items: [
-        '6+ years designing complex, data-rich product experiences, ideally in fintech or B2B SaaS.',
-        'A portfolio that shows measurable impact, not just polished screens.',
-        'Fluency with design systems and a track record of scaling them across teams.',
-        'Strong written communication and comfort operating with high autonomy.',
-      ],
-    },
-    {
-      title: 'Benefits',
-      items: [
-        'Competitive salary, meaningful equity, and an annual performance bonus.',
-        'Fully remote within the US, with quarterly team gatherings.',
-        'Comprehensive health, dental, and vision coverage.',
-        '16 weeks of parental leave and a $3,000 annual learning budget.',
-      ],
-    },
-  ],
-  totalComp: '$399–459k',
-  compNote: 'Base + equity + target bonus, plus a one-time sign-on.',
-  comp: [
-    { label: 'Base salary', value: '$170–210k' },
-    { label: 'Equity / yr', value: '~$180k' },
-    { label: 'Target bonus', value: '15%' },
-    { label: 'Sign-on', value: '$25k' },
-  ],
-};
 
 /* ------------------------------------------------------------- normalize --- */
 function initialsFor(name) {
-  if (!name) return SAMPLE.initials;
+  if (!name) return '';
   const parts = String(name).trim().split(/\s+/);
   return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase() || name.slice(0, 2);
 }
 
-// Fold a real scraped-job / match payload into the design's view-model shape.
+// Fold a real scraped-job / match payload into the page's view-model shape.
+// Missing fields collapse to empty values — never fabricated placeholders.
 function normalize(job, match) {
-  if (!job && !match) return SAMPLE;
   const j = job || {};
   const m = match || {};
 
-  const company = j.company || j.companyName || SAMPLE.company;
+  const company = j.company || j.companyName || '';
   const locParts = [];
   if (j.location) locParts.push(j.location);
   if (j.employmentType || j.type) locParts.push(j.employmentType || j.type);
@@ -89,51 +30,46 @@ function normalize(job, match) {
   const score =
     m.score != null ? Math.round(m.score) :
     m.matchScore != null ? Math.round(m.matchScore) :
-    SAMPLE.matchScore;
+    null;
 
   const matched =
-    (Array.isArray(m.matchedSkills) && m.matchedSkills.length && m.matchedSkills) ||
-    (Array.isArray(m.matched) && m.matched.length && m.matched) ||
-    SAMPLE.matched;
+    (Array.isArray(m.matchedSkills) && m.matchedSkills) ||
+    (Array.isArray(m.matched) && m.matched) ||
+    [];
   const gaps =
-    (Array.isArray(m.missingSkills) && m.missingSkills.length && m.missingSkills) ||
-    (Array.isArray(m.gaps) && m.gaps.length && m.gaps) ||
-    SAMPLE.gaps;
+    (Array.isArray(m.missingSkills) && m.missingSkills) ||
+    (Array.isArray(m.gaps) && m.gaps) ||
+    [];
 
   // Build description sections from whatever the scraper gives us.
-  let sections = SAMPLE.sections;
-  let intro = j.description || j.summary || SAMPLE.intro;
-  if (Array.isArray(j.responsibilities) || Array.isArray(j.requirements) || Array.isArray(j.benefits)) {
-    sections = [];
-    if (Array.isArray(j.responsibilities) && j.responsibilities.length)
-      sections.push({ title: 'What you’ll do', items: j.responsibilities });
-    if (Array.isArray(j.requirements) && j.requirements.length)
-      sections.push({ title: 'What we’re looking for', items: j.requirements });
-    if (Array.isArray(j.benefits) && j.benefits.length)
-      sections.push({ title: 'Benefits', items: j.benefits });
-    if (!sections.length) sections = SAMPLE.sections;
-  }
+  const sections = [];
+  if (Array.isArray(j.responsibilities) && j.responsibilities.length)
+    sections.push({ title: 'What you’ll do', items: j.responsibilities });
+  if (Array.isArray(j.requirements) && j.requirements.length)
+    sections.push({ title: 'What we’re looking for', items: j.requirements });
+  if (Array.isArray(j.benefits) && j.benefits.length)
+    sections.push({ title: 'Benefits', items: j.benefits });
 
   return {
     id: j._id || j.id || null,
     initials: initialsFor(company),
-    title: j.title || SAMPLE.title,
+    title: j.title || '',
     company,
-    location: locParts[0] || SAMPLE.location,
-    type: locParts[1] || SAMPLE.type,
-    salary: j.salary || j.salaryRange || SAMPLE.salary,
+    location: locParts[0] || '',
+    type: locParts[1] || '',
+    salary: j.salary || j.salaryRange || '',
     matchScore: score,
-    posted: j.postedAt || j.posted || SAMPLE.posted,
-    applicants: j.applicants || SAMPLE.applicants,
-    hiringTeam: j.hiringTeam || SAMPLE.hiringTeam,
-    why: m.explanation || m.reason || SAMPLE.why,
+    posted: j.postedAt || j.posted || '',
+    applicants: j.applicants || '',
+    hiringTeam: j.hiringTeam || '',
+    why: m.explanation || m.reason || '',
     matched,
     gaps,
-    intro,
+    intro: j.description || j.summary || '',
     sections,
-    totalComp: j.totalComp || SAMPLE.totalComp,
-    compNote: SAMPLE.compNote,
-    comp: (Array.isArray(j.comp) && j.comp.length && j.comp) || SAMPLE.comp,
+    totalComp: j.totalComp || '',
+    compNote: '',
+    comp: (Array.isArray(j.comp) && j.comp) || [],
   };
 }
 
@@ -157,21 +93,24 @@ function Bookmark({ saved }) {
 /* ----------------------------------------------------------- component --- */
 export default function AppJob() {
   const router = useRouter();
-  const [data, setData] = useState(SAMPLE);
+  const [data, setData] = useState(null);
   const [saved, setSaved] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Fetch real data when a job id is present; otherwise show the sample design.
+  // Fetch real data when a job id is present.
   useEffect(() => {
     if (!router.isReady) return;
     const jobId = router.query.id || router.query.jobId;
     if (!jobId) {
-      setData(SAMPLE);
+      setData(null);
+      setLoading(false);
       return;
     }
     let alive = true;
     setLoading(true);
+    setError(null);
     (async () => {
       try {
         const [jobRes, matchRes] = await Promise.allSettled([
@@ -181,10 +120,12 @@ export default function AppJob() {
         if (!alive) return;
         const job = jobRes.status === 'fulfilled' ? jobRes.value?.job || jobRes.value : null;
         const match = matchRes.status === 'fulfilled' ? matchRes.value?.match || matchRes.value : null;
-        // Graceful fallback: if both failed, keep the faithful sample design.
-        setData(job || match ? normalize(job, match) : SAMPLE);
+        setData(job || match ? normalize(job, match) : null);
       } catch (e) {
-        if (alive) setData(SAMPLE);
+        if (alive) {
+          setError(e);
+          setData(null);
+        }
       } finally {
         if (alive) setLoading(false);
       }
@@ -197,7 +138,7 @@ export default function AppJob() {
   const toggleSave = () => {
     setSaved((prev) => {
       const next = !prev;
-      if (data.id) {
+      if (data?.id) {
         markJobAsInterested(data.id, next).catch(() => {});
       }
       return next;
@@ -205,7 +146,7 @@ export default function AppJob() {
   };
 
   const d = data;
-  const matchDeg = `${(d.matchScore / 100) * 360}deg`;
+  const matchDeg = `${((d?.matchScore || 0) / 100) * 360}deg`;
 
   const saveColor = saved ? '#157A49' : '#46413A';
   const saveBg = saved ? '#EAF6EE' : '#FFFEFB';
@@ -218,13 +159,7 @@ export default function AppJob() {
   return (
     <>
       <Head>
-        <title>{`${d.title} · ${d.company} — Jobocate`}</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
+        <title>{d ? `${d.title} · ${d.company} — Jobocate` : 'Job — Jobocate'}</title>
       </Head>
 
       <style jsx global>{`
@@ -256,7 +191,7 @@ export default function AppJob() {
           display: 'flex',
           minHeight: '100vh',
           background: '#F7F3EA',
-          fontFamily: "'Hanken Grotesk',sans-serif",
+          fontFamily: 'var(--jb-font-sans)',
           color: '#1B1A16',
         }}
       >
@@ -326,6 +261,13 @@ export default function AppJob() {
             </Link>
           </header>
 
+          {loading ? (
+            <LoadingState label="Loading job…" />
+          ) : error ? (
+            <ErrorState error={error} onRetry={() => router.reload()} />
+          ) : !d ? (
+            <EmptyState title="No job to show" hint="Open a role from your matches to see the full details here." />
+          ) : (
           <div
             style={{
               display: 'flex',
@@ -361,25 +303,25 @@ export default function AppJob() {
                   {d.initials}
                 </Link>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 34, lineHeight: 1.04, margin: '0 0 6px' }}>{d.title}</h1>
+                  <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 34, lineHeight: 1.04, margin: '0 0 6px' }}>{d.title}</h1>
                   <div style={{ fontSize: 14.5, color: '#5A544A' }}>
                     <Link href={appRoute('App Company.dc.html')} style={{ color: '#157A49', fontWeight: 600, textDecoration: 'none' }}>
                       {d.company}
                     </Link>{' '}
                     · {d.location} · {d.type} ·{' '}
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", color: '#157A49' }}>{d.salary}</span>
+                    <span style={{ fontFamily: 'var(--jb-font-mono)', color: '#157A49' }}>{d.salary}</span>
                   </div>
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 30, fontWeight: 600, color: '#157A49', lineHeight: 1 }}>{d.matchScore}%</div>
-                  <div style={{ fontSize: 11, color: '#8A8378', fontFamily: "'JetBrains Mono',monospace" }}>match</div>
+                  <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 30, fontWeight: 600, color: '#157A49', lineHeight: 1 }}>{d.matchScore != null ? `${d.matchScore}%` : '—'}</div>
+                  <div style={{ fontSize: 11, color: '#8A8378', fontFamily: 'var(--jb-font-mono)' }}>match</div>
                 </div>
               </div>
 
               {/* WHY MATCH */}
               <div style={{ background: '#EAF6EE', border: '1px solid #CDE9D6', borderRadius: 16, padding: 22 }}>
-                <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#157A49', marginBottom: 10 }}>
-                  Why you’re a {d.matchScore}% match
+                <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#157A49', marginBottom: 10 }}>
+                  Why you’re a {d.matchScore != null ? `${d.matchScore}%` : ''} match
                 </div>
                 <p style={{ fontSize: 14.5, lineHeight: 1.6, color: '#1F4733', margin: '0 0 16px' }}>{d.why}</p>
                 <div style={{ marginBottom: 14 }}>
@@ -482,15 +424,15 @@ export default function AppJob() {
               <div style={card}>
                 <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 14, marginBottom: 18 }}>
                   <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Compensation</h2>
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#8A8378' }}>est. total / yr</span>
+                  <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#8A8378' }}>est. total / yr</span>
                 </div>
-                <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 34, fontWeight: 600, lineHeight: 1, color: '#1B1A16', marginBottom: 4 }}>{d.totalComp}</div>
+                <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 34, fontWeight: 600, lineHeight: 1, color: '#1B1A16', marginBottom: 4 }}>{d.totalComp}</div>
                 <div style={{ fontSize: 13, color: '#8A8378', marginBottom: 20 }}>{d.compNote}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   {d.comp.map((c, i) => (
                     <div key={`${c.label}-${i}`} style={{ background: '#FBF8F1', border: '1px solid #E6DECF', borderRadius: 12, padding: '14px 16px' }}>
-                      <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#9A9286', marginBottom: 6 }}>{c.label}</div>
-                      <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 16, fontWeight: 600, color: '#1B1A16' }}>{c.value}</div>
+                      <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#9A9286', marginBottom: 6 }}>{c.label}</div>
+                      <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 16, fontWeight: 600, color: '#1B1A16' }}>{c.value}</div>
                     </div>
                   ))}
                 </div>
@@ -522,13 +464,13 @@ export default function AppJob() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontFamily: "'JetBrains Mono',monospace",
+                        fontFamily: 'var(--jb-font-mono)',
                         fontSize: 17,
                         fontWeight: 600,
                         color: '#157A49',
                       }}
                     >
-                      {d.matchScore}%
+                      {d.matchScore != null ? `${d.matchScore}%` : '—'}
                     </div>
                   </div>
                   <div>
@@ -639,6 +581,7 @@ export default function AppJob() {
               </div>
             </div>
           </div>
+          )}
         </main>
       </div>
     </>

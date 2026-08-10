@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
 export type MockInterviewSessionDocument = MockInterviewSession & Document;
 
@@ -25,13 +25,13 @@ export interface RubricScore {
 
 @Schema({ timestamps: true, collection: 'mock_interview_sessions' })
 export class MockInterviewSession {
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true, index: true })
   userId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'Application', required: false, index: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Application', required: false, index: true })
   applicationId?: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'Job', required: false, index: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Job', required: false, index: true })
   jobId?: Types.ObjectId;
 
   @Prop({ required: true })
@@ -92,6 +92,5 @@ export const MockInterviewSessionSchema = SchemaFactory.createForClass(MockInter
 
 // Indexes
 MockInterviewSessionSchema.index({ userId: 1, status: 1, createdAt: -1 });
-MockInterviewSessionSchema.index({ applicationId: 1 });
-MockInterviewSessionSchema.index({ jobId: 1 });
+// applicationId and jobId are already indexed via @Prop({ index: true }).
 

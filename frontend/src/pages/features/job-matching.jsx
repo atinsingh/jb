@@ -2,39 +2,32 @@
 
 import Head from 'next/head';
 import Link from 'next/link';
-import SiteNav from '@/components/site/SiteNav';
-import SiteFooter from '@/components/site/SiteFooter';
+import PublicLayout from '@/components/layout/PublicLayout';
 import { appRoute } from '@/components/app/appRoutes';
 
 const STATS = [
-  { value: '10K+', label: 'New roles scanned daily' },
-  { value: '94%', label: 'Average match accuracy' },
-  { value: '0', label: 'Hours wasted scrolling boards' },
+  { value: 'Daily', label: 'Fresh roles scanned across verified employers' },
+  { value: '100%', label: 'Of matches show the reasoning behind them' },
+  { value: '0', label: 'Applications sent without your approval' },
 ];
 
 const STEPS = [
   { n: '01', title: 'Build your profile', desc: "Skills, seniority, comp, location, and the things you'd never compromise on — captured once." },
-  { n: '02', title: 'We scan everywhere', desc: 'Thousands of fresh postings across verified employers, indexed and scored against your profile.' },
-  { n: '03', title: 'You get a shortlist', desc: 'Only strong fits, each with a transparent reason — so you spend energy on roles worth it.' },
+  { n: '02', title: 'We scan verified employers', desc: 'Fresh postings from verified employers, indexed and scored against your profile every day.' },
+  { n: '03', title: 'You get a shortlist', desc: 'Only strong fits, each with the reasoning shown — so you spend time on roles worth it.' },
 ];
 
 const CAPABILITIES = [
-  { n: '01', title: 'Transparent reasoning', desc: 'Every match shows exactly why it fits — skills, comp, culture signals — never a black box.' },
-  { n: '02', title: 'Dealbreaker filters', desc: "Set hard limits on location, salary, and seniority — we'll never surface what you'd reject." },
-  { n: '03', title: 'Daily digest', desc: 'A tidy morning shortlist of new fits — review in two minutes, apply with one click.' },
+  { n: '01', title: 'The reasoning shown', desc: 'Every match spells out why it fits — skills, comp, location, seniority — never a black box.' },
+  { n: '02', title: 'Dealbreaker filters', desc: "Set hard limits on location, salary, and seniority — we won't surface roles you'd reject." },
+  { n: '03', title: 'Daily shortlist', desc: 'A short list of new fits each morning — review in a couple of minutes, apply on your terms.' },
 ];
 
 export default function JobMatching() {
   return (
     <>
       <Head>
-        <title>Smart Job Matching — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
+        <title>Job Matching That Shows Its Reasoning — Jobocate</title>
       </Head>
 
       <style jsx global>{`
@@ -42,7 +35,7 @@ export default function JobMatching() {
           box-sizing: border-box;
         }
         #jbmatch ::selection {
-          background: #1fa463;
+          background: var(--jb-d-accent);
           color: #f7f3ea;
         }
         @keyframes riseIn {
@@ -57,78 +50,78 @@ export default function JobMatching() {
         }
       `}</style>
 
-      <div id="jbmatch" style={{ background: '#F7F3EA', color: '#1B1A16', fontFamily: "'Hanken Grotesk',sans-serif" }}>
-        <SiteNav />
+      <div id="jbmatch" style={{ background: 'transparent', color: 'var(--jb-d-ink)', fontFamily: 'var(--jb-font-sans)' }}>
+        <PublicLayout>
 
         {/* BREADCRUMB */}
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 32px 0' }}>
-          <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, letterSpacing: '0.08em', color: '#9A9286' }}>
-            <Link href={appRoute('Jobocate Home.dc.html')} style={{ color: '#9A9286', textDecoration: 'none' }}>HOME</Link>
-            &nbsp;/&nbsp; PRODUCT &nbsp;/&nbsp; <span style={{ color: '#157A49' }}>JOB MATCHING</span>
+          <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, letterSpacing: '0.08em', color: 'var(--jb-d-ink-55)' }}>
+            <Link href={appRoute('Jobocate Home.dc.html')} style={{ color: 'var(--jb-d-ink-55)', textDecoration: 'none' }}>HOME</Link>
+            &nbsp;/&nbsp; PRODUCT &nbsp;/&nbsp; <span style={{ color: 'var(--jb-d-accent)' }}>JOB MATCHING</span>
           </div>
         </div>
 
         {/* HERO */}
         <section style={{ maxWidth: 1200, margin: '0 auto', padding: '44px 32px 56px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1.02fr 0.98fr', gap: 56, alignItems: 'center' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', gap: 56, alignItems: 'center' }}>
             <div style={{ animation: 'riseIn 0.7s ease both' }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 9, border: '1px solid #D9D0BE', borderRadius: 999, padding: '7px 14px', marginBottom: 24 }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#1FA463' }} />
-                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#5A544A' }}>Product — Smart Job Matching</span>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 9, border: '1px solid var(--jb-d-line-btn)', borderRadius: 999, padding: '7px 14px', marginBottom: 24 }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--jb-d-accent)' }} />
+                <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--jb-d-ink-70)' }}>Product — Job Matching</span>
               </div>
-              <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 74, lineHeight: 0.98, letterSpacing: '-0.01em', margin: '0 0 22px' }}>
-                The right roles<br />
-                <span style={{ background: 'linear-gradient(transparent 56%, rgba(31,164,99,0.32) 56%)', padding: '0 2px' }}>find you.</span>
+              <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 'clamp(34px, 7vw, 74px)', lineHeight: 0.98, letterSpacing: '-0.01em', margin: '0 0 22px' }}>
+                Job matches that<br />
+                <span style={{ background: 'linear-gradient(transparent 56%, rgba(31,164,99,0.32) 56%)', padding: '0 2px' }}>show why.</span>
               </h1>
-              <p style={{ fontSize: 19, lineHeight: 1.55, color: '#4B463E', maxWidth: 470, margin: '0 0 32px' }}>
-                Stop scrolling job boards. Jobocate scans thousands of fresh openings every day and surfaces only the ones that genuinely fit — with the reasons why.
+              <p style={{ fontSize: 19, lineHeight: 1.55, color: 'var(--jb-d-ink-85)', maxWidth: 470, margin: '0 0 32px' }}>
+                Jobocate scans fresh openings from verified employers and surfaces only the roles you're eligible for — each with the reasoning shown, so you decide where to apply.
               </p>
               <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', marginBottom: 24 }}>
-                <Link href={appRoute('App Matches.dc.html')} style={{ display: 'inline-flex', alignItems: 'center', gap: 9, background: '#1B1A16', color: '#F7F3EA', fontSize: 16, fontWeight: 600, padding: '15px 26px', borderRadius: 999, textDecoration: 'none' }}>
+                <Link href={appRoute('App Matches.dc.html')} style={{ display: 'inline-flex', alignItems: 'center', gap: 9, background: 'var(--jb-d-footer)', color: '#F7F3EA', fontSize: 16, fontWeight: 600, padding: '15px 26px', borderRadius: 999, textDecoration: 'none' }}>
                   See my matches <span style={{ fontSize: 18 }}>→</span>
                 </Link>
-                <a href="#how" style={{ display: 'inline-flex', alignItems: 'center', gap: 9, color: '#1B1A16', fontSize: 16, fontWeight: 600, padding: '15px 22px', borderRadius: 999, textDecoration: 'none', border: '1px solid #D2C9B7' }}>How matching works</a>
+                <a href="#how" style={{ display: 'inline-flex', alignItems: 'center', gap: 9, color: 'var(--jb-d-ink)', fontSize: 16, fontWeight: 600, padding: '15px 22px', borderRadius: 999, textDecoration: 'none', border: '1px solid #D2C9B7' }}>How matching works</a>
               </div>
-              <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: '#8A8378' }}>● Scanning <b style={{ color: '#157A49' }}>10,000+</b> new roles every day</div>
+              <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 12, color: 'var(--jb-d-ink-65)' }}>● New roles indexed from <b style={{ color: 'var(--jb-d-accent)' }}>verified employers</b> every day</div>
             </div>
 
             {/* MATCH FEED MOCK */}
             <div style={{ animation: 'riseIn 0.9s ease both' }}>
-              <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 16, boxShadow: '0 30px 60px -28px rgba(27,26,22,0.28)', padding: 20 }}>
+              <div style={{ background: 'var(--jb-d-panel)', border: '1px solid var(--jb-d-line-card)', borderRadius: 16, boxShadow: '0 30px 60px -28px rgba(27,26,22,0.28)', padding: 20 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                  <div style={{ fontWeight: 700, fontSize: 15 }}>Top matches for you</div>
-                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#1FA463' }}>● refreshed 2m ago</div>
+                  <div style={{ fontWeight: 700, fontSize: 15 }}>Your matches today</div>
+                  <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: 'var(--jb-d-accent)' }}>● refreshed 2m ago</div>
                 </div>
-                <div style={{ border: '1px solid #EEE7D9', borderRadius: 12, padding: 14, marginBottom: 9 }}>
+                <div style={{ border: '1px solid var(--jb-d-line-card)', borderRadius: 12, padding: 14, marginBottom: 9 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 9 }}>
-                    <span style={{ width: 36, height: 36, borderRadius: 9, background: '#EAF6EE', color: '#157A49', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13 }}>St</span>
+                    <span style={{ width: 36, height: 36, borderRadius: 9, background: 'var(--jb-d-accent-tint)', color: 'var(--jb-d-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13 }}>St</span>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13.5, fontWeight: 600 }}>Senior Product Designer</div>
-                      <div style={{ fontSize: 12, color: '#8A8378' }}>Stripe · Remote (US)</div>
+                      <div style={{ fontSize: 12, color: 'var(--jb-d-ink-65)' }}>Meridian · Remote (US)</div>
                     </div>
-                    <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 15, fontWeight: 600, color: '#157A49' }}>96%</div>
+                    <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 15, fontWeight: 600, color: 'var(--jb-d-accent)' }}>96%</div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 10.5, background: '#EAF6EE', color: '#157A49', borderRadius: 999, padding: '3px 9px' }}>✓ design systems</span>
-                    <span style={{ fontSize: 10.5, background: '#EAF6EE', color: '#157A49', borderRadius: 999, padding: '3px 9px' }}>✓ fintech</span>
-                    <span style={{ fontSize: 10.5, background: '#EAF6EE', color: '#157A49', borderRadius: 999, padding: '3px 9px' }}>✓ salary fit</span>
+                    <span style={{ fontSize: 11, background: 'var(--jb-d-accent-tint)', color: 'var(--jb-d-accent)', borderRadius: 999, padding: '3px 9px' }}>✓ design systems</span>
+                    <span style={{ fontSize: 11, background: 'var(--jb-d-accent-tint)', color: 'var(--jb-d-accent)', borderRadius: 999, padding: '3px 9px' }}>✓ fintech</span>
+                    <span style={{ fontSize: 11, background: 'var(--jb-d-accent-tint)', color: 'var(--jb-d-accent)', borderRadius: 999, padding: '3px 9px' }}>✓ salary fit</span>
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 11, border: '1px solid #EEE7D9', borderRadius: 12, padding: '12px 14px', marginBottom: 9 }}>
-                  <span style={{ width: 36, height: 36, borderRadius: 9, background: '#F4EFE4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13 }}>Fi</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 11, border: '1px solid var(--jb-d-line-card)', borderRadius: 12, padding: '12px 14px', marginBottom: 9 }}>
+                  <span style={{ width: 36, height: 36, borderRadius: 9, background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13 }}>Fi</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13.5, fontWeight: 600 }}>Product Manager, Growth</div>
-                    <div style={{ fontSize: 12, color: '#8A8378' }}>Figma · Hybrid SF</div>
+                    <div style={{ fontSize: 12, color: 'var(--jb-d-ink-65)' }}>Juniper · Hybrid SF</div>
                   </div>
-                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 15, fontWeight: 600, color: '#157A49' }}>93%</div>
+                  <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 15, fontWeight: 600, color: 'var(--jb-d-accent)' }}>93%</div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 11, border: '1px solid #EEE7D9', borderRadius: 12, padding: '12px 14px' }}>
-                  <span style={{ width: 36, height: 36, borderRadius: 9, background: '#F4EFE4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13 }}>Li</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 11, border: '1px solid var(--jb-d-line-card)', borderRadius: 12, padding: '12px 14px' }}>
+                  <span style={{ width: 36, height: 36, borderRadius: 9, background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13 }}>Li</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13.5, fontWeight: 600 }}>Staff Frontend Engineer</div>
-                    <div style={{ fontSize: 12, color: '#8A8378' }}>Linear · Remote</div>
+                    <div style={{ fontSize: 12, color: 'var(--jb-d-ink-65)' }}>Cobalt Labs · Remote</div>
                   </div>
-                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 15, fontWeight: 600, color: '#157A49' }}>91%</div>
+                  <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 15, fontWeight: 600, color: 'var(--jb-d-accent)' }}>91%</div>
                 </div>
               </div>
             </div>
@@ -136,13 +129,13 @@ export default function JobMatching() {
         </section>
 
         {/* STAT BAND */}
-        <section style={{ background: '#F1ECE0', borderTop: '1px solid #E7E0D2', borderBottom: '1px solid #E7E0D2' }}>
-          <div style={{ maxWidth: 1200, margin: '0 auto', padding: '46px 32px', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 24 }}>
+        <section style={{ background: 'var(--jb-d-glass)', borderTop: '1px solid var(--jb-d-line-card)', borderBottom: '1px solid var(--jb-d-line-card)' }}>
+          <div style={{ maxWidth: 1200, margin: '0 auto', padding: '46px 32px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', gap: 24 }}>
             {STATS.map((s) => (
               <div key={s.label}>
-                <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 40, fontWeight: 600, lineHeight: 1 }}>{s.value}</div>
-                <div style={{ width: 32, height: 3, background: '#1FA463', margin: '12px 0 10px' }} />
-                <div style={{ fontSize: 14, color: '#5A544A' }}>{s.label}</div>
+                <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 'clamp(26px, 5vw, 40px)', fontWeight: 600, lineHeight: 1 }}>{s.value}</div>
+                <div style={{ width: 32, height: 3, background: 'var(--jb-d-accent)', margin: '12px 0 10px' }} />
+                <div style={{ fontSize: 14, color: 'var(--jb-d-ink-70)' }}>{s.label}</div>
               </div>
             ))}
           </div>
@@ -151,33 +144,33 @@ export default function JobMatching() {
         {/* HOW IT WORKS */}
         <section id="how" style={{ maxWidth: 1200, margin: '0 auto', padding: '88px 32px' }}>
           <div style={{ maxWidth: 600, marginBottom: 54 }}>
-            <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#1FA463', marginBottom: 16 }}>— How it works</div>
-            <h2 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 48, lineHeight: 1.05, margin: 0 }}>Matching that actually understands you</h2>
+            <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--jb-d-accent)', marginBottom: 16 }}>— How it works</div>
+            <h2 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 'clamp(26px, 5vw, 48px)', lineHeight: 1.05, margin: 0 }}>Matching built on your real profile</h2>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 36 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', gap: 36 }}>
             {STEPS.map((s) => (
-              <div key={s.n} style={{ borderTop: '2px solid #1B1A16', paddingTop: 22 }}>
-                <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: 60, lineHeight: 1, color: '#1FA463', marginBottom: 14 }}>{s.n}</div>
+              <div key={s.n} style={{ borderTop: '2px solid var(--jb-d-footer)', paddingTop: 22 }}>
+                <div style={{ fontFamily: 'var(--jb-font-display)', fontSize: 'clamp(28px, 6vw, 60px)', lineHeight: 1, color: 'var(--jb-d-accent)', marginBottom: 14 }}>{s.n}</div>
                 <h3 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 10px' }}>{s.title}</h3>
-                <p style={{ fontSize: 15, lineHeight: 1.6, color: '#5A544A', margin: 0 }}>{s.desc}</p>
+                <p style={{ fontSize: 15, lineHeight: 1.6, color: 'var(--jb-d-ink-70)', margin: 0 }}>{s.desc}</p>
               </div>
             ))}
           </div>
         </section>
 
         {/* CAPABILITY CARDS */}
-        <section style={{ background: '#1B1A16', color: '#F2EDE2' }}>
+        <section style={{ background: 'var(--jb-d-footer)', color: '#F2EDE2' }}>
           <div style={{ maxWidth: 1200, margin: '0 auto', padding: '88px 32px' }}>
             <div style={{ maxWidth: 620, marginBottom: 46 }}>
-              <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#5BD08C', marginBottom: 16 }}>— Why it&apos;s different</div>
-              <h2 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 48, lineHeight: 1.05, margin: 0, color: '#FBF8F1' }}>Signal, not noise</h2>
+              <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--jb-d-accent)', marginBottom: 16 }}>— Why it&apos;s different</div>
+              <h2 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 'clamp(26px, 5vw, 48px)', lineHeight: 1.05, margin: 0, color: '#FBF8F1' }}>A shortlist, not a firehose</h2>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', gap: 20 }}>
               {CAPABILITIES.map((c) => (
                 <div key={c.n} style={{ background: '#242219', border: '1px solid #34322A', borderRadius: 16, padding: 28 }}>
-                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 13, color: '#5BD08C', marginBottom: 18 }}>{c.n}</div>
+                  <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 13, color: 'var(--jb-d-accent)', marginBottom: 18 }}>{c.n}</div>
                   <h3 style={{ fontSize: 18, fontWeight: 700, color: '#FBF8F1', margin: '0 0 10px' }}>{c.title}</h3>
-                  <p style={{ fontSize: 14, lineHeight: 1.55, color: '#B8B1A4', margin: 0 }}>{c.desc}</p>
+                  <p style={{ fontSize: 14, lineHeight: 1.55, color: 'var(--jb-d-ink-65)', margin: 0 }}>{c.desc}</p>
                 </div>
               ))}
             </div>
@@ -186,32 +179,32 @@ export default function JobMatching() {
 
         {/* TESTIMONIAL */}
         <section style={{ maxWidth: 920, margin: '0 auto', padding: '88px 32px', textAlign: 'center' }}>
-          <div style={{ color: '#1FA463', fontSize: 16, letterSpacing: '0.12em', marginBottom: 22 }}>★★★★★</div>
-          <p style={{ fontFamily: "'Instrument Serif',serif", fontSize: 38, lineHeight: 1.25, margin: '0 0 28px' }}>&quot;I stopped doom-scrolling job boards. Every morning I get five roles that actually fit — and I only apply to those.&quot;</p>
+          <div style={{ color: 'var(--jb-d-accent)', fontSize: 16, letterSpacing: '0.12em', marginBottom: 22 }}>— The promise</div>
+          <p style={{ fontFamily: 'var(--jb-font-display)', fontSize: 'clamp(26px, 5vw, 38px)', lineHeight: 1.25, margin: '0 0 28px' }}>No more scrolling every board. Each morning, a short list of roles you're eligible for — and you choose which ones are worth applying to.</p>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 13 }}>
-            <span style={{ width: 46, height: 46, borderRadius: '50%', background: '#1FA463', color: '#0C2C1C', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 15 }}>SC</span>
+            <span style={{ width: 46, height: 46, borderRadius: '50%', background: 'var(--jb-d-accent)', color: 'var(--jb-d-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 15 }}>JB</span>
             <div style={{ textAlign: 'left' }}>
-              <div style={{ fontWeight: 700, fontSize: 15 }}>Sarah Chen</div>
-              <div style={{ fontSize: 13.5, color: '#7A7367' }}>Software Engineer at Google</div>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>How Jobocate is built to work</div>
+              <div style={{ fontSize: 13.5, color: 'var(--jb-d-ink-65)' }}>Matched to eligibility, applied on your terms</div>
             </div>
           </div>
         </section>
 
         {/* CTA */}
         <section style={{ maxWidth: 1200, margin: '0 auto 70px', padding: '0 32px' }}>
-          <div style={{ position: 'relative', overflow: 'hidden', background: '#15140F', borderRadius: 24, padding: '78px 40px', textAlign: 'center' }}>
+          <div style={{ position: 'relative', overflow: 'hidden', background: 'var(--jb-d-footer)', borderRadius: 24, padding: '78px 40px', textAlign: 'center' }}>
             <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 130%, rgba(31,164,99,0.42), transparent 60%)', pointerEvents: 'none' }} />
             <div style={{ position: 'relative' }}>
-              <h2 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 58, lineHeight: 1.02, color: '#FBF8F1', margin: '0 auto 16px', maxWidth: 640 }}>See your matches today</h2>
-              <p style={{ fontSize: 18, color: '#B8B1A4', maxWidth: 460, margin: '0 auto 32px', lineHeight: 1.55 }}>Build your profile in minutes and get your first shortlist free.</p>
-              <Link href={appRoute('App Matches.dc.html')} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: '#1FA463', color: '#0C2C1C', fontSize: 17, fontWeight: 700, padding: '17px 32px', borderRadius: 999, textDecoration: 'none' }}>
+              <h2 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 'clamp(27px, 5vw, 58px)', lineHeight: 1.02, color: '#FBF8F1', margin: '0 auto 16px', maxWidth: 640 }}>See your matches today</h2>
+              <p style={{ fontSize: 18, color: 'var(--jb-d-ink-65)', maxWidth: 460, margin: '0 auto 32px', lineHeight: 1.55 }}>Build your profile and get your first shortlist free — each match with the reasoning shown.</p>
+              <Link href={appRoute('App Matches.dc.html')} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: 'var(--jb-d-accent)', color: 'var(--jb-d-bg)', fontSize: 17, fontWeight: 700, padding: '17px 32px', borderRadius: 999, textDecoration: 'none' }}>
                 See my matches <span style={{ fontSize: 19 }}>→</span>
               </Link>
             </div>
           </div>
         </section>
 
-        <SiteFooter />
+        </PublicLayout>
       </div>
     </>
   );

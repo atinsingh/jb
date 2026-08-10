@@ -1,9 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 import { appRoute } from '@/components/app/appRoutes';
+import { InlineError } from '@/components/employer/EmployerStates';
+import { employerCompanyApi, employerTeamApi, employerJobsApi } from '@/services/employerApi';
 
 const STEP_TITLES = ['Company', 'Team', 'First job'];
 
@@ -23,14 +26,19 @@ const ROLE_OPTS = [
 const BRAND_LABELS = ['Company profile', 'Invite your team', 'Post your first role'];
 
 export default function EmployerOnboarding() {
+  const router = useRouter();
   const [step, setStep] = useState(0);
-  const [company, setCompany] = useState('Stripe');
-  const [website, setWebsite] = useState('stripe.com');
-  const [hq, setHq] = useState('San Francisco, CA');
+  const [company, setCompany] = useState('');
+  const [website, setWebsite] = useState('');
+  const [industry, setIndustry] = useState('');
+  const [size, setSize] = useState('');
+  const [hq, setHq] = useState('');
   const [role, setRole] = useState('recruiter');
-  const [invites, setInvites] = useState(['raj@stripe.com']);
+  const [invites, setInvites] = useState([]);
   const [inviteDraft, setInviteDraft] = useState('');
   const [jobTitle, setJobTitle] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
 
   const isCompany = step === 0;
   const isTeam = step === 1;
@@ -44,6 +52,37 @@ export default function EmployerOnboarding() {
 
   const next = () => setStep((s) => Math.min(s + 1, 2));
   const back = () => setStep((s) => Math.max(s - 1, 0));
+
+  const logoInitials =
+    company
+      .trim()
+      .split(' ')
+      .filter(Boolean)
+      .map((w) => w[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || '—';
+
+  // Persist everything captured during onboarding, then move to the dashboard.
+  const handleComplete = async () => {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await employerCompanyApi.update({ name: company, website, industry, size, hq });
+      for (const email of invites) {
+        await employerTeamApi.invite({ email, role: 'recruiter' });
+      }
+      const title = jobTitle.trim();
+      if (title) {
+        await employerJobsApi.create({ title });
+      }
+      router.push(appRoute('Employer Dashboard.dc.html'));
+    } catch (err) {
+      setSaveError(err);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const addInvite = () => {
     const v = inviteDraft.trim();
@@ -76,12 +115,6 @@ export default function EmployerOnboarding() {
     <>
       <Head>
         <title>Set up your hiring — Jobocate for Employers</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
       <style jsx global>{`
@@ -124,7 +157,7 @@ export default function EmployerOnboarding() {
           gridTemplateColumns: '1.05fr 0.95fr',
           minHeight: '100vh',
           background: '#F7F3EA',
-          fontFamily: "'Hanken Grotesk',sans-serif",
+          fontFamily: 'var(--jb-font-sans)',
           color: '#1B1A16',
         }}
       >
@@ -133,7 +166,7 @@ export default function EmployerOnboarding() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <span
               style={{
-                fontFamily: "'Bricolage Grotesque',sans-serif",
+                fontFamily: 'var(--jb-font-display)',
                 fontWeight: 800,
                 letterSpacing: '-0.02em',
                 fontSize: 23,
@@ -144,8 +177,8 @@ export default function EmployerOnboarding() {
             </span>
             <span
               style={{
-                fontFamily: "'JetBrains Mono',monospace",
-                fontSize: 8.5,
+                fontFamily: 'var(--jb-font-mono)',
+                fontSize: 11,
                 fontWeight: 600,
                 letterSpacing: '0.12em',
                 color: '#364FC7',
@@ -160,7 +193,7 @@ export default function EmployerOnboarding() {
             <div style={{ flex: 1, height: 3, borderRadius: 999, background: '#E6DECF', overflow: 'hidden' }}>
               <div style={{ width: progress, height: '100%', background: '#4263EB', transition: 'width 0.35s ease' }} />
             </div>
-            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#9A9286' }}>{stepLabel}</span>
+            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#9A9286' }}>{stepLabel}</span>
           </div>
 
           <div
@@ -191,7 +224,7 @@ export default function EmployerOnboarding() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontFamily: "'JetBrains Mono',monospace",
+                        fontFamily: 'var(--jb-font-mono)',
                         fontSize: 12,
                         fontWeight: 600,
                         color: cur || done ? '#fff' : '#9A9286',
@@ -212,7 +245,7 @@ export default function EmployerOnboarding() {
 
             <h1
               style={{
-                fontFamily: "'Instrument Serif',serif",
+                fontFamily: 'var(--jb-font-display)',
                 fontWeight: 400,
                 fontSize: 38,
                 lineHeight: 1.04,
@@ -242,12 +275,12 @@ export default function EmployerOnboarding() {
                         justifyContent: 'center',
                         fontWeight: 700,
                         fontSize: 20,
-                        fontFamily: "'JetBrains Mono',monospace",
+                        fontFamily: 'var(--jb-font-mono)',
                         border: '1px dashed #C7D2FB',
                         cursor: 'pointer',
                       }}
                     >
-                      St
+                      {logoInitials}
                     </div>
                   </div>
                   <div style={{ flex: 1 }}>
@@ -262,8 +295,9 @@ export default function EmployerOnboarding() {
                 <div style={{ display: 'flex', gap: 14 }}>
                   <div style={{ flex: 1 }}>
                     <label style={labelStyle}>Industry</label>
-                    <select style={selectStyle} defaultValue="Financial infrastructure">
-                      <option>Financial infrastructure</option>
+                    <select style={selectStyle} value={industry} onChange={(e) => setIndustry(e.target.value)}>
+                      <option value="">Select industry…</option>
+                      <option>Fintech</option>
                       <option>SaaS</option>
                       <option>Marketplace</option>
                       <option>Healthcare</option>
@@ -272,7 +306,8 @@ export default function EmployerOnboarding() {
                   </div>
                   <div style={{ flex: 1 }}>
                     <label style={labelStyle}>Company size</label>
-                    <select style={selectStyle} defaultValue="1,000+">
+                    <select style={selectStyle} value={size} onChange={(e) => setSize(e.target.value)}>
+                      <option value="">Select size…</option>
                       <option>1–50</option>
                       <option>51–200</option>
                       <option>201–1,000</option>
@@ -349,7 +384,7 @@ export default function EmployerOnboarding() {
                             color: '#364FC7',
                             borderRadius: '50%',
                             cursor: 'pointer',
-                            fontSize: 10,
+                            fontSize: 11,
                             lineHeight: 1,
                           }}
                         >
@@ -474,29 +509,39 @@ export default function EmployerOnboarding() {
                   >
                     Skip for now
                   </Link>
-                  <Link
-                    href={appRoute('Employer Dashboard.dc.html')}
+                  <button
+                    onClick={handleComplete}
+                    disabled={saving}
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: 9,
+                      fontFamily: 'inherit',
                       fontSize: 15,
                       fontWeight: 700,
                       color: '#fff',
                       background: '#4263EB',
+                      border: 'none',
                       borderRadius: 999,
                       padding: '14px 26px',
-                      textDecoration: 'none',
+                      cursor: saving ? 'not-allowed' : 'pointer',
+                      opacity: saving ? 0.6 : 1,
                     }}
                   >
-                    Post your first job <span>→</span>
-                  </Link>
+                    {saving ? 'Saving…' : 'Finish setup'} <span>→</span>
+                  </button>
                 </div>
               )}
             </div>
+
+            {saveError && (
+              <div style={{ marginTop: 14 }}>
+                <InlineError error={saveError} />
+              </div>
+            )}
           </div>
 
-          <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#A79E8F' }}>© 2026 Jobocate</div>
+          <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#A79E8F' }}>© 2026 Jobocate</div>
         </div>
 
         {/* BRAND SIDE */}
@@ -524,7 +569,7 @@ export default function EmployerOnboarding() {
           <div
             style={{
               position: 'relative',
-              fontFamily: "'JetBrains Mono',monospace",
+              fontFamily: 'var(--jb-font-mono)',
               fontSize: 11,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
@@ -537,7 +582,7 @@ export default function EmployerOnboarding() {
           <div style={{ position: 'relative' }}>
             <p
               style={{
-                fontFamily: "'Instrument Serif',serif",
+                fontFamily: 'var(--jb-font-display)',
                 fontSize: 38,
                 lineHeight: 1.08,
                 color: '#F2EDE2',
@@ -576,7 +621,7 @@ export default function EmployerOnboarding() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontFamily: "'JetBrains Mono',monospace",
+                        fontFamily: 'var(--jb-font-mono)',
                         fontWeight: 600,
                         fontSize: 12,
                       }}
@@ -597,7 +642,7 @@ export default function EmployerOnboarding() {
               })}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 30, fontWeight: 600, color: '#8DA2F5' }}>
+              <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 30, fontWeight: 600, color: '#8DA2F5' }}>
                 37→6
               </span>
               <span style={{ fontSize: 14, lineHeight: 1.4, color: '#9A9286', maxWidth: 250 }}>
@@ -607,8 +652,8 @@ export default function EmployerOnboarding() {
           </div>
 
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#9A9286' }}>
-            <span style={{ color: '#1FA463', letterSpacing: '0.1em' }}>★★★★★</span>
-            Trusted by 5,000+ hiring teams
+            <span style={{ color: '#1FA463' }}>✓</span>
+            Free to post your first role · No card required
           </div>
         </div>
       </div>

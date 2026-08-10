@@ -6,12 +6,14 @@ import {
   EmployerJob,
   EmployerJobSchema,
 } from './schemas/employer-job.schema';
+import { IngestionModule } from '../ingestion/ingestion.module';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: EmployerJob.name, schema: EmployerJobSchema },
     ]),
+    IngestionModule,
   ],
   controllers: [EmployerJobsController],
   providers: [EmployerJobsService],

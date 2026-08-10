@@ -1,42 +1,15 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import EmployerSidebar from '@/components/employer/EmployerSidebar';
+import { EmptyState, InlineError } from '@/components/employer/EmployerStates';
 import { appRoute } from '@/components/app/appRoutes';
+import { aiRecruiterApi } from '@/services/employerApi';
 
-/* ---------------------------------------------------------------- data --- */
-const SCREENED = [
-  {
-    id: 's1', initials: 'SC', name: 'Sarah Chen', when: '2h ago', duration: '24 min',
-    rec: 'STRONG HIRE', recKey: 'strong', accent: 'green',
-    scores: [{ label: 'Craft', value: '4.8' }, { label: 'Systems', value: '4.6' }, { label: 'Comms', value: '4.7' }],
-    transcript: [
-      { q: 'Walk me through a project you’re proud of.', a: 'Led the Plaid onboarding redesign — framed activation as the core metric, ran research, shipped in six weeks and lifted activation 31% across 2M users.' },
-      { q: 'How do you drive design-system adoption?', a: 'Pair early with a few teams, make the right thing the easy thing, and measure adoption like a product — I got 40+ engineers onto our system this way.' },
-    ],
-  },
-  {
-    id: 's2', initials: 'JL', name: 'Jordan Lee', when: '5h ago', duration: '21 min',
-    rec: 'HIRE', recKey: 'hire', accent: 'indigo',
-    scores: [{ label: 'Craft', value: '4.2' }, { label: 'Systems', value: '3.9' }, { label: 'Comms', value: '4.3' }],
-    transcript: [
-      { q: 'Walk me through a project you’re proud of.', a: 'Shipped the Square seller dashboard used by 200k merchants daily; focused on reducing time-to-first-action.' },
-      { q: 'How do you drive design-system adoption?', a: 'Mostly through documentation and office hours — still building the muscle for measuring adoption rigorously.' },
-    ],
-  },
-  {
-    id: 's3', initials: 'MO', name: 'Marcus Obi', when: 'Yesterday', duration: '19 min',
-    rec: 'NEEDS REVIEW', recKey: 'review', accent: 'neutral',
-    scores: [{ label: 'Craft', value: '3.6' }, { label: 'Systems', value: '3.2' }, { label: 'Comms', value: '3.8' }],
-    transcript: [
-      { q: 'Walk me through a project you’re proud of.', a: 'Redesigned a SaaS settings area; improved task completion but the metrics story was less defined.' },
-      { q: 'How do you drive design-system adoption?', a: 'Haven’t owned a system end to end yet, but I’ve contributed components to one.' },
-    ],
-  },
-];
-
+/* ---------------------------------------------------------------- config --- */
+// Static interview-configuration options (UI only — not fabricated results).
 const QSETS = [
   { key: 'design', label: 'Product design — core', meta: '6 questions · craft, systems, collaboration' },
   { key: 'behavioral', label: 'Behavioral screen', meta: '5 questions · motivation, teamwork' },
@@ -49,54 +22,24 @@ const LIMITS = [
   { key: '45', label: '45 min' },
 ];
 
-const COMP_RAW = [
-  { label: 'Craft & visual', score: '4.8' },
-  { label: 'Systems thinking', score: '4.6' },
-  { label: 'Communication', score: '4.7' },
-  { label: 'Collaboration', score: '4.3' },
-  { label: 'Org / scale', score: '3.6' },
-];
-
-const STRENGTHS = [
-  'Metric-driven: framed and moved activation +31% at Plaid.',
-  'Proven design-systems leadership across 40+ engineers.',
-  'Crisp, structured communicator under whiteboard pressure.',
-];
-
-const RISKS = [
-  'Less experience steering very large cross-functional orgs.',
-  'Probe how she handles ambiguous executive stakeholders.',
-];
-
-const FOLLOWUPS = [
-  'Tell me about a time a launch metric went the wrong way — what did you do?',
-  'How would you structure design ops for a 60-person org?',
-  'Describe a disagreement with a PM you lost, and what you learned.',
-];
-
-const DEFAULT_NOTES = `Final round with Sarah Chen (Senior Product Designer).
-
-Walked through the Plaid onboarding redesign end to end — framed the activation problem, ran the research, shipped in 6 weeks, +31% activation. Strong on tradeoffs. Built a design system adopted by 40+ engineers; spoke well about governance and adoption. Communication crisp. Some uncertainty on managing very large cross-functional orgs. Whiteboard exercise on a payments flow was excellent.`;
+// Map the scorecard recommendation returned by the backend to a display badge.
+const REC_META = {
+  hire: { label: 'HIRE', color: '#157A49', bg: '#EAF6EE', border: '#CDE9D6' },
+  lean_hire: { label: 'LEAN HIRE', color: '#4263EB', bg: '#EDF0FE', border: '#C7D2FB' },
+  lean_no_hire: { label: 'LEAN NO HIRE', color: '#9A6A2E', bg: '#FBF1E2', border: '#EAD9BE' },
+  no_hire: { label: 'NO HIRE', color: '#C9622E', bg: '#FBEDE4', border: '#EAD0C4' },
+};
 
 /* ----------------------------------------------------------- helpers --- */
-const recStyle = (k) => {
-  if (k === 'strong') return { color: '#157A49', bg: '#EAF6EE', border: '#CDE9D6' };
-  if (k === 'hire') return { color: '#4263EB', bg: '#EDF0FE', border: '#C7D2FB' };
-  return { color: '#9A6A2E', bg: '#FBF1E2', border: '#EAD9BE' };
-};
-const avatarStyle = (a) => {
-  if (a === 'green') return { bg: '#1FA463', color: '#0C2C1C' };
-  if (a === 'indigo') return { bg: '#4263EB', color: '#fff' };
-  return { bg: '#EDE7DA', color: '#5A544A' };
-};
-const scoreColor = (v) => {
+// Rating is a 1–5 integer from the backend.
+const ratingColor = (v) => {
   const n = parseFloat(v);
-  return n >= 4.4 ? '#157A49' : n >= 3.8 ? '#4263EB' : '#9A6A2E';
+  return n >= 4 ? '#1FA463' : n >= 3 ? '#4263EB' : '#C9622E';
 };
 
 const monoLabel = {
-  fontFamily: "'JetBrains Mono',monospace",
-  fontSize: 10,
+  fontFamily: 'var(--jb-font-mono)',
+  fontSize: 11,
   letterSpacing: '0.08em',
   textTransform: 'uppercase',
   color: '#9A9286',
@@ -109,28 +52,49 @@ export default function EmployerAiInterview() {
   const [tab, setTab] = useState('screen');
   const [qset, setQset] = useState('design');
   const [limit, setLimit] = useState('30');
-  const [open, setOpen] = useState(null);
-  const [notes, setNotes] = useState(DEFAULT_NOTES);
-  const [generated, setGenerated] = useState(true);
+
+  // Scorecard is generated on demand — nothing is shown until the AI returns.
+  const [notes, setNotes] = useState('');
   const [generating, setGenerating] = useState(false);
-  const genTimer = useRef(null);
+  const [generated, setGenerated] = useState(false);
+  const [scoreError, setScoreError] = useState(null);
+  const [card, setCard] = useState(null);
 
-  useEffect(() => () => clearTimeout(genTimer.current), []);
-
-  const generate = () => {
+  const generate = async () => {
+    const text = notes.trim();
+    if (!text || generating) return;
     setGenerating(true);
     setGenerated(false);
-    clearTimeout(genTimer.current);
-    genTimer.current = setTimeout(() => {
-      setGenerating(false);
+    setScoreError(null);
+    try {
+      const res = await aiRecruiterApi.scorecard({ notes: text });
+      setCard({
+        recommendation: res?.recommendation || '',
+        overall: res?.overall ?? null,
+        summary: res?.summary || '',
+        comps: Array.isArray(res?.competencies)
+          ? res.competencies.map((c) => ({
+              label: c.competency,
+              score: String(c.rating),
+              evidence: c.evidence || '',
+            }))
+          : [],
+        nextSteps: Array.isArray(res?.nextSteps) ? res.nextSteps : [],
+      });
       setGenerated(true);
-    }, 1100);
+    } catch (err) {
+      // Surface the failure — never fall back to a fabricated scorecard.
+      setScoreError(err);
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const isScreen = tab === 'screen';
   const isScorecard = tab === 'scorecard';
-  const showCard = generated && !generating;
+  const showCard = generated && !generating && card && card.comps.length > 0;
   const generateLabel = generated ? 'Regenerate scorecard' : 'Generate scorecard';
+  const rec = (card && REC_META[card.recommendation]) || null;
 
   const tabs = [
     { key: 'screen', label: '✦ AI screening interview' },
@@ -141,12 +105,6 @@ export default function EmployerAiInterview() {
     <>
       <Head>
         <title>AI interviews — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
       <style jsx global>{`
@@ -187,20 +145,20 @@ export default function EmployerAiInterview() {
         }
       `}</style>
 
-      <div id="emapp" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: "'Hanken Grotesk',sans-serif", color: '#1B1A16' }}>
+      <div id="emapp" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16' }}>
         <EmployerSidebar active="interviews" />
 
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           {/* HEADER */}
           <header style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: 14, padding: '14px 32px', background: 'rgba(247,243,234,0.85)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #E7E0D2' }}>
             <span style={{ color: '#1FA463' }}>✦</span>
-            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9286' }}>AI interview tools</span>
+            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9286' }}>AI interview tools</span>
             <div style={{ flex: 1 }} />
             <Link href={appRoute('Employer Interviews.dc.html')} style={{ fontSize: 13, fontWeight: 600, color: '#4263EB', textDecoration: 'none' }}>All interviews →</Link>
           </header>
 
           <div style={{ padding: '26px 32px 56px', maxWidth: 1080, width: '100%', margin: '0 auto' }}>
-            <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 34, lineHeight: 1, margin: '0 0 16px' }}>AI interviews</h1>
+            <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 34, lineHeight: 1, margin: '0 0 16px' }}>AI interviews</h1>
 
             {/* TABS */}
             <div style={{ display: 'inline-flex', padding: 4, background: '#F1ECE0', border: '1px solid #E1D9C9', borderRadius: 999, gap: 4, marginBottom: 24 }}>
@@ -240,14 +198,6 @@ export default function EmployerAiInterview() {
                   <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>Configure interview</h2>
                   <p style={{ fontSize: 12.5, color: '#8A8378', margin: '0 0 18px' }}>The AI conducts an async interview; candidates answer on their own time.</p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    <div>
-                      <label style={monoLabel}>Role</label>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: '#FBF8F1', border: '1px solid #E1D9C9', borderRadius: 11, padding: '11px 13px' }}>
-                        <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>Senior Product Designer</span>
-                        <span style={{ color: '#A79E8F', fontSize: 11 }}>▾</span>
-                      </div>
-                    </div>
-
                     <div>
                       <label style={monoLabel}>Question set</label>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -309,15 +259,6 @@ export default function EmployerAiInterview() {
                         })}
                       </div>
                     </div>
-
-                    <button className="em-send" style={{ width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit', fontSize: 14, fontWeight: 700, color: '#fff', background: '#4263EB', border: 'none', borderRadius: 999, padding: 12, cursor: 'pointer', marginTop: 4 }}>
-                      ✦ Send interview link
-                    </button>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: '#FBF8F1', border: '1px solid #E1D9C9', borderRadius: 10, padding: '9px 12px' }}>
-                      <span style={{ flex: 1, fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, color: '#5A544A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>jobocate.com/ai/sr-design</span>
-                      <button style={{ fontFamily: 'inherit', fontSize: 11.5, fontWeight: 600, color: '#4263EB', background: 'none', border: 'none', cursor: 'pointer' }}>Copy</button>
-                    </div>
                   </div>
                 </div>
 
@@ -325,61 +266,14 @@ export default function EmployerAiInterview() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                     <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Completed interviews</h2>
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#8A8378' }}>3 of 5 returned</span>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {SCREENED.map((c) => {
-                      const rs = recStyle(c.recKey);
-                      const av = avatarStyle(c.accent);
-                      const isOpen = open === c.id;
-                      const cardBorder = c.recKey === 'strong' ? '#CDE9D6' : '#E6DECF';
-                      return (
-                        <div key={c.id} style={{ background: '#FFFEFB', border: `1px solid ${cardBorder}`, borderRadius: 16, padding: 18 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
-                            <span style={{ width: 42, height: 42, flexShrink: 0, borderRadius: '50%', background: av.bg, color: av.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14 }}>{c.initials}</span>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 15, fontWeight: 700, color: '#1B1A16' }}>{c.name}</div>
-                              <div style={{ fontSize: 12.5, color: '#8A8378' }}>Completed {c.when} · {c.duration}</div>
-                            </div>
-                            <span style={{ flexShrink: 0, fontFamily: "'JetBrains Mono',monospace", fontSize: 10, fontWeight: 600, letterSpacing: '0.03em', color: rs.color, background: rs.bg, border: `1px solid ${rs.border}`, padding: '4px 10px', borderRadius: 999 }}>{c.rec}</span>
-                          </div>
-
-                          <div style={{ display: 'flex', gap: 10, margin: '14px 0', flexWrap: 'wrap' }}>
-                            {c.scores.map((s) => (
-                              <div key={s.label} style={{ flex: 1, minWidth: 96, background: '#FBF9F4', border: '1px solid #EFE8DA', borderRadius: 10, padding: '10px 12px' }}>
-                                <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 16, fontWeight: 600, color: scoreColor(s.value) }}>{s.value}</div>
-                                <div style={{ fontSize: 11, color: '#8A8378', marginTop: 1 }}>{s.label}</div>
-                              </div>
-                            ))}
-                          </div>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                            <button
-                              onClick={() => setOpen((o) => (o === c.id ? null : c.id))}
-                              style={{ fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: '#4263EB', background: '#EDF0FE', border: '1px solid #C7D2FB', borderRadius: 999, padding: '8px 14px', cursor: 'pointer' }}
-                            >
-                              {isOpen ? 'Hide transcript' : 'View transcript'}
-                            </button>
-                            <Link href={appRoute('Employer Candidate.dc.html')} style={{ fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: '#1B1A16', textDecoration: 'none', padding: '8px 6px' }}>View profile →</Link>
-                          </div>
-
-                          {isOpen && (
-                            <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #F2ECE0', display: 'flex', flexDirection: 'column', gap: 13, animation: 'emrise 0.2s ease' }}>
-                              {c.transcript.map((t, i) => (
-                                <div key={i}>
-                                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 5 }}>
-                                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#4263EB', flexShrink: 0 }}>AI</span>
-                                    <span style={{ fontSize: 13, fontWeight: 600, color: '#1B1A16' }}>{t.q}</span>
-                                  </div>
-                                  <div style={{ fontSize: 13, lineHeight: 1.55, color: '#5A544A', paddingLeft: 24 }}>{t.a}</div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                  <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 16 }}>
+                    <EmptyState
+                      icon="○"
+                      title="No completed AI interviews yet"
+                      hint="When candidates finish an async AI interview, their transcripts and recommendations will appear here."
+                    />
                   </div>
                 </div>
               </div>
@@ -395,13 +289,14 @@ export default function EmployerAiInterview() {
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Paste your interview notes or transcript here…"
                     style={{ width: '100%', minHeight: 280, fontFamily: 'inherit', fontSize: 13, lineHeight: 1.6, color: '#2A2820', background: '#FBF8F1', border: '1px solid #E1D9C9', borderRadius: 12, padding: 14, resize: 'vertical' }}
                   />
+                  <InlineError error={scoreError} />
                   <div style={{ display: 'flex', gap: 9, marginTop: 14 }}>
-                    <button onClick={generate} className="em-send" style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit', fontSize: 14, fontWeight: 700, color: '#fff', background: '#4263EB', border: 'none', borderRadius: 999, padding: 12, cursor: 'pointer' }}>
-                      ✦ {generateLabel}
+                    <button onClick={generate} disabled={!notes.trim() || generating} className="em-send" style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit', fontSize: 14, fontWeight: 700, color: '#fff', background: '#4263EB', border: 'none', borderRadius: 999, padding: 12, cursor: !notes.trim() || generating ? 'not-allowed' : 'pointer', opacity: !notes.trim() || generating ? 0.5 : 1 }}>
+                      ✦ {generating ? 'Generating…' : generateLabel}
                     </button>
-                    <button style={{ fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: '#5A544A', background: '#FFFEFB', border: '1px solid #D9D0BE', borderRadius: 999, padding: '12px 16px', cursor: 'pointer' }}>Import</button>
                   </div>
                 </div>
 
@@ -419,78 +314,71 @@ export default function EmployerAiInterview() {
                     </div>
                   )}
 
+                  {!generating && !showCard && (
+                    <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18 }}>
+                      <EmptyState
+                        icon="✦"
+                        title="No scorecard yet"
+                        hint="Paste interview notes or a transcript on the left and generate a structured scorecard."
+                      />
+                    </div>
+                  )}
+
                   {showCard && (
                     <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18, padding: 24, animation: 'emrise 0.3s ease' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
                         <div>
-                          <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1FA463', marginBottom: 5 }}>✦ AI-generated scorecard</div>
-                          <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Sarah Chen · Senior Product Designer</h2>
+                          <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1FA463', marginBottom: 5 }}>✦ AI-generated scorecard</div>
+                          <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>
+                            {card.overall != null ? `Overall ${card.overall} / 5` : 'Interview scorecard'}
+                          </h2>
                         </div>
-                        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 600, color: '#157A49', background: '#EAF6EE', border: '1px solid #CDE9D6', padding: '6px 12px', borderRadius: 999 }}>STRONG HIRE</span>
+                        {rec && (
+                          <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, color: rec.color, background: rec.bg, border: `1px solid ${rec.border}`, padding: '6px 12px', borderRadius: 999 }}>{rec.label}</span>
+                        )}
                       </div>
 
-                      <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9A9286', marginBottom: 11 }}>Competency ratings</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 11, marginBottom: 22 }}>
-                        {COMP_RAW.map((c) => {
+                      <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9A9286', marginBottom: 11 }}>Competency ratings</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 13, marginBottom: 22 }}>
+                        {card.comps.map((c) => {
                           const n = Math.round(parseFloat(c.score));
-                          const col = parseFloat(c.score) >= 4.4 ? '#1FA463' : parseFloat(c.score) >= 3.8 ? '#4263EB' : '#C9622E';
+                          const col = ratingColor(c.score);
                           return (
-                            <div key={c.label} style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
-                              <span style={{ width: 140, flexShrink: 0, fontSize: 13, fontWeight: 600, color: '#1B1A16' }}>{c.label}</span>
-                              <div style={{ flex: 1, display: 'flex', gap: 5 }}>
-                                {[0, 1, 2, 3, 4].map((i) => (
-                                  <span key={i} style={{ flex: 1, height: 8, borderRadius: 3, background: i < n ? col : '#EFE8DA' }} />
-                                ))}
+                            <div key={c.label}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
+                                <span style={{ width: 150, flexShrink: 0, fontSize: 13, fontWeight: 600, color: '#1B1A16' }}>{c.label}</span>
+                                <div style={{ flex: 1, display: 'flex', gap: 5 }}>
+                                  {[0, 1, 2, 3, 4].map((i) => (
+                                    <span key={i} style={{ flex: 1, height: 8, borderRadius: 3, background: i < n ? col : '#EFE8DA' }} />
+                                  ))}
+                                </div>
+                                <span style={{ width: 34, flexShrink: 0, textAlign: 'right', fontFamily: 'var(--jb-font-mono)', fontSize: 12, fontWeight: 600, color: '#4263EB' }}>{c.score}</span>
                               </div>
-                              <span style={{ width: 34, flexShrink: 0, textAlign: 'right', fontFamily: "'JetBrains Mono',monospace", fontSize: 12, fontWeight: 600, color: '#4263EB' }}>{c.score}</span>
+                              {c.evidence && (
+                                <div style={{ fontSize: 11.5, lineHeight: 1.45, color: '#8A8378', marginTop: 4, paddingLeft: 163 }}>{c.evidence}</div>
+                              )}
                             </div>
                           );
                         })}
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 20 }}>
-                        <div style={{ background: '#EAF6EE', border: '1px solid #CDE9D6', borderRadius: 13, padding: 16 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: '#157A49', marginBottom: 9 }}>Strengths</div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                            {STRENGTHS.map((s, i) => (
-                              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12.5, lineHeight: 1.45, color: '#1F4733' }}>
-                                <span style={{ color: '#1FA463', flexShrink: 0 }}>+</span>
+                      {card.summary && (
+                        <div style={{ fontSize: 13.5, lineHeight: 1.6, color: '#3A352C', marginBottom: 20 }}>{card.summary}</div>
+                      )}
+
+                      {card.nextSteps.length > 0 && (
+                        <div>
+                          <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9A9286', marginBottom: 10 }}>Suggested next steps</div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {card.nextSteps.map((s, i) => (
+                              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: '#FBF9F4', border: '1px solid #EFE8DA', borderRadius: 10, padding: '11px 13px', fontSize: 13, lineHeight: 1.5, color: '#3A352C' }}>
+                                <span style={{ color: '#4263EB', flexShrink: 0, fontWeight: 700 }}>→</span>
                                 <span>{s}</span>
                               </div>
                             ))}
                           </div>
                         </div>
-                        <div style={{ background: '#FBF1E2', border: '1px solid #EAD9BE', borderRadius: 13, padding: 16 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: '#9A6A2E', marginBottom: 9 }}>Risks to probe</div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                            {RISKS.map((r, i) => (
-                              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12.5, lineHeight: 1.45, color: '#7A4326' }}>
-                                <span style={{ color: '#C9622E', flexShrink: 0 }}>!</span>
-                                <span>{r}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div style={{ marginBottom: 20 }}>
-                        <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9A9286', marginBottom: 10 }}>Suggested follow-up questions</div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          {FOLLOWUPS.map((f, i) => (
-                            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: '#FBF9F4', border: '1px solid #EFE8DA', borderRadius: 10, padding: '11px 13px', fontSize: 13, lineHeight: 1.5, color: '#3A352C' }}>
-                              <span style={{ color: '#4263EB', flexShrink: 0, fontWeight: 700 }}>Q</span>
-                              <span>{f}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 18, borderTop: '1px solid #F2ECE0' }}>
-                        <span style={{ fontSize: 13, color: '#8A8378' }}>Confirm this scorecard for the panel?</span>
-                        <div style={{ flex: 1 }} />
-                        <button style={{ fontFamily: 'inherit', fontSize: 13, fontWeight: 700, color: '#0C2C1C', background: '#1FA463', border: 'none', borderRadius: 999, padding: '9px 18px', cursor: 'pointer' }}>✓ Confirm &amp; save</button>
-                        <button style={{ fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: '#1B1A16', background: '#FFFEFB', border: '1px solid #D9D0BE', borderRadius: 999, padding: '9px 15px', cursor: 'pointer' }}>Edit</button>
-                      </div>
+                      )}
                     </div>
                   )}
                 </div>

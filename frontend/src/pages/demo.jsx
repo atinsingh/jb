@@ -3,17 +3,16 @@
 import { useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import SiteNav from '@/components/site/SiteNav';
-import SiteFooter from '@/components/site/SiteFooter';
+import PublicLayout from '@/components/layout/PublicLayout';
 import { appRoute } from '@/components/app/appRoutes';
+import { API_URL } from '@/config/api';
 
 const VALUE_POINTS = [
-  'A live walkthrough on your real open roles',
-  'See Autopilot screen, source and schedule end to end',
+  'A walkthrough on your own open roles, not a canned demo',
+  'Watch Autopilot source, screen and schedule end to end',
   'Pricing and rollout mapped to your team',
 ];
 
-const LOGOS = ['Northwind', 'Lumen', 'Vertex', 'Corewave'];
 
 const DAY_DEFS = [
   { dow: 'MON', num: '30' },
@@ -28,9 +27,9 @@ const inputStyle = {
   width: '100%',
   fontFamily: 'inherit',
   fontSize: 14.5,
-  color: '#1B1A16',
-  background: '#FBF8F1',
-  border: '1px solid #E1D9C9',
+  color: 'var(--jb-d-ink)',
+  background: 'var(--jb-d-glass)',
+  border: '1px solid var(--jb-d-line-card)',
   borderRadius: 11,
   padding: '12px 14px',
 };
@@ -38,7 +37,7 @@ const inputStyle = {
 const labelStyle = {
   fontSize: 12.5,
   fontWeight: 600,
-  color: '#46413A',
+  color: 'var(--jb-d-ink-85)',
   marginBottom: 6,
   display: 'block',
 };
@@ -55,8 +54,59 @@ export default function BookDemo() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [company, setCompany] = useState('');
+  const [companySize, setCompanySize] = useState('1–50');
+  const [role, setRole] = useState('');
+  const [hiringVolume, setHiringVolume] = useState('1–10 hires');
+  const [message, setMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState(null);
   const [day, setDay] = useState(1);
   const [slot, setSlot] = useState(null);
+
+  const submitDemoRequest = async (e) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!name.trim() || !email.trim()) {
+      setError('Please add your name and work email.');
+      return;
+    }
+
+    setSending(true);
+    try {
+      const res = await fetch(`${API_URL}/api/leads/demo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          company: company.trim() || undefined,
+          companySize,
+          role: role.trim() || undefined,
+          hiringVolume,
+          message: message.trim() || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        const detail = Array.isArray(body.message) ? body.message[0] : body.message;
+        throw new Error(detail || 'Request failed');
+      }
+
+      setSubmitted(true);
+    } catch (err) {
+      // Never show a success state we can't back up — a demo request that
+      // silently vanishes is worse than one the visitor knows to retry.
+      setError(
+        err.message === 'Failed to fetch'
+          ? "We couldn't reach our servers. Please retry, or email hello@jobocate.com."
+          : err.message || 'Something went wrong. Please try again.',
+      );
+    } finally {
+      setSending(false);
+    }
+  };
 
   const slotLabel = (i) => SLOT_DEFS[i] + (i < 2 ? ' AM' : ' PM');
 
@@ -73,13 +123,7 @@ export default function BookDemo() {
   return (
     <>
       <Head>
-        <title>Book a demo — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
+        <title>Book a demo — Jobocate AI recruiter for hiring teams</title>
       </Head>
 
       <style jsx global>{`
@@ -88,13 +132,13 @@ export default function BookDemo() {
         }
         #emkt input::placeholder,
         #emkt textarea::placeholder {
-          color: #a79e8f;
+          color: var(--jb-d-ink-55);
         }
         #emkt input:focus,
         #emkt textarea:focus,
         #emkt select:focus {
           outline: none;
-          border-color: #4263eb;
+          border-color: #7cc4ff;
           box-shadow: 0 0 0 3px rgba(66, 99, 235, 0.14);
         }
         @keyframes rbpop {
@@ -109,10 +153,8 @@ export default function BookDemo() {
         }
       `}</style>
 
-      <div id="emkt" style={{ fontFamily: "'Hanken Grotesk',sans-serif", color: '#1B1A16', background: '#F7F3EA' }}>
-        <div style={{ position: 'sticky', top: 0, zIndex: 50, display: 'block' }}>
-          <SiteNav />
-        </div>
+      <div id="emkt" style={{ fontFamily: 'var(--jb-font-sans)', color: 'var(--jb-d-ink)', background: 'transparent' }}>
+        <PublicLayout>
 
         <div
           style={{
@@ -120,7 +162,7 @@ export default function BookDemo() {
             margin: '0 auto',
             padding: '56px 32px 72px',
             display: 'grid',
-            gridTemplateColumns: '1fr 1.05fr',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))',
             gap: 56,
             alignItems: 'start',
           }}
@@ -132,21 +174,21 @@ export default function BookDemo() {
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 8,
-                border: '1px solid #C7D2FB',
-                background: '#EDF0FE',
+                border: '1px solid rgba(124,196,255,0.3)',
+                background: 'rgba(124,196,255,0.12)',
                 borderRadius: 999,
                 padding: '6px 13px',
                 marginBottom: 20,
               }}
             >
-              <span style={{ color: '#1FA463' }}>✦</span>
+              <span style={{ color: 'var(--jb-d-accent)' }}>✦</span>
               <span
                 style={{
-                  fontFamily: "'JetBrains Mono',monospace",
+                  fontFamily: 'var(--jb-font-mono)',
                   fontSize: 11,
                   letterSpacing: '0.08em',
                   textTransform: 'uppercase',
-                  color: '#364FC7',
+                  color: '#7cc4ff',
                 }}
               >
                 Book a demo
@@ -154,18 +196,18 @@ export default function BookDemo() {
             </div>
             <h1
               style={{
-                fontFamily: "'Instrument Serif',serif",
+                fontFamily: 'var(--jb-font-display)',
                 fontWeight: 400,
-                fontSize: 48,
+                fontSize: 'clamp(26px, 5vw, 48px)',
                 lineHeight: 1.04,
                 letterSpacing: '-0.01em',
                 margin: '0 0 16px',
               }}
             >
-              See your AI recruiter in action.
+              See our AI recruiter work your open roles.
             </h1>
-            <p style={{ fontSize: 17, lineHeight: 1.55, color: '#5A544A', margin: '0 0 30px', maxWidth: 440 }}>
-              A 30-minute walkthrough on your real reqs — see Autopilot screen, source and schedule live, then map it to your pipeline.
+            <p style={{ fontSize: 17, lineHeight: 1.55, color: 'var(--jb-d-ink-70)', margin: '0 0 30px', maxWidth: 440 }}>
+              A 30-minute walkthrough on your own open roles — watch Autopilot source, screen and schedule candidates live, then map it to your pipeline.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 13, marginBottom: 34 }}>
@@ -177,8 +219,8 @@ export default function BookDemo() {
                       height: 26,
                       flexShrink: 0,
                       borderRadius: '50%',
-                      background: '#EDF0FE',
-                      color: '#4263EB',
+                      background: 'rgba(124,196,255,0.12)',
+                      color: '#7cc4ff',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -187,57 +229,28 @@ export default function BookDemo() {
                   >
                     ✓
                   </span>
-                  <span style={{ fontSize: 15, lineHeight: 1.5, color: '#3A352C' }}>{v}</span>
+                  <span style={{ fontSize: 15, lineHeight: 1.5, color: 'var(--jb-d-ink-85)' }}>{v}</span>
                 </div>
               ))}
             </div>
 
-            <div
-              style={{
-                fontFamily: "'JetBrains Mono',monospace",
-                fontSize: 10.5,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                color: '#9A9286',
-                marginBottom: 16,
-              }}
-            >
-              Trusted by talent teams
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 30, flexWrap: 'wrap', opacity: 0.7, marginBottom: 34 }}>
-              {LOGOS.map((l) => (
-                <span key={l} style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 800, fontSize: 19, color: '#8A8378' }}>
-                  {l}
-                </span>
-              ))}
-            </div>
+            {/*
+              An invented logo strip (Northwind, Lumen, Vertex, Corewave) and a
+              testimonial from "Dana Whitfield, Senior Recruiter, Stripe" sat
+              here — Stripe is not a customer, and the same invented person was
+              the form's own name placeholder directly to the right. Both are
+              removed until there is a real, permissioned quote to run.
+            */}
 
-            <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 16, padding: 22 }}>
-              <p style={{ fontSize: 16, lineHeight: 1.45, color: '#1B1A16', margin: '0 0 16px', fontFamily: "'Instrument Serif',serif" }}>
-                &quot;The demo used our own open roles. By the end of the call Autopilot had already shortlisted four people.&quot;
-              </p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: '50%',
-                    background: '#4263EB',
-                    color: '#fff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 700,
-                    fontSize: 13,
-                  }}
-                >
-                  DW
-                </span>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>Dana Whitfield</div>
-                  <div style={{ fontSize: 12.5, color: '#8A8378' }}>Senior Recruiter, Stripe</div>
-                </div>
+            <div style={{ background: 'var(--jb-d-panel)', border: '1px solid var(--jb-d-line-card)', borderRadius: 16, padding: 22 }}>
+              <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--jb-d-ink-55)', marginBottom: 12 }}>
+                What to expect
               </div>
+              <p style={{ fontSize: 15, lineHeight: 1.55, color: 'var(--jb-d-ink-85)', margin: 0 }}>
+                We&rsquo;ll reply within one business day to book a time. The call runs
+                on your own open roles — bring a live job description and we&rsquo;ll set
+                Autopilot against it while you watch.
+              </p>
             </div>
           </div>
 
@@ -246,15 +259,15 @@ export default function BookDemo() {
             {!submitted ? (
               <div
                 style={{
-                  background: '#FFFEFB',
-                  border: '1px solid #E6DECF',
+                  background: 'var(--jb-d-panel)',
+                  border: '1px solid var(--jb-d-line-card)',
                   borderRadius: 20,
                   padding: 32,
                   boxShadow: '0 30px 60px -40px rgba(27,26,22,0.35)',
                 }}
               >
                 <h2 style={{ fontSize: 21, fontWeight: 700, margin: '0 0 4px' }}>Request your demo</h2>
-                <p style={{ fontSize: 13.5, color: '#8A8378', margin: '0 0 22px' }}>
+                <p style={{ fontSize: 13.5, color: 'var(--jb-d-ink-65)', margin: '0 0 22px' }}>
                   Tell us a little about your team — we&rsquo;ll tailor the call.
                 </p>
 
@@ -265,7 +278,7 @@ export default function BookDemo() {
                       <input
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        placeholder="Dana Whitfield"
+                        placeholder="Your name"
                         style={inputStyle}
                       />
                     </div>
@@ -292,7 +305,11 @@ export default function BookDemo() {
                     </div>
                     <div style={{ flex: 1 }}>
                       <label style={labelStyle}>Company size</label>
-                      <select style={selectStyle} defaultValue="1–50">
+                      <select
+                        style={selectStyle}
+                        value={companySize}
+                        onChange={(e) => setCompanySize(e.target.value)}
+                      >
                         <option>1–50</option>
                         <option>51–200</option>
                         <option>201–1,000</option>
@@ -303,11 +320,20 @@ export default function BookDemo() {
                   <div style={{ display: 'flex', gap: 12 }}>
                     <div style={{ flex: 1 }}>
                       <label style={labelStyle}>Your role</label>
-                      <input placeholder="Head of Talent" style={inputStyle} />
+                      <input
+                        value={role}
+                        onChange={(e) => setRole(e.target.value)}
+                        placeholder="Head of Talent"
+                        style={inputStyle}
+                      />
                     </div>
                     <div style={{ flex: 1 }}>
                       <label style={labelStyle}>Hiring volume / yr</label>
-                      <select style={selectStyle} defaultValue="1–10 hires">
+                      <select
+                        style={selectStyle}
+                        value={hiringVolume}
+                        onChange={(e) => setHiringVolume(e.target.value)}
+                      >
                         <option>1–10 hires</option>
                         <option>11–50 hires</option>
                         <option>51–200 hires</option>
@@ -318,9 +344,11 @@ export default function BookDemo() {
                   <div>
                     <label style={labelStyle}>
                       What would you like to see?{' '}
-                      <span style={{ color: '#A79E8F', fontWeight: 500 }}>(optional)</span>
+                      <span style={{ color: 'var(--jb-d-ink-55)', fontWeight: 500 }}>(optional)</span>
                     </label>
                     <textarea
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
                       placeholder="We&rsquo;re hiring 12 designers this half and screening is the bottleneck…"
                       style={{
                         ...inputStyle,
@@ -333,8 +361,28 @@ export default function BookDemo() {
                   </div>
                 </div>
 
+                {error && (
+                  <p
+                    role="alert"
+                    style={{
+                      margin: '18px 0 0',
+                      padding: '10px 13px',
+                      borderRadius: 10,
+                      background: 'rgba(224,120,86,0.14)',
+                      border: '1px solid rgba(224,120,86,0.4)',
+                      color: 'var(--jb-d-danger)',
+                      fontSize: 13.5,
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {error}
+                  </p>
+                )}
+
                 <button
-                  onClick={() => setSubmitted(true)}
+                  type="submit"
+                  onClick={submitDemoRequest}
+                  disabled={sending}
                   style={{
                     width: '100%',
                     display: 'flex',
@@ -345,27 +393,31 @@ export default function BookDemo() {
                     fontSize: 15.5,
                     fontWeight: 700,
                     color: '#fff',
-                    background: '#4263EB',
+                    background: sending ? '#8A9BF0' : '#7cc4ff',
                     border: 'none',
                     borderRadius: 999,
                     padding: 14,
-                    cursor: 'pointer',
-                    marginTop: 22,
+                    cursor: sending ? 'not-allowed' : 'pointer',
+                    marginTop: error ? 14 : 22,
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = '#364FC7')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = '#4263EB')}
+                  onMouseEnter={(e) => {
+                    if (!sending) e.currentTarget.style.background= '#7cc4ff';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!sending) e.currentTarget.style.background= '#7cc4ff';
+                  }}
                 >
-                  Request demo <span>→</span>
+                  {sending ? 'Sending…' : <>Request demo <span>→</span></>}
                 </button>
-                <p style={{ fontSize: 12, color: '#A79E8F', textAlign: 'center', margin: '13px 0 0' }}>
+                <p style={{ fontSize: 12, color: 'var(--jb-d-ink-55)', textAlign: 'center', margin: '13px 0 0' }}>
                   No spam. We&rsquo;ll only use this to schedule your call.
                 </p>
               </div>
             ) : (
               <div
                 style={{
-                  background: '#FFFEFB',
-                  border: '1px solid #E6DECF',
+                  background: 'var(--jb-d-panel)',
+                  border: '1px solid var(--jb-d-line-card)',
                   borderRadius: 20,
                   padding: 32,
                   boxShadow: '0 30px 60px -40px rgba(27,26,22,0.35)',
@@ -377,8 +429,8 @@ export default function BookDemo() {
                     width: 56,
                     height: 56,
                     borderRadius: '50%',
-                    background: '#EAF6EE',
-                    color: '#157A49',
+                    background: 'var(--jb-d-accent-tint)',
+                    color: 'var(--jb-d-accent)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -390,7 +442,7 @@ export default function BookDemo() {
                 </div>
                 <h2
                   style={{
-                    fontFamily: "'Instrument Serif',serif",
+                    fontFamily: 'var(--jb-font-display)',
                     fontWeight: 400,
                     fontSize: 28,
                     lineHeight: 1.08,
@@ -399,17 +451,17 @@ export default function BookDemo() {
                 >
                   Request received.
                 </h2>
-                <p style={{ fontSize: 14.5, lineHeight: 1.55, color: '#5A544A', margin: '0 0 24px' }}>
-                  We&rsquo;ll reach out within <b style={{ color: '#1B1A16' }}>1 business day</b> — or grab a slot now and skip the wait.
+                <p style={{ fontSize: 14.5, lineHeight: 1.55, color: 'var(--jb-d-ink-70)', margin: '0 0 24px' }}>
+                  We&rsquo;ll reach out within <b style={{ color: 'var(--jb-d-ink)' }}>1 business day</b> — or grab a slot now and skip the wait.
                 </p>
 
                 <div
                   style={{
-                    fontFamily: "'JetBrains Mono',monospace",
-                    fontSize: 10.5,
+                    fontFamily: 'var(--jb-font-mono)',
+                    fontSize: 11,
                     letterSpacing: '0.08em',
                     textTransform: 'uppercase',
-                    color: '#9A9286',
+                    color: 'var(--jb-d-ink-55)',
                     marginBottom: 13,
                   }}
                 >
@@ -428,7 +480,7 @@ export default function BookDemo() {
                         style={{
                           flex: 1,
                           textAlign: 'center',
-                          background: on ? '#EDF0FE' : '#FBF8F1',
+                          background: on ? 'rgba(124,196,255,0.12)' : 'var(--jb-d-glass)',
                           border: `1.5px solid ${on ? '#4263EB' : '#E1D9C9'}`,
                           borderRadius: 11,
                           padding: '11px 6px',
@@ -436,13 +488,13 @@ export default function BookDemo() {
                           fontFamily: 'inherit',
                         }}
                       >
-                        <div style={{ fontSize: 11, color: on ? '#4263EB' : '#A79E8F' }}>{d.dow}</div>
+                        <div style={{ fontSize: 11, color: on ? '#7cc4ff' : 'var(--jb-d-ink-55)' }}>{d.dow}</div>
                         <div
                           style={{
-                            fontFamily: "'JetBrains Mono',monospace",
+                            fontFamily: 'var(--jb-font-mono)',
                             fontSize: 17,
                             fontWeight: 600,
-                            color: on ? '#1B1A16' : '#5A544A',
+                            color: on ? 'var(--jb-d-ink)' : 'var(--jb-d-ink-70)',
                           }}
                         >
                           {d.num}
@@ -451,7 +503,7 @@ export default function BookDemo() {
                     );
                   })}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 22 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', gap: 8, marginBottom: 22 }}>
                   {SLOT_DEFS.map((label, i) => {
                     const on = slot === i;
                     return (
@@ -459,11 +511,11 @@ export default function BookDemo() {
                         key={label}
                         onClick={() => setSlot(i)}
                         style={{
-                          fontFamily: "'JetBrains Mono',monospace",
+                          fontFamily: 'var(--jb-font-mono)',
                           fontSize: 12.5,
                           fontWeight: 600,
-                          color: on ? '#fff' : '#46413A',
-                          background: on ? '#4263EB' : '#FBF8F1',
+                          color: on ? '#fff' : 'var(--jb-d-ink-85)',
+                          background: on ? '#7cc4ff' : 'var(--jb-d-glass)',
                           border: `1.5px solid ${on ? '#4263EB' : '#E1D9C9'}`,
                           borderRadius: 9,
                           padding: '10px 6px',
@@ -482,8 +534,8 @@ export default function BookDemo() {
                       display: 'flex',
                       alignItems: 'center',
                       gap: 11,
-                      background: '#EDF0FE',
-                      border: '1px solid #C7D2FB',
+                      background: 'rgba(124,196,255,0.12)',
+                      border: '1px solid rgba(124,196,255,0.3)',
                       borderRadius: 12,
                       padding: '14px 16px',
                       marginBottom: 16,
@@ -495,7 +547,7 @@ export default function BookDemo() {
                         height: 26,
                         flexShrink: 0,
                         borderRadius: '50%',
-                        background: '#4263EB',
+                        background: '#7cc4ff',
                         color: '#fff',
                         display: 'flex',
                         alignItems: 'center',
@@ -513,7 +565,7 @@ export default function BookDemo() {
 
                 <Link
                   href={appRoute('For Employers.dc.html')}
-                  style={{ display: 'block', textAlign: 'center', fontSize: 13.5, fontWeight: 600, color: '#4263EB', textDecoration: 'none' }}
+                  style={{ display: 'block', textAlign: 'center', fontSize: 13.5, fontWeight: 600, color: '#7cc4ff', textDecoration: 'none' }}
                 >
                   ← Back to For Employers
                 </Link>
@@ -522,7 +574,7 @@ export default function BookDemo() {
           </div>
         </div>
 
-        <SiteFooter />
+        </PublicLayout>
       </div>
     </>
   );

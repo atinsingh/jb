@@ -5,6 +5,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import AppSidebar from '@/components/app/AppSidebar';
 import { appRoute } from '@/components/app/appRoutes';
+import { ErrorState, InlineError } from '@/components/app/AppStates';
 import {
   getUserPreferences,
   updateUserPreferences,
@@ -12,31 +13,6 @@ import {
   queueApplication,
   getMyApplications,
 } from '@/services/autoApplyApi';
-
-/* -------------------------------------------------------- sample data --- */
-// Faithful to the design's Component.renderVals() — used as graceful
-// fallback whenever the backend is unauthenticated or unreachable.
-const SAMPLE_RULES = [
-  { label: 'Daily limit', value: '10 / day' },
-  { label: 'Min. match score', value: '85% or higher' },
-  { label: 'Roles', value: 'Design · Product' },
-  { label: 'Work type', value: 'Remote · Hybrid' },
-];
-
-const SAMPLE_QUEUE = [
-  { id: 's1', logo: 'Da', company: 'Datadog', role: 'Senior Product Designer', salary: '$180–215k', match: '94%', bg: '#F4EFE4', fg: '#1B1A16' },
-  { id: 's2', logo: 'Ai', company: 'Airtable', role: 'Design Systems Manager', salary: '$195–225k', match: '92%', bg: '#F4EFE4', fg: '#1B1A16' },
-  { id: 's3', logo: 'Wb', company: 'Webflow', role: 'Staff Designer, Growth', salary: '$185–220k', match: '90%', bg: '#F4EFE4', fg: '#1B1A16' },
-  { id: 's4', logo: 'Sc', company: 'Scale AI', role: 'Product Manager, Platform', salary: '$200–240k', match: '88%', bg: '#F4EFE4', fg: '#1B1A16' },
-  { id: 's5', logo: 'Me', company: 'Mercury', role: 'Senior PM, Payments', salary: '$190–225k', match: '86%', bg: '#F4EFE4', fg: '#1B1A16' },
-];
-
-const SAMPLE_SENT = [
-  { id: 't1', role: 'Staff Product Designer', company: 'Vanta', time: '3:12 AM' },
-  { id: 't2', role: 'Senior PM, Platform', company: 'Ramp', time: '2:48 AM' },
-  { id: 't3', role: 'Frontend Engineer', company: 'Retool', time: '1:55 AM' },
-  { id: 't4', role: 'Product Designer II', company: 'Brex', time: '1:30 AM' },
-];
 
 /* -------------------------------------------------------------- utils --- */
 const initials = (str) => {
@@ -78,15 +54,15 @@ function normalizePreferences(prefs) {
   const roles = prefs.roles || prefs.targetRoles || prefs.jobTitles;
   const workType = prefs.workType || prefs.workTypes || prefs.workArrangement;
   const rules = [
-    { label: 'Daily limit', value: limit ? `${limit} / day` : SAMPLE_RULES[0].value },
-    { label: 'Min. match score', value: minScore ? `${minScore}% or higher` : SAMPLE_RULES[1].value },
-    { label: 'Roles', value: Array.isArray(roles) ? roles.join(' · ') : roles || SAMPLE_RULES[2].value },
-    { label: 'Work type', value: Array.isArray(workType) ? workType.join(' · ') : workType || SAMPLE_RULES[3].value },
+    { label: 'Daily limit', value: limit ? `${limit} / day` : '—' },
+    { label: 'Min. match score', value: minScore ? `${minScore}% or higher` : '—' },
+    { label: 'Roles', value: (Array.isArray(roles) ? roles.join(' · ') : roles) || '—' },
+    { label: 'Work type', value: (Array.isArray(workType) ? workType.join(' · ') : workType) || '—' },
   ];
   return {
     rules,
-    autoApply: prefs.autoApply ?? prefs.autoApplyEnabled ?? true,
-    minMatchScore: minScore ?? 85,
+    autoApply: prefs.autoApply ?? prefs.autoApplyEnabled ?? false,
+    minMatchScore: minScore ?? null,
   };
 }
 
@@ -122,17 +98,17 @@ function normalizeSentItem(app) {
 
 /* ----------------------------------------------------------- component --- */
 export default function AppAutoApply() {
-  const [on, setOn] = useState(true);
-  const [rules, setRules] = useState(SAMPLE_RULES);
-  const [queue, setQueue] = useState(SAMPLE_QUEUE);
-  const [sent, setSent] = useState(SAMPLE_SENT);
+  const [on, setOn] = useState(false);
+  const [rules, setRules] = useState([]);
+  const [queue, setQueue] = useState([]);
+  const [sent, setSent] = useState([]);
 
   const [loading, setLoading] = useState(true);
-  const [usingSample, setUsingSample] = useState(true);
+  const [error, setError] = useState(null);
+  const [actionError, setActionError] = useState(null);
   const [savingToggle, setSavingToggle] = useState(false);
   const [busyId, setBusyId] = useState(null);
   const [approvingAll, setApprovingAll] = useState(false);
-  const [error, setError] = useState(null);
 
   // ----- initial load: preferences + applications -----
   useEffect(() => {
@@ -140,43 +116,48 @@ export default function AppAutoApply() {
 
     (async () => {
       setLoading(true);
-      let anyReal = false;
+      setError(null);
+      let failures = 0;
 
       // Preferences (autoApply, minMatchScore, rules strip)
       try {
         const res = await getUserPreferences();
         const prefs = normalizePreferences(res?.preferences || res);
-        if (prefs && !cancelled) {
-          setRules(prefs.rules);
-          setOn(!!prefs.autoApply);
-          anyReal = true;
+        if (!cancelled) {
+          setRules(prefs ? prefs.rules : []);
+          setOn(!!prefs?.autoApply);
         }
       } catch (e) {
-        // keep sample rules
+        failures += 1;
       }
 
       // Applications: split into pending (queue) vs sent
       try {
         const res = await getMyApplications({ limit: 50 });
         const apps = res?.applications || res || [];
-        if (Array.isArray(apps) && apps.length && !cancelled) {
-          const pendingStatuses = ['queued', 'pending', 'pending_review', 'draft', 'ready'];
-          const sentStatuses = ['applied', 'submitted', 'sent', 'completed'];
-          const status = (a) => String(a.status || '').toLowerCase();
+        if (!cancelled) {
+          if (Array.isArray(apps) && apps.length) {
+            const pendingStatuses = ['queued', 'pending', 'pending_review', 'draft', 'ready'];
+            const sentStatuses = ['applied', 'submitted', 'sent', 'completed'];
+            const status = (a) => String(a.status || '').toLowerCase();
 
-          const pending = apps.filter((a) => pendingStatuses.includes(status(a)));
-          const done = apps.filter((a) => sentStatuses.includes(status(a)));
+            const pending = apps.filter((a) => pendingStatuses.includes(status(a)));
+            const done = apps.filter((a) => sentStatuses.includes(status(a)));
 
-          setQueue((pending.length ? pending : apps).map(normalizeQueueItem));
-          if (done.length) setSent(done.map(normalizeSentItem));
-          anyReal = true;
+            setQueue((pending.length ? pending : apps).map(normalizeQueueItem));
+            setSent(done.map(normalizeSentItem));
+          } else {
+            setQueue([]);
+            setSent([]);
+          }
         }
       } catch (e) {
-        // keep sample queue/sent
+        failures += 1;
       }
 
       if (!cancelled) {
-        setUsingSample(!anyReal);
+        // Only surface a page-level error when every source failed.
+        if (failures === 2) setError(new Error('Could not load your auto-apply data.'));
         setLoading(false);
       }
     })();
@@ -191,13 +172,13 @@ export default function AppAutoApply() {
     const nextOn = !on;
     setOn(nextOn);
     setSavingToggle(true);
-    setError(null);
+    setActionError(null);
     try {
       await updateUserPreferences({ autoApply: nextOn });
     } catch (e) {
       // revert on failure, but never crash
-      setOn((v) => v);
-      setError('Could not save your auto-apply setting.');
+      setOn(!nextOn);
+      setActionError(new Error('Could not save your auto-apply setting.'));
     } finally {
       setSavingToggle(false);
     }
@@ -206,7 +187,7 @@ export default function AppAutoApply() {
   // ----- approve one queued item (queueApplication) -----
   const approveOne = useCallback(async (item) => {
     setBusyId(item.id);
-    setError(null);
+    setActionError(null);
     try {
       if (item.jobId) await queueApplication(item.jobId);
       setQueue((q) => q.filter((x) => x.id !== item.id));
@@ -229,7 +210,7 @@ export default function AppAutoApply() {
   const approveAll = useCallback(async () => {
     if (!queue.length) return;
     setApprovingAll(true);
-    setError(null);
+    setActionError(null);
     const snapshot = queue;
     try {
       await processApplyRunner(snapshot.length);
@@ -250,7 +231,7 @@ export default function AppAutoApply() {
   const toggleBg = on ? '#1FA463' : '#D2C9B7';
   const knobX = on ? '24px' : '3px';
 
-  const creditsLeft = 38;
+  const creditsLeft = null; // no backend source yet — shown as “—”
   const sentToday = sent.length;
   const queuedCount = queue.length;
 
@@ -260,12 +241,6 @@ export default function AppAutoApply() {
     <>
       <Head>
         <title>Auto-Apply — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
       <style jsx global>{`
@@ -305,7 +280,7 @@ export default function AppAutoApply() {
 
       <div
         id="jbapp"
-        style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: "'Hanken Grotesk',sans-serif", color: '#1B1A16' }}
+        style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16' }}
       >
         <AppSidebar active="auto" />
 
@@ -325,7 +300,7 @@ export default function AppAutoApply() {
               borderBottom: '1px solid #E7E0D2',
             }}
           >
-            <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9286' }}>
+            <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9286' }}>
               Workspace / Auto-Apply
             </div>
             <div style={{ flex: 1 }} />
@@ -364,10 +339,10 @@ export default function AppAutoApply() {
             </div>
           </header>
 
-          <div style={{ padding: '30px 32px 48px', maxWidth: 1180, width: '100%' }}>
+          <div style={{ padding: '30px 32px 48px', width: '100%' }}>
             {/* TITLE */}
             <div style={{ marginBottom: 24 }}>
-              <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 40, lineHeight: 1, letterSpacing: '-0.01em', margin: '0 0 8px' }}>
+              <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 40, lineHeight: 1, letterSpacing: '-0.01em', margin: '0 0 8px' }}>
                 Auto-Apply
               </h1>
               <p style={{ fontSize: 15.5, color: '#5A544A', margin: 0 }}>
@@ -375,26 +350,12 @@ export default function AppAutoApply() {
               </p>
             </div>
 
-            {error && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  background: '#FBEFE9',
-                  border: '1px solid #EBC9B8',
-                  color: '#9A4A2A',
-                  borderRadius: 12,
-                  padding: '11px 16px',
-                  fontSize: 13.5,
-                  marginBottom: 16,
-                }}
-              >
-                <span>⚠</span>
-                <span>{error}</span>
-              </div>
-            )}
+            <InlineError error={actionError} />
 
+            {error ? (
+              <ErrorState error={error} onRetry={() => window.location.reload()} />
+            ) : (
+            <>
             {/* HERO STATUS */}
             <div
               style={{
@@ -412,47 +373,58 @@ export default function AppAutoApply() {
                 <div>
                   <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, border: '1px solid #34322A', borderRadius: 999, padding: '6px 12px', marginBottom: 16 }}>
                     <span style={{ width: 7, height: 7, borderRadius: '50%', background: on ? '#1FA463' : '#8A8378', boxShadow: on ? '0 0 0 4px rgba(31,164,99,0.25)' : 'none' }} />
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: on ? '#5BD08C' : '#9A9286' }}>
-                      {on ? 'Active · applying daily' : 'Paused · not applying'}
+                    <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: on ? '#5BD08C' : '#9A9286' }}>
+                      {on ? 'Active · preparing applications' : 'Paused'}
                     </span>
+                    <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#C99A5B', border: '1px solid #4A3E2A', borderRadius: 999, padding: '2px 7px' }}>Beta</span>
                   </div>
-                  <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: 30, lineHeight: 1.15, color: '#FBF8F1', maxWidth: 440 }}>
-                    Applied to {sentToday} {sentToday === 1 ? 'role' : 'roles'} overnight. {queuedCount} more queued for your review.
+                  <div style={{ fontFamily: 'var(--jb-font-display)', fontSize: 30, lineHeight: 1.15, color: '#FBF8F1', maxWidth: 460 }}>
+                    {on
+                      ? <>{sentToday} {sentToday === 1 ? 'role' : 'roles'} prepared. {queuedCount} more queued for your review.</>
+                      : <>Turn on Auto-Apply to queue strong-fit roles for your review.</>}
+                  </div>
+                  <div style={{ fontSize: 12.5, color: '#9A9286', marginTop: 10, maxWidth: 460, lineHeight: 1.5 }}>
+                    In beta, Auto-Apply prepares and queues matching roles for your review — you confirm before anything is submitted. Fully automated submission is rolling out.
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 28 }}>
                   <div>
-                    <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 34, fontWeight: 600, color: '#FBF8F1', lineHeight: 1 }}>{creditsLeft}</div>
+                    <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 34, fontWeight: 600, color: '#FBF8F1', lineHeight: 1 }}>{creditsLeft ?? '—'}</div>
                     <div style={{ fontSize: 12.5, color: '#9A9286', marginTop: 6 }}>credits left</div>
                   </div>
                   <div>
-                    <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 34, fontWeight: 600, color: '#5BD08C', lineHeight: 1 }}>{sentToday}</div>
-                    <div style={{ fontSize: 12.5, color: '#9A9286', marginTop: 6 }}>sent today</div>
+                    <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 34, fontWeight: 600, color: '#5BD08C', lineHeight: 1 }}>{sentToday}</div>
+                    <div style={{ fontSize: 12.5, color: '#9A9286', marginTop: 6 }}>prepared today</div>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* RULES STRIP */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 26 }}>
-              {(loading ? SAMPLE_RULES : rules).map((r, i) => (
-                <div
-                  key={r.label + i}
-                  style={{
-                    background: '#FFFEFB',
-                    border: '1px solid #E6DECF',
-                    borderRadius: 14,
-                    padding: '16px 18px',
-                    animation: loading ? 'jbshimmer 1.2s ease infinite' : 'none',
-                  }}
-                >
-                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#8A8378', marginBottom: 9 }}>
-                    {r.label}
+            {(loading || rules.length > 0) && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 26 }}>
+                {(loading
+                  ? [{ label: '', value: '' }, { label: '', value: '' }, { label: '', value: '' }, { label: '', value: '' }]
+                  : rules
+                ).map((r, i) => (
+                  <div
+                    key={(r.label || 'skeleton') + i}
+                    style={{
+                      background: '#FFFEFB',
+                      border: '1px solid #E6DECF',
+                      borderRadius: 14,
+                      padding: '16px 18px',
+                      animation: loading ? 'jbshimmer 1.2s ease infinite' : 'none',
+                    }}
+                  >
+                    <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#8A8378', marginBottom: 9, minHeight: 13 }}>
+                      {r.label}
+                    </div>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: '#1B1A16', minHeight: 18 }}>{r.value}</div>
                   </div>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: '#1B1A16' }}>{r.value}</div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 14 }}>
               {/* QUEUE */}
@@ -460,7 +432,7 @@ export default function AppAutoApply() {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 22px', borderBottom: '1px solid #EEE7D9' }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
                     <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Pending your review</h2>
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#C9622E' }}>● {queuedCount} queued</span>
+                    <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#C9622E' }}>● {queuedCount} queued</span>
                   </div>
                   <button
                     onClick={approveAll}
@@ -509,7 +481,7 @@ export default function AppAutoApply() {
                           <div style={{ fontWeight: 600, fontSize: 14.5 }}>{q.role}</div>
                           <div style={{ fontSize: 12.5, color: '#8A8378' }}>{q.company} · {q.salary}</div>
                         </div>
-                        <span style={{ flexShrink: 0, fontFamily: "'JetBrains Mono',monospace", fontSize: 13, fontWeight: 600, color: '#157A49' }}>{q.match}</span>
+                        <span style={{ flexShrink: 0, fontFamily: 'var(--jb-font-mono)', fontSize: 13, fontWeight: 600, color: '#157A49' }}>{q.match}</span>
                         <div style={{ flexShrink: 0, display: 'flex', gap: 7 }}>
                           <button
                             onClick={() => dismissOne(q)}
@@ -536,10 +508,10 @@ export default function AppAutoApply() {
                 )}
               </div>
 
-              {/* SENT TODAY */}
+              {/* PREPARED TODAY */}
               <div style={{ ...card, alignSelf: 'flex-start' }}>
                 <div style={{ padding: '18px 22px', borderBottom: '1px solid #EEE7D9' }}>
-                  <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Sent today</h2>
+                  <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Prepared today</h2>
                 </div>
 
                 {loading ? (
@@ -553,7 +525,7 @@ export default function AppAutoApply() {
                     </div>
                   ))
                 ) : sent.length === 0 ? (
-                  <div style={{ padding: '32px 22px', textAlign: 'center', color: '#8A8378', fontSize: 13.5 }}>No applications sent yet today.</div>
+                  <div style={{ padding: '32px 22px', textAlign: 'center', color: '#8A8378', fontSize: 13.5 }}>Nothing prepared yet today.</div>
                 ) : (
                   sent.map((s) => (
                     <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 22px', borderBottom: '1px solid #F2ECE0' }}>
@@ -562,7 +534,7 @@ export default function AppAutoApply() {
                         <div style={{ fontWeight: 600, fontSize: 13.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.role}</div>
                         <div style={{ fontSize: 12, color: '#8A8378' }}>{s.company}</div>
                       </div>
-                      <span style={{ flexShrink: 0, fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, color: '#8A8378' }}>{s.time}</span>
+                      <span style={{ flexShrink: 0, fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, color: '#8A8378' }}>{s.time}</span>
                     </div>
                   ))
                 )}
@@ -575,10 +547,7 @@ export default function AppAutoApply() {
               </div>
             </div>
 
-            {usingSample && !loading && (
-              <div style={{ marginTop: 18, fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: '#B7AE9C' }}>
-                Showing sample data — sign in to see your live auto-apply queue.
-              </div>
+            </>
             )}
           </div>
         </main>

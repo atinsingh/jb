@@ -1,11 +1,11 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
 export type ResumeDocument = Resume & Document;
 
 @Schema({ timestamps: true })
 export class Resume {
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
   userId: Types.ObjectId;
 
   @Prop({ required: true })
@@ -35,6 +35,10 @@ export class Resume {
 
   @Prop()
   github?: string;
+
+  // Professional headline / target title (distinct from a job title).
+  @Prop()
+  headline?: string;
 
   // Professional Summary
   @Prop()
@@ -172,6 +176,58 @@ export class Resume {
 
   @Prop()
   publicUrl?: string;
+
+  // ---- Library / workspace metadata -------------------------------------
+  // Lifecycle status shown as a badge in the library.
+  @Prop({ default: 'draft', enum: ['draft', 'ready', 'needs_review', 'archived'] })
+  status?: string;
+
+  // How this resume came to exist.
+  @Prop({ default: 'manual', enum: ['manual', 'imported', 'ai_rewrite', 'job_tailored', 'duplicate'] })
+  creationMethod?: string;
+
+  @Prop()
+  targetRole?: string;
+
+  @Prop()
+  targetCompany?: string;
+
+  @Prop({ type: [String], default: [] })
+  tags?: string[];
+
+  // Default resume used for auto-apply / one-click applications.
+  @Prop({ default: false })
+  isPrimary?: boolean;
+
+  @Prop({ type: Number })
+  atsScore?: number;
+
+  @Prop({ type: Number, default: 0 })
+  applicationCount?: number;
+
+  // Lineage: the resume this one was duplicated / tailored from.
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Resume' })
+  sourceResumeId?: Types.ObjectId;
+
+  @Prop()
+  archivedAt?: Date;
+
+  // ---- Import source metadata (present when creationMethod involves a file) --
+  @Prop({
+    type: Object,
+    default: null,
+  })
+  source?: {
+    originalFilename?: string;
+    fileExtension?: string;
+    mimeType?: string;
+    fileSize?: number;
+    importedAt?: Date;
+    importMode?: string; // 'keep_format' | 'ai_rewrite'
+    parseStatus?: string; // 'parsed' | 'partial' | 'failed'
+    parseConfidence?: number; // 0..1
+    parserVersion?: string;
+  } | null;
 
   // Timestamps (automatically added by Mongoose with timestamps: true)
   createdAt?: Date;

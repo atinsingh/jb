@@ -26,6 +26,8 @@ export class AuthService {
       email: user.email,
       name: user.name,
       role: user.role,
+      // Session generation. Bumped on logout so all prior tokens stop validating.
+      tokenVersion: user.tokenVersion ?? 0,
     };
     return this.jwtService.sign(payload);
   }
@@ -111,6 +113,16 @@ export class AuthService {
 
   async findById(id: string): Promise<UserDocument | null> {
     return this.userModel.findById(id).select('-password');
+  }
+
+  /**
+   * Invalidate every JWT currently held by this user by bumping their session
+   * generation. Existing tokens carry the old `tokenVersion` and stop validating
+   * immediately; the next login mints a token with the new version. Immune to
+   * the whole-second `iat` granularity a timestamp approach would suffer.
+   */
+  async logout(userId: string): Promise<void> {
+    await this.userModel.updateOne({ _id: userId }, { $inc: { tokenVersion: 1 } });
   }
 
 

@@ -20,10 +20,10 @@ const ThreeSteps = () => {
   return (
     <div className="py-20 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <p className="text-center text-sm mb-4" style={{ color: '#666666', fontFamily: 'Manrope, sans-serif' }}>
+        <p className="text-center text-sm mb-4" style={{ color: '#666666', fontFamily: 'var(--jb-font-sans)' }}>
           AI based job search
         </p>
-        <h2 className="font-bold text-center mb-16" style={{ fontSize: '36px', color: '#1D2445', fontFamily: 'Manrope, sans-serif' }}>
+        <h2 className="font-bold text-center mb-16" style={{ fontSize: '36px', color: '#1D2445', fontFamily: 'var(--jb-font-sans)' }}>
           Land Your Next Job In 3 Simple Steps— Powered By AI..
         </h2>
 
@@ -32,11 +32,11 @@ const ThreeSteps = () => {
             <div key={index} className="flex-1 max-w-sm">
               <div className="rounded-2xl p-8 shadow-lg transform transition hover:scale-105 relative overflow-hidden" style={{ backgroundColor: '#1D2445' }}>
                 <div className="absolute top-6 left-6 w-2 h-2 rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}></div>
-                <div className="w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold mb-6" style={{ backgroundColor: '#FF5733', color: '#FFFFFF', fontFamily: 'Manrope, sans-serif' }}>
+                <div className="w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold mb-6" style={{ backgroundColor: '#FF5733', color: '#FFFFFF', fontFamily: 'var(--jb-font-sans)' }}>
                   {step.number}
                 </div>
-                <h3 className="font-bold mb-3" style={{ fontSize: '24px', color: '#FFFFFF', fontFamily: 'Manrope, sans-serif' }}>{step.title}</h3>
-                <p style={{ fontSize: '16px', color: '#CCCCCC', lineHeight: '24px', fontFamily: 'Manrope, sans-serif' }}>{step.description}</p>
+                <h3 className="font-bold mb-3" style={{ fontSize: '24px', color: '#FFFFFF', fontFamily: 'var(--jb-font-sans)' }}>{step.title}</h3>
+                <p style={{ fontSize: '16px', color: '#CCCCCC', lineHeight: '24px', fontFamily: 'var(--jb-font-sans)' }}>{step.description}</p>
                 
                 {/* Decorative pattern at bottom */}
                 <div className="absolute bottom-0 left-0 right-0 h-24 opacity-10" style={{

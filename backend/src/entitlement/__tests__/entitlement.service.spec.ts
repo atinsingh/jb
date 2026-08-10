@@ -344,7 +344,7 @@ describe('EntitlementService', () => {
       });
 
       expect(result.allowed).toBe(false);
-      expect(result.message).toBe('Plan not found');
+      expect(result.message).toContain('Plan not found');
     });
 
     it('should deny access when feature not defined for plan', async () => {

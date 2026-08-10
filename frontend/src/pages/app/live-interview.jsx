@@ -9,87 +9,7 @@ import {
   getInterviewSessions,
   getInterviewSession,
 } from '@/services/interviewApi';
-
-/* =========================================================================
-   SAMPLE DATA — faithful port of the design's Component.script() + renderVals.
-   Used as the graceful fallback whenever the backend is unavailable.
-   ========================================================================= */
-
-const SAMPLE_SCRIPT = [
-  {
-    q: 'Walk me through a product you shipped end to end.',
-    you:
-      'Sure — at Plaid I led the onboarding redesign. We had a big drop-off problem before users connected a bank…',
-    direct:
-      'Anchor on the Plaid onboarding redesign — name the problem, your role, and the measurable result.',
-    star: [
-      { k: 'S', t: '60% of new users dropped before connecting a bank account.' },
-      { k: 'T', t: 'You owned the redesign end to end across 2M monthly users.' },
-      { k: 'A', t: 'Ran research, rebuilt the flow, shipped a phased A/B test.' },
-      { k: 'R', t: '+31% activation — it is now the default experience.' },
-    ],
-    facts: ['Plaid · 2021–Present', '+31% activation', '2M users', 'Led 4 ICs'],
-  },
-  {
-    q: 'Tell me about a time you disagreed with a PM.',
-    you:
-      'On the Brex expense flow, our PM wanted to ship a single-step approval, but my research showed…',
-    direct:
-      'Use the Brex expense-approval disagreement. Show you used data, not opinion, to align.',
-    star: [
-      { k: 'S', t: 'PM pushed a one-step approval; research showed it confused admins.' },
-      { k: 'T', t: 'You needed to realign without slowing the roadmap.' },
-      { k: 'A', t: 'Ran a 5-user test, shared a clip reel, proposed a compromise.' },
-      { k: 'R', t: 'Shipped a two-step flow; support tickets fell 18%.' },
-    ],
-    facts: ['Brex · 2019–2021', '20k+ businesses', 'Tickets −18%', 'Research-led'],
-  },
-  {
-    q: 'How would you redesign Stripe Checkout?',
-    you: 'I would start from the drop-off data and the highest-intent moment, which is…',
-    direct:
-      'Frame before solving: clarify goals, constraints, and the metric before proposing changes.',
-    star: [
-      { k: 'S', t: 'Checkout conversion is the headline metric; trust is the lever.' },
-      { k: 'T', t: 'Goal: reduce friction without hurting fraud signals.' },
-      { k: 'A', t: 'Map the funnel, find the highest drop, test express paths.' },
-      { k: 'R', t: 'Close with how you would measure success and de-risk.' },
-    ],
-    facts: ['0→1 fintech', 'Conversion focus', 'Trust & fraud', 'Funnel thinking'],
-  },
-];
-
-const SAMPLE_CONTEXT = [
-  '7 years in product design · fintech & B2B SaaS',
-  'Led design system adopted by 40+ engineers',
-  'Shipped activation +31% and ticket reduction −18%',
-];
-
-const SAMPLE_STRENGTHS = [
-  'Clear STAR structure on every behavioral question.',
-  'Strong, quantified outcomes (+31%, −18%) tied to business value.',
-  'Confident pace held steady between 135–150 wpm.',
-];
-
-const SAMPLE_IMPROVEMENTS = [
-  'On the Stripe redesign, spend 20s on tradeoffs before solutions.',
-  'Trim setup on long answers — get to impact 10s sooner.',
-  'Reduce "kind of" filler in technical answers.',
-];
-
-const SAMPLE_SCORES = [
-  { score: '9', q: 'Walk me through a product you shipped end to end.', label: 'Excellent', color: '#1FA463' },
-  { score: '8', q: 'Tell me about a time you disagreed with a PM.', label: 'Strong', color: '#1FA463' },
-  { score: '7', q: 'How would you redesign Stripe Checkout?', label: 'Good', color: '#C9A227' },
-  { score: '9', q: 'Where do you want to grow next?', label: 'Excellent', color: '#1FA463' },
-];
-
-const SAMPLE_HEADER = {
-  company: 'Stripe',
-  tag: 'St',
-  role: 'Senior Product Designer',
-  sub: 'Final round · with Dana Whitfield',
-};
+import { LoadingState, EmptyState, ErrorState } from '@/components/app/AppStates';
 
 const fmt = (sec) => {
   const m = Math.floor(sec / 60);
@@ -102,28 +22,35 @@ const fmt = (sec) => {
    ========================================================================= */
 
 export default function AppLiveInterview() {
-  // --- live state machine (ported from the design's Component.state) ---
-  const [elapsed, setElapsed] = useState(372);
-  const [step, setStep] = useState(1);
+  // --- live state machine ---
+  const [elapsed, setElapsed] = useState(0);
+  const [step, setStep] = useState(0);
   const [stepAcc, setStepAcc] = useState(0);
   const [tick, setTick] = useState(0);
   const [paused, setPaused] = useState(false);
   const [view, setView] = useState('live'); // 'live' | 'summary'
 
-  // --- backend-fed data (falls back to sample data) ---
-  const [script] = useState(SAMPLE_SCRIPT);
-  const [header, setHeader] = useState(SAMPLE_HEADER);
-  const [context] = useState(SAMPLE_CONTEXT);
-  const [strengths] = useState(SAMPLE_STRENGTHS);
-  const [improvements] = useState(SAMPLE_IMPROVEMENTS);
-  const [scores] = useState(SAMPLE_SCORES);
+  // --- backend-fed session data (empty until a real session loads) ---
+  const [script] = useState([]);
+  const [header, setHeader] = useState({
+    company: '',
+    tag: 'JB',
+    role: 'Live interview copilot',
+    sub: 'Start a session to go live',
+  });
+  const [context] = useState([]);
+  const [strengths] = useState([]);
+  const [improvements] = useState([]);
+  const [scores] = useState([]);
 
   const [loading, setLoading] = useState(true);
-  const [usingSample, setUsingSample] = useState(true);
+  const [error, setError] = useState(null);
 
   const timerRef = useRef(null);
+  const scriptLenRef = useRef(0);
+  scriptLenRef.current = script.length;
 
-  // ---- attempt to load a real session, gracefully fall back ----
+  // ---- attempt to load a real in-progress session ----
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -154,12 +81,10 @@ export default function AppLiveInterview() {
                 ? `${session.status} · live copilot`
                 : h.sub,
             }));
-            setUsingSample(false);
           }
         }
       } catch (e) {
-        // backend unavailable / unauthenticated — keep sample data
-        if (alive) setUsingSample(true);
+        if (alive) setError(e);
       } finally {
         if (alive) setLoading(false);
       }
@@ -169,7 +94,7 @@ export default function AppLiveInterview() {
     };
   }, []);
 
-  // ---- 1s tick driving the timer + auto-advancing question (design parity) ----
+  // ---- 1s tick driving the timer + auto-advancing question ----
   useEffect(() => {
     timerRef.current = setInterval(() => {
       setTick((t) => t + 1);
@@ -181,7 +106,7 @@ export default function AppLiveInterview() {
               const next = acc + 1;
               if (next >= 8) {
                 setStep((s) => {
-                  if (s < SAMPLE_SCRIPT.length - 1) return s + 1;
+                  if (s < scriptLenRef.current - 1) return s + 1;
                   return s;
                 });
                 return 0;
@@ -199,11 +124,18 @@ export default function AppLiveInterview() {
     };
   }, []);
 
-  // ---- derived render values (ported from renderVals) ----
+  // ---- derived render values ----
   const safeStep = Math.min(step, script.length - 1);
   const card = script[safeStep];
+  const hasScript = script.length > 0 && card;
+  const hasSummary = scores.length > 0 || strengths.length > 0 || improvements.length > 0;
+  const avgScore = scores.length
+    ? scores.reduce((a, s) => a + (Number(s.score) || 0), 0) / scores.length
+    : 0;
+  const scorePct = Math.max(0, Math.min(100, Math.round((avgScore / 10) * 100)));
 
   const transcript = useMemo(() => {
+    if (!card) return [];
     const lines = [];
     for (let i = 0; i < safeStep; i++) {
       lines.push({
@@ -296,12 +228,6 @@ export default function AppLiveInterview() {
     <>
       <Head>
         <title>Live Interview Copilot — Jobocate</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
       </Head>
 
       <style jsx global>{`
@@ -353,7 +279,7 @@ export default function AppLiveInterview() {
           display: 'flex',
           minHeight: '100vh',
           background: '#100F0B',
-          fontFamily: "'Hanken Grotesk',sans-serif",
+          fontFamily: 'var(--jb-font-sans)',
           color: '#E4DECF',
         }}
       >
@@ -398,7 +324,7 @@ export default function AppLiveInterview() {
               />
               <span
                 style={{
-                  fontFamily: "'JetBrains Mono',monospace",
+                  fontFamily: 'var(--jb-font-mono)',
                   fontSize: 11,
                   letterSpacing: '0.08em',
                   color: '#E89A8E',
@@ -439,7 +365,7 @@ export default function AppLiveInterview() {
 
             <span
               style={{
-                fontFamily: "'JetBrains Mono',monospace",
+                fontFamily: 'var(--jb-font-mono)',
                 fontSize: 15,
                 color: '#FBF8F1',
               }}
@@ -483,7 +409,52 @@ export default function AppLiveInterview() {
           </header>
 
           {/* LIVE VIEW */}
-          {isLive && (
+          {isLive && loading && (
+            <div style={{ padding: '32px 28px' }}>
+              <div style={{ background: '#FBF8F1', border: '1px solid #E6DECF', borderRadius: 18 }}>
+                <LoadingState label="Connecting to your session…" />
+              </div>
+            </div>
+          )}
+          {isLive && !loading && error && (
+            <div style={{ padding: '32px 28px' }}>
+              <div style={{ background: '#FBF8F1', border: '1px solid #E6DECF', borderRadius: 18 }}>
+                <ErrorState error={error} />
+              </div>
+            </div>
+          )}
+          {isLive && !loading && !error && !hasScript && (
+            <div style={{ padding: '32px 28px' }}>
+              <div style={{ background: '#FBF8F1', border: '1px solid #E6DECF', borderRadius: 18 }}>
+                <EmptyState
+                  icon="◉"
+                  title="No live session running"
+                  hint="Launch a mock interview to start the copilot — your live transcript and coaching will appear here."
+                  action={
+                    <Link
+                      href={appRoute('App Mock Interview.dc.html')}
+                      style={{
+                        marginTop: 8,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: '#0C2C1C',
+                        background: '#1FA463',
+                        borderRadius: 999,
+                        padding: '11px 20px',
+                        textDecoration: 'none',
+                      }}
+                    >
+                      Start a mock interview →
+                    </Link>
+                  }
+                />
+              </div>
+            </div>
+          )}
+          {isLive && !loading && !error && hasScript && (
             <div
               style={{
                 padding: '24px 28px 40px',
@@ -542,8 +513,8 @@ export default function AppLiveInterview() {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          fontFamily: "'JetBrains Mono',monospace",
-                          fontSize: 9,
+                          fontFamily: 'var(--jb-font-mono)',
+                          fontSize: 11,
                           color: '#6B6456',
                         }}
                       >
@@ -565,8 +536,8 @@ export default function AppLiveInterview() {
                         <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#1FA463' }} />
                         <span
                           style={{
-                            fontFamily: "'JetBrains Mono',monospace",
-                            fontSize: 9,
+                            fontFamily: 'var(--jb-font-mono)',
+                            fontSize: 11,
                             color: '#E4DECF',
                           }}
                         >
@@ -613,8 +584,8 @@ export default function AppLiveInterview() {
                             {line.isLive && (
                               <span
                                 style={{
-                                  fontFamily: "'JetBrains Mono',monospace",
-                                  fontSize: 9,
+                                  fontFamily: 'var(--jb-font-mono)',
+                                  fontSize: 11,
                                   color: '#E1786A',
                                   letterSpacing: '0.05em',
                                 }}
@@ -702,7 +673,7 @@ export default function AppLiveInterview() {
                     <div style={{ flex: 1 }} />
                     <span
                       style={{
-                        fontFamily: "'JetBrains Mono',monospace",
+                        fontFamily: 'var(--jb-font-mono)',
                         fontSize: 11,
                         color: '#6B6456',
                       }}
@@ -740,7 +711,7 @@ export default function AppLiveInterview() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
                       <span
                         style={{
-                          fontFamily: "'JetBrains Mono',monospace",
+                          fontFamily: 'var(--jb-font-mono)',
                           fontSize: 11,
                           letterSpacing: '0.1em',
                           textTransform: 'uppercase',
@@ -781,8 +752,8 @@ export default function AppLiveInterview() {
                           <span
                             style={{
                               flexShrink: 0,
-                              fontFamily: "'JetBrains Mono',monospace",
-                              fontSize: 10,
+                              fontFamily: 'var(--jb-font-mono)',
+                              fontSize: 11,
                               fontWeight: 600,
                               color: '#0C2C1C',
                               background: '#5BD08C',
@@ -805,7 +776,7 @@ export default function AppLiveInterview() {
                         <span
                           key={i}
                           style={{
-                            fontFamily: "'JetBrains Mono',monospace",
+                            fontFamily: 'var(--jb-font-mono)',
                             fontSize: 11,
                             color: '#5BD08C',
                             background: 'rgba(31,164,99,0.1)',
@@ -839,7 +810,7 @@ export default function AppLiveInterview() {
                         <span style={{ fontSize: 13, color: '#B8B1A4' }}>{m.label}</span>
                         <span
                           style={{
-                            fontFamily: "'JetBrains Mono',monospace",
+                            fontFamily: 'var(--jb-font-mono)',
                             fontSize: 13,
                             fontWeight: 600,
                             color: m.color,
@@ -873,7 +844,7 @@ export default function AppLiveInterview() {
                 <div style={{ ...cardBox, padding: 20 }}>
                   <div
                     style={{
-                      fontFamily: "'JetBrains Mono',monospace",
+                      fontFamily: 'var(--jb-font-mono)',
                       fontSize: 11,
                       letterSpacing: '0.08em',
                       textTransform: 'uppercase',
@@ -903,7 +874,52 @@ export default function AppLiveInterview() {
           )}
 
           {/* SUMMARY VIEW */}
-          {isSummary && (
+          {isSummary && loading && (
+            <div style={{ padding: '32px 28px' }}>
+              <div style={{ background: '#FBF8F1', border: '1px solid #E6DECF', borderRadius: 18 }}>
+                <LoadingState label="Loading session summary…" />
+              </div>
+            </div>
+          )}
+          {isSummary && !loading && error && (
+            <div style={{ padding: '32px 28px' }}>
+              <div style={{ background: '#FBF8F1', border: '1px solid #E6DECF', borderRadius: 18 }}>
+                <ErrorState error={error} />
+              </div>
+            </div>
+          )}
+          {isSummary && !loading && !error && !hasSummary && (
+            <div style={{ padding: '32px 28px' }}>
+              <div style={{ background: '#FBF8F1', border: '1px solid #E6DECF', borderRadius: 18 }}>
+                <EmptyState
+                  icon="✓"
+                  title="No completed session yet"
+                  hint="Finish a live interview and your scored summary — strengths, areas to sharpen, and per-question grades — will appear here."
+                  action={
+                    <button
+                      type="button"
+                      onClick={() => setView('live')}
+                      style={{
+                        marginTop: 8,
+                        fontFamily: 'inherit',
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: '#0C2C1C',
+                        background: '#1FA463',
+                        border: 'none',
+                        borderRadius: 999,
+                        padding: '11px 20px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      ← Back to live
+                    </button>
+                  }
+                />
+              </div>
+            </div>
+          )}
+          {isSummary && !loading && !error && hasSummary && (
             <div style={{ padding: 28, maxWidth: 980, width: '100%' }}>
               <div
                 style={{
@@ -924,7 +940,7 @@ export default function AppLiveInterview() {
                     height: 96,
                     flexShrink: 0,
                     borderRadius: '50%',
-                    background: 'conic-gradient(#1FA463 0% 87%, #2C2A22 87% 100%)',
+                    background: `conic-gradient(#1FA463 0% ${scorePct}%, #2C2A22 ${scorePct}% 100%)`,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -944,19 +960,19 @@ export default function AppLiveInterview() {
                   >
                     <span
                       style={{
-                        fontFamily: "'JetBrains Mono',monospace",
+                        fontFamily: 'var(--jb-font-mono)',
                         fontSize: 26,
                         fontWeight: 600,
                         color: '#5BD08C',
                         lineHeight: 1,
                       }}
                     >
-                      8.7
+                      {avgScore.toFixed(1)}
                     </span>
                     <span
                       style={{
-                        fontFamily: "'JetBrains Mono',monospace",
-                        fontSize: 10,
+                        fontFamily: 'var(--jb-font-mono)',
+                        fontSize: 11,
                         color: '#8A8378',
                       }}
                     >
@@ -967,7 +983,7 @@ export default function AppLiveInterview() {
                 <div>
                   <div
                     style={{
-                      fontFamily: "'JetBrains Mono',monospace",
+                      fontFamily: 'var(--jb-font-mono)',
                       fontSize: 11,
                       letterSpacing: '0.1em',
                       textTransform: 'uppercase',
@@ -979,7 +995,7 @@ export default function AppLiveInterview() {
                   </div>
                   <h1
                     style={{
-                      fontFamily: "'Instrument Serif',serif",
+                      fontFamily: 'var(--jb-font-display)',
                       fontWeight: 400,
                       fontSize: 34,
                       lineHeight: 1.05,
@@ -987,11 +1003,11 @@ export default function AppLiveInterview() {
                       margin: '0 0 6px',
                     }}
                   >
-                    Strong final round. You&apos;re ready.
+                    Session complete.
                   </h1>
                   <p style={{ fontSize: 14.5, color: '#B8B1A4', margin: 0 }}>
-                    You answered {scores.length} of {scores.length} questions with clear structure
-                    and quantified impact.
+                    You answered {scores.length} {scores.length === 1 ? 'question' : 'questions'} in
+                    this session.
                   </p>
                 </div>
               </div>
@@ -1053,7 +1069,7 @@ export default function AppLiveInterview() {
                   >
                     <span
                       style={{
-                        fontFamily: "'JetBrains Mono',monospace",
+                        fontFamily: 'var(--jb-font-mono)',
                         fontSize: 18,
                         fontWeight: 600,
                         color: q.color,
@@ -1065,7 +1081,7 @@ export default function AppLiveInterview() {
                     <span style={{ flex: 1, fontSize: 14, color: '#D8D2C4' }}>{q.q}</span>
                     <span
                       style={{
-                        fontFamily: "'JetBrains Mono',monospace",
+                        fontFamily: 'var(--jb-font-mono)',
                         fontSize: 11,
                         color: q.color,
                       }}
@@ -1119,14 +1135,14 @@ export default function AppLiveInterview() {
             </div>
           )}
 
-          {loading && usingSample && (
+          {loading && (
             <div
               style={{
                 position: 'fixed',
                 bottom: 16,
                 right: 18,
-                fontFamily: "'JetBrains Mono',monospace",
-                fontSize: 10,
+                fontFamily: 'var(--jb-font-mono)',
+                fontSize: 11,
                 color: '#6B6456',
               }}
             >

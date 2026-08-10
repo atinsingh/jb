@@ -1,9 +1,13 @@
-/* Import Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
-@import url('https://api.fontshare.com/v2/css?f[]=clash-display@200,300,400,500,600,700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+/* Fonts are NOT loaded here. They are self-hosted by next/font in
+   src/pages/_app.js, which publishes them as --font-display / --font-sans /
+   --font-mono on :root. Never add an @import url(...) for a font to this file:
+   Turbopack's CSS pipeline silently drops all but the first one. */
 
 @import "tailwindcss";
+
+/* --jb-* editorial tokens. Namespaced, so it cannot collide with the coral
+   --color-primary-* scale defined further down for the older app surface. */
+@import './tokens.css';
 
 @variant dark (&:where(.dark, .dark *));
 
@@ -31,6 +35,100 @@
   --color-accent-700: #e8590c;
   --color-accent-800: #d9480f;
   --color-accent-900: #bf4000;
+
+  /* ---- Typeface families (Tailwind v4 idiom) ----
+     Declaring them here is what makes the `font-sans` / `font-serif` /
+     `font-mono` / `font-display` utility classes actually generate. The old
+     `theme.extend.fontFamily` block in tailwind.config.js never loaded (there
+     is no @config directive), so `font-display` was a silent no-op and
+     `font-serif` fell back to Tailwind's default Georgia stack.
+     Values chain through the --jb-font-* tokens in tokens.css so there is
+     exactly one definition per face. */
+  --font-sans: var(--jb-font-sans);
+  --font-serif: var(--jb-font-display);
+  --font-display: var(--jb-font-display);
+  --font-mono: var(--jb-font-mono);
+
+  /* ---- Signed-in app surface palette (Tailwind utility tokens) ----
+     The /app/* and /employer/* screens are a cream+green editorial surface
+     hand-built with inline hex values. These tokens name those recurring hexes
+     so the same design is expressible as Tailwind utilities (bg-jb-cream,
+     text-jb-ink, border-jb-line, …) with no inline styles or styled-jsx. New
+     app-surface work should use these instead of raw hex. */
+  --color-jb-cream: #f7f3ea;      /* app background */
+  --color-jb-paper: #fffefb;      /* cards / inputs */
+  --color-jb-paper-2: #fbf8f1;
+  --color-jb-soft: #f1ece0;       /* dividers, skeleton, inset chips */
+  --color-jb-soft-2: #f2ece0;
+  --color-jb-deep: #15140f;       /* dark hero / bands */
+  --color-jb-deep-2: #24221b;
+
+  --color-jb-ink: #1b1a16;        /* primary text */
+  --color-jb-ink-heading: #46413a;
+  --color-jb-ink-body: #3e3a33;
+  --color-jb-ink-muted: #5a544a;
+  --color-jb-ink-subtle: #8a8378;
+  --color-jb-ink-faint: #9a9286;
+  --color-jb-ink-ghost: #a79e8f;
+
+  --color-jb-green: #1fa463;       /* CTA fills (dark text on top) */
+  --color-jb-green-text: #157a49;  /* links / small green text */
+  --color-jb-green-ink: #0c2c1c;   /* text on green fills */
+  --color-jb-green-tint: #eaf6ee;  /* green pill/tile background */
+  --color-jb-green-line: #cde9d6;
+  --color-jb-green-on-dark: #5bd08c;
+
+  --color-jb-line: #e7e0d2;        /* default hairline */
+  --color-jb-line-2: #e6decf;
+  --color-jb-line-3: #e1d9c9;
+  --color-jb-line-input: #d9d0be;  /* input borders */
+
+  --color-jb-amber-ink: #c9622e;   /* warnings */
+  --color-jb-amber-deep: #8a5a22;
+  --color-jb-amber-tint: #fbf1e8;
+  --color-jb-danger: #b4231f;
+  --color-jb-danger-ink: #b4472a;
+  --color-jb-danger-tint: #fbecea;
+  --color-jb-danger-line: #f0cfcb;
+
+  /* App-surface entrance animations, exposed as utilities so pages don't need
+     per-file @keyframes in styled-jsx. */
+  --animate-rise-in: riseIn 0.6s ease both;
+  --animate-rb-pop: rbPop 0.25s ease;
+  --animate-jb-pop: jbPop 0.18s ease;
+  --animate-jb-fade: jbFade 0.15s ease;
+  --animate-jb-shimmer: jbShimmer 1.2s infinite linear;
+  --animate-jb-pulse: jbPulse 1.3s ease-in-out infinite;
+}
+
+@keyframes jbShimmer {
+  0% { background-position: -360px 0; }
+  100% { background-position: 360px 0; }
+}
+
+@keyframes jbPulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes rbPop {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes jbPop {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes jbFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 
@@ -52,9 +150,10 @@
   --gradient-primary: linear-gradient(135deg, #fa5252 0%, #ff922b 100%);
   --gradient-subtle: linear-gradient(135deg, rgba(250, 82, 82, 0.05) 0%, rgba(255, 146, 43, 0.05) 100%);
 
-  --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
-  --font-display: 'Clash Display', 'Plus Jakarta Sans', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  /* --font-sans / --font-display / --font-mono are emitted by the @theme block
+     above (Tailwind v4) and chain to the --jb-font-* tokens. Do not redefine
+     them here — that is what used to pin the whole app to Plus Jakarta Sans
+     and Clash Display. */
 
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
@@ -62,19 +161,29 @@
   --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
 }
 
-* {
-  font-family: var(--font-sans);
-}
-
 html {
   scroll-behavior: smooth;
 }
 
+/* Set the base font on body so it INHERITS down. A universal `* { font-family }`
+   rule (previously here) set the font directly on every element, which defeated
+   per-surface fonts — e.g. the /app cream/green surface (#jbapp → Hanken Grotesk)
+   and the résumé template fonts. Inheritance lets each container's font flow. */
 body {
+  font-family: var(--font-sans);
   background-color: var(--color-bg);
   color: var(--color-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Form controls don't inherit font-family by default — keep them in context. */
+button,
+input,
+textarea,
+select,
+optgroup {
+  font-family: inherit;
 }
 
 /* Light theme body styles */

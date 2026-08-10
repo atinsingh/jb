@@ -9,8 +9,7 @@ import {
   PencilIcon,
 } from '@heroicons/react/24/outline';
 import { toast } from 'react-hot-toast';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+import { API_URL } from '@/config/api';
 
 export default function AIAssistantPanel({ resumeData, onUpdate, isOpen, onClose }) {
   const [activeFeature, setActiveFeature] = useState(null);

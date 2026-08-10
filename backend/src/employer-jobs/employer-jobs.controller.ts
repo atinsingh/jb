@@ -19,6 +19,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { EmployerJobsService } from './employer-jobs.service';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
@@ -26,7 +28,8 @@ import { UpdateStatusDto } from './dto/update-status.dto';
 
 @ApiTags('employer-jobs')
 @Controller('employer/jobs')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('ROLE_EMPLOYER', 'ROLE_ADMIN')
 export class EmployerJobsController {
   constructor(private readonly employerJobsService: EmployerJobsService) {}
 

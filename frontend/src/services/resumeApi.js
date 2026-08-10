@@ -109,3 +109,33 @@ export const downloadResumePdf = async (id) => {
   if (!response.ok) throw new Error('PDF download failed');
   return response.blob();
 };
+
+// ---- Library / workspace operations --------------------------------------
+
+// POST /api/resume-builder/import  -> creates a resume from parsed data + source metadata
+export const importResume = async (payload) =>
+  apiCall('/api/resume-builder/import', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+// POST /api/resume-builder/:id/duplicate  -> new independent resume
+export const duplicateResume = async (id, name) =>
+  apiCall(`/api/resume-builder/${id}/duplicate`, {
+    method: 'POST',
+    body: JSON.stringify(name ? { name } : {}),
+  });
+
+// PATCH /api/resume-builder/:id/primary  -> set as default resume
+export const setPrimaryResume = async (id) =>
+  apiCall(`/api/resume-builder/${id}/primary`, { method: 'PATCH' });
+
+// PATCH /api/resume-builder/:id  -> rename / status / archive (generic update)
+export const renameResume = async (id, name) => updateResume(id, { name });
+export const archiveResume = async (id) => updateResume(id, { status: 'archived' });
+export const unarchiveResume = async (id) => updateResume(id, { status: 'ready' });
+export const setResumeStatus = async (id, status) => updateResume(id, { status });
+
+// DELETE /api/resume-builder/:id
+export const deleteResume = async (id) =>
+  apiCall(`/api/resume-builder/${id}`, { method: 'DELETE' });

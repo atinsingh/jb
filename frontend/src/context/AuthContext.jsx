@@ -71,6 +71,18 @@ const PUBLIC_APP_ROUTES = [
   '/app/states',
 ];
 
+// Routes behind a session. These are held back until auth resolves so a
+// protected page can't paint before the redirect in `initializeAuth` fires.
+// Everything else — the whole marketing surface — must render on the server:
+// gating it too left `<div id="__next">` empty in the SSR output, so no page
+// ever shipped a title, description, OG tag or <h1> to a crawler.
+const isProtectedRoute = (pathname) =>
+  pathname.startsWith('/employer/') ||
+  pathname.startsWith('/candidate/') ||
+  pathname.startsWith('/agent/') ||
+  pathname.startsWith('/admin') ||
+  (pathname.startsWith('/app') && !PUBLIC_APP_ROUTES.includes(pathname));
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -126,7 +138,12 @@ export const AuthProvider = ({ children }) => {
             });
         } else {
           // If no token but trying to access a protected route, redirect to login
-          if (router.pathname.startsWith('/employer/') || router.pathname.startsWith('/candidate/')) {
+          if (
+            router.pathname.startsWith('/employer/') ||
+            router.pathname.startsWith('/candidate/') ||
+            router.pathname.startsWith('/agent/') ||
+            router.pathname.startsWith('/admin/')
+          ) {
             router.push('/app/login');
           } else if (router.pathname.startsWith('/app')) {
             // New app surface: these are public (auth/entry) routes; everything
@@ -145,22 +162,37 @@ export const AuthProvider = ({ children }) => {
 
   // Role-based surface enforcement: an authenticated user should only ever be
   // on the surface that matches their role. Employers belong on /employer/*,
-  // everyone else on the candidate app (/app/*). This runs on every navigation
-  // so a stale session, a direct URL, or a back-button can't strand an employer
-  // on the jobseeker dashboard (or vice-versa). Note: `/employer/` (trailing
-  // slash) is the app; `/employers` (plural, marketing) is public and exempt.
+  // human career agents on /agent/*, everyone else on the candidate app
+  // (/app/*). This runs on every navigation so a stale session, a direct URL,
+  // or a back-button can't strand a user on the wrong surface. Note:
+  // `/employer/` and `/agent/` (trailing slash) are the apps; `/employers`
+  // (plural, marketing) is public and exempt. Admins are never bounced.
   useEffect(() => {
     if (loading || !user) return;
     const path = router.pathname;
-    const isEmployer = user.role === 'ROLE_EMPLOYER';
+    const role = user.role;
+    // The /admin/* operator console is ROLE_ADMIN-only. Any non-admin who lands
+    // there (stale session, direct URL) is sent to the unauthorized page.
+    if (path.startsWith('/admin') && role !== 'ROLE_ADMIN') {
+      router.replace('/unauthorized');
+      return;
+    }
+    if (role === 'ROLE_ADMIN') return; // admins may view every surface
+
+    const isEmployer = role === 'ROLE_EMPLOYER';
+    const isAgent = role === 'ROLE_AGENT';
     const onEmployerApp = path.startsWith('/employer/') || path === '/employer';
+    const onAgentApp = path.startsWith('/agent/') || path === '/agent';
     const onCandidateApp =
       path.startsWith('/app') && !PUBLIC_APP_ROUTES.includes(path);
 
-    if (isEmployer && onCandidateApp) {
-      router.replace('/employer/dashboard');
-    } else if (!isEmployer && onEmployerApp) {
-      router.replace('/app/dashboard');
+    if (isAgent) {
+      if (onCandidateApp || onEmployerApp) router.replace('/agent/dashboard');
+    } else if (isEmployer) {
+      if (onCandidateApp || onAgentApp) router.replace('/employer/dashboard');
+    } else {
+      // candidate / default role
+      if (onEmployerApp || onAgentApp) router.replace('/app/dashboard');
     }
   }, [loading, user, router.pathname]);
 
@@ -319,7 +351,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider value={{ user, loading, signup, login, loginWithToken, logout, hasRole, setAuthData, refreshUser }}>
-      {!loading && children}
+      {loading && isProtectedRoute(router.pathname) ? null : children}
     </AuthContext.Provider>
   );
 };

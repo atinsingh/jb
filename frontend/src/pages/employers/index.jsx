@@ -2,277 +2,347 @@
 
 import Head from 'next/head';
 import Link from 'next/link';
-import SiteNav from '@/components/site/SiteNav';
-import SiteFooter from '@/components/site/SiteFooter';
+import PublicLayout from '@/components/layout/PublicLayout';
 import { appRoute } from '@/components/app/appRoutes';
 
-const HERO_ACTIONS = [
-  { icon: '⚖', iconBg: '#1E2D24', iconColor: '#5BD08C', title: 'Screened 37 applicants', sub: 'Senior Product Designer', stat: 'overnight' },
-  { icon: '↑', iconBg: '#1E2D24', iconColor: '#5BD08C', title: 'Advanced Sarah Chen', sub: '96% match → Interview', stat: 'auto' },
-  { icon: '◷', iconBg: '#1E2D24', iconColor: '#5BD08C', title: 'Scheduled 3 interviews', sub: 'From interviewer availability', stat: 'done' },
+/**
+ * For Employers — the "Arrivals" board.
+ *
+ * Ported from the approved `For Employers.dc.html` mock: arrivals-panel hero,
+ * trust strip, three feature cards, three numbered steps, amber closing CTA.
+ *
+ * Deliberate departures from the mock, carried over from the brand audit:
+ *
+ * - No invented customer logo strip. The previous build ran "Northwind, Lumen,
+ *   Vertex, Corewave, Quanta, Brightside" under the heading "Built for how
+ *   modern talent teams hire"; none of them exist.
+ * - No unsourced outcome metrics ("3× faster time-to-hire", "−45% cost per
+ *   hire"). The trust strip states what the product does, which is verifiable.
+ * - Candidate names in the arrivals panel stay initialled, as in the mock —
+ *   that is also how the real pipeline surfaces them pre-shortlist.
+ */
+
+const R = {
+  postJob: `${appRoute('App Sign Up.dc.html')}?as=employer`,
+  demo: appRoute('Book Demo.dc.html'),
+  pricing: appRoute('Employer Pricing.dc.html'),
+};
+
+const ARRIVALS = [
+  { name: 'Candidate · A.R.', role: 'Sr Product Designer', score: '44', badge: 'SHORTLISTED', bg: 'rgba(124,196,255,.16)', fg: '#7cc4ff' },
+  { name: 'Candidate · M.K.', role: 'Product Designer', score: '41', badge: 'SCREENING', bg: 'rgba(242,236,219,.1)', fg: 'var(--jb-d-ink-65)' },
+  { name: 'Candidate · J.T.', role: 'Design Lead', score: '42', badge: 'NEW', bg: 'rgba(143,214,163,.16)', fg: 'var(--jb-d-accent)' },
 ];
 
-const LOGOS = ['Northwind', 'Lumen', 'Vertex', 'Corewave', 'Quanta', 'Brightside'];
+const TRUST = ['RANKED ON JOB-RELATED CRITERIA', 'REASONING SHOWN ON EVERY SCORE', 'VERIFIED CANDIDATES ONLY'];
 
-const PROPS = [
+const FEATURES = [
   {
-    kicker: 'Autopilot', glyph: '✦', tagBg: '#EAF6EE', tagColor: '#157A49',
-    title: 'Screens and schedules while you sleep.', cols: '1fr 0.9fr', textOrder: 1, mockOrder: 2,
-    body: 'Autopilot ranks every applicant against your rubric, advances strong matches, politely declines the rest, and books interviews from your team’s availability.',
-    points: ['Auto-rank against your must-haves', 'Auto-advance ≥85%, decline below your floor', 'Every action waits for your one-tap approval'],
-    mockBg: '#FBF9F4', mockBorder: '#EFE8DA', mockInk: '#1B1A16', mockMuted: '#8A8378',
-    mockRows: [
-      { initials: 'SC', name: 'Sarah Chen', sub: 'Advance → Interview', stat: '96%', avatarBg: '#1FA463', avatarColor: '#0C2C1C', statColor: '#157A49', divider: '#EFE8DA' },
-      { initials: 'AB', name: 'Aisha Bello', sub: 'Advance → Screening', stat: '92%', avatarBg: '#4263EB', avatarColor: '#fff', statColor: '#157A49', divider: '#EFE8DA' },
-      { initials: '8', name: '8 applicants', sub: 'Auto-decline < 50%', stat: '—', avatarBg: '#E8DCD3', avatarColor: '#9A6A2E', statColor: '#C9622E', divider: 'transparent' },
-    ],
+    eyebrow: 'STRUCTURED ROLES',
+    title: 'Post once, rank everything',
+    body: 'Define the role’s real requirements once. Every applicant is scored against them — not against keyword noise.',
   },
   {
-    kicker: 'Sourcing Agent', glyph: '✦', tagBg: '#EDF0FE', tagColor: '#4263EB',
-    title: 'Finds the passive talent you’d never see.', cols: '0.9fr 1fr', textOrder: 2, mockOrder: 1,
-    body: 'Describe the ideal hire and the agent works your talent pool and the wider network, ranking candidates by fit and drafting personalized outreach for each.',
-    points: ['AI fit % from your real hiring signals', 'Editable, personalized outreach drafts', 'Tracks opens, replies and interest'],
-    mockBg: '#FBF9F4', mockBorder: '#EFE8DA', mockInk: '#1B1A16', mockMuted: '#8A8378',
-    mockRows: [
-      { initials: 'DR', name: 'Diego Ramos', sub: 'Outreach drafted', stat: '89%', avatarBg: '#4263EB', avatarColor: '#fff', statColor: '#4263EB', divider: '#EFE8DA' },
-      { initials: 'ML', name: 'Mei Lin', sub: 'Outreach sent · opened', stat: '87%', avatarBg: '#4263EB', avatarColor: '#fff', statColor: '#4263EB', divider: '#EFE8DA' },
-      { initials: 'TK', name: 'Tomas Kovac', sub: 'Saved to shortlist', stat: '82%', avatarBg: '#4263EB', avatarColor: '#fff', statColor: '#8A8378', divider: 'transparent' },
-    ],
+    eyebrow: 'REASONED RANKING',
+    title: 'Scores you can defend',
+    body: 'Every rank opens to show why — job-related criteria in plain terms, ready for your hiring record.',
   },
   {
-    kicker: 'AI interviews', glyph: '✦', tagBg: '#EAF6EE', tagColor: '#157A49',
-    title: 'Runs first rounds and writes the scorecards.', cols: '1fr 0.9fr', textOrder: 1, mockOrder: 2,
-    body: 'Send an async AI screening interview, or drop in your notes — the AI returns a structured scorecard with competency ratings, risks to probe, and a hire recommendation.',
-    points: ['Async AI screens, ranked transcripts', 'Structured scorecards your panel confirms', 'Consistent, bias-aware evaluation'],
-    mockBg: '#FBF9F4', mockBorder: '#EFE8DA', mockInk: '#1B1A16', mockMuted: '#8A8378',
-    mockRows: [
-      { initials: 'SC', name: 'Sarah Chen', sub: 'Strong hire · 4.7 avg', stat: '✓', avatarBg: '#1FA463', avatarColor: '#0C2C1C', statColor: '#157A49', divider: '#EFE8DA' },
-      { initials: 'JL', name: 'Jordan Lee', sub: 'Hire · 4.1 avg', stat: '✓', avatarBg: '#4263EB', avatarColor: '#fff', statColor: '#4263EB', divider: '#EFE8DA' },
-      { initials: 'MO', name: 'Marcus Obi', sub: 'Needs review · 3.5', stat: '~', avatarBg: '#EDE7DA', avatarColor: '#5A544A', statColor: '#9A6A2E', divider: 'transparent' },
-    ],
+    eyebrow: 'TWO-SIDED TRUST',
+    title: 'Verified people, both ways',
+    body: 'Candidates arrive with verified experience; you arrive as a verified employer. No scam listings, no ghost applicants.',
   },
 ];
 
-const METRICS = [
-  { value: '3×', label: 'faster time-to-hire', color: '#5BD08C' },
-  { value: '−45%', label: 'cost per hire', color: '#FBF8F1' },
-  { value: '37→6', label: 'applicants to shortlist', color: '#FBF8F1' },
-  { value: '24d', label: 'avg days to offer', color: '#8DA2F5' },
+const STEPS = [
+  { num: '01', title: 'Post a structured role', body: 'Requirements, must-haves and nice-to-haves — ten minutes, guided.' },
+  { num: '02', title: 'Receive ranked arrivals', body: 'Cleared candidates land in your board with the reasoning attached.' },
+  { num: '03', title: 'Shortlist and meet', body: 'Move the top of the board straight to interviews — no sorting stage.' },
 ];
 
 export default function ForEmployers() {
-  const signUp = appRoute('App Sign Up.dc.html');
-  const bookDemo = appRoute('Book Demo.dc.html');
-  const pricing = appRoute('Employer Pricing.dc.html');
-
   return (
     <>
       <Head>
-        <title>Jobocate for Employers — Hire 3× faster with an AI recruiter</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
+        <title>AI Recruiter for Employers — Hiring Platform | Jobocate</title>
+        <meta
+          name="description"
+          content="Post a structured role and Jobocate ranks candidates on job-related criteria, with the reasoning shown. From posting to shortlist without the sorting."
         />
       </Head>
 
-      <style jsx global>{`
-        html {
-          scroll-behavior: smooth;
-        }
-        #emkt * {
-          box-sizing: border-box;
-        }
-        #emkt ::selection {
-          background: #1fa463;
-          color: #f7f3ea;
-        }
-        @keyframes mkpulse {
-          0%,
-          100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.5;
-          }
-        }
-      `}</style>
-
-      <div
-        id="emkt"
-        style={{
-          fontFamily: "'Hanken Grotesk', sans-serif",
-          color: '#1B1A16',
-          background: '#F7F3EA',
-          WebkitFontSmoothing: 'antialiased',
-        }}
-      >
-        <div style={{ position: 'sticky', top: 0, zIndex: 50 }}>
-          <SiteNav />
-        </div>
-
-        {/* HERO */}
-        <section style={{ maxWidth: 1200, margin: '0 auto', padding: '72px 32px 56px', display: 'grid', gridTemplateColumns: '1.05fr 1fr', gap: 56, alignItems: 'center' }}>
-          <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, border: '1px solid #C7D2FB', background: '#EDF0FE', borderRadius: 999, padding: '6px 13px', marginBottom: 22 }}>
-              <span style={{ color: '#1FA463' }}>✦</span>
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#364FC7' }}>For employers</span>
+      <PublicLayout variant="employer">
+        <div className="em">
+          {/* ---------- HERO ---------- */}
+          <section className="em__hero">
+            <div className="em__herotext">
+              <span className="em__eyebrow">FOR EMPLOYERS · ARRIVALS</span>
+              <h1 className="em__h1">
+                Meet candidates cleared <span className="jb-em">for arrival.</span>
+              </h1>
+              <p className="em__lede">
+                Post a structured role and Jobocate ranks candidates on job-related criteria — with
+                the reasoning shown. Move from posting to shortlist without the sorting.
+              </p>
+              <div className="em__ctas">
+                <Link href={R.postJob} className="em__btn em__btn--green">Post a job</Link>
+                <Link href={R.demo} className="em__btn em__btn--ghost">Book a demo</Link>
+              </div>
+              <span className="em__micro">FIRST ROLE FREE · NO CARD REQUIRED</span>
             </div>
-            <h1 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 60, lineHeight: 1.02, letterSpacing: '-0.015em', margin: '0 0 20px' }}>Hire 3× faster with an AI recruiter that does the work.</h1>
-            <p style={{ fontSize: 18, lineHeight: 1.55, color: '#5A544A', margin: '0 0 30px', maxWidth: 520 }}>Jobocate screens every applicant, sources passive talent, runs first-round interviews, and schedules the rest — so your team only spends time on the people worth meeting.</p>
-            <div style={{ display: 'flex', gap: 13, flexWrap: 'wrap' }}>
-              <Link href={signUp} style={{ display: 'inline-flex', alignItems: 'center', gap: 9, background: '#4263EB', color: '#fff', fontSize: 16, fontWeight: 700, padding: '15px 26px', borderRadius: 999, textDecoration: 'none' }}>Start hiring <span style={{ fontSize: 17 }}>→</span></Link>
-              <Link href={bookDemo} style={{ display: 'inline-flex', alignItems: 'center', background: '#FFFEFB', color: '#1B1A16', fontSize: 16, fontWeight: 600, padding: '15px 26px', borderRadius: 999, textDecoration: 'none', border: '1px solid #D9D0BE' }}>Book a demo</Link>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 20, fontSize: 13.5, color: '#8A8378' }}><span style={{ color: '#1FA463' }}>✓</span> Free to post your first role · No card required</div>
-          </div>
 
-          {/* HERO MOCK: Autopilot panel */}
-          <div style={{ position: 'relative' }}>
-            <div style={{ position: 'relative', overflow: 'hidden', background: '#15140F', border: '1px solid #2C2A22', borderRadius: 20, padding: 24, boxShadow: '0 40px 80px -40px rgba(27,26,22,0.5)' }}>
-              <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 85% 8%, rgba(31,164,99,0.3), transparent 58%)', pointerEvents: 'none' }} />
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-                <span style={{ width: 40, height: 40, borderRadius: 11, background: '#1E2D24', color: '#5BD08C', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, animation: 'mkpulse 2.4s ease-in-out infinite' }}>✦</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: '#FBF8F1' }}>Autopilot is ON</div>
-                  <div style={{ fontSize: 12, color: '#9A9286' }}>Working across 5 reqs</div>
+            <div className="em__panel">
+              <header className="em__panelhead">
+                <span className="em__panelkicker">ARRIVALS — SR PRODUCT DESIGNER</span>
+                <span className="em__live"><span className="em__pulse" aria-hidden="true" />3 CLEARED FOR YOU</span>
+              </header>
+              {ARRIVALS.map((a) => (
+                <div key={a.name} className="em__arow">
+                  <span className="em__aname">{a.name}</span>
+                  <span className="em__arole">{a.role}</span>
+                  <span className="em__ascore">{a.score}</span>
+                  <span className="em__abadge" style={{ background: a.bg, color: a.fg }}>{a.badge}</span>
                 </div>
-                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, fontWeight: 600, color: '#0C2C1C', background: '#5BD08C', padding: '4px 9px', borderRadius: 999 }}>LIVE</span>
-              </div>
-              <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 9 }}>
-                {HERO_ACTIONS.map((a) => (
-                  <div key={a.title} style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#1E1C15', border: '1px solid #2C2A22', borderRadius: 12, padding: '13px 14px' }}>
-                    <span style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 8, background: a.iconBg, color: a.iconColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>{a.icon}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#FBF8F1' }}>{a.title}</div>
-                      <div style={{ fontSize: 11, color: '#8A8378' }}>{a.sub}</div>
-                    </div>
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: '#5BD08C' }}>{a.stat}</span>
-                  </div>
-                ))}
-              </div>
+              ))}
+              <p className="em__panelfoot">
+                Each score opens to show the reasoning — job-related criteria only.
+              </p>
             </div>
-          </div>
-        </section>
+          </section>
 
-        {/* LOGO STRIP */}
-        <section style={{ maxWidth: 1200, margin: '0 auto', padding: '8px 32px 56px' }}>
-          <div style={{ textAlign: 'center', fontFamily: "'JetBrains Mono',monospace", fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9A9286', marginBottom: 22 }}>Talent teams hiring on Jobocate</div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 48, flexWrap: 'wrap', opacity: 0.7 }}>
-            {LOGOS.map((l) => (
-              <span key={l} style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 800, fontSize: 22, color: '#8A8378' }}>{l}</span>
+          {/* ---------- TRUST STRIP ---------- */}
+          <section className="em__trust">
+            {TRUST.map((t) => (
+              <span key={t} className="em__trustitem">{t}</span>
             ))}
-          </div>
-        </section>
+          </section>
 
-        {/* VALUE PROPS */}
-        <section style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 32px' }}>
-          <div style={{ textAlign: 'center', maxWidth: 640, margin: '0 auto 44px' }}>
-            <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#364FC7', marginBottom: 14 }}>The agentic hiring stack</div>
-            <h2 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 42, lineHeight: 1.06, margin: '0 0 12px' }}>Your AI recruiter handles the busywork.</h2>
-            <p style={{ fontSize: 16, lineHeight: 1.55, color: '#5A544A', margin: 0 }}>Three agents work your pipeline around the clock — you stay in control of every decision.</p>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            {PROPS.map((p) => (
-              <div key={p.kicker} style={{ display: 'grid', gridTemplateColumns: p.cols, gap: 40, alignItems: 'center', background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 22, padding: 36, overflow: 'hidden' }}>
-                <div style={{ order: p.textOrder }}>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                    <span style={{ width: 32, height: 32, borderRadius: 9, background: p.tagBg, color: p.tagColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15 }}>{p.glyph}</span>
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: p.tagColor }}>{p.kicker}</span>
-                  </div>
-                  <h3 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 30, lineHeight: 1.1, margin: '0 0 12px' }}>{p.title}</h3>
-                  <p style={{ fontSize: 15.5, lineHeight: 1.6, color: '#5A544A', margin: '0 0 18px' }}>{p.body}</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-                    {p.points.map((pt) => (
-                      <div key={pt} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 14, color: '#3A352C' }}><span style={{ color: '#1FA463', flexShrink: 0 }}>✓</span>{pt}</div>
-                    ))}
-                  </div>
-                </div>
-                {/* MOCK */}
-                <div style={{ order: p.mockOrder }}>
-                  <div style={{ background: p.mockBg, border: `1px solid ${p.mockBorder}`, borderRadius: 16, padding: 18 }}>
-                    {p.mockRows.map((m) => (
-                      <div key={m.name} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderBottom: `1px solid ${m.divider}` }}>
-                        <span style={{ width: 34, height: 34, flexShrink: 0, borderRadius: '50%', background: m.avatarBg, color: m.avatarColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12 }}>{m.initials}</span>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: p.mockInk }}>{m.name}</div>
-                          <div style={{ fontSize: 11, color: p.mockMuted }}>{m.sub}</div>
-                        </div>
-                        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, fontWeight: 600, color: m.statColor }}>{m.stat}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ROI BAND */}
-        <section style={{ background: '#15140F', marginTop: 40 }}>
-          <div style={{ maxWidth: 1200, margin: '0 auto', padding: '64px 32px' }}>
-            <div style={{ textAlign: 'center', marginBottom: 40 }}>
-              <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#5BD08C', marginBottom: 12 }}>The results</div>
-              <h2 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 40, lineHeight: 1.06, color: '#FBF8F1', margin: 0 }}>Hiring teams move faster on Jobocate.</h2>
+          {/* ---------- FEATURES ---------- */}
+          <section className="em__section">
+            <div className="em__sechead">
+              <span className="em__eyebrow">WHY JOBOCATE</span>
+              <h2 className="em__h2">From posting to shortlist, without the sorting.</h2>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 20 }}>
-              {METRICS.map((m) => (
-                <div key={m.label} style={{ textAlign: 'center' }}>
-                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 46, fontWeight: 600, color: m.color, lineHeight: 1 }}>{m.value}</div>
-                  <div style={{ fontSize: 14, color: '#B8B1A4', marginTop: 8 }}>{m.label}</div>
+            <div className="em__grid3">
+              {FEATURES.map((f) => (
+                <article key={f.eyebrow} className="em__card">
+                  <span className="em__cardkicker">{f.eyebrow}</span>
+                  <h3 className="em__cardtitle">{f.title}</h3>
+                  <p className="em__cardbody">{f.body}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          {/* ---------- HOW ---------- */}
+          <section className="em__howwrap">
+            <div className="em__how">
+              {STEPS.map((s) => (
+                <div key={s.num} className="em__step">
+                  <span className="em__stepnum">{s.num}</span>
+                  <h3 className="em__cardtitle">{s.title}</h3>
+                  <p className="em__cardbody">{s.body}</p>
                 </div>
               ))}
             </div>
-          </div>
-        </section>
+          </section>
 
-        {/* TESTIMONIAL */}
-        <section style={{ maxWidth: 900, margin: '0 auto', padding: '72px 32px', textAlign: 'center' }}>
-          <div style={{ fontSize: 30, color: '#1FA463', letterSpacing: '0.1em', marginBottom: 18 }}>★★★★★</div>
-          <p style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 32, lineHeight: 1.3, color: '#1B1A16', margin: '0 0 26px' }}>&quot;Autopilot screens overnight and hands me a clean shortlist by morning. We cut time-to-hire from 38 days to 21 — with a smaller team.&quot;</p>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 13 }}>
-            <span style={{ width: 48, height: 48, borderRadius: '50%', background: '#4263EB', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 15 }}>DW</span>
-            <div style={{ textAlign: 'left' }}>
-              <div style={{ fontWeight: 700, fontSize: 15 }}>Dana Whitfield</div>
-              <div style={{ fontSize: 13.5, color: '#8A8378' }}>Senior Recruiter, Stripe</div>
-            </div>
-          </div>
-        </section>
-
-        {/* PRICING TEASER */}
-        <section style={{ maxWidth: 1200, margin: '0 auto', padding: '0 32px 64px' }}>
-          <div style={{ background: '#EDF0FE', border: '1px solid #C7D2FB', borderRadius: 24, padding: 48, display: 'flex', alignItems: 'center', gap: 40, flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: 280 }}>
-              <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#364FC7', marginBottom: 12 }}>Simple pricing</div>
-              <h2 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 34, lineHeight: 1.08, margin: '0 0 10px' }}>Plans that scale with your hiring.</h2>
-              <p style={{ fontSize: 15.5, lineHeight: 1.55, color: '#3F4A7A', margin: 0 }}>From your first hire to high-volume recruiting. Job slots, seats and AI actions included on every tier.</p>
-            </div>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <Link href={pricing} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#4263EB', color: '#fff', fontSize: 15, fontWeight: 700, padding: '14px 24px', borderRadius: 999, textDecoration: 'none' }}>See pricing →</Link>
-              <Link href={bookDemo} style={{ display: 'inline-flex', alignItems: 'center', background: '#FFFEFB', color: '#1B1A16', fontSize: 15, fontWeight: 600, padding: '14px 24px', borderRadius: 999, textDecoration: 'none', border: '1px solid #C7D2FB' }}>Talk to sales</Link>
-            </div>
-          </div>
-        </section>
-
-        {/* FINAL CTA */}
-        <section style={{ maxWidth: 1200, margin: '0 auto', padding: '0 32px 80px' }}>
-          <div style={{ position: 'relative', overflow: 'hidden', background: '#15140F', borderRadius: 28, padding: '72px 48px', textAlign: 'center' }}>
-            <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 0%, rgba(66,99,235,0.4), transparent 60%)', pointerEvents: 'none' }} />
-            <div style={{ position: 'relative' }}>
-              <h2 style={{ fontFamily: "'Instrument Serif',serif", fontWeight: 400, fontSize: 46, lineHeight: 1.04, color: '#FBF8F1', margin: '0 0 16px' }}>Put your hiring on autopilot.</h2>
-              <p style={{ fontSize: 17, lineHeight: 1.55, color: '#B8B1A4', margin: '0 auto 30px', maxWidth: 480 }}>Post your first role free and watch the AI recruiter go to work before your next coffee.</p>
-              <div style={{ display: 'flex', gap: 13, justifyContent: 'center', flexWrap: 'wrap' }}>
-                <Link href={signUp} style={{ display: 'inline-flex', alignItems: 'center', gap: 9, background: '#4263EB', color: '#fff', fontSize: 16, fontWeight: 700, padding: '15px 28px', borderRadius: 999, textDecoration: 'none' }}>Start hiring free <span>→</span></Link>
-                <Link href={bookDemo} style={{ display: 'inline-flex', alignItems: 'center', background: 'transparent', color: '#FBF8F1', fontSize: 16, fontWeight: 600, padding: '15px 28px', borderRadius: 999, textDecoration: 'none', border: '1px solid #3A382E' }}>Book a demo</Link>
+          {/* ---------- PRICING TEASER ---------- */}
+          <section className="em__section em__section--tight">
+            <div className="em__pricing">
+              <div>
+                <span className="em__eyebrow">SIMPLE PRICING</span>
+                <h2 className="em__h3">Plans that scale with your hiring.</h2>
+                <p className="em__cardbody">
+                  From your first hire to high-volume recruiting. Job slots, seats and AI actions
+                  included on every tier.
+                </p>
+              </div>
+              <div className="em__ctas">
+                <Link href={R.pricing} className="em__btn em__btn--green">See pricing →</Link>
+                <Link href={R.demo} className="em__btn em__btn--ghost">Talk to sales</Link>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <SiteFooter />
-      </div>
+          {/* ---------- FINAL CTA ---------- */}
+          <section className="em__finalwrap">
+            <div className="em__final">
+              <h2 className="em__h2">
+                Your next hire is <span className="jb-em">already en route.</span>
+              </h2>
+              <p className="em__lede em__lede--narrow">
+                Post your first structured role free and see a ranked, reasoned shortlist — with the
+                criteria behind every score.
+              </p>
+              <Link href={R.postJob} className="em__btn em__btn--amber">Post a job →</Link>
+            </div>
+          </section>
+        </div>
+
+        <style jsx>{`
+          .em { --pad: 48px; max-width: 1280px; margin: 0 auto; font-family: var(--jb-font-sans); }
+          .em :global(*) { box-sizing: border-box; }
+
+          .em__eyebrow {
+            display: block; font-family: var(--jb-font-mono); font-size: 11px; font-weight: 500;
+            letter-spacing: 0.24em; color: var(--jb-d-accent);
+          }
+          .em__h1 {
+            margin: 0; font-family: var(--jb-font-display); font-weight: 400;
+            font-size: clamp(36px, 5vw, 62px); line-height: 1.02;
+          }
+          .em__h2 {
+            margin: 0; font-family: var(--jb-font-display); font-weight: 400;
+            font-size: clamp(30px, 3.6vw, 46px); line-height: 1.08;
+          }
+          .em__h3 {
+            margin: 0; font-family: var(--jb-font-display); font-weight: 400;
+            font-size: clamp(24px, 2.6vw, 32px); line-height: 1.1;
+          }
+          .em__lede { margin: 0; max-width: 460px; font-size: 16px; line-height: 1.65; color: var(--jb-d-ink-70); }
+          .em__lede--narrow { max-width: 440px; }
+          .em__micro { font-family: var(--jb-font-mono); font-size: 12px; color: var(--jb-d-ink-45); }
+
+          .em__ctas { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 4px; }
+          :global(.em__btn) {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-height: 48px; padding: 15px 30px; border-radius: 999px;
+            font-family: var(--jb-font-sans); font-size: 15px; font-weight: 700;
+            text-decoration: none; border: 1.5px solid transparent;
+            transition: background-color 0.18s ease, border-color 0.18s ease;
+          }
+          :global(.em__btn--green) { background: var(--jb-d-accent); color: var(--jb-d-bg); }
+          :global(.em__btn--green:hover) { background: var(--jb-d-accent-hi); }
+          :global(.em__btn--ghost) { border-color: var(--jb-d-line-btn); color: var(--jb-d-ink); font-weight: 600; }
+          :global(.em__btn--ghost:hover) { border-color: var(--jb-d-accent); }
+          :global(.em__btn--amber) { background: var(--jb-d-amber); color: var(--jb-d-bg); margin-top: 6px; }
+          :global(.em__btn--amber:hover) { background: var(--jb-d-amber-hi); }
+
+          /* ---- hero ---- */
+          .em__hero {
+            padding: 64px var(--pad) 48px;
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr));
+            gap: 48px; align-items: center;
+          }
+          .em__herotext { display: flex; flex-direction: column; gap: 20px; }
+
+          .em__panel {
+            background: var(--jb-d-panel-solid); border: 1px solid var(--jb-d-line-card);
+            border-radius: 14px; overflow: hidden;
+          }
+          .em__panelhead {
+            display: flex; align-items: center; justify-content: space-between; gap: 12px;
+            padding: 15px 22px; border-bottom: 1px solid var(--jb-d-line); flex-wrap: wrap;
+          }
+          .em__panelkicker {
+            font-family: var(--jb-font-mono); font-size: 11px; font-weight: 600;
+            letter-spacing: 0.18em; color: var(--jb-d-accent);
+          }
+          .em__live {
+            display: flex; align-items: center; gap: 7px;
+            font-family: var(--jb-font-mono); font-size: 11px; font-weight: 500; color: var(--jb-d-ink-55);
+          }
+          .em__pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--jb-d-accent); animation: emPulse 1.6s infinite; }
+          @keyframes emPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+          .em__arow {
+            display: grid; grid-template-columns: 1fr 1.2fr 0.4fr auto; gap: 12px; align-items: center;
+            padding: 15px 22px; border-bottom: 1px solid var(--jb-d-line);
+            font-size: 13px; font-weight: 500;
+          }
+          .em__aname { color: var(--jb-d-ink-85); }
+          .em__arole { color: var(--jb-d-ink-65); }
+          .em__ascore { font-family: var(--jb-font-display); font-size: 20px; color: var(--jb-d-accent); }
+          .em__abadge {
+            font-family: var(--jb-font-mono); font-size: 10px; font-weight: 600;
+            letter-spacing: 0.12em; padding: 4px 9px; border-radius: 3px; white-space: nowrap;
+          }
+          .em__panelfoot { margin: 0; padding: 14px 22px; font-size: 12px; color: var(--jb-d-ink-55); }
+
+          /* ---- trust ---- */
+          .em__trust {
+            margin: 0 var(--pad); display: flex; justify-content: center; flex-wrap: wrap;
+            border-top: 1px solid var(--jb-d-line-card); border-bottom: 1px solid var(--jb-d-line-card);
+          }
+          .em__trustitem {
+            font-family: var(--jb-font-mono); font-size: 11px; font-weight: 500;
+            letter-spacing: 0.16em; color: var(--jb-d-ink-65);
+            padding: 14px 28px; border-right: 1px solid var(--jb-d-line);
+          }
+          .em__trustitem:last-child { border-right: none; }
+
+          /* ---- features ---- */
+          .em__section { padding: 64px var(--pad); display: flex; flex-direction: column; gap: 32px; }
+          .em__section--tight { padding-top: 0; }
+          .em__sechead { display: flex; flex-direction: column; gap: 10px; }
+          .em__grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 18px; }
+          .em__card {
+            background: var(--jb-d-glass); border: 1px solid var(--jb-d-line-glass);
+            border-radius: 12px; padding: 26px;
+            display: flex; flex-direction: column; gap: 11px;
+            transition: border-color 0.18s ease;
+          }
+          .em__card:hover { border-color: var(--jb-d-accent); }
+          .em__cardkicker {
+            font-family: var(--jb-font-mono); font-size: 11px; font-weight: 600;
+            letter-spacing: 0.18em; color: var(--jb-d-accent);
+          }
+          .em__cardtitle { margin: 0; font-family: var(--jb-font-sans); font-size: 18px; font-weight: 700; letter-spacing: 0; }
+          .em__cardbody { margin: 0; font-size: 14px; line-height: 1.6; color: var(--jb-d-ink-65); }
+
+          /* ---- how ---- */
+          .em__howwrap { padding: 0 var(--pad); }
+          .em__how {
+            background: var(--jb-d-panel); border: 1px solid var(--jb-d-line-card);
+            border-radius: 14px; padding: 40px;
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 28px;
+          }
+          .em__step { display: flex; flex-direction: column; gap: 10px; }
+          .em__stepnum { font-family: var(--jb-font-display); font-size: 30px; font-style: italic; color: var(--jb-d-accent); }
+
+          /* ---- pricing teaser ---- */
+          .em__pricing {
+            background: var(--jb-d-glass-hi); border: 1px solid var(--jb-d-line-card);
+            border-radius: 16px; padding: 40px;
+            display: flex; align-items: center; justify-content: space-between; gap: 32px; flex-wrap: wrap;
+          }
+          .em__pricing > div:first-child { display: flex; flex-direction: column; gap: 10px; max-width: 560px; }
+
+          /* ---- final ---- */
+          .em__finalwrap { padding: 0 var(--pad) 64px; }
+          .em__final {
+            border: 1px solid var(--jb-d-line-strong);
+            background: radial-gradient(ellipse at 50% 120%, rgba(143, 214, 163, 0.25), transparent 70%);
+            border-radius: 16px; padding: 56px var(--pad);
+            display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center;
+          }
+
+          @media (max-width: 760px) {
+            .em { --pad: 20px; }
+            .em__hero { padding: 36px var(--pad) 32px; gap: 28px; }
+            .em__ctas { flex-direction: column; width: 100%; }
+            :global(.em__btn) { width: 100%; }
+            .em__trust { border: none; gap: 8px; margin: 0; padding: 0 var(--pad); justify-content: flex-start; }
+            .em__trustitem {
+              border: 1px solid var(--jb-d-line-strong); border-radius: 999px;
+              padding: 7px 13px; font-size: 11px; letter-spacing: 0.12em;
+            }
+            .em__section { padding: 36px var(--pad); }
+            .em__how { padding: 24px; }
+            .em__pricing { padding: 24px; }
+            .em__final { padding: 36px 24px; }
+            .em__arow {
+              grid-template-columns: 1fr auto;
+              grid-template-areas: 'name score' 'role badge';
+            }
+            .em__aname { grid-area: name; }
+            .em__arole { grid-area: role; }
+            .em__ascore { grid-area: score; justify-self: end; }
+            .em__abadge { grid-area: badge; justify-self: end; }
+          }
+        `}</style>
+      </PublicLayout>
     </>
   );
 }

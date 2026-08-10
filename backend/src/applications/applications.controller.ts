@@ -10,6 +10,7 @@ import {
   Query,
   Body,
   UnauthorizedException,
+  BadRequestException,
   Logger,
 } from '@nestjs/common';
 import {
@@ -78,7 +79,7 @@ export class ApplicationsController {
 
     if (alreadyApplied) {
       this.logger.warn(`⚠️ User already applied to job ${jobId}`);
-      throw new Error('Already applied to this job');
+      throw new BadRequestException('Already applied to this job');
     }
 
     // This would need to use job matching service to get match and cover letter
@@ -111,18 +112,24 @@ export class ApplicationsController {
       required: ['jobIds'],
     },
   })
-  @ApiResponse({ status: 200, description: 'Auto-application completed' })
+  @ApiResponse({ status: 200, description: 'Auto-application completed (inline) or queued' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async autoApply(@Body('jobIds') jobIds: string[], @Request() req) {
+    if (!Array.isArray(jobIds) || jobIds.length === 0) {
+      throw new BadRequestException('jobIds must be a non-empty array of job IDs');
+    }
     this.logger.log(`🤖 Auto-applying for user ${req.user?.email || 'unknown'} to ${jobIds.length} jobs`);
     const userId = req.user._id.toString();
-    const applications = await this.applicationAgentService.autoApply(userId, jobIds);
-    this.logger.log(`✅ Auto-applied to ${applications.length} jobs`);
-    return {
-      message: 'Auto-application completed',
-      applications,
-      count: applications.length,
-    };
+    // Producer: enqueues one batch job when the queue is enabled (returns
+    // { queued: true, jobId }), otherwise runs inline and returns the original
+    // { message, applications, count } shape. See requestAutoApply.
+    const result = await this.applicationAgentService.requestAutoApply(userId, jobIds);
+    if (result.queued) {
+      this.logger.log(`📬 Auto-apply queued as job ${result.jobId}`);
+    } else {
+      this.logger.log(`✅ Auto-applied to ${result.count} jobs`);
+    }
+    return result;
   }
 
   @Get('should-apply/:jobId')

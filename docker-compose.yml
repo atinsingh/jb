@@ -25,6 +25,9 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
+      # Dev uses the full-dependency stage (nest CLI, hot reload) + source mount.
+      # Production is built via docker-compose.prod.yml (default `runtime` stage).
+      target: deps
     container_name: jobocate-backend
     restart: unless-stopped
     ports:
@@ -63,6 +66,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      # Dev uses the full-dependency stage (`next dev`, tailwind) + source mount.
+      target: deps
     container_name: jobocate-frontend
     restart: unless-stopped
     ports:

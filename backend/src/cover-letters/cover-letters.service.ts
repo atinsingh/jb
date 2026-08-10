@@ -3,34 +3,23 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { CoverLetter, CoverLetterDocument } from '../schemas/cover-letter.schema';
 import { User, UserDocument } from '../schemas/user.schema';
-import { AiProviderService } from '../ai-services/ai-provider.service';
+import { LLMRoutingService, LLMFeature } from '../llm/llm-routing.service';
 import { GenerateCoverLetterDto } from './dto/generate-cover-letter.dto';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import { StorageService } from '../storage';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 @Injectable()
 export class CoverLettersService {
   private readonly logger = new Logger(CoverLettersService.name);
-  private readonly uploadsDir = path.join(process.cwd(), 'uploads', 'cover-letters');
 
   constructor(
     @InjectModel(CoverLetter.name)
     private coverLetterModel: Model<CoverLetterDocument>,
     @InjectModel(User.name)
     private userModel: Model<UserDocument>,
-    private aiProviderService: AiProviderService,
-  ) {
-    this.ensureUploadsDirectory();
-  }
-
-  private async ensureUploadsDirectory() {
-    try {
-      await fs.mkdir(this.uploadsDir, { recursive: true });
-    } catch (error) {
-      this.logger.error('Failed to create uploads directory:', error);
-    }
-  }
+    private readonly llmRoutingService: LLMRoutingService,
+    private readonly storageService: StorageService,
+  ) {}
 
   async findAll(userId: string): Promise<CoverLetterDocument[]> {
     return this.coverLetterModel
@@ -202,52 +191,69 @@ Write a storytelling cover letter (300-400 words) that narrates the candidate's 
     const prompt = templatePrompts[template] || templatePrompts.professional;
 
     try {
-      // Use the AI service to generate the cover letter
-      // Access the OpenAI client from the service
-      const openai = (this.aiProviderService as any).openai;
-      const anthropic = (this.aiProviderService as any).anthropic;
-      const provider = (this.aiProviderService as any).provider || 'openai';
+      // Route through the modern llm/ stack. `getProviderForFeature` returns the
+      // configured provider (or MockProvider when no API key is present), so the
+      // template prompts run against the same primitive the feature-services use.
+      const provider = this.llmRoutingService.getProviderForFeature(
+        LLMFeature.GENERATE_COVER_LETTER,
+      );
+      const config = this.llmRoutingService.getFeatureConfig(
+        LLMFeature.GENERATE_COVER_LETTER,
+      );
 
-      if (provider === 'openai' && openai) {
-        const response = await openai.chat.completions.create({
-          model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content: `You are a professional cover letter writer. Generate cover letters based on the template style requested. Return only the cover letter content, no additional text or explanations.`,
-            },
-            { role: 'user', content: prompt },
-          ],
-          temperature: 0.7,
-          max_tokens: 1000,
-        });
+      const response = await provider.chat({
+        messages: [
+          {
+            role: 'system',
+            content: `You are a professional cover letter writer. Generate cover letters based on the template style requested. Return only the cover letter content, no additional text or explanations.`,
+          },
+          { role: 'user', content: prompt },
+        ],
+        model: config.model,
+        temperature: config.temperature,
+        maxTokens: config.maxTokens,
+      });
 
-        if (response?.choices?.[0]?.message?.content) {
-          return response.choices[0].message.content.trim();
-        }
-      } else if (provider === 'anthropic' && anthropic) {
-        const response = await anthropic.messages.create({
-          model: 'claude-3-haiku-20240307',
-          max_tokens: 1000,
-          messages: [
-            {
-              role: 'user',
-              content: `You are a professional cover letter writer. Generate cover letters based on the template style requested. Return only the cover letter content, no additional text or explanations.\n\n${prompt}`,
-            },
-          ],
-        });
-
-        if (response?.content?.[0]?.text) {
-          return response.content[0].text.trim();
-        }
+      if (response?.content) {
+        return response.content.trim();
       }
 
-      // Fallback to basic generation
-      return await this.aiProviderService.generateCoverLetter(candidateInfo, jobInfo);
+      // No content returned — degrade to the local template.
+      return this.composeFallbackCoverLetter(candidateInfo, jobInfo);
     } catch (error) {
-      this.logger.error('Error generating cover letter with AI:', error);
-      throw new Error('Failed to generate cover letter');
+      this.logger.error(
+        'AI cover letter generation failed, using local template fallback:',
+        error?.message || error,
+      );
+      // Graceful degradation: compose a usable letter locally instead of 500ing
+      return this.composeFallbackCoverLetter(candidateInfo, jobInfo);
     }
+  }
+
+  private composeFallbackCoverLetter(candidateInfo: any, jobInfo: any): string {
+    const name = candidateInfo?.name || 'Candidate';
+    const skills = Array.isArray(candidateInfo?.skills) ? candidateInfo.skills : [];
+    const summary = candidateInfo?.summary || '';
+    const title = jobInfo?.title || 'the open role';
+    const company = jobInfo?.companyName || 'your company';
+    const skillsLine = skills.length
+      ? `My background spans ${skills.slice(0, 6).join(', ')}, which maps directly to what this role requires.`
+      : 'My background and hands-on experience map directly to what this role requires.';
+    const summaryLine = summary ? ` ${summary}` : '';
+
+    return [
+      `Dear Hiring Team at ${company},`,
+      '',
+      `I am writing to express my strong interest in the ${title} position at ${company}. ` +
+        `After reviewing the role, I am confident that my experience and drive make me a great fit.${summaryLine}`,
+      '',
+      `${skillsLine} I take ownership of my work, collaborate well across teams, and consistently deliver results that move the business forward.`,
+      '',
+      `I would welcome the opportunity to discuss how I can contribute to ${company}. Thank you for your time and consideration.`,
+      '',
+      'Sincerely,',
+      name,
+    ].join('\n');
   }
 
   private async generatePDF(
@@ -361,14 +367,14 @@ Write a storytelling cover letter (300-400 words) that narrates the candidate's 
         color: rgb(0, 0, 0),
       });
 
-      // Save PDF
+      // Persist PDF via the storage abstraction and return its storage key.
       const pdfBytes = await pdfDoc.save();
-      const filename = `cover-letter-${coverLetter._id}-${Date.now()}.pdf`;
-      const filepath = path.join(this.uploadsDir, filename);
+      const key = `cover-letters/${coverLetter._id}.pdf`;
+      await this.storageService.put(key, Buffer.from(pdfBytes), {
+        contentType: 'application/pdf',
+      });
 
-      await fs.writeFile(filepath, pdfBytes);
-
-      return filepath;
+      return key;
     } catch (error) {
       this.logger.error('Error generating PDF:', error);
       throw new Error('Failed to generate PDF');
@@ -401,12 +407,12 @@ Write a storytelling cover letter (300-400 words) that narrates the candidate's 
   async delete(id: string, userId: string): Promise<void> {
     const coverLetter = await this.findOne(id, userId);
 
-    // Delete PDF file if exists
+    // Delete PDF object if exists
     if (coverLetter.pdfPath) {
       try {
-        await fs.unlink(coverLetter.pdfPath);
+        await this.storageService.delete(coverLetter.pdfPath);
       } catch (error) {
-        this.logger.warn(`Failed to delete PDF file: ${coverLetter.pdfPath}`, error);
+        this.logger.warn(`Failed to delete PDF object: ${coverLetter.pdfPath}`, error);
       }
     }
 

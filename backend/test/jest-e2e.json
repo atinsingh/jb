@@ -1,0 +1,22 @@
+{
+  "moduleFileExtensions": ["ts", "js", "json"],
+  "rootDir": ".",
+  "testEnvironment": "node",
+  "testRegex": ".e2e-spec.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": [
+      "ts-jest",
+      {
+        "isolatedModules": true,
+        "tsconfig": { "allowJs": true }
+      }
+    ]
+  },
+  "transformIgnorePatterns": [
+    "node_modules/(?!(.*/)?(uuid|htmlparser2|domhandler|domelementtype|domutils|dom-serializer|entities|css-select|css-what|nth-check|boolbase|parse5)/)"
+  ],
+  "setupFiles": ["<rootDir>/setup-e2e.ts"],
+  "testTimeout": 60000,
+  "maxWorkers": 1,
+  "forceExit": true
+}

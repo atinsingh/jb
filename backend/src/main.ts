@@ -1,10 +1,16 @@
+// MUST be first: populate process.env from .env before AppModule is evaluated,
+// so module-load-time conditionals (e.g. QUEUE_ENABLED in queue.config.ts) see
+// the right values. See src/load-env.ts.
+import './load-env';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppLoggerService } from './common/logger/logger.service';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import helmet from 'helmet';
 import * as dotenv from 'dotenv';
 import { join } from 'path';
 
@@ -53,10 +59,23 @@ if (!envLoaded) {
 async function bootstrap() {
   try {
     earlyLogger.log('Starting application bootstrap...');
-    const app = await NestFactory.create(AppModule, {
+    const app = await NestFactory.create<NestExpressApplication>(AppModule, {
       logger: false, // Disable NestJS default logger, use our custom logger
+      rawBody: true, // Preserve raw request body (req.rawBody) for Stripe webhook signature verification
     });
     earlyLogger.log('App module created successfully');
+
+    // Serve locally-stored uploads (StorageService local driver) at /uploads/*.
+    // No-op for the s3 driver, which returns absolute/presigned URLs instead.
+    const storageLocalPath = process.env.STORAGE_LOCAL_PATH || './uploads';
+    app.useStaticAssets(
+      join(process.cwd(), storageLocalPath.replace(/^\.\//, '')),
+      { prefix: '/uploads/' },
+    );
+
+  // Security response headers (HSTS, noSniff, frameguard, etc.). CSP is disabled
+  // because this process serves a JSON API + Swagger UI, not first-party HTML.
+  app.use(helmet({ contentSecurityPolicy: false }));
 
   // Get logger service from app context
   const logger = app.get(AppLoggerService);
@@ -64,7 +83,7 @@ async function bootstrap() {
 
   // CORS configuration
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:8000',
+    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
     credentials: true,
   });
 
@@ -87,7 +106,7 @@ async function bootstrap() {
 
   // Global prefix (health endpoint excluded - handled separately)
   app.setGlobalPrefix('api', {
-    exclude: ['health'],
+    exclude: ['health', 'health/readiness'],
   });
 
   // Swagger/OpenAPI configuration
