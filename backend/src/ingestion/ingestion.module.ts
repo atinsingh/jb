@@ -2,6 +2,9 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 
 import { Job, JobSchema } from '../schemas/job.schema';
+// PublisherService normalizes geography on the employer -> search bridge so
+// first-party listings are filterable on the same fields as scraped ones.
+import { GeographyModule } from '../geography/geography.module';
 import {
   EmployerJob,
   EmployerJobSchema,
@@ -75,6 +78,7 @@ import { QUEUE_CRON } from '../queue/cron-queue.constants';
       { name: DeadLetter.name, schema: DeadLetterSchema },
       { name: IngestionLock.name, schema: IngestionLockSchema },
     ]),
+    GeographyModule,
     // Registers the shared 'cron' Bull queue only when QUEUE_ENABLED=true; []
     // otherwise, so the schedulers' @Optional queue resolves to undefined.
     ...bullQueueImports(QUEUE_CRON),

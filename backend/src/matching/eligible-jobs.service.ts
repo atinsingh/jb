@@ -32,8 +32,9 @@ export class EligibleJobsService {
     private scorer: MatchScorerService,
   ) {}
 
-  /** Aggregate the candidate's skills + title from their résumés for Stage-2 scoring. */
-  private async scoreProfile(userId: string, prefs: any): Promise<ScoreCandidate> {
+  /** Aggregate the candidate's skills + title from their résumés AND the active
+   *  job profile for Stage-2 scoring. */
+  private async scoreProfile(userId: string, prefs: any, profile?: any): Promise<ScoreCandidate> {
     const resumes: any[] = await this.resumeModel
       .find({ userId: new Types.ObjectId(userId) })
       .sort({ isPrimary: -1, updatedAt: -1 })
@@ -45,6 +46,16 @@ export class EligibleJobsService {
       (r.skills || []).forEach((s: string) => skillSet.add(s));
       if (!title) title = r.headline || (r.experience && r.experience[0] && r.experience[0].title) || '';
     }
+
+    // The JobProfile is where the candidate states, explicitly and per-search,
+    // what they want to be matched on. Ignoring its skills/role meant a profile
+    // could look fully configured while contributing nothing but its target
+    // countries: a résumé with no parsed skills produced a zero-skill candidate,
+    // every job scored near the floor, and the whole pool fell below the
+    // recommendation threshold — an empty screen that blamed the job market.
+    (profile?.skills || []).forEach((s: string) => { if (s) skillSet.add(s); });
+    if (!title) title = profile?.role || '';
+
     (prefs.titles || []).forEach((t: string) => { if (!title) title = t; });
     return {
       skills: normalizeSkills([...skillSet]),
@@ -74,13 +85,19 @@ export class EligibleJobsService {
    * profile. A candidate with no profile at all falls back to their current
    * country, so matching keeps working before any profile is created.
    */
-  private async resolveTargets(userId: string, prefs: any, profileId?: string): Promise<string[]> {
+  /**
+   * The JobProfile that scopes this search: an explicitly requested one, else
+   * the active one. Resolved ONCE per search and threaded through targeting,
+   * scoring and thresholds — previously each of those looked it up (or failed
+   * to) independently, which is how a profile could supply target countries
+   * while its skills, role and match threshold were silently ignored.
+   */
+  private async resolveProfile(userId: string, profileId?: string): Promise<any | null> {
     const query: any = { userId: new Types.ObjectId(userId) };
     if (profileId && Types.ObjectId.isValid(profileId)) query._id = new Types.ObjectId(profileId);
     else query.active = true;
 
-    const profile: any = await this.profileModel.findOne(query).sort({ updatedAt: -1 }).lean();
-    return resolveTargetCountries(profile, prefs);
+    return this.profileModel.findOne(query).sort({ updatedAt: -1 }).lean();
   }
 
   /**
@@ -93,10 +110,11 @@ export class EligibleJobsService {
     opts: { keywords?: string; limit?: number; includeConditional?: boolean; profileId?: string } = {},
   ) {
     const prefs: any = (await this.prefsModel.findOne({ userId: new Types.ObjectId(userId) }).lean()) || {};
-    const targets = await this.resolveTargets(userId, prefs, opts.profileId);
+    const profile = await this.resolveProfile(userId, opts.profileId);
+    const targets = resolveTargetCountries(profile, prefs);
     const cand = this.eligProfile(prefs, targets);
-    const scoreCand = await this.scoreProfile(userId, prefs);
-    const pref = this.buildPrefFilter(prefs);
+    const scoreCand = await this.scoreProfile(userId, prefs, profile);
+    const pref = this.buildPrefFilter(prefs, profile);
     const limit = Math.min(opts.limit || 40, 100);
 
     // ---- Stage 1a: fast indexed pre-filter to bound the candidate pool ----
@@ -232,13 +250,19 @@ export class EligibleJobsService {
   }
 
   /* ----------------------------------------- preference filters + preview */
-  private buildPrefFilter(prefs: any) {
+  private buildPrefFilter(prefs: any, profile?: any) {
     const EMP_MAP: Record<string, string> = {
       full_time: 'full-time', part_time: 'part-time', contract: 'contract',
       contract_to_hire: 'contract', temporary: 'temporary', internship: 'internship', freelance: 'contract',
     };
     return {
-      minMatch: prefs.minMatchScore || 0,
+      // A profile-scoped search obeys that profile's own threshold; the global
+      // preference is the fallback. Previously the profile's minMatchScore was
+      // stored, shown in the UI, and never consulted.
+      minMatch:
+        (typeof profile?.minMatchScore === 'number' ? profile.minMatchScore : undefined) ??
+        prefs.minMatchScore ??
+        0,
       workplaces: (prefs.workplaceTypes || []).map((w: string) => w.toUpperCase()),
       employments: new Set((prefs.employmentTypes || []).map((e: string) => EMP_MAP[e]).filter(Boolean)),
       exclCompanies: new Set((prefs.companyBlocklist || []).map((s: string) => s.toLowerCase().trim())),
@@ -262,10 +286,11 @@ export class EligibleJobsService {
   /** Real counts for the preferences "Preview matching impact" panel. */
   async previewImpact(userId: string, profileId?: string) {
     const prefs: any = (await this.prefsModel.findOne({ userId: new Types.ObjectId(userId) }).lean()) || {};
-    const targets = await this.resolveTargets(userId, prefs, profileId);
+    const profile = await this.resolveProfile(userId, profileId);
+    const targets = resolveTargetCountries(profile, prefs);
     const cand = this.eligProfile(prefs, targets);
-    const scoreCand = await this.scoreProfile(userId, prefs);
-    const pref = this.buildPrefFilter(prefs);
+    const scoreCand = await this.scoreProfile(userId, prefs, profile);
+    const pref = this.buildPrefFilter(prefs, profile);
     const pool = await this.jobModel.find({ isActive: { $ne: false } }).sort({ scrapedAt: -1 }).limit(1500).lean();
 
     let eligible = 0, excludedByGeography = 0, excludedByPreference = 0, belowMinMatch = 0, recommended = 0, autoApplyEligible = 0;

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Job, JobDocument } from '../../schemas/job.schema';
+import { JobGeoService } from '../../geography/job-geo.service';
 import { IngestionSourceDocument } from '../schemas/ingestion-source.schema';
 import { NormalizedJob } from './normalizer.service';
 import { ValidationResult } from './validator.service';
@@ -62,6 +63,7 @@ const ADAPTER_TO_IMPORT_METHOD: Record<string, string> = {
 export class PublisherService {
   constructor(
     @InjectModel(Job.name) private readonly jobModel: Model<JobDocument>,
+    private readonly geo: JobGeoService,
   ) {}
 
   async publishNormalized(
@@ -258,6 +260,20 @@ export class PublisherService {
     const externalId = `jobocate:${employerJob._id}`;
     const now = new Date();
     const published = employerJob.status === 'active';
+
+    // Run the SAME geography engine the ingestion path runs. Without this the
+    // bridge wrote `workplaceType` but left `country` unset, which is the one
+    // combination the matcher's Stage-1a pre-filter rejects outright: its
+    // legacy escape hatch only forgives a missing country when `workplaceType`
+    // is also unset. The result was that a job an employer posted in Toronto
+    // was invisible to every candidate targeting Canada — the marketplace's
+    // own listings were the only ones that could not be matched.
+    const geo = this.geo.normalize({
+      location: employerJob.location,
+      description: employerJob.description,
+      title: employerJob.title,
+      workplaceType: employerJob.isRemote ? 'REMOTE' : undefined,
+    });
     const disclosed =
       employerJob.salaryMin != null || employerJob.salaryMax != null;
     const salary = disclosed
@@ -274,9 +290,22 @@ export class PublisherService {
             employerJob.location ||
             (employerJob.isRemote ? 'Remote' : 'Not specified'),
           isRemote: !!employerJob.isRemote,
-          // Uppercase to match the matching/eligibility engine, which compares
-          // against 'REMOTE' | 'ONSITE' | 'HYBRID' (see eligible-jobs.service.ts).
-          workplaceType: employerJob.isRemote ? 'REMOTE' : 'ONSITE',
+          // Geography comes from the shared engine so employer-posted jobs are
+          // filterable on exactly the same fields as scraped ones. The engine
+          // already emits uppercase 'REMOTE' | 'ONSITE' | 'HYBRID', which is
+          // what the matching/eligibility layer compares against. An explicit
+          // isRemote flag from the employer still wins over inferred text.
+          workplaceType: employerJob.isRemote ? 'REMOTE' : geo.workplaceType,
+          country: geo.country,
+          region: geo.region,
+          city: geo.city,
+          remoteScope: geo.remoteScope,
+          eligibleCountries: geo.eligibleCountries,
+          excludedCountries: geo.excludedCountries,
+          sponsorship: geo.sponsorship,
+          locationConfidence: geo.locationConfidence,
+          needsGeoReview: geo.needsGeoReview,
+          geoEvidence: geo.geoEvidence,
           description: employerJob.description || '',
           requirements: employerJob.requirements || [],
           skills: employerJob.skills || [],

@@ -174,4 +174,84 @@ describe('EligibleJobsService — Stage-1a geo pre-filter', () => {
     expect(res.targetCountries).toEqual(['CA']);
     expect(res.hasTargetCountries).toBe(true);
   });
+
+  // -------------------------------------------------------------------------
+  // The job profile is where a candidate states, per search, what they want to
+  // be matched on. It used to contribute ONLY its target countries: skills,
+  // role and minMatchScore were stored, shown in the UI, and never read. A
+  // candidate whose résumé had no parsed skills therefore scored as a zero-skill
+  // candidate, every job landed near the floor, and the whole pool fell below
+  // the recommendation threshold — an empty screen that blamed the job market.
+  // -------------------------------------------------------------------------
+  describe('the job profile drives scoring, not just geography', () => {
+    it('counts the profile skills the candidate entered', async () => {
+      profile = { targetCountries: ['CA'], skills: ['typescript', 'postgres', 'kubernetes'] };
+
+      const res: any = await service.getEligibleJobs(USER_ID);
+
+      expect(res.candidateSkillCount).toBe(3);
+    });
+
+    it('still counts résumé skills, and merges both without double-counting', async () => {
+      profile = { targetCountries: ['CA'], skills: ['typescript', 'postgres'] };
+      (service as any).resumeModel.find = () =>
+        chain([{ skills: ['typescript', 'graphql'], headline: 'Staff Engineer' }]);
+
+      const res: any = await service.getEligibleJobs(USER_ID);
+
+      // typescript appears in both sources but is one skill.
+      expect(res.candidateSkillCount).toBe(3);
+    });
+
+    it('falls back to the profile role when no résumé supplies a headline', async () => {
+      profile = { targetCountries: ['CA'], role: 'Senior Backend Engineer' };
+
+      const cand = await (service as any).scoreProfile(USER_ID, prefs, profile);
+
+      expect(cand.title).toBe('Senior Backend Engineer');
+    });
+
+    it('does not let the profile role override a résumé headline', async () => {
+      profile = { targetCountries: ['CA'], role: 'Senior Backend Engineer' };
+      (service as any).resumeModel.find = () => chain([{ skills: [], headline: 'Staff Engineer' }]);
+
+      const cand = await (service as any).scoreProfile(USER_ID, prefs, profile);
+
+      expect(cand.title).toBe('Staff Engineer');
+    });
+
+    it('survives a profile that has no skills at all', async () => {
+      profile = { targetCountries: ['CA'] };
+
+      const res: any = await service.getEligibleJobs(USER_ID);
+
+      expect(res.candidateSkillCount).toBe(0);
+    });
+  });
+
+  describe('match threshold', () => {
+    it("obeys the profile's own minMatchScore over the global preference", () => {
+      const pref = (service as any).buildPrefFilter(
+        { minMatchScore: 60 },
+        { minMatchScore: 75 },
+      );
+
+      expect(pref.minMatch).toBe(75);
+    });
+
+    it('falls back to the global preference when the profile sets none', () => {
+      const pref = (service as any).buildPrefFilter({ minMatchScore: 60 }, {});
+
+      expect(pref.minMatch).toBe(60);
+    });
+
+    it('treats a profile threshold of 0 as "show me everything", not as unset', () => {
+      const pref = (service as any).buildPrefFilter(
+        { minMatchScore: 60 },
+        { minMatchScore: 0 },
+      );
+
+      expect(pref.minMatch).toBe(0);
+    });
+  });
 });

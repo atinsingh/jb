@@ -21,6 +21,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "health": "curl -f http://localhost:8000/api/health || exit 1",
     "db:seed": "ts-node src/scripts/seed.ts",
+    "backfill:employer-geo": "ts-node src/scripts/backfill-employer-job-geography.ts",
     "db:migrate-objectid": "ts-node src/scripts/migrate-objectid-fields.ts",
     "stripe:sync": "ts-node src/scripts/sync-stripe-catalog.ts",
     "interview:seed-prompts": "ts-node src/interview-buddy/scripts/seed-prompts.ts",
