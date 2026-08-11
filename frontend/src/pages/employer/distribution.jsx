@@ -178,6 +178,11 @@ export default function EmployerDistribution() {
         #emapp .em-sponsor:hover {
           background: #364fc7 !important;
         }
+        @media (max-width: 640px) {
+          #emapp .dist-board-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
       `}</style>
 
       <div id="emapp" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16' }}>
@@ -226,7 +231,7 @@ export default function EmployerDistribution() {
                     <p style={{ fontSize: 14, color: '#8A8378', margin: 0 }}>No distribution channels are available yet.</p>
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 13, marginBottom: 24 }}>
+                  <div className="dist-board-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 13, marginBottom: 24 }}>
                     {boards.map((b) => (
                       <div key={b.key} style={{ background: '#FFFEFB', border: `1px solid ${b.cardBorder}`, borderRadius: 15, padding: 18 }}>
                         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
@@ -272,8 +277,12 @@ export default function EmployerDistribution() {
                   {perf.length === 0 ? (
                     <div style={{ padding: 40, textAlign: 'center', fontSize: 13.5, color: '#8A8378' }}>No performance data yet. Metrics appear once your sponsored posts start collecting views and applies.</div>
                   ) : (
-                    <>
-                      <div style={{ display: 'grid', gridTemplateColumns: grid, gap: 10, padding: '11px 22px', background: '#FBF9F4', borderBottom: '1px solid #F2ECE0' }}>
+                    /* Genuine tabular data (5 aligned columns) — stacking it to one
+                       column would break the row/column association that makes it
+                       readable. It scrolls WITHIN its own box instead, so the page
+                       itself never overflows sideways. */
+                    <div style={{ overflowX: 'auto' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: grid, gap: 10, padding: '11px 22px', background: '#FBF9F4', borderBottom: '1px solid #F2ECE0', minWidth: 540 }}>
                         <span style={monoLabel}>Source</span>
                         <span style={{ ...monoLabel, textAlign: 'right' }}>Views</span>
                         <span style={{ ...monoLabel, textAlign: 'right' }}>Applies</span>
@@ -281,7 +290,7 @@ export default function EmployerDistribution() {
                         <span style={{ ...monoLabel, textAlign: 'right' }}>Cost / applicant</span>
                       </div>
                       {perf.map((p) => (
-                        <div key={p.source} style={{ display: 'grid', gridTemplateColumns: grid, gap: 10, alignItems: 'center', padding: '13px 22px', borderBottom: `1px solid ${p.divider}` }}>
+                        <div key={p.source} style={{ display: 'grid', gridTemplateColumns: grid, gap: 10, alignItems: 'center', padding: '13px 22px', borderBottom: `1px solid ${p.divider}`, minWidth: 540 }}>
                           <span style={{ fontSize: 13.5, fontWeight: 600, color: '#1B1A16' }}>{p.source}</span>
                           <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 13, color: '#5A544A', textAlign: 'right' }}>{p.views}</span>
                           <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 13, color: '#5A544A', textAlign: 'right' }}>{p.applies}</span>
@@ -289,7 +298,7 @@ export default function EmployerDistribution() {
                           <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 13, fontWeight: 600, color: p.cpaColor, textAlign: 'right' }}>{p.cpa}</span>
                         </div>
                       ))}
-                    </>
+                    </div>
                   )}
                 </div>
               </>

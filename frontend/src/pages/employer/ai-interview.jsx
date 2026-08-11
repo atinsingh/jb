@@ -143,6 +143,14 @@ export default function EmployerAiInterview() {
             opacity: 1;
           }
         }
+        @media (max-width: 780px) {
+          #emapp .ai-split {
+            flex-direction: column !important;
+          }
+          #emapp .ai-panel {
+            width: 100% !important;
+          }
+        }
       `}</style>
 
       <div id="emapp" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16' }}>
@@ -192,9 +200,9 @@ export default function EmployerAiInterview() {
 
             {/* ============ TAB 1: AI SCREENING INTERVIEW ============ */}
             {isScreen && (
-              <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+              <div className="ai-split" style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
                 {/* CONFIG */}
-                <div style={{ width: 340, flexShrink: 0, background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18, padding: 22 }}>
+                <div className="ai-panel" style={{ width: 340, flexShrink: 0, background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18, padding: 22 }}>
                   <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>Configure interview</h2>
                   <p style={{ fontSize: 12.5, color: '#8A8378', margin: '0 0 18px' }}>The AI conducts an async interview; candidates answer on their own time.</p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -281,9 +289,9 @@ export default function EmployerAiInterview() {
 
             {/* ============ TAB 2: AI SCORECARD ============ */}
             {isScorecard && (
-              <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+              <div className="ai-split" style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
                 {/* INPUT */}
-                <div style={{ width: 380, flexShrink: 0, background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18, padding: 22 }}>
+                <div className="ai-panel" style={{ width: 380, flexShrink: 0, background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18, padding: 22 }}>
                   <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>Generate a scorecard</h2>
                   <p style={{ fontSize: 12.5, color: '#8A8378', margin: '0 0 16px' }}>Paste interview notes or a transcript — the AI structures it into a scorecard for the team to confirm.</p>
                   <textarea

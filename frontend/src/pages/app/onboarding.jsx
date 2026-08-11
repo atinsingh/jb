@@ -286,6 +286,18 @@ export default function AppOnboarding() {
             display: none !important;
           }
         }
+        @media (max-width: 480px) {
+          #jbob .ob-wizard-side {
+            padding: 24px 20px 20px !important;
+          }
+          /* The full stepper (circle + label + connector, ×3) has no room on
+             a phone even in a single full-width column. The compact "Step X
+             of 3" label next to the progress bar already conveys the same
+             information, so the verbose stepper stands down here. */
+          #jbob .ob-stepper {
+            display: none !important;
+          }
+        }
       `}</style>
 
       <div
@@ -300,7 +312,7 @@ export default function AppOnboarding() {
         }}
       >
         {/* ===== WIZARD SIDE ===== */}
-        <div style={{ display: 'flex', flexDirection: 'column', padding: '34px 56px 28px' }}>
+        <div className="ob-wizard-side" style={{ display: 'flex', flexDirection: 'column', padding: '34px 56px 28px' }}>
           {/* top bar: logo + progress + step label */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <Link href="/" style={{ textDecoration: 'none' }}>
@@ -316,7 +328,7 @@ export default function AppOnboarding() {
 
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', maxWidth: 480, width: '100%', margin: '0 auto' }}>
             {/* STEPPER */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 26 }}>
+            <div className="ob-stepper" style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 26 }}>
               {STEP_TITLES.map((t, i) => {
                 const done = i < step;
                 const cur = i === step;

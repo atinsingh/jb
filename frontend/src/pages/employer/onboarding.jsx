@@ -148,6 +148,19 @@ export default function EmployerOnboarding() {
             transform: scale(1);
           }
         }
+        @media (max-width: 900px) {
+          #emob {
+            grid-template-columns: 1fr !important;
+          }
+        }
+        @media (max-width: 480px) {
+          #emob .eob-wizard-side {
+            padding: 24px 20px 20px !important;
+          }
+          #emob .eob-stepper {
+            display: none !important;
+          }
+        }
       `}</style>
 
       <div
@@ -162,7 +175,7 @@ export default function EmployerOnboarding() {
         }}
       >
         {/* WIZARD SIDE */}
-        <div style={{ display: 'flex', flexDirection: 'column', padding: '34px 56px 28px' }}>
+        <div className="eob-wizard-side" style={{ display: 'flex', flexDirection: 'column', padding: '34px 56px 28px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <span
               style={{
@@ -209,7 +222,7 @@ export default function EmployerOnboarding() {
             }}
           >
             {/* STEPPER */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 26 }}>
+            <div className="eob-stepper" style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 26 }}>
               {STEP_TITLES.map((t, i) => {
                 const done = i < step;
                 const cur = i === step;

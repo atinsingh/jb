@@ -198,6 +198,17 @@ export default function EmployerMessages() {
             transform: translateY(0);
           }
         }
+        @media (max-width: 780px) {
+          #emapp .msg-split {
+            flex-direction: column !important;
+          }
+          #emapp .msg-list-panel {
+            width: 100% !important;
+            border-right: none !important;
+            border-bottom: 1px solid #e7e0d2 !important;
+            max-height: 40vh !important;
+          }
+        }
       `}</style>
 
       <div id="emapp" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16' }}>
@@ -214,9 +225,9 @@ export default function EmployerMessages() {
             </span>
           </header>
 
-          <div style={{ display: 'flex', gap: 0, alignItems: 'stretch', flex: 1, minHeight: 0 }}>
+          <div className="msg-split" style={{ display: 'flex', gap: 0, alignItems: 'stretch', flex: 1, minHeight: 0 }}>
             {/* ===== LEFT: CONVERSATION LIST ===== */}
-            <div style={{ width: 340, flexShrink: 0, borderRight: '1px solid #E7E0D2', background: '#FBF8F1', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <div className="msg-list-panel" style={{ width: 340, flexShrink: 0, borderRight: '1px solid #E7E0D2', background: '#FBF8F1', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
               <div style={{ padding: '20px 20px 14px' }}>
                 <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 26, lineHeight: 1.05, margin: '0 0 12px' }}>Inbox</h1>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>

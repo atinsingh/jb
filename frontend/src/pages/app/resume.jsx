@@ -376,6 +376,18 @@ export default function AppResume() {
             opacity: 0.55;
           }
         }
+        @media (max-width: 780px) {
+          /* Editor controls + live preview stack instead of sitting side by
+             side — the controls column has a 320px floor (minmax(320px,
+             380px)) that alone exceeds a phone viewport. */
+          #jbapp .rb-editor-grid {
+            grid-template-columns: 1fr !important;
+          }
+          #jbapp .rb-editor-panel {
+            border-right: none !important;
+            border-bottom: 1px solid #e7e0d2 !important;
+          }
+        }
       `}</style>
 
       <div
@@ -399,6 +411,8 @@ export default function AppResume() {
               zIndex: 20,
               display: 'flex',
               alignItems: 'center',
+              flexWrap: 'wrap',
+              rowGap: 10,
               gap: 16,
               padding: '15px 32px',
               background: 'rgba(247,243,234,0.85)',
@@ -573,6 +587,7 @@ export default function AppResume() {
             />
           ) : (
             <div
+              className="rb-editor-grid"
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'minmax(320px, 380px) 1fr',
@@ -583,6 +598,7 @@ export default function AppResume() {
             >
               {/* LEFT: EDITOR CONTROLS */}
               <motion.div
+                className="rb-editor-panel"
                 initial={{ opacity: 0, x: -14 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}

@@ -145,6 +145,11 @@ export default function EmployerSecurity() {
             transform: translateY(0);
           }
         }
+        @media (max-width: 700px) {
+          #emapp .sec-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
       `}</style>
 
       <div id="emapp" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16' }}>
@@ -254,7 +259,7 @@ export default function EmployerSecurity() {
               </div>
 
               {/* SESSION + RETENTION */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div className="sec-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div style={{ ...card, padding: 22 }}>
                   <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 14px' }}>Session policy</h2>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

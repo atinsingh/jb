@@ -176,6 +176,16 @@ export default function AppConcierge() {
         .jb-coach-btn:hover {
           background: #5bd08c !important;
         }
+        @media (max-width: 640px) {
+          #jbapp .cc-agent-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
+        @media (max-width: 780px) {
+          #jbapp .cc-split-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
       `}</style>
 
       <div
@@ -254,7 +264,7 @@ export default function AppConcierge() {
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 22 }}>
                 <h2 style={{ fontSize: 19, fontWeight: 700, margin: 0 }}>What your concierge handles</h2>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
+              <div className="cc-agent-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
                 {SERVICES.map((s) => (
                   <div key={s.tag} style={{ border: `1px solid ${s.border}`, background: s.bg, borderRadius: 14, padding: 18 }}>
                     <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
@@ -271,7 +281,7 @@ export default function AppConcierge() {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr', gap: 16, marginBottom: 16 }}>
+            <div className="cc-split-grid" style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr', gap: 16, marginBottom: 16 }}>
               {/* COACH ACTIVITY */}
               <div style={{ ...card, overflow: 'hidden' }}>
                 <div style={{ padding: '20px 22px', borderBottom: '1px solid #EEE7D9' }}>

@@ -144,6 +144,11 @@ export default function AppInterview() {
         #jbapp .jb-start:hover {
           background: #5bd08c !important;
         }
+        @media (max-width: 640px) {
+          #jbapp .jb-cat-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
       `}</style>
 
       <div
@@ -414,7 +419,7 @@ export default function AppInterview() {
                 <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Practice by category</h2>
                 <span style={{ fontSize: 13, color: '#8A8378' }}>Pick a set or let AI build one</span>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+              <div className="jb-cat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
                 {categories.map((c) => (
                   <Link
                     key={c.title}
