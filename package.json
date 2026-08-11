@@ -13,7 +13,10 @@
     "test": "pnpm -r test",
     "clean": "pnpm -r clean && rm -rf node_modules",
     "db:seed": "pnpm --filter backend db:seed",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "test:e2e": "pnpm --filter @jobocate/e2e test",
+    "test:e2e:smoke": "pnpm --filter @jobocate/e2e test:smoke",
+    "test:e2e:ui": "pnpm --filter @jobocate/e2e test:ui"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
