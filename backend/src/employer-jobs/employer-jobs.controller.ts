@@ -25,13 +25,18 @@ import { EmployerJobsService } from './employer-jobs.service';
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
+import { GenerateJobDescriptionDto } from './dto/generate-job-description.dto';
+import { JobDescriptionGeneratorService } from '../llm/features/job-description-generator.service';
 
 @ApiTags('employer-jobs')
 @Controller('employer/jobs')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ROLE_EMPLOYER', 'ROLE_ADMIN')
 export class EmployerJobsController {
-  constructor(private readonly employerJobsService: EmployerJobsService) {}
+  constructor(
+    private readonly employerJobsService: EmployerJobsService,
+    private readonly jobDescriptionGenerator: JobDescriptionGeneratorService,
+  ) {}
 
   @Post()
   @ApiBearerAuth('JWT-auth')
@@ -44,6 +49,26 @@ export class EmployerJobsController {
       message: 'Job created successfully',
       job,
     };
+  }
+
+  @Post('generate-description')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'AI-draft a job description from what the employer has entered',
+    description:
+      'Drafts description/responsibilities/requirements/benefits from the ' +
+      'title, company, location and skills already typed into the post-a-job ' +
+      'form. A draft only — the employer edits every field before Preview & ' +
+      'Submit publishes anything.',
+  })
+  @ApiResponse({ status: 201, description: 'Draft generated successfully' })
+  async generateDescription(
+    @Body() dto: GenerateJobDescriptionDto,
+    @Request() req,
+  ) {
+    const userId = req.user._id.toString();
+    const draft = await this.jobDescriptionGenerator.generate(userId, dto);
+    return { draft };
   }
 
   @Get()

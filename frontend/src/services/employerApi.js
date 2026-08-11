@@ -70,6 +70,14 @@ export const employerJobsApi = {
     }),
   // DELETE /api/employer/jobs/:id
   remove: (id) => apiCall(`/api/employer/jobs/${id}`, { method: 'DELETE' }),
+  // POST /api/employer/jobs/generate-description -> { draft }
+  // AI-drafts description/responsibilities/requirements/benefits from what's
+  // already been typed. A draft only — nothing is saved by this call.
+  generateDescription: (seed) =>
+    apiCall('/api/employer/jobs/generate-description', {
+      method: 'POST',
+      body: JSON.stringify(seed),
+    }),
 };
 
 /* -------------------------------------------------------------- pipeline --- */

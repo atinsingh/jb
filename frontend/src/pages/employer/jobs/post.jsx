@@ -126,6 +126,13 @@ function PostJob() {
     applicationDeadline: '',
   });
 
+  // AI drafting: seed-only fields not part of the saved job, plus the
+  // generation call's own loading/error state.
+  const [aiSkills, setAiSkills] = useState('');
+  const [aiNotes, setAiNotes] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState('');
+
   // Update salary string whenever min, max or type changes - client-side only
   useEffect(() => {
     // Only run on client side
@@ -230,6 +237,65 @@ function PostJob() {
       setSubmitError(error?.message || 'Failed to save job. Please try again.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Draft description/responsibilities/requirements/benefits from what's
+  // already been entered. Never touches the form until the call succeeds, and
+  // never overwrites content the employer already wrote without asking.
+  const handleGenerate = async () => {
+    if (!formData.title.trim()) {
+      setGenError('Enter a job title first — the draft is built from it.');
+      return;
+    }
+
+    const hasExistingContent =
+      formData.description.trim() ||
+      formData.responsibilities.length > 0 ||
+      formData.requirements.length > 0;
+    if (
+      hasExistingContent &&
+      !window.confirm(
+        'This replaces the description, responsibilities and requirements you’ve already entered with an AI draft. Continue?',
+      )
+    ) {
+      return;
+    }
+
+    setGenerating(true);
+    setGenError('');
+
+    try {
+      const seed = {
+        title: formData.title.trim(),
+        companyName: formData.companyName.trim() || undefined,
+        location: formData.location.trim() || undefined,
+        isRemote: !!formData.isRemote,
+        jobType: toTypeEnum(formData.type),
+        experience: formData.experience || undefined,
+        educationLevel: formData.educationLevel || undefined,
+        skills: aiSkills
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+        notes: aiNotes.trim() || undefined,
+      };
+
+      const { draft } = await employerJobsApi.generateDescription(seed);
+
+      setFormData((prev) => ({
+        ...prev,
+        description: draft.description,
+        responsibilities: draft.responsibilities,
+        requirements: draft.requirements,
+        benefits: draft.benefits.length > 0 ? draft.benefits : prev.benefits,
+        skills: seed.skills.length > 0 ? seed.skills : prev.skills,
+      }));
+    } catch (error) {
+      console.error('Error generating job description:', error);
+      setGenError(error?.message || 'Could not generate a draft. Please try again.');
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -385,6 +451,46 @@ function PostJob() {
                   <input id="isRemote" name="isRemote" type="checkbox" checked={formData.isRemote} onChange={handleChange} style={{ width: 16, height: 16, accentColor: '#4263EB', cursor: 'pointer' }} />
                   <span style={{ fontSize: 13.5, color: '#3A352C' }}>This is a remote position</span>
                 </label>
+
+                <div style={{ background: '#F5F7FF', border: '1px solid #C7D2FB', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 15 }}>✦</span>
+                    <span style={{ fontSize: 13.5, fontWeight: 700, color: '#1F2D6B' }}>Draft with AI</span>
+                    <span style={{ fontSize: 12, color: '#5A544A' }}>— writes the description, responsibilities and requirements below from the title and skills you give it. Edit anything before publishing.</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+                    <Field label="Key Skills (comma-separated)">
+                      <input
+                        type="text"
+                        value={aiSkills}
+                        onChange={(e) => setAiSkills(e.target.value)}
+                        placeholder="e.g. Node.js, TypeScript, AWS"
+                        style={fieldInput}
+                      />
+                    </Field>
+                    <Field label="Notes for the AI (optional)">
+                      <input
+                        type="text"
+                        value={aiNotes}
+                        onChange={(e) => setAiNotes(e.target.value)}
+                        placeholder="e.g. also owns our payments pipeline"
+                        style={fieldInput}
+                      />
+                    </Field>
+                  </div>
+                  {genError && (
+                    <div role="alert" style={{ fontSize: 12.5, color: '#9B4A2F' }}>{genError}</div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleGenerate}
+                    disabled={generating}
+                    className="em-blue-btn"
+                    style={{ ...blueBtn, alignSelf: 'flex-start', opacity: generating ? 0.65 : 1 }}
+                  >
+                    {generating ? 'Drafting…' : '✦ Generate draft'}
+                  </button>
+                </div>
 
                 <Field label="Job Description" required>
                   <textarea id="description" name="description" value={formData.description} onChange={handleChange} placeholder="Describe the job responsibilities, required skills, and other details…" rows={8} required style={{ ...fieldInput, resize: 'vertical', lineHeight: 1.6 }} />

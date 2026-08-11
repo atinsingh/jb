@@ -11,6 +11,7 @@ import { MockProvider } from './providers/mock.provider';
 import { AnthropicProvider } from './providers/anthropic.provider';
 import { OpenRouterProvider } from './providers/openrouter.provider';
 import { LiteLLMProvider } from './providers/litellm.provider';
+import { JobDescriptionGeneratorService } from './features/job-description-generator.service';
 import { LLMRoutingService } from './llm-routing.service';
 import { LLMAccountingService } from './llm-accounting.service';
 import { LLMQuotaService } from './llm-quota.service';
@@ -54,6 +55,7 @@ import {
     MatchCalculatorService,
     ResumeParserAIService,
     InterviewChatService,
+    JobDescriptionGeneratorService,
   ],
   controllers: [LLMController],
   exports: [
@@ -67,6 +69,7 @@ import {
     MatchCalculatorService,
     ResumeParserAIService,
     InterviewChatService,
+    JobDescriptionGeneratorService,
   ],
 })
 export class LLMModule {}

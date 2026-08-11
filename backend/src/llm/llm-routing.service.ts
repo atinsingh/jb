@@ -27,6 +27,7 @@ export enum LLMFeature {
   RECRUITER_COPILOT = 'recruiterCopilot',
   SOURCE_CANDIDATES = 'sourceCandidates',
   INTERVIEW_SCORECARD = 'interviewScorecard',
+  GENERATE_JOB_DESCRIPTION = 'generateJobDescription',
   // Generic reusable AI agent runtime (planner/executor loop). Individual
   // agents (e.g. the Job-Search Copilot) run on this feature unless they
   // define their own dedicated feature.
@@ -199,6 +200,17 @@ export class LLMRoutingService {
       provider: this.configService.get<string>('LLM_INTERVIEW_SCORECARD_PROVIDER') || 'anthropic',
       temperature: parseFloat(this.configService.get<string>('LLM_INTERVIEW_SCORECARD_TEMP') || '0.3'),
       maxTokens: parseInt(this.configService.get<string>('LLM_INTERVIEW_SCORECARD_MAX_TOKENS') || '2000'),
+    });
+
+    // Generate Job Description — drafts responsibilities/requirements/benefits
+    // from what the employer has already typed (title, company, location,
+    // skills). A draft the employer edits before Preview & Submit, not a
+    // publish, so temperature sits higher than the screening features above.
+    this.featureConfigs.set(LLMFeature.GENERATE_JOB_DESCRIPTION, {
+      model: this.configService.get<string>('LLM_JOB_DESCRIPTION_MODEL') || 'claude-opus-4-8',
+      provider: this.configService.get<string>('LLM_JOB_DESCRIPTION_PROVIDER') || 'anthropic',
+      temperature: parseFloat(this.configService.get<string>('LLM_JOB_DESCRIPTION_TEMP') || '0.6'),
+      maxTokens: parseInt(this.configService.get<string>('LLM_JOB_DESCRIPTION_MAX_TOKENS') || '1500'),
     });
 
     // Agent Runtime (generic tool-use agent loop). Defaults to Claude via the

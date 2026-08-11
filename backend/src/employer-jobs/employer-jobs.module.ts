@@ -7,6 +7,7 @@ import {
   EmployerJobSchema,
 } from './schemas/employer-job.schema';
 import { IngestionModule } from '../ingestion/ingestion.module';
+import { LLMModule } from '../llm/llm.module';
 
 @Module({
   imports: [
@@ -14,6 +15,8 @@ import { IngestionModule } from '../ingestion/ingestion.module';
       { name: EmployerJob.name, schema: EmployerJobSchema },
     ]),
     IngestionModule,
+    // Supplies JobDescriptionGeneratorService for the AI-drafted JD endpoint.
+    LLMModule,
   ],
   controllers: [EmployerJobsController],
   providers: [EmployerJobsService],

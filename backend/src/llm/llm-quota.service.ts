@@ -53,6 +53,7 @@ const FEATURE_TO_ENTITLEMENT: Record<LLMFeature, string> = {
   [LLMFeature.RECRUITER_COPILOT]: EMPLOYER_AI_ENTITLEMENT,
   [LLMFeature.SOURCE_CANDIDATES]: EMPLOYER_AI_ENTITLEMENT,
   [LLMFeature.INTERVIEW_SCORECARD]: EMPLOYER_AI_ENTITLEMENT,
+  [LLMFeature.GENERATE_JOB_DESCRIPTION]: EMPLOYER_AI_ENTITLEMENT,
   // Generic agent runtime consumes the candidate AI credit pool. An N-step run
   // charges exactly one credit (see AgentRuntimeService metering).
   [LLMFeature.AGENT_RUNTIME]: 'ai_credits_per_month',
