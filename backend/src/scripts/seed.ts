@@ -134,10 +134,23 @@ const ENTITLEMENTS: Record<PlanType, EntitlementConfig[]> = {
     { featureKey: FeatureKeys.ANALYTICS_ADVANCED, featureName: 'Advanced Analytics', type: 'boolean', value: false },
     { featureKey: FeatureKeys.JOB_APPLICATIONS_PER_MONTH, featureName: 'Job Applications per Month', type: 'limit', value: 5 },
     { featureKey: FeatureKeys.RESUME_VERSIONS, featureName: 'Resume Versions', type: 'limit', value: 1 },
-    { featureKey: FeatureKeys.AI_CREDITS_PER_MONTH, featureName: 'AI Credits per Month', type: 'limit', value: 0 },
+    // Free tier gets a real, if small, AI allowance.
+    //
+    // This was 0, which made the free tier unusable rather than limited: SIX
+    // candidate features route to ai_credits_per_month (see llm-quota.service),
+    // including PARSE_RESUME and CALCULATE_MATCH. At 0 a new signup could not
+    // upload a résumé — the first step of onboarding — and every match scored a
+    // meaningless default because scoring was quota-denied. The signup page
+    // meanwhile advertises "AI résumé & tailored cover letters" on a free tier.
+    //
+    // 25 is enough to complete the core loop a few times (parse a résumé, score
+    // matches, generate one tailored résumé and cover letter) and feel the
+    // product work, without being a free substitute for a paid plan.
+    { featureKey: FeatureKeys.AI_CREDITS_PER_MONTH, featureName: 'AI Credits per Month', type: 'limit', value: 25 },
     { featureKey: FeatureKeys.SAVED_JOBS, featureName: 'Saved Jobs', type: 'limit', value: 10 },
     { featureKey: FeatureKeys.JOB_ALERTS, featureName: 'Job Alerts', type: 'limit', value: 1 },
-    { featureKey: FeatureKeys.INTERVIEW_SESSIONS_PER_MONTH, featureName: 'Interview Sessions per Month', type: 'limit', value: 0 },
+    // One practice interview, so the feature can be experienced before paying.
+    { featureKey: FeatureKeys.INTERVIEW_SESSIONS_PER_MONTH, featureName: 'Interview Sessions per Month', type: 'limit', value: 1 },
     { featureKey: FeatureKeys.AGENT_TYPE, featureName: 'Agent Type', type: 'tier', value: 'ai' },
     { featureKey: FeatureKeys.SUPPORT_LEVEL, featureName: 'Support Level', type: 'tier', value: 'community' },
   ],
