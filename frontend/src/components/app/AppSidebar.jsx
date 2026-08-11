@@ -434,15 +434,30 @@ export default function AppSidebar({ active = 'dashboard' }) {
 
           {wide && (
             <Link href={appRoute('App Auto-Apply.dc.html')} className="mt-[22px] p-4 border border-[#2C2A22] rounded-[14px] bg-[linear-gradient(160deg,#1E1C15,#15140F)] block no-underline">
-              <div className="font-mono text-[11px] tracking-[0.1em] uppercase text-jb-green-on-dark mb-[7px]">Auto-apply credits</div>
-              <div className="flex items-baseline gap-1.5 mb-2.5">
-                <span className="font-mono text-[22px] font-semibold text-[#FBF8F1]">{credits.left}</span>
-                <span className="text-xs text-jb-ink-subtle">/ {credits.limit} this week</span>
-              </div>
-              <div className="h-[5px] rounded-full bg-[#2C2A22] overflow-hidden">
-                {/* width is data-driven (percent) → inline */}
-                <div className="h-full bg-jb-green transition-[width] duration-[400ms]" style={{ width: `${credits.pct}%` }} />
-              </div>
+              <div className="font-mono text-[11px] tracking-[0.1em] uppercase text-jb-green-on-dark mb-[7px]">Auto-apply</div>
+
+              {/* A meter with no data is not a meter. The user record carries no
+                  autoApply* credit fields, so this rendered "— / — this week"
+                  above an empty 0% bar on every page — which reads as broken
+                  rather than as "not set up". When there are no numbers, show
+                  the invitation instead of the gauge. */}
+              {credits.limit === '—' ? (
+                <div className="text-[13px] text-[#CFC8B8] leading-snug">
+                  Let Jobocate prepare applications for your best matches.
+                  <span className="block mt-1.5 text-jb-green-on-dark font-semibold">Set it up →</span>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-baseline gap-1.5 mb-2.5">
+                    <span className="font-mono text-[22px] font-semibold text-[#FBF8F1]">{credits.left}</span>
+                    <span className="text-xs text-jb-ink-subtle">/ {credits.limit} this week</span>
+                  </div>
+                  <div className="h-[5px] rounded-full bg-[#2C2A22] overflow-hidden">
+                    {/* width is data-driven (percent) → inline */}
+                    <div className="h-full bg-jb-green transition-[width] duration-[400ms]" style={{ width: `${credits.pct}%` }} />
+                  </div>
+                </>
+              )}
             </Link>
           )}
 
