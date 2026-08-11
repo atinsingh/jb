@@ -8,6 +8,10 @@ import {
   OpenRouterProvider,
   DEFAULT_OPENROUTER_MODEL,
 } from './providers/openrouter.provider';
+import {
+  LiteLLMProvider,
+  DEFAULT_LITELLM_MODEL,
+} from './providers/litellm.provider';
 
 export enum LLMFeature {
   REWRITE_BULLETS = 'rewriteBullets',
@@ -54,6 +58,7 @@ export class LLMRoutingService {
     private readonly openaiProvider: OpenAIProvider,
     private readonly mockProvider: MockProvider,
     private readonly anthropicProvider: AnthropicProvider,
+    private readonly litellmProvider: LiteLLMProvider,
     private readonly openrouterProvider: OpenRouterProvider,
   ) {
     this.initializeProviders();
@@ -71,6 +76,12 @@ export class LLMRoutingService {
     if (this.anthropicProvider.isAvailable()) {
       this.providers.set('anthropic', this.anthropicProvider);
       this.logger.log('✅ Anthropic provider registered');
+    }
+
+    // Register the self-hosted LiteLLM gateway when configured.
+    if (this.litellmProvider.isAvailable()) {
+      this.providers.set('litellm', this.litellmProvider);
+      this.logger.log('✅ LiteLLM provider registered');
     }
 
     // Register OpenRouter (OpenAI-compatible gateway to ~400 models)
@@ -220,11 +231,14 @@ export class LLMRoutingService {
    * call site, so they must agree: resolving both here stops a feature from
    * sending, say, a `claude-opus-4-8` model id to OpenRouter.
    *
-   * Order: the configured provider → OpenRouter → Mock. OpenRouter sits in the
-   * middle because it fronts every major lab, so a feature pinned to a provider
-   * we hold no key for still reaches a real model instead of degrading to the
-   * deterministic fallback. Its model id comes from `OPENROUTER_MODEL`, not from
-   * the feature config, since provider-native ids are not OpenRouter slugs.
+   * Order: the configured provider → LiteLLM → OpenRouter → Mock. The two
+   * gateways sit in the middle because each fronts many models, so a feature
+   * pinned to a provider we hold no key for still reaches a real model instead
+   * of degrading to the deterministic fallback. Self-hosted LiteLLM is tried
+   * first: it costs nothing per token and keeps the request on the operator's
+   * own infrastructure. Both take their model id from their own env var, never
+   * from the feature config, since provider-native ids are neither OpenRouter
+   * slugs nor LiteLLM aliases.
    */
   private resolveFeature(feature: LLMFeature): {
     provider: LLMProvider;
@@ -238,6 +252,27 @@ export class LLMRoutingService {
     const configured = this.providers.get(config.provider);
     if (configured?.isAvailable()) {
       return { provider: configured, config: { ...config } };
+    }
+
+    // Self-hosted gateway first: it costs nothing per token and keeps the
+    // request inside the operator's network, so preferring it over a paid
+    // routing intermediary is both cheaper and less of a data-sharing decision.
+    // Its model id must come from LITELLM_MODEL, never from the feature config —
+    // LiteLLM aliases are operator-defined and a provider-native id (say, an
+    // Anthropic model string) is not guaranteed to exist in its catalog.
+    const litellm = this.providers.get('litellm');
+    if (litellm?.isAvailable()) {
+      this.warnFallbackOnce(feature, config.provider, 'litellm');
+      return {
+        provider: litellm,
+        config: {
+          ...config,
+          provider: 'litellm',
+          model:
+            this.configService.get<string>('LITELLM_MODEL') ||
+            DEFAULT_LITELLM_MODEL,
+        },
+      };
     }
 
     const openrouter = this.providers.get('openrouter');

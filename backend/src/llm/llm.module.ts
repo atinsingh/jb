@@ -10,6 +10,7 @@ import { OpenAIProvider } from './providers/openai.provider';
 import { MockProvider } from './providers/mock.provider';
 import { AnthropicProvider } from './providers/anthropic.provider';
 import { OpenRouterProvider } from './providers/openrouter.provider';
+import { LiteLLMProvider } from './providers/litellm.provider';
 import { LLMRoutingService } from './llm-routing.service';
 import { LLMAccountingService } from './llm-accounting.service';
 import { LLMQuotaService } from './llm-quota.service';
@@ -42,6 +43,7 @@ import {
     MockProvider,
     AnthropicProvider,
     OpenRouterProvider,
+    LiteLLMProvider,
     LLMRoutingService,
     LLMAccountingService,
     LLMQuotaService,

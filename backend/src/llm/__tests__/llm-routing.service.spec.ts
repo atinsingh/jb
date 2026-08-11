@@ -8,6 +8,10 @@ import {
   OpenRouterProvider,
   DEFAULT_OPENROUTER_MODEL,
 } from '../providers/openrouter.provider';
+import {
+  LiteLLMProvider,
+  DEFAULT_LITELLM_MODEL,
+} from '../providers/litellm.provider';
 
 describe('LLMRoutingService', () => {
   /**
@@ -23,7 +27,12 @@ describe('LLMRoutingService', () => {
     }) as any;
 
   const buildService = async (
-    availability: { openai?: boolean; anthropic?: boolean; openrouter?: boolean },
+    availability: {
+      openai?: boolean;
+      anthropic?: boolean;
+      litellm?: boolean;
+      openrouter?: boolean;
+    },
     config: Record<string, any> = {},
   ): Promise<LLMRoutingService> => {
     const module: TestingModule = await Test.createTestingModule({
@@ -50,6 +59,10 @@ describe('LLMRoutingService', () => {
         {
           provide: AnthropicProvider,
           useValue: stubProvider('anthropic', availability.anthropic ?? true),
+        },
+        {
+          provide: LiteLLMProvider,
+          useValue: stubProvider('litellm', availability.litellm ?? false),
         },
         {
           provide: OpenRouterProvider,
@@ -87,6 +100,85 @@ describe('LLMRoutingService', () => {
     expect(
       service.getProviderForFeature(LLMFeature.REWRITE_BULLETS).getName(),
     ).toBe('openrouter');
+  });
+
+  // ---------------------------------------------------------------- LiteLLM --
+  // The self-hosted gateway is preferred over OpenRouter on fallback: it costs
+  // nothing per token and the request stays on the operator's own network.
+  describe('LiteLLM (self-hosted gateway)', () => {
+    it('routes directly to LiteLLM when it is the configured default', async () => {
+      const service = await buildService(
+        { litellm: true },
+        {
+          LLM_DEFAULT_PROVIDER: 'litellm',
+          LLM_DEFAULT_MODEL: DEFAULT_LITELLM_MODEL,
+        },
+      );
+
+      expect(
+        service.getProviderForFeature(LLMFeature.REWRITE_BULLETS).getName(),
+      ).toBe('litellm');
+    });
+
+    it('is preferred over OpenRouter when both gateways are available', async () => {
+      const service = await buildService({
+        openai: false,
+        litellm: true,
+        openrouter: true,
+      });
+
+      expect(
+        service.getProviderForFeature(LLMFeature.REWRITE_BULLETS).getName(),
+      ).toBe('litellm');
+    });
+
+    it('substitutes its own alias, since a provider-native id is not a LiteLLM alias', async () => {
+      // SCREEN_APPLICANTS is pinned to anthropic/claude-opus-4-8 in the config.
+      const service = await buildService({ anthropic: false, litellm: true });
+
+      const config = service.getFeatureConfig(LLMFeature.SCREEN_APPLICANTS);
+      expect(config.provider).toBe('litellm');
+      expect(config.model).toBe(DEFAULT_LITELLM_MODEL);
+      // Feature tuning survives the substitution.
+      expect(config.temperature).toBe(0.3);
+      expect(config.maxTokens).toBe(2000);
+    });
+
+    it('honours LITELLM_MODEL for the fallback alias', async () => {
+      const service = await buildService(
+        { openai: false, litellm: true },
+        { LITELLM_MODEL: 'perfectum-structured-v1' },
+      );
+
+      expect(service.getFeatureConfig(LLMFeature.REWRITE_BULLETS).model).toBe(
+        'perfectum-structured-v1',
+      );
+    });
+
+    it('falls through to OpenRouter when the gateway is not running', async () => {
+      const service = await buildService({
+        openai: false,
+        litellm: false,
+        openrouter: true,
+      });
+
+      expect(
+        service.getProviderForFeature(LLMFeature.REWRITE_BULLETS).getName(),
+      ).toBe('openrouter');
+    });
+
+    it('still reaches mock when no provider at all is available', async () => {
+      const service = await buildService({
+        openai: false,
+        anthropic: false,
+        litellm: false,
+        openrouter: false,
+      });
+
+      expect(
+        service.getProviderForFeature(LLMFeature.REWRITE_BULLETS).getName(),
+      ).toBe('mock');
+    });
   });
 
   it('rewrites the model id when falling back, since provider-native ids are not OpenRouter slugs', async () => {

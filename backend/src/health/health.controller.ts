@@ -36,7 +36,11 @@ export class HealthController {
       uptime: process.uptime(),
       // 1 = connected, per mongoose ConnectionStates
       mongodb: this.connection.readyState === 1 ? 'connected' : 'disconnected',
-      aiProvider: process.env.AI_PROVIDER || 'openai',
+      // LLM_DEFAULT_PROVIDER is what the routing layer actually reads; AI_PROVIDER
+      // is the older env var kept for compatibility. Reporting the legacy one
+      // first made health claim "openai" on a box routing every call elsewhere.
+      aiProvider:
+        process.env.LLM_DEFAULT_PROVIDER || process.env.AI_PROVIDER || 'openai',
     };
   }
 
@@ -91,6 +95,8 @@ export class HealthController {
       frontendUrl: this.isSet('FRONTEND_URL'),
       // Any one AI provider key is acceptable.
       aiKey:
+        this.isSet('LITELLM_API_KEY') ||
+        this.isSet('LITELLM_MASTER_KEY') ||
         this.isSet('ANTHROPIC_API_KEY') ||
         this.isSet('OPENAI_API_KEY') ||
         this.isSet('OPENROUTER_API_KEY'),
