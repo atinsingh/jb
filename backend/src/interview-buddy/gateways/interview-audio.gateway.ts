@@ -13,6 +13,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InterviewBuddyService } from '../interview-buddy.service';
 import { LiveSessionService } from '../services/live-session.service';
 import type { SpeechSource } from '../interfaces/streaming-stt.interface';
+import { corsOrigins } from '../../common/config/cors-origins';
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -37,7 +38,9 @@ interface AuthenticatedSocket extends Socket {
 @WebSocketGateway({
   namespace: '/interview-sessions',
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    // Same allowlist as the HTTP API: a browser connecting from an allowed
+    // origin must not be rejected at the websocket layer instead.
+    origin: corsOrigins(),
     credentials: true,
   },
 })

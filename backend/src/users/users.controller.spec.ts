@@ -3,6 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { StorageService } from '../storage';
+import { BillingService } from '../billing/billing.service';
 
 describe('UsersController.updateProfilePicture (storage migration)', () => {
   let controller: UsersController;
@@ -12,6 +13,9 @@ describe('UsersController.updateProfilePicture (storage migration)', () => {
   };
   const storage = {
     put: jest.fn(),
+  };
+  const billing = {
+    getUserInvoices: jest.fn(),
   };
 
   const req = { user: { _id: 'u1', email: 'a@b.com' } };
@@ -23,6 +27,7 @@ describe('UsersController.updateProfilePicture (storage migration)', () => {
       providers: [
         { provide: UsersService, useValue: usersService },
         { provide: StorageService, useValue: storage },
+        { provide: BillingService, useValue: billing },
       ],
     }).compile();
 

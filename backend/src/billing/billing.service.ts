@@ -77,6 +77,43 @@ export class BillingService {
       .populate('planId');
   }
 
+  /**
+   * The candidate's billing history, read straight from Stripe rather than a
+   * local table. Stripe is already the source of truth for the subscription
+   * itself (see createOrGetStripeCustomer / the webhook handlers below), and
+   * mirroring invoices into Mongo would just be a second copy to keep in sync.
+   *
+   * A user with no Stripe customer yet (never checked out) has no invoices —
+   * that is a real empty state, not an error, so it returns `[]` rather than
+   * throwing.
+   */
+  async getUserInvoices(
+    userId: string,
+  ): Promise<
+    { date: string; description: string; amount: number; status: string }[]
+  > {
+    const user = await this.userModel.findById(userId);
+    if (!user?.stripeCustomerId) return [];
+
+    const invoices = await this.stripe.invoices.list({
+      customer: user.stripeCustomerId,
+      limit: 100,
+    });
+
+    return invoices.data.map((inv) => ({
+      date: inv.created
+        ? new Date(inv.created * 1000).toISOString()
+        : new Date().toISOString(),
+      description:
+        inv.lines?.data?.[0]?.description ||
+        inv.description ||
+        'Subscription',
+      // Stripe amounts are in the smallest currency unit (cents for USD).
+      amount: (inv.amount_paid ?? inv.total ?? 0) / 100,
+      status: inv.status === 'paid' ? 'paid' : (inv.status ?? 'open'),
+    }));
+  }
+
   async createOrGetStripeCustomer(user: UserDocument): Promise<string> {
     if (user.stripeCustomerId) {
       return user.stripeCustomerId;

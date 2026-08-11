@@ -30,6 +30,7 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { memoryStorage } from 'multer';
 import { extname } from 'path';
 import { StorageService } from '../storage';
+import { BillingService } from '../billing/billing.service';
 
 const fileFilter = (req: any, file: Express.Multer.File, cb: any) => {
   const allowedTypes = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
@@ -55,6 +56,7 @@ export class UsersController {
   constructor(
     private usersService: UsersService,
     private readonly storageService: StorageService,
+    private readonly billingService: BillingService,
   ) {}
 
   @Get('profile')
@@ -73,6 +75,24 @@ export class UsersController {
       message: 'Profile retrieved successfully',
       user,
     };
+  }
+
+  @Get('invoices')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: "Get the current user's billing history",
+    description:
+      'Read straight from Stripe by the stored customer id. A user who never ' +
+      'checked out has no Stripe customer and gets an empty list, not an error.',
+  })
+  @ApiResponse({ status: 200, description: 'Invoices retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getInvoices(@Request() req) {
+    const invoices = await this.billingService.getUserInvoices(
+      req.user._id.toString(),
+    );
+    return { invoices };
   }
 
   @Get('autofill-payload')

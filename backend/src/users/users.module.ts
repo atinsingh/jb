@@ -8,6 +8,7 @@ import { EmailService } from '../common/services/email.service';
 import { LoggerModule } from '../common/logger/logger.module';
 import { UserPreferencesService } from './user-preferences.service';
 import { UserPreferencesController } from './user-preferences.controller';
+import { BillingModule } from '../billing/billing.module';
 
 @Module({
   imports: [
@@ -16,6 +17,9 @@ import { UserPreferencesController } from './user-preferences.controller';
       { name: UserPreferences.name, schema: UserPreferencesSchema },
     ]),
     LoggerModule,
+    // Supplies BillingService for GET /users/invoices. BillingModule does not
+    // import this module back, so there is no cycle.
+    BillingModule,
   ],
   controllers: [UsersController, UserPreferencesController],
   providers: [UsersService, EmailService, UserPreferencesService],
