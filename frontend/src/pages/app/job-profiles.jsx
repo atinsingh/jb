@@ -567,16 +567,21 @@ export default function JobProfilesPage() {
                       <button type="button" onClick={() => checkImpact(p.id)} style={ghostBtn}>
                         Check impact
                       </button>
+                      {/* "View matches" is why this card exists, so it carries the
+                          filled treatment. Delete is separated by the spacer and
+                          drops its border — destructive actions should be reachable
+                          without competing for the eye with the primary one. */}
                       <Link
                         href={`${appRoute('App Matches.dc.html')}?profileId=${p.id}`}
-                        style={{ ...ghostBtn, textDecoration: 'none' }}
+                        style={{ ...primaryBtn, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
                       >
                         View matches →
                       </Link>
+                      <span style={{ flex: 1 }} />
                       <button
                         type="button"
                         onClick={() => remove(p)}
-                        style={{ ...ghostBtn, color: '#B23A22', borderColor: '#EFD3CC' }}
+                        style={{ ...ghostBtn, color: '#96796F', background: 'transparent', border: 'none', padding: '9px 4px' }}
                       >
                         Delete
                       </button>

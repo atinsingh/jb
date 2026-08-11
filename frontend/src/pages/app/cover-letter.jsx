@@ -234,7 +234,15 @@ export default function AppCoverLetter() {
           ) : letters.length === 0 ? (
             <EmptyState
               title="No cover letters yet"
-              hint="Generate one from a role to start tailoring your applications."
+              hint="Pick a role you're interested in and we'll draft a letter tailored to it."
+              action={
+                <Link
+                  href={appRoute('App Matches.dc.html')}
+                  style={{ marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 8, padding: '11px 20px', background: '#1FA463', color: '#0C2C1C', fontSize: 13.5, fontWeight: 700, borderRadius: 999, textDecoration: 'none' }}
+                >
+                  ✦ New from a role
+                </Link>
+              }
             />
           ) : (
           <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>

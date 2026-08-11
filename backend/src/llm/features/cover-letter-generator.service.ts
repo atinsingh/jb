@@ -15,8 +15,9 @@ export class CoverLetterGeneratorService {
 
   // Quota is opt-in via LLM_ENFORCE_QUOTA (default false), matching the sibling
   // feature-services. Legacy cover-letter generation (now routed here from
-  // matching/job-matching) had no quota, and FREE seeds ai_credits_per_month=0,
-  // so unconditional enforcement would ForbiddenException every FREE user.
+  // matching/job-matching) had no quota. FREE now seeds a real allowance
+  // (ai_credits_per_month=25), so enforcement no longer locks FREE users out —
+  // but it stays opt-in until the per-feature costs are tuned against it.
   private readonly enforceQuotaEnabled: boolean;
 
   constructor(

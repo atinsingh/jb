@@ -47,6 +47,9 @@ export default function AppResume() {
   const [error, setError] = useState(null);
   const [savedAt, setSavedAt] = useState('just now');
   const [activeResumeId, setActiveResumeId] = useState(null);
+  // Score from an ATS check run in this session. `data.atsScore` only refreshes
+  // on reload, so without this the completeness ring lingers next to the ATS one.
+  const [liveAtsScore, setLiveAtsScore] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [notice, setNotice] = useState(null);
@@ -600,11 +603,15 @@ export default function AppResume() {
                     resumeId={activeResumeId}
                     initialScore={typeof data.atsScore === 'number' ? data.atsScore : null}
                     initialReport={data.atsReport || null}
+                    onScore={setLiveAtsScore}
                   />
                 )}
 
-                {/* COMPLETENESS */}
-                {data.atsScore > 0 ? null : (
+                {/* COMPLETENESS — a section checklist, not a quality score. It
+                    stands down once a real ATS score exists (persisted or from
+                    a check run in this session) so the page never shows two
+                    rings scored on different scales. */}
+                {data.atsScore > 0 || liveAtsScore > 0 ? null : (
                   <div
                     style={{
                       background:

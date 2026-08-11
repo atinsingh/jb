@@ -28,9 +28,10 @@ export class MatchCalculatorService {
    * Whether to gate LLM calls on the candidate/employer quota system.
    *
    * The legacy flows this service replaces had NO quota and worked for ALL
-   * users including FREE (which seeds `ai_credits_per_month = 0`). Calling
-   * `enforceQuota` unconditionally would hand every FREE user a
-   * `ForbiddenException`. So enforcement is opt-in via `LLM_ENFORCE_QUOTA`
+   * users including FREE, which seeded `ai_credits_per_month = 0` until the
+   * allowance landed (now 25) — so unconditional `enforceQuota` would once have
+   * handed every FREE user a `ForbiddenException`. Enforcement stays opt-in via
+   * `LLM_ENFORCE_QUOTA`
    * (default `false`). When disabled we SKIP `enforceQuota` but still record
    * usage best-effort for accounting (wrapped so it never throws).
    */

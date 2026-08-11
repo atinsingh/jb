@@ -24,9 +24,10 @@ export class ResumeParserAIService {
   private readonly logger = new Logger(ResumeParserAIService.name);
 
   /**
-   * Opt-in quota gate. FREE users seed `ai_credits_per_month = 0`, so
-   * enforcing quota here would lock every FREE user out of resume parsing
-   * (which had no quota in the legacy flow). Defaults OFF; when off we skip
+   * Opt-in quota gate. Résumé parsing had no quota in the legacy flow, and FREE
+   * seeded `ai_credits_per_month = 0` until the allowance landed (now 25), so
+   * enforcing here would once have locked every FREE user out. Defaults OFF —
+   * turning it on is now safe but changes onboarding cost. When off we skip
    * `enforceQuota` and only record usage best-effort.
    */
   private readonly enforceQuotaEnabled: boolean;

@@ -504,7 +504,15 @@ export default function AppMatches() {
                             )}
                             {job.reason && (
                               <div className="flex items-center gap-2.5">
-                                <span className="font-mono text-[11px] tracking-[0.06em] uppercase text-jb-green flex-shrink-0">{job.matchLabel || (browsing ? 'About' : 'Why it fits')}</span>
+                                {/* This eyebrow labels a category, so it keeps the
+                                    mono/uppercase treatment used for eyebrows
+                                    elsewhere. The scorer's verdict ("Possible
+                                    match") used to be rendered here instead —
+                                    uppercased into "POSSIBLE MATCH", which read as
+                                    debug output and merely restated the "72% match"
+                                    above it. The verdict now lives in the detail
+                                    modal, where a verdict belongs. */}
+                                <span className="font-mono text-[11px] tracking-[0.06em] uppercase text-jb-green flex-shrink-0">{browsing ? 'About' : 'Why it fits'}</span>
                                 <span className="text-[13px] text-jb-ink-muted overflow-hidden text-ellipsis whitespace-nowrap">{job.reason}</span>
                               </div>
                             )}

@@ -85,7 +85,10 @@ function Ring({ value }) {
   );
 }
 
-export default function AtsPanel({ resumeId, initialScore = null, initialReport = null }) {
+// `onScore` lets the parent know a check produced a score. Without it the page
+// keeps rendering its own "Résumé strength" ring alongside this one, because
+// the persisted `atsScore` it gates on is only refreshed on reload.
+export default function AtsPanel({ resumeId, initialScore = null, initialReport = null, onScore }) {
   const [report, setReport] = useState(initialReport);
   const [score, setScore] = useState(initialScore);
   const [checking, setChecking] = useState(false);
@@ -102,7 +105,9 @@ export default function AtsPanel({ resumeId, initialScore = null, initialReport 
     try {
       const result = await checkAts(resumeId);
       setReport(result);
-      setScore(result?.score ?? null);
+      const next = result?.score ?? null;
+      setScore(next);
+      if (typeof next === 'number' && onScore) onScore(next);
     } catch (e) {
       setError(e.message || 'Could not check this résumé.');
     } finally {
