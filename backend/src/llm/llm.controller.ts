@@ -9,6 +9,15 @@ import {
   Request,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import {
+  IsArray,
+  IsIn,
+  IsObject,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { BulletRewriteService } from './features/bullet-rewrite.service';
 import { ResumeTailoringService } from './features/resume-tailoring.service';
@@ -18,34 +27,92 @@ import { LLMQuotaService } from './llm-quota.service';
 import { ClaimsReviewService } from './claims-review.service';
 import { LLMFeature } from './llm-routing.service';
 
+/**
+ * These DTOs carry class-validator decorators for a reason that is easy to miss:
+ * `main.ts` runs ValidationPipe with `whitelist` + `forbidNonWhitelisted`, and
+ * that pipe decides what a DTO contains from decorator METADATA, not from the
+ * TypeScript types (which are erased at runtime). An undecorated property is
+ * therefore not "an unvalidated property" — it is an unknown one, and the pipe
+ * rejects the whole request with "property X should not exist".
+ *
+ * Every DTO in this file was previously plain TypeScript, so all three POST
+ * routes below returned 400 for every well-formed request. The endpoints were
+ * unreachable, not merely unvalidated.
+ */
+
 export class RewriteBulletsDto {
+  @IsArray()
+  @IsString({ each: true })
   bullets: string[];
+
+  @IsOptional()
+  @IsString()
   roleTarget?: string;
 }
 
 export class TailorResumeDto {
+  @IsObject()
   resumeJson: Record<string, any>;
+
+  @IsString()
   jobDescription: string;
 }
 
+export class CandidateInfoDto {
+  @IsString()
+  name: string;
+
+  @IsString()
+  email: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  skills: string[];
+
+  @IsOptional()
+  @IsString()
+  experience?: string;
+
+  @IsOptional()
+  @IsString()
+  summary?: string;
+}
+
+export class JobInfoDto {
+  @IsString()
+  title: string;
+
+  @IsString()
+  companyName: string;
+
+  @IsString()
+  description: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  requirements?: string[];
+}
+
 export class GenerateCoverLetterDto {
-  candidateInfo: {
-    name: string;
-    email: string;
-    skills: string[];
-    experience?: string;
-    summary?: string;
-  };
-  jobInfo: {
-    title: string;
-    companyName: string;
-    description: string;
-    requirements?: string[];
-  };
+  // Nested objects need BOTH @ValidateNested and @Type: without @Type the pipe
+  // has no class to validate the plain object against, so the nested contents
+  // pass unchecked.
+  @ValidateNested()
+  @Type(() => CandidateInfoDto)
+  candidateInfo: CandidateInfoDto;
+
+  @ValidateNested()
+  @Type(() => JobInfoDto)
+  jobInfo: JobInfoDto;
 }
 
 export class ReviewClaimDto {
+  @IsIn(['approve', 'reject', 'modify'])
   decision: 'approve' | 'reject' | 'modify';
+
+  @IsOptional()
+  @IsString()
   modifiedContent?: string;
 }
 
