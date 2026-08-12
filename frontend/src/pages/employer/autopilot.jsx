@@ -56,6 +56,8 @@ export default function EmployerAutopilot() {
   const [error, setError] = useState(null);
   const [toggleError, setToggleError] = useState(null);
   const [toggling, setToggling] = useState(false);
+  const [deciding, setDeciding] = useState({}); // { [proposalId]: boolean }
+  const [runningNow, setRunningNow] = useState(false);
 
   // Fetch live autopilot data. No sample fallback — surface real state only.
   const load = async () => {
@@ -105,6 +107,7 @@ export default function EmployerAutopilot() {
                 match: q.score != null ? `${q.score}% match` : '',
                 why: q.rationale || '',
                 req: q.currentStage || '',
+                proposalId: q.proposalId || null,
               };
             })
           : [],
@@ -154,6 +157,30 @@ export default function EmployerAutopilot() {
       setToggleError(err);
     } finally {
       setToggling(false);
+    }
+  };
+
+  const decide = async (proposalId, decision) => {
+    setDeciding((prev) => ({ ...prev, [proposalId]: true }));
+    try {
+      await aiRecruiterApi.decideProposedAction(proposalId, decision);
+      await load(); // re-fetch — the queue and activity log both change
+    } catch (err) {
+      console.error('Error deciding proposed action:', err);
+    } finally {
+      setDeciding((prev) => ({ ...prev, [proposalId]: false }));
+    }
+  };
+
+  const runNow = async () => {
+    setRunningNow(true);
+    try {
+      await aiRecruiterApi.runAutopilotNow();
+      await load();
+    } catch (err) {
+      console.error('Error running autopilot sweep:', err);
+    } finally {
+      setRunningNow(false);
     }
   };
 
@@ -579,6 +606,28 @@ export default function EmployerAutopilot() {
                     >
                       {queue.length} PENDING
                     </span>
+                    <div style={{ flex: 1 }} />
+                    <button
+                      onClick={runNow}
+                      disabled={runningNow}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        fontFamily: 'inherit',
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: '#0C2C1C',
+                        background: '#1FA463',
+                        border: 'none',
+                        borderRadius: 999,
+                        padding: '9px 16px',
+                        cursor: runningNow ? 'wait' : 'pointer',
+                        opacity: runningNow ? 0.6 : 1,
+                      }}
+                    >
+                      ↻ {runningNow ? 'Running…' : 'Run now'}
+                    </button>
                   </div>
 
                   {hasQueue ? (
@@ -669,6 +718,53 @@ export default function EmployerAutopilot() {
                               )}
                             </div>
                           </div>
+
+                          {q.proposalId ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 14, paddingTop: 14, borderTop: '1px solid #F2ECE0' }}>
+                              <button
+                                onClick={() => decide(q.proposalId, 'approve')}
+                                disabled={deciding[q.proposalId]}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 7,
+                                  fontFamily: 'inherit',
+                                  fontSize: 13,
+                                  fontWeight: 700,
+                                  color: '#0C2C1C',
+                                  background: '#1FA463',
+                                  border: 'none',
+                                  borderRadius: 999,
+                                  padding: '9px 17px',
+                                  cursor: deciding[q.proposalId] ? 'wait' : 'pointer',
+                                  opacity: deciding[q.proposalId] ? 0.6 : 1,
+                                }}
+                              >
+                                ✓ Approve
+                              </button>
+                              <button
+                                onClick={() => decide(q.proposalId, 'reject')}
+                                disabled={deciding[q.proposalId]}
+                                style={{
+                                  fontFamily: 'inherit',
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  color: '#C9622E',
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: deciding[q.proposalId] ? 'wait' : 'pointer',
+                                  padding: '9px 8px',
+                                  opacity: deciding[q.proposalId] ? 0.6 : 1,
+                                }}
+                              >
+                                Dismiss
+                              </button>
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: 11.5, color: '#A79E8F', marginTop: 12, paddingTop: 12, borderTop: '1px solid #F2ECE0' }}>
+                              No pending proposal for this item yet.
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>

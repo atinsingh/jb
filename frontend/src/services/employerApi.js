@@ -113,6 +113,18 @@ export const aiRecruiterApi = {
       method: 'POST',
       body: JSON.stringify({ enabled }),
     }),
+  // POST /api/employer/ai/autopilot/run-now
+  runAutopilotNow: () =>
+    apiCall('/api/employer/ai/autopilot/run-now', { method: 'POST' }),
+  // GET /api/employer/ai/proposed-actions?status=
+  listProposedActions: (status) =>
+    apiCall(`/api/employer/ai/proposed-actions${status ? `?status=${status}` : ''}`),
+  // POST /api/employer/ai/proposed-actions/:id/decide { decision }
+  decideProposedAction: (id, decision) =>
+    apiCall(`/api/employer/ai/proposed-actions/${id}/decide`, {
+      method: 'POST',
+      body: JSON.stringify({ decision }),
+    }),
   // POST /api/employer/ai/screen { jobId? }
   screen: (jobId) =>
     apiCall('/api/employer/ai/screen', {
