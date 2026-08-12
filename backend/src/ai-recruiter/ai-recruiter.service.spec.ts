@@ -14,6 +14,7 @@ import { LLMQuotaService } from '../llm/llm-quota.service';
 import { EmployerApplicant } from '../employer-pipeline/schemas/employer-applicant.schema';
 import { EmployerAutopilotConfig } from './schemas/employer-autopilot-config.schema';
 import { AiProposedAction } from './schemas/ai-proposed-action.schema';
+import { EmployerTalentCandidate } from '../employer-talent/schemas/employer-talent-candidate.schema';
 
 /**
  * Chainable mongoose model mock. `query(rows)` sets what the next find(...)
@@ -95,6 +96,7 @@ describe('AiRecruiterService', () => {
   let quota: any;
   let autopilotConfigModel: ReturnType<typeof makeAutopilotConfigModel>;
   let proposedActionModel: ReturnType<typeof makeProposedActionModel>;
+  let talentModel: any;
 
   // Must be a valid ObjectId hex string: getAutopilot/toggleAutopilot now do
   // `new Types.ObjectId(ownerId)` internally to query the persisted config.
@@ -122,6 +124,11 @@ describe('AiRecruiterService', () => {
     };
     autopilotConfigModel = makeAutopilotConfigModel();
     proposedActionModel = makeProposedActionModel();
+    talentModel = {
+      find: jest.fn().mockReturnValue({
+        limit: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) }),
+      }),
+    };
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
@@ -136,6 +143,10 @@ describe('AiRecruiterService', () => {
         {
           provide: getModelToken(AiProposedAction.name),
           useValue: proposedActionModel,
+        },
+        {
+          provide: getModelToken(EmployerTalentCandidate.name),
+          useValue: talentModel,
         },
       ],
     }).compile();
@@ -553,12 +564,14 @@ describe('AiRecruiterService.toggleAutopilot / getOrCreateAutopilotConfig', () =
     };
     const applicantModel: any = { find: jest.fn().mockReturnValue({ sort: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) }) }) };
     const proposedActionModel: any = { find: jest.fn(), findOne: jest.fn() }; // unused by these tests
+    const talentModel: any = { find: jest.fn() }; // unused by these tests
     const service = new AiRecruiterService(
       applicantModel,
       {} as any, // routingService — unused by this test
       {} as any, // quotaService — unused by this test
       autopilotConfigModel,
       proposedActionModel,
+      talentModel,
     );
     return { service, autopilotConfigModel };
   };
@@ -658,5 +671,81 @@ describe('AI Recruiter LLM contracts', () => {
         nextSteps: [],
       }).success,
     ).toBe(false);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// Sourcing pool merge (Task 13)
+// -----------------------------------------------------------------------------
+describe('AiRecruiterService.sourcing — pool merge', () => {
+  const ownerId = new Types.ObjectId().toString();
+
+  it('merges talent-pool and applicant-history candidates, tagging each with sourcePool', async () => {
+    const talentCandidate = {
+      _id: new Types.ObjectId(), name: 'Jamie Fox', candidateId: null,
+      skills: ['Go'], headline: 'Backend Engineer',
+    };
+    const applicant = {
+      _id: new Types.ObjectId(), candidateId: new Types.ObjectId(),
+      candidateName: 'Riley Park', skills: ['Go'], candidateEmail: 'riley@x.com',
+      appliedAt: new Date(),
+    };
+    const applicantModel: any = {
+      find: jest.fn().mockReturnValue({
+        sort: jest.fn().mockReturnValue({ limit: jest.fn().mockReturnValue({ lean: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([applicant]) }) }) }),
+      }),
+    };
+    const talentModel: any = {
+      find: jest.fn().mockReturnValue({
+        limit: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([talentCandidate]) }),
+      }),
+    };
+    const service = new AiRecruiterService(
+      applicantModel, {} as any, { enforceQuota: jest.fn().mockRejectedValue(new Error('no key')) } as any,
+      { findOneAndUpdate: jest.fn() } as any, // autopilotConfigModel
+      { find: jest.fn().mockReturnValue({ sort: jest.fn().mockReturnValue({ limit: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) }) }) }) } as any, // proposedActionModel (Task 3) — unused by sourcing()
+      talentModel,
+    );
+
+    const result = await service.sourcing('backend engineer with Go', ownerId);
+
+    const pools = result.candidates.map((c: any) => c.sourcePool);
+    expect(pools).toContain('talent_pool');
+    expect(pools).toContain('past_applicant');
+  });
+
+  it('deduplicates a candidate present in both pools, keeping the applicant record', async () => {
+    const sharedCandidateId = new Types.ObjectId();
+    const talentCandidate = {
+      _id: new Types.ObjectId(), name: 'Riley Park', candidateId: sharedCandidateId,
+      skills: ['Go'],
+    };
+    const applicant = {
+      _id: new Types.ObjectId(), candidateId: sharedCandidateId,
+      candidateName: 'Riley Park', skills: ['Go'], candidateEmail: 'riley@x.com',
+      appliedAt: new Date(),
+    };
+    const applicantModel: any = {
+      find: jest.fn().mockReturnValue({
+        sort: jest.fn().mockReturnValue({ limit: jest.fn().mockReturnValue({ lean: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([applicant]) }) }) }),
+      }),
+    };
+    const talentModel: any = {
+      find: jest.fn().mockReturnValue({
+        limit: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([talentCandidate]) }),
+      }),
+    };
+    const service = new AiRecruiterService(
+      applicantModel, {} as any, { enforceQuota: jest.fn().mockRejectedValue(new Error('no key')) } as any,
+      { findOneAndUpdate: jest.fn() } as any, // autopilotConfigModel
+      { find: jest.fn().mockReturnValue({ sort: jest.fn().mockReturnValue({ limit: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) }) }) }) } as any, // proposedActionModel (Task 3) — unused by sourcing()
+      talentModel,
+    );
+
+    const result = await service.sourcing('Go engineer', ownerId);
+
+    const rileys = result.candidates.filter((c: any) => c.name === 'Riley Park');
+    expect(rileys).toHaveLength(1);
+    expect(rileys[0].sourcePool).toBe('past_applicant');
   });
 });

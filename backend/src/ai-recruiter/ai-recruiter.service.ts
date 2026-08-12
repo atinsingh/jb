@@ -21,6 +21,10 @@ import {
   AiProposedAction,
   AiProposedActionDocument,
 } from './schemas/ai-proposed-action.schema';
+import {
+  EmployerTalentCandidate,
+  EmployerTalentCandidateDocument,
+} from '../employer-talent/schemas/employer-talent-candidate.schema';
 
 /**
  * AiRecruiterService
@@ -52,6 +56,8 @@ export class AiRecruiterService {
     private readonly autopilotConfigModel: Model<EmployerAutopilotConfigDocument>,
     @InjectModel(AiProposedAction.name)
     private readonly proposedActionModel: Model<AiProposedActionDocument>,
+    @InjectModel(EmployerTalentCandidate.name)
+    private readonly talentModel: Model<EmployerTalentCandidateDocument>,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -548,8 +554,9 @@ Include every applicant exactly once, keyed by their "id".`,
     const text = brief || '';
     const role = this.extractRole(text);
 
-    // Pull this employer's real applicants (deduped by candidate) as the pool.
-    const pool = employerId
+    // Pull this employer's real applicants (deduped by candidate) and talent
+    // pool as the combined sourcing pool.
+    const applicantPool = employerId
       ? await this.applicantModel
           .find({ ownerId: employerId })
           .sort({ appliedAt: -1 })
@@ -557,8 +564,15 @@ Include every applicant exactly once, keyed by their "id".`,
           .lean()
           .exec()
       : [];
+    const talentPool = employerId
+      ? await this.talentModel
+          .find({ ownerId: new Types.ObjectId(employerId) })
+          .limit(200)
+          .lean()
+      : [];
 
-    const built = this.buildSourcingCandidates(pool, text, role);
+    const merged = this.mergeSourcingPools(applicantPool, talentPool);
+    const built = this.buildSourcingCandidates(merged, text, role);
     const deterministic = {
       brief: text,
       role: role || null,
@@ -634,6 +648,7 @@ Include every candidate exactly once, keyed by their "id".`,
             yearsExperience: b.candidate.yearsExperience,
             matchScore,
             outreach: llm.outreach,
+            sourcePool: b.candidate.sourcePool,
           };
         })
         .sort((x, y) => y.matchScore - x.matchScore);
@@ -662,11 +677,40 @@ Include every candidate exactly once, keyed by their "id".`,
   }
 
   /**
-   * Deterministic candidate scoring over the pool. Returns items carrying the
-   * join `id` (applicant `_id`) alongside the exact-shape candidate object.
+   * Merges the applicant-history pool and talent pool into a single list,
+   * deduping candidates present in both (keyed by candidateId, falling back
+   * to email) and preferring the richer applicant-history record.
+   */
+  private mergeSourcingPools(
+    applicants: any[],
+    talent: any[],
+  ): Array<{ record: any; sourcePool: 'talent_pool' | 'past_applicant' }> {
+    const seen = new Set<string>(); // candidateId.toString() OR email, whichever is present
+    const merged: Array<{ record: any; sourcePool: 'talent_pool' | 'past_applicant' }> = [];
+
+    // Applicant history wins the dedup — it is the richer record.
+    for (const app of applicants as any[]) {
+      const key = app.candidateId ? String(app.candidateId) : (app.candidateEmail || '');
+      if (key) seen.add(key);
+      merged.push({ record: app, sourcePool: 'past_applicant' });
+    }
+
+    for (const cand of talent as any[]) {
+      const key = cand.candidateId ? String(cand.candidateId) : (cand.email || '');
+      if (key && seen.has(key)) continue; // already represented by a richer applicant record
+      merged.push({ record: cand, sourcePool: 'talent_pool' });
+    }
+
+    return merged;
+  }
+
+  /**
+   * Deterministic candidate scoring over the merged pool. Returns items
+   * carrying the join `id` (record `_id`) alongside the exact-shape
+   * candidate object, tagged with which pool it was sourced from.
    */
   private buildSourcingCandidates(
-    pool: any[],
+    pool: Array<{ record: any; sourcePool: 'talent_pool' | 'past_applicant' }>,
     text: string,
     role: string | null,
   ): Array<{ id: string; candidate: any }> {
@@ -676,34 +720,36 @@ Include every candidate exactly once, keyed by their "id".`,
       .filter((t) => t.length > 2);
 
     return pool
-      .map((c) => {
-        const skills = Array.isArray(c.skills) ? c.skills : [];
+      .map(({ record, sourcePool }) => {
+        const skills = Array.isArray(record.skills) ? record.skills : [];
         const overlap = skills.filter((s: string) =>
           tokens.some(
             (t) => s.toLowerCase().includes(t) || t.includes(s.toLowerCase()),
           ),
         ).length;
-        const name = c.candidateName || 'Candidate';
-        const years = Number(c.yearsExperience) || 0;
-        const jitter = this.seededUnit(`source:${String(c._id)}:${text}`) * 10;
+        const name = record.candidateName || record.name || 'Candidate';
+        const headline = record.candidateHeadline || record.headline;
+        const years = Number(record.yearsExperience) || 0;
+        const jitter = this.seededUnit(`source:${String(record._id)}:${text}`) * 10;
         const score = Math.round(
           Math.min(100, 35 + overlap * 14 + Math.min(20, years) + jitter),
         );
         return {
-          id: String(c._id),
+          id: String(record._id),
           candidate: {
-            candidateId: c.candidateId ? String(c.candidateId) : null,
+            candidateId: record.candidateId ? String(record.candidateId) : null,
             name,
-            title: c.candidateHeadline || role || 'Candidate',
-            location: c.candidateLocation || '',
+            title: headline || role || 'Candidate',
+            location: record.candidateLocation || '',
             skills,
             yearsExperience: years,
             matchScore: score,
             outreach: this.draftOutreach(
               name,
-              role || c.candidateHeadline || 'role',
+              role || headline || 'role',
               skills,
             ),
+            sourcePool,
           },
         };
       })

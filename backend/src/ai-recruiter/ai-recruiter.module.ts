@@ -5,6 +5,7 @@ import { LLMModule } from '../llm/llm.module';
 import { EmployerInterviewsModule } from '../employer-interviews/employer-interviews.module';
 import { EmployerMessagesModule } from '../employer-messages/employer-messages.module';
 import { AgentRuntimeModule } from '../agent-runtime/agent-runtime.module';
+import { EmployerTalentModule } from '../employer-talent/employer-talent.module';
 import { AiRecruiterController } from './ai-recruiter.controller';
 import { AiRecruiterService } from './ai-recruiter.service';
 import { EmployerAiActionsService } from './employer-ai-actions.service';
@@ -40,6 +41,7 @@ import {
     EmployerInterviewsModule,
     EmployerMessagesModule,
     AgentRuntimeModule,
+    EmployerTalentModule, // provides EmployerTalentCandidate's model via its MongooseModule export
     MongooseModule.forFeature([
       { name: EmployerAutopilotConfig.name, schema: EmployerAutopilotConfigSchema },
       { name: AiProposedAction.name, schema: AiProposedActionSchema },
