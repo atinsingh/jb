@@ -60,8 +60,8 @@ export default function EmployerAutopilot() {
   const [runningNow, setRunningNow] = useState(false);
 
   // Fetch live autopilot data. No sample fallback — surface real state only.
-  const load = async () => {
-    setLoading(true);
+  const load = async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const res = await aiRecruiterApi.autopilot();
@@ -135,7 +135,7 @@ export default function EmployerAutopilot() {
     } catch (err) {
       setError(err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -164,7 +164,7 @@ export default function EmployerAutopilot() {
     setDeciding((prev) => ({ ...prev, [proposalId]: true }));
     try {
       await aiRecruiterApi.decideProposedAction(proposalId, decision);
-      await load(); // re-fetch — the queue and activity log both change
+      await load({ silent: true }); // re-fetch — the queue and activity log both change
     } catch (err) {
       console.error('Error deciding proposed action:', err);
     } finally {
@@ -176,7 +176,7 @@ export default function EmployerAutopilot() {
     setRunningNow(true);
     try {
       await aiRecruiterApi.runAutopilotNow();
-      await load();
+      await load({ silent: true });
     } catch (err) {
       console.error('Error running autopilot sweep:', err);
     } finally {
