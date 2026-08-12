@@ -97,7 +97,7 @@ export class AiRecruiterService {
    * Heuristic 0-100 score for an applicant. Combines stage weight, rating and a
    * stable seeded jitter so identical inputs always produce identical scores.
    */
-  private scoreApplicant(app: EmployerApplicantDocument): number {
+  scoreApplicant(app: EmployerApplicantDocument): number {
     const id =
       (app._id ? app._id.toString() : '') +
       (app.candidateEmail || app.candidateName || '');
@@ -108,7 +108,7 @@ export class AiRecruiterService {
     return Math.round(stageComponent + ratingComponent + baseMatch + jitter);
   }
 
-  private rationaleFor(app: EmployerApplicantDocument, score: number): string {
+  rationaleFor(app: EmployerApplicantDocument, score: number): string {
     const bits: string[] = [];
     bits.push(`stage "${app.stage || 'applied'}"`);
     if (app.rating) bits.push(`recruiter rating ${app.rating}/5`);
