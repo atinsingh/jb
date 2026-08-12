@@ -391,6 +391,7 @@ describe('AiRecruiterService', () => {
             yearsExperience: expect.any(Number),
             matchScore: expect.any(Number),
             outreach: expect.any(String),
+            sourcePool: expect.any(String),
           }),
         );
       }
