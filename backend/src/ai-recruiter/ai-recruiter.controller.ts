@@ -36,7 +36,8 @@ export class AiRecruiterController {
   @ApiOperation({ summary: 'Enable or disable recruiting autopilot' })
   @ApiResponse({ status: 201, description: 'Autopilot toggled' })
   async toggleAutopilot(@Body() dto: ToggleAutopilotDto, @Request() req) {
-    return this.aiRecruiterService.toggleAutopilot(dto.enabled);
+    const employerId = req.user._id.toString();
+    return this.aiRecruiterService.toggleAutopilot(employerId, dto.enabled);
   }
 
   @Post('screen')

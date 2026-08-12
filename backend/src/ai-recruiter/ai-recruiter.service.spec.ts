@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
 import { ForbiddenException } from '@nestjs/common';
+import { Types } from 'mongoose';
 import {
   RecruiterScreenResponseSchema,
   RecruiterSourcingResponseSchema,
@@ -11,6 +12,8 @@ import { AiRecruiterService } from './ai-recruiter.service';
 import { LLMRoutingService } from '../llm/llm-routing.service';
 import { LLMQuotaService } from '../llm/llm-quota.service';
 import { EmployerApplicant } from '../employer-pipeline/schemas/employer-applicant.schema';
+import { EmployerAutopilotConfig } from './schemas/employer-autopilot-config.schema';
+import { AiProposedAction } from './schemas/ai-proposed-action.schema';
 
 /**
  * Chainable mongoose model mock. `query(rows)` sets what the next find(...)
@@ -30,6 +33,32 @@ function makeModel() {
       state.rows = rows;
     },
     find: jest.fn(() => builder),
+  };
+}
+
+/**
+ * autopilotConfigModel mock — the service calls `findOneAndUpdate(...)`
+ * directly (no `.exec()`, matching real Mongoose Query thenables).
+ */
+function makeAutopilotConfigModel(doc: any = { enabled: false, rules: [] }) {
+  return {
+    findOneAndUpdate: jest.fn(() => Promise.resolve(doc)),
+  };
+}
+
+/**
+ * proposedActionModel mock for the `getAutopilot` activity query:
+ * `.find().sort().limit().lean()` resolves directly, no `.exec()`.
+ */
+function makeProposedActionModel(rows: any[] = []) {
+  const builder: any = {
+    sort: jest.fn(() => builder),
+    limit: jest.fn(() => builder),
+    lean: jest.fn(() => Promise.resolve(rows)),
+  };
+  return {
+    find: jest.fn(() => builder),
+    findOne: jest.fn(),
   };
 }
 
@@ -64,8 +93,12 @@ describe('AiRecruiterService', () => {
   let provider: any;
   let routing: any;
   let quota: any;
+  let autopilotConfigModel: ReturnType<typeof makeAutopilotConfigModel>;
+  let proposedActionModel: ReturnType<typeof makeProposedActionModel>;
 
-  const USER = 'employer-user-1';
+  // Must be a valid ObjectId hex string: getAutopilot/toggleAutopilot now do
+  // `new Types.ObjectId(ownerId)` internally to query the persisted config.
+  const USER = new Types.ObjectId().toString();
 
   beforeEach(async () => {
     model = makeModel();
@@ -87,6 +120,8 @@ describe('AiRecruiterService', () => {
       enforceQuota: jest.fn(() => Promise.resolve()),
       recordUsageAndIncrement: jest.fn(() => Promise.resolve()),
     };
+    autopilotConfigModel = makeAutopilotConfigModel();
+    proposedActionModel = makeProposedActionModel();
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
@@ -94,6 +129,14 @@ describe('AiRecruiterService', () => {
         { provide: getModelToken(EmployerApplicant.name), useValue: model },
         { provide: LLMRoutingService, useValue: routing },
         { provide: LLMQuotaService, useValue: quota },
+        {
+          provide: getModelToken(EmployerAutopilotConfig.name),
+          useValue: autopilotConfigModel,
+        },
+        {
+          provide: getModelToken(AiProposedAction.name),
+          useValue: proposedActionModel,
+        },
       ],
     }).compile();
 
@@ -146,13 +189,13 @@ describe('AiRecruiterService', () => {
   });
 
   describe('toggleAutopilot', () => {
-    it('returns enabled/status/message', () => {
-      expect(service.toggleAutopilot(true)).toEqual({
+    it('returns enabled/status/message', async () => {
+      expect(await service.toggleAutopilot(USER, true)).toEqual({
         enabled: true,
         status: 'active',
         message: expect.any(String),
       });
-      expect(service.toggleAutopilot(false)).toEqual({
+      expect(await service.toggleAutopilot(USER, false)).toEqual({
         enabled: false,
         status: 'paused',
         message: expect.any(String),
@@ -494,6 +537,58 @@ describe('AiRecruiterService', () => {
       const r2 = await service.scorecard(USER, 'design system debug approach');
       expect(r2).toEqual(r1);
     });
+  });
+});
+
+// -----------------------------------------------------------------------------
+// Persisted autopilot toggle (Task 3)
+// -----------------------------------------------------------------------------
+describe('AiRecruiterService.toggleAutopilot / getOrCreateAutopilotConfig', () => {
+  const ownerId = new Types.ObjectId().toString();
+
+  const buildService = (existingConfig: any = null) => {
+    const savedDoc = { ownerId: new Types.ObjectId(ownerId), enabled: false, rules: [] };
+    const autopilotConfigModel: any = {
+      findOneAndUpdate: jest.fn().mockResolvedValue(existingConfig || savedDoc),
+    };
+    const applicantModel: any = { find: jest.fn().mockReturnValue({ sort: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) }) }) };
+    const proposedActionModel: any = { find: jest.fn(), findOne: jest.fn() }; // unused by these tests
+    const service = new AiRecruiterService(
+      applicantModel,
+      {} as any, // routingService — unused by this test
+      {} as any, // quotaService — unused by this test
+      autopilotConfigModel,
+      proposedActionModel,
+    );
+    return { service, autopilotConfigModel };
+  };
+
+  it('getOrCreateAutopilotConfig upserts a default-disabled config on first read', async () => {
+    const { service, autopilotConfigModel } = buildService();
+
+    await service.getOrCreateAutopilotConfig(ownerId);
+
+    expect(autopilotConfigModel.findOneAndUpdate).toHaveBeenCalledWith(
+      { ownerId: new Types.ObjectId(ownerId) },
+      expect.objectContaining({ $setOnInsert: expect.objectContaining({ enabled: false }) }),
+      expect.objectContaining({ upsert: true, new: true }),
+    );
+  });
+
+  it('toggleAutopilot persists the enabled flag for this owner', async () => {
+    const { service, autopilotConfigModel } = buildService({
+      ownerId: new Types.ObjectId(ownerId), enabled: true, rules: [],
+    });
+
+    const result = await service.toggleAutopilot(ownerId, true);
+
+    expect(autopilotConfigModel.findOneAndUpdate).toHaveBeenCalledWith(
+      { ownerId: new Types.ObjectId(ownerId) },
+      expect.objectContaining({ $set: { enabled: true } }),
+      expect.objectContaining({ upsert: true, new: true }),
+    );
+    expect(result.enabled).toBe(true);
+    expect(result.status).toBe('active');
   });
 });
 

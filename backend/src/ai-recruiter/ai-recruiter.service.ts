@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import {
   RecruiterScreenResponseSchema,
   RecruiterSourcingResponseSchema,
@@ -13,6 +13,14 @@ import {
   EmployerApplicant,
   EmployerApplicantDocument,
 } from '../employer-pipeline/schemas/employer-applicant.schema';
+import {
+  EmployerAutopilotConfig,
+  EmployerAutopilotConfigDocument,
+} from './schemas/employer-autopilot-config.schema';
+import {
+  AiProposedAction,
+  AiProposedActionDocument,
+} from './schemas/ai-proposed-action.schema';
 
 /**
  * AiRecruiterService
@@ -40,6 +48,10 @@ export class AiRecruiterService {
     private readonly applicantModel: Model<EmployerApplicantDocument>,
     private readonly routingService: LLMRoutingService,
     private readonly quotaService: LLMQuotaService,
+    @InjectModel(EmployerAutopilotConfig.name)
+    private readonly autopilotConfigModel: Model<EmployerAutopilotConfigDocument>,
+    @InjectModel(AiProposedAction.name)
+    private readonly proposedActionModel: Model<AiProposedActionDocument>,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -162,11 +174,17 @@ export class AiRecruiterService {
 
     const queue = this.buildAutopilotQueueDeterministic(applicants);
 
-    const activity = applicants.slice(0, 8).map((a) => ({
-      applicantId: a._id ? a._id.toString() : null,
-      name: a.candidateName || 'Candidate',
-      event: a.stage === 'applied' ? 'received' : `moved_to_${a.stage}`,
-      at: (a as any).updatedAt || (a as any).createdAt || new Date(),
+    const config = await this.getOrCreateAutopilotConfig(ownerId);
+
+    const decidedProposals = await this.proposedActionModel
+      .find({ ownerId: new Types.ObjectId(ownerId), status: { $in: ['approved', 'rejected', 'failed'] } })
+      .sort({ decidedAt: -1 })
+      .limit(8)
+      .lean();
+
+    const activity = decidedProposals.map((p: any) => ({
+      event: this.activityEventLabel(p),
+      at: p.decidedAt,
     }));
 
     const rules = [
@@ -193,8 +211,8 @@ export class AiRecruiterService {
     ];
 
     return {
-      enabled: queue.length > 0,
-      status: queue.length > 0 ? 'active' : 'idle',
+      enabled: config.enabled,
+      status: config.enabled ? 'active' : 'idle',
       stats: {
         reqsCovered,
         screenedToday,
@@ -206,6 +224,34 @@ export class AiRecruiterService {
       queue,
       activity,
     };
+  }
+
+  async getOrCreateAutopilotConfig(
+    ownerId: string,
+  ): Promise<EmployerAutopilotConfigDocument> {
+    return this.autopilotConfigModel.findOneAndUpdate(
+      { ownerId: new Types.ObjectId(ownerId) },
+      { $setOnInsert: { enabled: false } },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
+  }
+
+  private activityEventLabel(p: any): string {
+    const verb =
+      p.actionType === 'reject'
+        ? 'Rejected'
+        : p.actionType === 'advance_stage'
+          ? 'Advanced'
+          : p.actionType === 'schedule_interview'
+            ? 'Interview scheduled for'
+            : 'Message sent to';
+    const outcome =
+      p.status === 'failed'
+        ? ' (failed — see reason)'
+        : p.status === 'rejected'
+          ? ' (dismissed)'
+          : '';
+    return `${verb} applicant${outcome}`;
   }
 
   /**
@@ -240,7 +286,15 @@ export class AiRecruiterService {
       .sort((x, y) => y.score - x.score);
   }
 
-  toggleAutopilot(enabled: boolean) {
+  async toggleAutopilot(
+    ownerId: string,
+    enabled: boolean,
+  ): Promise<{ enabled: boolean; status: string; message: string }> {
+    await this.autopilotConfigModel.findOneAndUpdate(
+      { ownerId: new Types.ObjectId(ownerId) },
+      { $set: { enabled } },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
     return {
       enabled,
       status: enabled ? 'active' : 'paused',
