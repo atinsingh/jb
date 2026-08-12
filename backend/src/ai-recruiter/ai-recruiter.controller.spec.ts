@@ -46,20 +46,99 @@ describe('AiRecruiterController — new Autopilot endpoints', () => {
     expect(actionsService.decide).toHaveBeenCalledWith('employer-1', 'proposal-1', 'approve', 'employer-1');
   });
 
-  it('getAutopilot enriches each queue item with its matching pending proposal id', async () => {
+  const proposal = (overrides: any = {}) => ({
+    _id: { toString: () => 'proposal-9' },
+    applicantId: { toString: () => 'app-1' },
+    source: 'autopilot',
+    actionType: 'advance_stage',
+    payload: { targetStage: 'screening' },
+    rationale: 'Strong fit (82/100).',
+    ...overrides,
+  });
+
+  const withQueue = (queue: any[]) => {
     aiRecruiterService.getAutopilot = jest.fn().mockResolvedValue({
       enabled: true, status: 'active',
       stats: {}, rules: [],
-      queue: [{ applicantId: 'app-1', name: 'Sarah Chen', proposedAction: 'advance_to_screening' }],
+      queue,
       activity: [],
     });
+  };
+
+  it('getAutopilot enriches each queue item with its matching pending proposal id', async () => {
+    withQueue([{ applicantId: 'app-1', name: 'Sarah Chen', proposedAction: 'advance_to_screening' }]);
+    actionsService.list = jest.fn().mockResolvedValue([proposal()]);
+
+    const result = await controller.getAutopilot(req as any);
+
+    expect(result.queue[0].proposalId).toBe('proposal-9');
+  });
+
+  it('getAutopilot overrides the heuristic label with the REAL proposal actionType when they disagree', async () => {
+    // The heuristic previewed "send_screening_questions" (an advance-flavored
+    // card), but the rule engine actually proposed a reject. The card must
+    // show what Approve will really do.
+    withQueue([
+      {
+        applicantId: 'app-1',
+        name: 'Sarah Chen',
+        proposedAction: 'send_screening_questions',
+        rationale: 'heuristic guess',
+      },
+    ]);
     actionsService.list = jest.fn().mockResolvedValue([
-      { _id: { toString: () => 'proposal-9' }, applicantId: { toString: () => 'app-1' } },
+      proposal({ actionType: 'reject', payload: {}, rationale: 'Developing fit (28/100).' }),
     ]);
 
     const result = await controller.getAutopilot(req as any);
 
     expect(result.queue[0].proposalId).toBe('proposal-9');
+    expect(result.queue[0].proposedAction).toBe('Reject applicant');
+    // The frontend derives its icon by substring-matching this string.
+    expect(String(result.queue[0].proposedAction).toLowerCase()).toContain('reject');
+    expect(result.queue[0].rationale).toBe('Developing fit (28/100).');
+  });
+
+  it('getAutopilot never attaches a copilot-sourced proposal to an autopilot queue card', async () => {
+    withQueue([
+      { applicantId: 'app-1', name: 'Sarah Chen', proposedAction: 'advance_to_screening' },
+    ]);
+    actionsService.list = jest.fn().mockResolvedValue([
+      proposal({ source: 'copilot', actionType: 'reject', payload: {} }),
+    ]);
+
+    const result = await controller.getAutopilot(req as any);
+
+    expect(result.queue[0].proposalId).toBeUndefined();
+    // The heuristic preview survives untouched when nothing real matched.
+    expect(result.queue[0].proposedAction).toBe('advance_to_screening');
+  });
+
+  it('getAutopilot joins the NEWEST pending proposal when an applicant has two (list is newest-first)', async () => {
+    withQueue([
+      { applicantId: 'app-1', name: 'Sarah Chen', proposedAction: 'advance_to_screening' },
+    ]);
+    actionsService.list = jest.fn().mockResolvedValue([
+      // newest first, exactly as EmployerAiActionsService.list() sorts
+      proposal({
+        _id: { toString: () => 'proposal-new' },
+        actionType: 'schedule_interview',
+        payload: {},
+        rationale: 'newest rationale',
+      }),
+      proposal({
+        _id: { toString: () => 'proposal-old' },
+        actionType: 'reject',
+        payload: {},
+        rationale: 'oldest rationale',
+      }),
+    ]);
+
+    const result = await controller.getAutopilot(req as any);
+
+    expect(result.queue[0].proposalId).toBe('proposal-new');
+    expect(result.queue[0].proposedAction).toBe('Schedule interview');
+    expect(result.queue[0].rationale).toBe('newest rationale');
   });
 
   it('getAutopilot leaves a queue item without a matching proposal unchanged (no proposalId)', async () => {

@@ -29,9 +29,17 @@ describe('EmployerAiActionsService', () => {
       }),
       findOne: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue(proposal) }),
     };
-    const pipelineService: any = { updateStage: jest.fn().mockResolvedValue({}) };
+    const pipelineService: any = {
+      updateStage: jest.fn().mockResolvedValue({}),
+      findOne: jest.fn().mockResolvedValue({
+        _id: new Types.ObjectId(applicantId),
+        candidateName: 'Ada Lovelace',
+        candidateId: 'cand-77',
+      }),
+    };
     const interviewsService: any = { create: jest.fn().mockResolvedValue({}) };
     const messagesService: any = {
+      listConversations: jest.fn().mockResolvedValue([]),
       createConversation: jest.fn().mockResolvedValue({ _id: new Types.ObjectId() }),
       sendMessage: jest.fn().mockResolvedValue({}),
     };
@@ -66,6 +74,26 @@ describe('EmployerAiActionsService', () => {
         rationale: 'Strong technical fit',
       }),
     );
+  });
+
+  it('create() refuses to propose against an applicant that is not this owner\'s', async () => {
+    const proposal = buildProposal();
+    const { service, proposedActionModel, pipelineService } = buildService(proposal);
+    // EmployerPipelineService.findOne throws when {_id, ownerId} matches nothing.
+    pipelineService.findOne.mockRejectedValue(new NotFoundException('Applicant not found'));
+
+    await expect(
+      service.create({
+        ownerId,
+        source: 'copilot',
+        actionType: 'reject',
+        applicantId: new Types.ObjectId().toString(),
+        payload: {},
+        rationale: 'cross-tenant attempt',
+      }),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(proposedActionModel.create).not.toHaveBeenCalled();
   });
 
   it('throws NotFoundException deciding a proposal that does not belong to this owner', async () => {
@@ -141,6 +169,43 @@ describe('EmployerAiActionsService', () => {
 
     expect(messagesService.createConversation).toHaveBeenCalled();
     expect(messagesService.sendMessage).toHaveBeenCalled();
+  });
+
+  it('approving send_message uses the REAL applicant identity, not a "Candidate" placeholder', async () => {
+    const proposal = buildProposal({
+      actionType: 'send_message',
+      payload: { draftText: 'Thanks for applying!' },
+    });
+    const { service, messagesService, pipelineService } = buildService(proposal);
+
+    await service.decide(ownerId, proposal._id.toString(), 'approve', decidedBy);
+
+    expect(pipelineService.findOne).toHaveBeenCalledWith(ownerId, applicantId);
+    expect(messagesService.createConversation).toHaveBeenCalledWith(ownerId, {
+      candidateName: 'Ada Lovelace',
+      candidateId: 'cand-77',
+    });
+  });
+
+  it('approving send_message reuses an existing conversation with that candidate', async () => {
+    const proposal = buildProposal({
+      actionType: 'send_message',
+      payload: { draftText: 'Following up.' },
+    });
+    const { service, messagesService } = buildService(proposal);
+    const existingId = new Types.ObjectId();
+    messagesService.listConversations.mockResolvedValue([
+      { _id: existingId, candidateId: 'cand-77', candidateName: 'Ada Lovelace' },
+    ]);
+
+    await service.decide(ownerId, proposal._id.toString(), 'approve', decidedBy);
+
+    expect(messagesService.createConversation).not.toHaveBeenCalled();
+    expect(messagesService.sendMessage).toHaveBeenCalledWith(
+      ownerId,
+      existingId.toString(),
+      { body: 'Following up.' },
+    );
   });
 
   it('a failure during execution sets status=failed with a reason, never silently approved', async () => {

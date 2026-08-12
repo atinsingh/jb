@@ -39,6 +39,56 @@ describe('extractCopilotReply', () => {
     ]);
   });
 
+  it('pairs each of two same-named action tool calls with its OWN result', () => {
+    const run: any = {
+      status: 'completed',
+      steps: [
+        { type: 'tool_call', tool: 'propose_reject', args: { applicantId: 'a1' }, at: new Date() },
+        {
+          type: 'tool_result', tool: 'propose_reject',
+          output: { proposedActionId: 'p1', summary: 'Proposed rejecting Ada.' },
+          at: new Date(),
+        },
+        { type: 'tool_call', tool: 'propose_reject', args: { applicantId: 'a2' }, at: new Date() },
+        {
+          type: 'tool_result', tool: 'propose_reject',
+          output: { proposedActionId: 'p2', summary: 'Proposed rejecting Grace.' },
+          at: new Date(),
+        },
+        { type: 'final', text: 'Both proposed.', at: new Date() },
+      ],
+    };
+
+    const result = extractCopilotReply(run);
+
+    expect(result.actions).toEqual([
+      { type: 'propose_reject', label: 'Proposed rejecting Ada.', proposedActionId: 'p1' },
+      { type: 'propose_reject', label: 'Proposed rejecting Grace.', proposedActionId: 'p2' },
+    ]);
+  });
+
+  it('does not re-consume an earlier result when a later same-named call has none', () => {
+    const run: any = {
+      status: 'completed',
+      steps: [
+        { type: 'tool_call', tool: 'propose_reject', args: { applicantId: 'a1' }, at: new Date() },
+        {
+          type: 'tool_result', tool: 'propose_reject',
+          output: { proposedActionId: 'p1', summary: 'Proposed rejecting Ada.' },
+          at: new Date(),
+        },
+        { type: 'tool_call', tool: 'propose_reject', args: { applicantId: 'a2' }, at: new Date() },
+        { type: 'final', text: 'One proposed.', at: new Date() },
+      ],
+    };
+
+    const result = extractCopilotReply(run);
+
+    expect(result.actions).toEqual([
+      { type: 'propose_reject', label: 'Proposed rejecting Ada.', proposedActionId: 'p1' },
+    ]);
+  });
+
   it('ignores read-only tool calls (search_applicants etc) when deriving actions', () => {
     const run: any = {
       status: 'completed',

@@ -42,6 +42,27 @@ export class AiRecruiterController {
     private readonly agentRuntime: AgentRuntimeService,
   ) {}
 
+  /**
+   * Honest, human-readable label for what approving a REAL proposal will
+   * actually do. The frontend derives its queue-card icon by substring
+   * matching this string (`includes('reject')` / `includes('message')`), so
+   * the wording here is load-bearing, not cosmetic.
+   */
+  private proposalActionLabel(proposal: any): string {
+    switch (proposal?.actionType) {
+      case 'reject':
+        return 'Reject applicant';
+      case 'advance_stage':
+        return `Advance to ${proposal?.payload?.targetStage || 'next stage'}`;
+      case 'schedule_interview':
+        return 'Schedule interview';
+      case 'send_message':
+        return 'Send outreach message';
+      default:
+        return String(proposal?.actionType || 'review');
+    }
+  }
+
   @Get('autopilot')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get autopilot state, stats, rules, queue and activity' })
@@ -50,12 +71,30 @@ export class AiRecruiterController {
     const employerId = req.user._id.toString();
     const result = await this.aiRecruiterService.getAutopilot(employerId);
     const pending = await this.actionsService.list(employerId, 'pending' as any);
-    const byApplicantId = new Map(
-      pending.map((p: any) => [p.applicantId.toString(), p._id.toString()]),
-    );
+
+    // Only Autopilot-created proposals may attach to the Autopilot queue —
+    // a Copilot proposal must never be approvable under an Autopilot card.
+    // `list()` sorts newest-first, so the FIRST occurrence per applicant is
+    // the newest; later (older) entries must not overwrite it.
+    const byApplicantId = new Map<string, any>();
+    for (const p of pending as any[]) {
+      if (p?.source !== 'autopilot') continue;
+      const key = p.applicantId?.toString();
+      if (!key || byApplicantId.has(key)) continue;
+      byApplicantId.set(key, p);
+    }
+
     const queue = (result.queue || []).map((item: any) => {
-      const proposalId = byApplicantId.get(item.applicantId);
-      return proposalId ? { ...item, proposalId } : item;
+      const proposal = byApplicantId.get(item.applicantId);
+      if (!proposal) return item;
+      // The card must show what Approve will REALLY execute, not the
+      // deterministic preview heuristic's independent guess.
+      return {
+        ...item,
+        proposalId: proposal._id.toString(),
+        proposedAction: this.proposalActionLabel(proposal),
+        rationale: proposal.rationale || item.rationale,
+      };
     });
     return { ...result, queue };
   }

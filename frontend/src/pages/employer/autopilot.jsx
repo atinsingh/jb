@@ -55,6 +55,8 @@ export default function EmployerAutopilot() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [toggleError, setToggleError] = useState(null);
+  const [decideError, setDecideError] = useState(null);
+  const [runNowError, setRunNowError] = useState(null);
   const [toggling, setToggling] = useState(false);
   const [deciding, setDeciding] = useState({}); // { [proposalId]: boolean }
   const [runningNow, setRunningNow] = useState(false);
@@ -122,11 +124,15 @@ export default function EmployerAutopilot() {
                 : /schedul|interview|offer|hire/i.test(event)
                 ? 'green'
                 : 'indigo';
+              // The backend only ever sends {event, at} — `event` is already a
+              // complete sentence ("Rejected applicant (dismissed)"). Don't
+              // fabricate a name prefix or an empty metadata line from fields
+              // that are never present on the wire.
               return {
-                id: a.applicantId || `a${i}`,
-                text: `${a.name || 'Candidate'} — ${event.replace(/_/g, ' ')}`,
+                id: `a${i}`,
+                text: event.replace(/_/g, ' '),
                 time: fmtTime(a.at),
-                req: a.currentStage || '',
+                req: '',
                 t,
               };
             })
@@ -162,11 +168,12 @@ export default function EmployerAutopilot() {
 
   const decide = async (proposalId, decision) => {
     setDeciding((prev) => ({ ...prev, [proposalId]: true }));
+    setDecideError(null);
     try {
       await aiRecruiterApi.decideProposedAction(proposalId, decision);
       await load({ silent: true }); // re-fetch — the queue and activity log both change
     } catch (err) {
-      console.error('Error deciding proposed action:', err);
+      setDecideError(err);
     } finally {
       setDeciding((prev) => ({ ...prev, [proposalId]: false }));
     }
@@ -174,11 +181,12 @@ export default function EmployerAutopilot() {
 
   const runNow = async () => {
     setRunningNow(true);
+    setRunNowError(null);
     try {
       await aiRecruiterApi.runAutopilotNow();
       await load({ silent: true });
     } catch (err) {
-      console.error('Error running autopilot sweep:', err);
+      setRunNowError(err);
     } finally {
       setRunningNow(false);
     }
@@ -629,6 +637,9 @@ export default function EmployerAutopilot() {
                       ↻ {runningNow ? 'Running…' : 'Run now'}
                     </button>
                   </div>
+
+                  <InlineError error={runNowError} />
+                  <InlineError error={decideError} />
 
                   {hasQueue ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

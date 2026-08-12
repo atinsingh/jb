@@ -14,6 +14,7 @@ import {
   EmployerApplicantDocument,
 } from '../employer-pipeline/schemas/employer-applicant.schema';
 import {
+  AutopilotRule,
   EmployerAutopilotConfig,
   EmployerAutopilotConfigDocument,
 } from './schemas/employer-autopilot-config.schema';
@@ -193,28 +194,10 @@ export class AiRecruiterService {
       at: p.decidedAt,
     }));
 
-    const rules = [
-      {
-        id: 'auto-screen',
-        name: 'Auto-screen new applicants',
-        description:
-          'Screen incoming applicants and advance those scoring 60+ to screening.',
-        enabled: true,
-      },
-      {
-        id: 'auto-schedule',
-        name: 'Auto-schedule strong candidates',
-        description:
-          'Propose interview slots for screening candidates scoring 70+.',
-        enabled: true,
-      },
-      {
-        id: 'reject-stale',
-        name: 'Flag stale low-fit candidates',
-        description: 'Flag low-scoring candidates that have stalled for review.',
-        enabled: false,
-      },
-    ];
+    // The rules strip must describe the REAL persisted rules the engine runs
+    // (AutopilotRulesService reads exactly this `config.rules`), including
+    // their real thresholds — never a hardcoded marketing description.
+    const rules = (config.rules || []).map((r) => this.describeAutopilotRule(r));
 
     return {
       enabled: config.enabled,
@@ -240,6 +223,32 @@ export class AiRecruiterService {
       { $setOnInsert: { enabled: false } },
       { upsert: true, new: true, setDefaultsOnInsert: true },
     );
+  }
+
+  /**
+   * Maps one persisted `AutopilotRule` onto the display shape the rules strip
+   * renders, quoting the rule's REAL threshold and enabled flag.
+   */
+  private describeAutopilotRule(rule: AutopilotRule): {
+    id: string;
+    name: string;
+    description: string;
+    enabled: boolean;
+  } {
+    if (rule.type === 'auto_propose_reject') {
+      return {
+        id: 'auto-reject',
+        name: 'Auto-reject low-fit applicants',
+        description: `Propose rejecting applicants scoring below ${rule.scoreThreshold}.`,
+        enabled: Boolean(rule.enabled),
+      };
+    }
+    return {
+      id: 'auto-advance',
+      name: 'Auto-advance strong applicants',
+      description: `Propose advancing applicants scoring ${rule.scoreThreshold}+ to screening.`,
+      enabled: Boolean(rule.enabled),
+    };
   }
 
   private activityEventLabel(p: any): string {
@@ -639,18 +648,10 @@ Include every candidate exactly once, keyed by their "id".`,
           const matchScore = this.clampScore(
             0.5 * b.candidate.matchScore + 0.5 * llm.matchScore,
           );
-          return {
-            candidateId: b.candidate.candidateId,
-            name: b.candidate.name,
-            title: b.candidate.title,
-            location: b.candidate.location,
-            skills: b.candidate.skills,
-            yearsExperience: b.candidate.yearsExperience,
-            matchScore,
-            outreach: llm.outreach,
-            sourcePool: b.candidate.sourcePool,
-            appliedAt: b.candidate.appliedAt,
-          };
+          // Spread the deterministic candidate and override ONLY what the LLM
+          // branch actually changes — a manual field list has now silently
+          // dropped two newly-added fields (sourcePool, appliedAt) in review.
+          return { ...b.candidate, matchScore, outreach: llm.outreach };
         })
         .sort((x, y) => y.matchScore - x.matchScore);
 

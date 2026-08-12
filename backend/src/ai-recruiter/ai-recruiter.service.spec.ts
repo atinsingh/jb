@@ -197,6 +197,53 @@ describe('AiRecruiterService', () => {
       const r2 = await service.getAutopilot(USER);
       expect(r2.queue).toEqual(r1.queue);
     });
+
+    it('derives the rules strip from the REAL persisted config.rules, thresholds and all', async () => {
+      autopilotConfigModel.findOneAndUpdate = jest.fn(() =>
+        Promise.resolve({
+          enabled: true,
+          rules: [
+            { type: 'auto_propose_reject', scoreThreshold: 33, enabled: true },
+            { type: 'auto_propose_advance', scoreThreshold: 91, enabled: false },
+          ],
+        }),
+      ) as any;
+      model.query([applicant()]);
+
+      const res = await service.getAutopilot(USER);
+
+      expect(res.rules).toEqual([
+        {
+          id: 'auto-reject',
+          name: 'Auto-reject low-fit applicants',
+          description: 'Propose rejecting applicants scoring below 33.',
+          enabled: true,
+        },
+        {
+          id: 'auto-advance',
+          name: 'Auto-advance strong applicants',
+          description: 'Propose advancing applicants scoring 91+ to screening.',
+          enabled: false,
+        },
+      ]);
+      // Never the old hardcoded copy.
+      expect(JSON.stringify(res.rules)).not.toContain('scoring 60+');
+    });
+
+    it('reflects a rule toggled off in the persisted config', async () => {
+      autopilotConfigModel.findOneAndUpdate = jest.fn(() =>
+        Promise.resolve({
+          enabled: true,
+          rules: [{ type: 'auto_propose_reject', scoreThreshold: 40, enabled: false }],
+        }),
+      ) as any;
+      model.query([applicant()]);
+
+      const res = await service.getAutopilot(USER);
+
+      expect(res.rules).toHaveLength(1);
+      expect(res.rules[0].enabled).toBe(false);
+    });
   });
 
   describe('toggleAutopilot', () => {

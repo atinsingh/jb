@@ -35,6 +35,14 @@ export class EmployerAiActionsService {
   ) {}
 
   async create(input: CreateProposedActionInput): Promise<AiProposedActionDocument> {
+    // Structural tenant-ownership guard: a proposal may only ever be created
+    // for an applicant this owner actually has. `findOne` throws
+    // NotFoundException when no applicant matches {_id, ownerId}; letting it
+    // propagate is the intended behaviour. This is a second layer of defense
+    // behind the per-tool checks in recruiter-copilot.tools.ts, and it also
+    // covers every future caller without relying on caller discipline.
+    await this.pipelineService.findOne(input.ownerId, input.applicantId);
+
     return this.proposedActionModel.create({
       ownerId: new Types.ObjectId(input.ownerId),
       source: input.source,
@@ -144,9 +152,36 @@ export class EmployerAiActionsService {
       case 'send_message': {
         let conversationId = proposal.payload?.conversationId;
         if (!conversationId) {
-          const conversation = await this.messagesService.createConversation(ownerId, {
-            candidateName: 'Candidate',
-          } as any);
+          // Resolve the REAL candidate identity — a conversation created with
+          // a hardcoded "Candidate" placeholder and no candidateId is
+          // orphaned: EmployerMessagesService.sendMessage only notifies the
+          // candidate when conversation.candidateId is set.
+          const applicant: any = await this.pipelineService.findOne(
+            ownerId,
+            applicantId,
+          );
+          const candidateId = applicant?.candidateId
+            ? String(applicant.candidateId)
+            : undefined;
+
+          // Reuse an existing thread with this candidate when there is one —
+          // EmployerMessagesService exposes no candidate-keyed lookup, so
+          // filter its owner-scoped list rather than always forking a new
+          // conversation on every approved message.
+          let existing: any = null;
+          if (candidateId) {
+            const conversations = await this.messagesService.listConversations(ownerId);
+            existing = (conversations || []).find(
+              (c: any) => c.candidateId && String(c.candidateId) === candidateId,
+            );
+          }
+
+          const conversation =
+            existing ||
+            (await this.messagesService.createConversation(ownerId, {
+              candidateName: applicant?.candidateName || 'Candidate',
+              candidateId,
+            } as any));
           conversationId = (conversation as any)._id.toString();
         }
         await this.messagesService.sendMessage(ownerId, conversationId, {

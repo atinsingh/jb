@@ -96,7 +96,13 @@ export default function EmployerCopilot() {
         // The action already happened server-side as a pending proposal by the
         // time this reply rendered — link to where it can be reviewed instead
         // of pretending to "do" anything client-side.
-        router.push('/employer/approvals');
+        // NOTE: /employer/approvals reads the unrelated EmployerApproval model,
+        // never AiProposedAction — it could never show this proposal. The
+        // Autopilot review queue is the only surface that renders real
+        // AiProposedAction rows today. It is still a partial destination: its
+        // queue only covers applicants at stage applied/screening and is
+        // sliced to 10, so a proposal outside that window is not listed there.
+        router.push('/employer/autopilot');
         return;
       }
       // No proposedActionId means this action chip didn't create a real
