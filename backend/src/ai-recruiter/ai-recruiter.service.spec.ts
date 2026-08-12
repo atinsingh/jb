@@ -392,6 +392,7 @@ describe('AiRecruiterService', () => {
             matchScore: expect.any(Number),
             outreach: expect.any(String),
             sourcePool: expect.any(String),
+            appliedAt: expect.anything(),
           }),
         );
       }

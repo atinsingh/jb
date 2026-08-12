@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Head from 'next/head';
 import EmployerSidebar from '@/components/employer/EmployerSidebar';
 import { LoadingState, ErrorState, EmptyState } from '@/components/employer/EmployerStates';
-import { aiRecruiterApi } from '@/services/employerApi';
+import { aiRecruiterApi, employerTalentApi } from '@/services/employerApi';
 
 /* --------------------------------------------------------- form config --- */
 const ROLE = 'Senior Product Designer';
@@ -73,7 +73,28 @@ function adaptCandidate(c, i) {
     accent: i === 0 ? 'green' : 'indigo',
     rationale: skills.length ? `Key skills: ${skills.join(', ')}.` : 'Sourced by the AI recruiter.',
     outreach: c.outreach || '',
+    candidateId: c.candidateId,
+    sourcePool: c.sourcePool,
+    skills,
+    appliedAt: c.appliedAt || null,
   };
+}
+
+// Relative-time label, extended with month/year granularity beyond
+// notifications.jsx's timeAgo (applications can be much older than a day).
+function timeAgoLong(dateVal) {
+  const then = new Date(dateVal).getTime();
+  if (!then) return '';
+  const s = Math.max(0, Math.round((Date.now() - then) / 1000));
+  if (s < 60) return `${s}s ago`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.round(h / 24);
+  if (d < 30) return `${d}d ago`;
+  if (d < 365) return `${Math.round(d / 30)}mo ago`;
+  return `${Math.round(d / 365)}y ago`;
 }
 
 /* ----------------------------------------------------------- component --- */
@@ -85,6 +106,7 @@ export default function EmployerSourcing() {
   const [skillInput, setSkillInput] = useState('');
 
   const [shortlisted, setShortlisted] = useState({});
+  const [shortlisting, setShortlisting] = useState({}); // { [candidateId]: boolean }
   const [expanded, setExpanded] = useState({});
   const [drafts, setDrafts] = useState({});
 
@@ -135,6 +157,41 @@ export default function EmployerSourcing() {
     runSourcing();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const toggleShortlist = async (candidate) => {
+    const id = candidate.id;
+    const alreadyShortlisted = !!shortlisted[id];
+
+    if (alreadyShortlisted) {
+      // Un-shortlisting is local-only for now — removing FROM the talent pool
+      // is already a real, separate action on /employer/talent-pool.
+      setShortlisted((prev) => ({ ...prev, [id]: false }));
+      return;
+    }
+
+    if (candidate.sourcePool === 'talent_pool') {
+      // Already in the talent pool — nothing to write, just reflect it locally.
+      setShortlisted((prev) => ({ ...prev, [id]: true }));
+      return;
+    }
+
+    setShortlisting((prev) => ({ ...prev, [id]: true }));
+    try {
+      await employerTalentApi.create({
+        name: candidate.name,
+        headline: candidate.headline,
+        skills: candidate.skills,
+        candidateId: candidate.candidateId || undefined,
+        segment: 'saved',
+        source: 'sourcing_agent',
+      });
+      setShortlisted((prev) => ({ ...prev, [id]: true }));
+    } catch (err) {
+      console.error('Error adding to talent pool:', err);
+    } finally {
+      setShortlisting((prev) => ({ ...prev, [id]: false }));
+    }
+  };
 
   const shortlistCount = candidates.filter((c) => shortlisted[c.id]).length;
   const pool = tab === 'shortlist' ? candidates.filter((c) => shortlisted[c.id]) : candidates;
@@ -332,6 +389,13 @@ export default function EmployerSourcing() {
                             </div>
                             <div style={{ fontSize: 13, color: '#8A8378' }}>{c.headline}</div>
                             <div style={{ fontSize: 12.5, color: '#A79E8F', marginTop: 1 }}>{c.location} · {c.availability}</div>
+                            {c.sourcePool && (
+                              <div style={{ marginTop: 6 }}>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.03em', color: c.sourcePool === 'talent_pool' ? '#4263EB' : '#9A6A2E', background: c.sourcePool === 'talent_pool' ? '#EDF0FE' : '#FBF3E4', border: `1px solid ${c.sourcePool === 'talent_pool' ? '#C7D2FB' : '#EFDFBB'}`, padding: '3px 8px', borderRadius: 999 }}>
+                                  {c.sourcePool === 'talent_pool' ? 'In your talent pool' : c.appliedAt ? `Applied ${timeAgoLong(c.appliedAt)}` : 'Past applicant'}
+                                </span>
+                              </div>
+                            )}
                           </div>
                           <div style={{ textAlign: 'right', flexShrink: 0 }}>
                             <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 20, fontWeight: 600, color: fitColor(c.fit) }}>{c.fit}</div>
@@ -360,7 +424,7 @@ export default function EmployerSourcing() {
                           {hasDraft && (
                             <button className="em-ghost" onClick={() => setExpanded((p) => ({ ...p, [c.id]: !p[c.id] }))} style={{ fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: '#1B1A16', background: '#FFFEFB', border: '1px solid #D9D0BE', borderRadius: 999, padding: '9px 15px', cursor: 'pointer' }}>{isExpanded ? 'Hide draft' : 'View draft'}</button>
                           )}
-                          <button onClick={() => setShortlisted((p) => ({ ...p, [c.id]: !p[c.id] }))} style={{ fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: isShortlisted ? '#9A6A2E' : '#8A8378', background: 'none', border: 'none', cursor: 'pointer', padding: '9px 8px' }}>{isShortlisted ? '★ Shortlisted' : '☆ Shortlist'}</button>
+                          <button onClick={() => toggleShortlist(c)} disabled={!!shortlisting[c.id]} style={{ fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: isShortlisted ? '#9A6A2E' : '#8A8378', background: 'none', border: 'none', cursor: shortlisting[c.id] ? 'wait' : 'pointer', padding: '9px 8px', opacity: shortlisting[c.id] ? 0.6 : 1 }}>{shortlisting[c.id] ? '… Saving' : isShortlisted ? '★ Shortlisted' : '☆ Shortlist'}</button>
                         </div>
                       </div>
                     );

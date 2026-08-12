@@ -649,6 +649,7 @@ Include every candidate exactly once, keyed by their "id".`,
             matchScore,
             outreach: llm.outreach,
             sourcePool: b.candidate.sourcePool,
+            appliedAt: b.candidate.appliedAt,
           };
         })
         .sort((x, y) => y.matchScore - x.matchScore);
@@ -750,6 +751,7 @@ Include every candidate exactly once, keyed by their "id".`,
               skills,
             ),
             sourcePool,
+            appliedAt: record.appliedAt || null,
           },
         };
       })
