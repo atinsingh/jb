@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Post, Request, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -9,18 +18,25 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { AiRecruiterService } from './ai-recruiter.service';
+import { AutopilotRulesService } from './autopilot-rules.service';
+import { EmployerAiActionsService } from './employer-ai-actions.service';
 import { ToggleAutopilotDto } from './dto/toggle-autopilot.dto';
 import { ScreenDto } from './dto/screen.dto';
 import { CopilotDto } from './dto/copilot.dto';
 import { SourcingDto } from './dto/sourcing.dto';
 import { ScorecardDto } from './dto/scorecard.dto';
+import { DecideProposedActionDto } from './dto/decide-proposed-action.dto';
 
 @ApiTags('employer-ai')
 @Controller('employer/ai')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ROLE_EMPLOYER', 'ROLE_ADMIN')
 export class AiRecruiterController {
-  constructor(private readonly aiRecruiterService: AiRecruiterService) {}
+  constructor(
+    private readonly aiRecruiterService: AiRecruiterService,
+    private readonly autopilotRulesService: AutopilotRulesService,
+    private readonly actionsService: EmployerAiActionsService,
+  ) {}
 
   @Get('autopilot')
   @ApiBearerAuth('JWT-auth')
@@ -28,7 +44,47 @@ export class AiRecruiterController {
   @ApiResponse({ status: 200, description: 'Autopilot snapshot' })
   async getAutopilot(@Request() req) {
     const employerId = req.user._id.toString();
-    return this.aiRecruiterService.getAutopilot(employerId);
+    const result = await this.aiRecruiterService.getAutopilot(employerId);
+    const pending = await this.actionsService.list(employerId, 'pending' as any);
+    const byApplicantId = new Map(
+      pending.map((p: any) => [p.applicantId.toString(), p._id.toString()]),
+    );
+    const queue = (result.queue || []).map((item: any) => {
+      const proposalId = byApplicantId.get(item.applicantId);
+      return proposalId ? { ...item, proposalId } : item;
+    });
+    return { ...result, queue };
+  }
+
+  @Post('autopilot/run-now')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Immediately sweep the applicant pool for Autopilot rule matches' })
+  @ApiResponse({ status: 201, description: 'Sweep summary' })
+  async runNow(@Request() req) {
+    const employerId = req.user._id.toString();
+    return this.autopilotRulesService.sweepAll(employerId);
+  }
+
+  @Get('proposed-actions')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'List proposed Autopilot actions, optionally filtered by status' })
+  @ApiResponse({ status: 200, description: 'Proposed actions' })
+  async listProposedActions(@Query('status') status: string, @Request() req) {
+    const employerId = req.user._id.toString();
+    return this.actionsService.list(employerId, status as any);
+  }
+
+  @Post('proposed-actions/:id/decide')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Approve or reject a proposed Autopilot action' })
+  @ApiResponse({ status: 201, description: 'Decided proposed action' })
+  async decideProposedAction(
+    @Param('id') id: string,
+    @Body() dto: DecideProposedActionDto,
+    @Request() req,
+  ) {
+    const employerId = req.user._id.toString();
+    return this.actionsService.decide(employerId, id, dto.decision, employerId);
   }
 
   @Post('autopilot/toggle')
