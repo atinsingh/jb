@@ -8,6 +8,7 @@ import { Resume, ResumeDocument } from '../schemas/resume.schema';
 import { ApplicationEventsService } from './application-events.service';
 import { EmployerPipelineService } from '../employer-pipeline/employer-pipeline.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AutopilotRulesService } from '../ai-recruiter/autopilot-rules.service';
 
 @Injectable()
 export class ApplicationsService {
@@ -21,6 +22,7 @@ export class ApplicationsService {
     private readonly applicationEventsService: ApplicationEventsService,
     private readonly employerPipelineService: EmployerPipelineService,
     private readonly notificationsService: NotificationsService,
+    private readonly autopilotRulesService: AutopilotRulesService,
   ) { }
 
   async createApplication(
@@ -257,7 +259,7 @@ export class ApplicationsService {
 
       const candidateFields = await this.resolveCandidateFields(candidateId);
 
-      await this.employerPipelineService.upsertApplicant({
+      const applicant = await this.employerPipelineService.upsertApplicant({
         ownerId: ownerId || undefined,
         jobId: employerJobId,
         candidateId,
@@ -266,6 +268,25 @@ export class ApplicationsService {
         stage: 'applied',
         ...candidateFields,
       });
+
+      // Newly-created applicants only — compare createdAt/updatedAt rather than
+      // adding a return-shape change to a shared method other callers rely on.
+      // A re-apply/update to an existing applicant should not re-trigger
+      // autopilot evaluation.
+      const isNewlyCreated =
+        applicant.createdAt &&
+        applicant.updatedAt &&
+        applicant.createdAt.getTime() === applicant.updatedAt.getTime();
+
+      if (isNewlyCreated) {
+        try {
+          await this.autopilotRulesService.evaluateApplicant(ownerId, applicant);
+        } catch {
+          // Autopilot evaluation must never break the application-save path
+          // that triggered it — already defensive inside evaluateApplicant
+          // itself, but belt-and-suspenders here too.
+        }
+      }
 
       // Employer-side notification (only when we resolved an owner).
       if (ownerId) {

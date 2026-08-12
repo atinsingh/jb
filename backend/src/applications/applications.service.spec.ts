@@ -9,6 +9,7 @@ import { Resume } from '../schemas/resume.schema';
 import { ApplicationEventsService } from './application-events.service';
 import { EmployerPipelineService } from '../employer-pipeline/employer-pipeline.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AutopilotRulesService } from '../ai-recruiter/autopilot-rules.service';
 
 const CAND = new Types.ObjectId().toHexString();
 const OWNER = new Types.ObjectId().toHexString();
@@ -35,6 +36,7 @@ describe('ApplicationsService', () => {
     upsertApplicant: jest.fn().mockResolvedValue({ _id: 'app-1' }),
   };
   const notificationsService = { create: jest.fn().mockResolvedValue({}) };
+  const autopilotRulesService = { evaluateApplicant: jest.fn().mockResolvedValue(undefined) };
 
   beforeEach(async () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
@@ -47,6 +49,7 @@ describe('ApplicationsService', () => {
         { provide: ApplicationEventsService, useValue: applicationEventsService },
         { provide: EmployerPipelineService, useValue: employerPipelineService },
         { provide: NotificationsService, useValue: notificationsService },
+        { provide: AutopilotRulesService, useValue: autopilotRulesService },
       ],
     }).compile();
 
@@ -149,6 +152,49 @@ describe('ApplicationsService', () => {
       await expect(
         service.bridgeApplicationToPipeline({ _id: 'a3', candidateId: CAND, jobId: JOBID } as any),
       ).resolves.toBeUndefined();
+    });
+
+    it('evaluates the applicant with AutopilotRulesService only when the applicant was newly created', async () => {
+      jobModel.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(employerJob) });
+      const sameInstant = new Date('2026-08-11T00:00:00.000Z');
+      const newlyCreatedApplicant = {
+        _id: 'app-new',
+        createdAt: sameInstant,
+        updatedAt: sameInstant,
+      };
+      employerPipelineService.upsertApplicant.mockResolvedValueOnce(newlyCreatedApplicant);
+
+      await service.bridgeApplicationToPipeline({
+        _id: 'a4',
+        candidateId: CAND,
+        jobId: JOBID,
+        matchScore: 60,
+      } as any);
+
+      expect(autopilotRulesService.evaluateApplicant).toHaveBeenCalledTimes(1);
+      expect(autopilotRulesService.evaluateApplicant).toHaveBeenCalledWith(
+        OWNER,
+        newlyCreatedApplicant,
+      );
+    });
+
+    it('does not re-evaluate an applicant that already existed (re-apply / update path)', async () => {
+      jobModel.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(employerJob) });
+      const existingApplicant = {
+        _id: 'app-existing',
+        createdAt: new Date('2026-08-01T00:00:00.000Z'),
+        updatedAt: new Date('2026-08-11T00:00:00.000Z'),
+      };
+      employerPipelineService.upsertApplicant.mockResolvedValueOnce(existingApplicant);
+
+      await service.bridgeApplicationToPipeline({
+        _id: 'a5',
+        candidateId: CAND,
+        jobId: JOBID,
+        matchScore: 60,
+      } as any);
+
+      expect(autopilotRulesService.evaluateApplicant).not.toHaveBeenCalled();
     });
   });
 

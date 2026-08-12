@@ -66,6 +66,10 @@ export class EmployerApplicant {
 
   @Prop({ default: Date.now })
   appliedAt?: Date;
+
+  // Timestamps (automatically added by Mongoose with timestamps: true)
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export const EmployerApplicantSchema =

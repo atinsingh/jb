@@ -16,6 +16,7 @@ import { LoggerModule } from '../common/logger/logger.module';
 import { UsersModule } from '../users/users.module';
 import { ApplyRunnerModule } from '../apply-runner/apply-runner.module';
 import { EmployerPipelineModule } from '../employer-pipeline/employer-pipeline.module';
+import { AiRecruiterModule } from '../ai-recruiter/ai-recruiter.module';
 import { bullQueueImports } from '../queue/queue.config';
 import { isQueueEnabled, QUEUE_AUTO_APPLY } from '../queue/queue.constants';
 import { AutoApplyProcessor } from './auto-apply.processor';
@@ -35,6 +36,7 @@ import { AutoApplyProcessor } from './auto-apply.processor';
     UsersModule,
     LoggerModule,
     EmployerPipelineModule,
+    AiRecruiterModule,
     // Registers the auto-apply Bull queue only when QUEUE_ENABLED=true, else [].
     ...bullQueueImports(QUEUE_AUTO_APPLY),
   ],
