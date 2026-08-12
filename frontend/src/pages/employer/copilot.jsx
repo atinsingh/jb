@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import EmployerSidebar from '@/components/employer/EmployerSidebar';
 import { InlineError } from '@/components/employer/EmployerStates';
 import { appRoute } from '@/components/app/appRoutes';
@@ -33,7 +34,7 @@ function AiMessage({ m, onAction }) {
                 className="em-cp-chip"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: '#3A352C', background: '#FFFEFB', border: '1px solid #E1D9C9', borderRadius: 999, padding: '8px 14px', cursor: 'pointer' }}
               >
-                <span style={{ color: '#1FA463' }}>✦</span>
+                <span style={{ color: '#1FA463' }}>{a.proposedActionId ? '✓' : '✦'}</span>
                 {a.label || a.type}
               </button>
             ))}
@@ -46,6 +47,7 @@ function AiMessage({ m, onAction }) {
 
 /* ------------------------------------------------------- page --- */
 export default function EmployerCopilot() {
+  const router = useRouter();
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [thinking, setThinking] = useState(false);
@@ -87,6 +89,23 @@ export default function EmployerCopilot() {
       setThinking(false);
     }
   }, [thinking]);
+
+  const onAction = useCallback(
+    (a) => {
+      if (a.proposedActionId) {
+        // The action already happened server-side as a pending proposal by the
+        // time this reply rendered — link to where it can be reviewed instead
+        // of pretending to "do" anything client-side.
+        router.push('/employer/approvals');
+        return;
+      }
+      // No proposedActionId means this action chip didn't create a real
+      // proposal (e.g. an informational suggestion) — fall back to the
+      // existing behavior of resending it as a message.
+      pushUserAndReply(a.label || a.type);
+    },
+    [router, pushUserAndReply],
+  );
 
   const onKey = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -174,7 +193,7 @@ export default function EmployerCopilot() {
                     m.role === 'user' ? (
                       <div key={m.id} style={{ alignSelf: 'flex-end', maxWidth: '78%', background: '#4263EB', color: '#fff', fontSize: 14.5, lineHeight: 1.5, padding: '12px 16px', borderRadius: '16px 16px 4px 16px' }}>{m.text}</div>
                     ) : (
-                      <AiMessage key={m.id} m={m} onAction={(a) => pushUserAndReply(a.label || a.type)} />
+                      <AiMessage key={m.id} m={m} onAction={onAction} />
                     )
                   )}
 
