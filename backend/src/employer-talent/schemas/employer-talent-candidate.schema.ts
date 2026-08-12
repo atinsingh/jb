@@ -34,6 +34,12 @@ export class EmployerTalentCandidate {
   @Prop({ default: '' })
   source?: string;
 
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: false, index: true })
+  candidateId?: Types.ObjectId;
+
+  @Prop({ default: '' })
+  email?: string;
+
   @Prop({ default: Date.now })
   addedAt?: Date;
 }
@@ -43,3 +49,4 @@ export const EmployerTalentCandidateSchema = SchemaFactory.createForClass(
 );
 
 EmployerTalentCandidateSchema.index({ ownerId: 1, segment: 1 });
+EmployerTalentCandidateSchema.index({ ownerId: 1, candidateId: 1 });

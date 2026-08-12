@@ -83,6 +83,8 @@ export class EmployerTalentService {
       segment,
       tag: tagMap[segment] || 'Saved',
       source: dto.source || '',
+      candidateId: dto.candidateId || undefined,
+      email: dto.email || '',
       addedAt: new Date(),
     });
     return candidate.save();

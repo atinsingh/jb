@@ -20,4 +20,12 @@ export class CreateCandidateDto {
   @IsOptional()
   @IsString()
   source?: string;
+
+  @IsOptional()
+  @IsString()
+  candidateId?: string;
+
+  @IsOptional()
+  @IsString()
+  email?: string;
 }
