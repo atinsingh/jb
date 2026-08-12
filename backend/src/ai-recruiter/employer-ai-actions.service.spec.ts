@@ -1,5 +1,5 @@
 import { Types } from 'mongoose';
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { EmployerAiActionsService } from './employer-ai-actions.service';
 
 describe('EmployerAiActionsService', () => {
@@ -152,6 +152,38 @@ describe('EmployerAiActionsService', () => {
 
     expect(result.status).toBe('failed');
     expect(result.failureReason).toContain('applicant not found');
+  });
+
+  it('throws ConflictException re-deciding an already-approved proposal, without executing anything', async () => {
+    const proposal = buildProposal({
+      status: 'approved',
+      actionType: 'advance_stage',
+      payload: { targetStage: 'interview' },
+    });
+    const { service, pipelineService, interviewsService, messagesService } =
+      buildService(proposal);
+
+    await expect(
+      service.decide(ownerId, proposal._id.toString(), 'approve', decidedBy),
+    ).rejects.toThrow(ConflictException);
+
+    expect(pipelineService.updateStage).not.toHaveBeenCalled();
+    expect(interviewsService.create).not.toHaveBeenCalled();
+    expect(messagesService.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('throws ConflictException re-deciding an already-rejected proposal, without executing anything', async () => {
+    const proposal = buildProposal({ status: 'rejected' });
+    const { service, pipelineService, interviewsService, messagesService } =
+      buildService(proposal);
+
+    await expect(
+      service.decide(ownerId, proposal._id.toString(), 'reject', decidedBy),
+    ).rejects.toThrow(ConflictException);
+
+    expect(pipelineService.updateStage).not.toHaveBeenCalled();
+    expect(interviewsService.create).not.toHaveBeenCalled();
+    expect(messagesService.sendMessage).not.toHaveBeenCalled();
   });
 
   it('lists proposals for an owner, optionally filtered by status', async () => {

@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import {
@@ -86,6 +86,11 @@ export class EmployerAiActionsService {
       .exec();
     if (!proposal) {
       throw new NotFoundException('Proposed action not found');
+    }
+    if (proposal.status !== 'pending') {
+      throw new ConflictException(
+        `Proposal ${id} has already been decided (status: ${proposal.status})`,
+      );
     }
 
     proposal.decidedAt = new Date();
