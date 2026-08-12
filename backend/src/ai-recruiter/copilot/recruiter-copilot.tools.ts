@@ -120,6 +120,11 @@ export function buildRecruiterCopilotTools(deps: RecruiterCopilotToolDeps): Agen
     },
     handler: async (ctx: AgentToolContext, args: any = {}) => {
       try {
+        const applicant = await deps.applicantModel
+          .findOne({ _id: args.applicantId, ownerId: new Types.ObjectId(ctx.userId) })
+          .lean();
+        if (!applicant) return { error: 'Applicant not found' };
+
         const proposal = await deps.actionsService.create({
           ownerId: ctx.userId,
           source: 'copilot',
@@ -149,6 +154,11 @@ export function buildRecruiterCopilotTools(deps: RecruiterCopilotToolDeps): Agen
     },
     handler: async (ctx: AgentToolContext, args: any = {}) => {
       try {
+        const applicant = await deps.applicantModel
+          .findOne({ _id: args.applicantId, ownerId: new Types.ObjectId(ctx.userId) })
+          .lean();
+        if (!applicant) return { error: 'Applicant not found' };
+
         const proposal = await deps.actionsService.create({
           ownerId: ctx.userId,
           source: 'copilot',
@@ -181,6 +191,11 @@ export function buildRecruiterCopilotTools(deps: RecruiterCopilotToolDeps): Agen
     },
     handler: async (ctx: AgentToolContext, args: any = {}) => {
       try {
+        const applicant = await deps.applicantModel
+          .findOne({ _id: args.applicantId, ownerId: new Types.ObjectId(ctx.userId) })
+          .lean();
+        if (!applicant) return { error: 'Applicant not found' };
+
         const proposal = await deps.actionsService.create({
           ownerId: ctx.userId,
           source: 'copilot',
@@ -211,6 +226,11 @@ export function buildRecruiterCopilotTools(deps: RecruiterCopilotToolDeps): Agen
     },
     handler: async (ctx: AgentToolContext, args: any = {}) => {
       try {
+        const applicant = await deps.applicantModel
+          .findOne({ _id: args.applicantId, ownerId: new Types.ObjectId(ctx.userId) })
+          .lean();
+        if (!applicant) return { error: 'Applicant not found' };
+
         const proposal = await deps.actionsService.create({
           ownerId: ctx.userId,
           source: 'copilot',

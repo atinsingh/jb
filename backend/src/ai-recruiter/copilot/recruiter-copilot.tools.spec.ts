@@ -133,6 +133,84 @@ describe('buildRecruiterCopilotTools', () => {
     );
   });
 
+  it('get_job_stats returns funnel counts for all six stages', async () => {
+    const deps = buildDeps();
+    const tools = buildRecruiterCopilotTools(deps);
+    const tool = tools.find((t) => t.name === 'get_job_stats')!;
+
+    const result = await tool.handler(ctx, { jobId: new Types.ObjectId().toString() });
+
+    expect(result.counts).toEqual({
+      applied: 3, screening: 3, interview: 3, offer: 3, hired: 3, rejected: 3,
+    });
+    expect(deps.applicantModel.countDocuments).toHaveBeenCalledTimes(6);
+  });
+
+  it('propose_advance_stage returns an error and does not create a proposal when the applicant does not belong to this employer', async () => {
+    const deps = buildDeps();
+    deps.applicantModel.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) });
+    const tools = buildRecruiterCopilotTools(deps);
+    const tool = tools.find((t) => t.name === 'propose_advance_stage')!;
+
+    const result = await tool.handler(ctx, {
+      applicantId: new Types.ObjectId().toString(),
+      targetStage: 'interview',
+      rationale: 'Strong technical interview',
+    });
+
+    expect(result.error).toBeDefined();
+    expect(deps.actionsService.create).not.toHaveBeenCalled();
+  });
+
+  it('propose_reject returns an error and does not create a proposal when the applicant does not belong to this employer', async () => {
+    const deps = buildDeps();
+    deps.applicantModel.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) });
+    const tools = buildRecruiterCopilotTools(deps);
+    const tool = tools.find((t) => t.name === 'propose_reject')!;
+
+    const result = await tool.handler(ctx, {
+      applicantId: new Types.ObjectId().toString(),
+      rationale: 'Not a fit',
+    });
+
+    expect(result.error).toBeDefined();
+    expect(deps.actionsService.create).not.toHaveBeenCalled();
+  });
+
+  it('propose_schedule_interview returns an error and does not create a proposal when the applicant does not belong to this employer', async () => {
+    const deps = buildDeps();
+    deps.applicantModel.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) });
+    const tools = buildRecruiterCopilotTools(deps);
+    const tool = tools.find((t) => t.name === 'propose_schedule_interview')!;
+
+    const result = await tool.handler(ctx, {
+      applicantId: new Types.ObjectId().toString(),
+      type: 'video',
+      proposedAt: '2026-09-01T15:00:00.000Z',
+      durationMins: 30,
+      rationale: 'Ready for the next round',
+    });
+
+    expect(result.error).toBeDefined();
+    expect(deps.actionsService.create).not.toHaveBeenCalled();
+  });
+
+  it('propose_send_message returns an error and does not create a proposal when the applicant does not belong to this employer', async () => {
+    const deps = buildDeps();
+    deps.applicantModel.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) });
+    const tools = buildRecruiterCopilotTools(deps);
+    const tool = tools.find((t) => t.name === 'propose_send_message')!;
+
+    const result = await tool.handler(ctx, {
+      applicantId: new Types.ObjectId().toString(),
+      draftText: 'Thanks for interviewing!',
+      rationale: 'Post-interview follow up',
+    });
+
+    expect(result.error).toBeDefined();
+    expect(deps.actionsService.create).not.toHaveBeenCalled();
+  });
+
   it('every action tool returns {error} rather than throwing when actionsService.create fails', async () => {
     const deps = buildDeps();
     deps.actionsService.create.mockRejectedValue(new Error('db down'));
