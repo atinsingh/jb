@@ -4,10 +4,12 @@ import { EmployerPipelineModule } from '../employer-pipeline/employer-pipeline.m
 import { LLMModule } from '../llm/llm.module';
 import { EmployerInterviewsModule } from '../employer-interviews/employer-interviews.module';
 import { EmployerMessagesModule } from '../employer-messages/employer-messages.module';
+import { AgentRuntimeModule } from '../agent-runtime/agent-runtime.module';
 import { AiRecruiterController } from './ai-recruiter.controller';
 import { AiRecruiterService } from './ai-recruiter.service';
 import { EmployerAiActionsService } from './employer-ai-actions.service';
 import { AutopilotRulesService } from './autopilot-rules.service';
+import { RecruiterCopilotRegistrar } from './copilot/recruiter-copilot.registrar';
 import {
   EmployerAutopilotConfig,
   EmployerAutopilotConfigSchema,
@@ -37,13 +39,19 @@ import {
     LLMModule,
     EmployerInterviewsModule,
     EmployerMessagesModule,
+    AgentRuntimeModule,
     MongooseModule.forFeature([
       { name: EmployerAutopilotConfig.name, schema: EmployerAutopilotConfigSchema },
       { name: AiProposedAction.name, schema: AiProposedActionSchema },
     ]),
   ],
   controllers: [AiRecruiterController],
-  providers: [AiRecruiterService, EmployerAiActionsService, AutopilotRulesService],
+  providers: [
+    AiRecruiterService,
+    EmployerAiActionsService,
+    AutopilotRulesService,
+    RecruiterCopilotRegistrar,
+  ],
   exports: [AiRecruiterService, EmployerAiActionsService, AutopilotRulesService],
 })
 export class AiRecruiterModule {}
