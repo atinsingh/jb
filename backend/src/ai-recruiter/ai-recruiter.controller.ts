@@ -20,6 +20,9 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { AiRecruiterService } from './ai-recruiter.service';
 import { AutopilotRulesService } from './autopilot-rules.service';
 import { EmployerAiActionsService } from './employer-ai-actions.service';
+import { AgentRuntimeService } from '../agent-runtime/agent-runtime.service';
+import { RECRUITER_COPILOT_TYPE } from './copilot/recruiter-copilot.definition';
+import { extractCopilotReply } from './copilot/extract-copilot-reply';
 import { ToggleAutopilotDto } from './dto/toggle-autopilot.dto';
 import { ScreenDto } from './dto/screen.dto';
 import { CopilotDto } from './dto/copilot.dto';
@@ -36,6 +39,7 @@ export class AiRecruiterController {
     private readonly aiRecruiterService: AiRecruiterService,
     private readonly autopilotRulesService: AutopilotRulesService,
     private readonly actionsService: EmployerAiActionsService,
+    private readonly agentRuntime: AgentRuntimeService,
   ) {}
 
   @Get('autopilot')
@@ -107,11 +111,14 @@ export class AiRecruiterController {
 
   @Post('copilot')
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Recruiting copilot — templated structured action response' })
+  @ApiOperation({ summary: 'Recruiting copilot — multi-turn tool-use agent' })
   @ApiResponse({ status: 201, description: 'Copilot reply with proposed actions' })
   async copilot(@Body() dto: CopilotDto, @Request() req) {
     const userId = req.user._id.toString();
-    return this.aiRecruiterService.copilot(userId, dto.message);
+    const run = await this.agentRuntime.run(RECRUITER_COPILOT_TYPE, userId, {
+      message: dto.message,
+    });
+    return extractCopilotReply(run);
   }
 
   @Post('sourcing')

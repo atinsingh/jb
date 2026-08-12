@@ -3,6 +3,7 @@ import { AiRecruiterController } from './ai-recruiter.controller';
 import { AiRecruiterService } from './ai-recruiter.service';
 import { AutopilotRulesService } from './autopilot-rules.service';
 import { EmployerAiActionsService } from './employer-ai-actions.service';
+import { AgentRuntimeService } from '../agent-runtime/agent-runtime.service';
 
 describe('AiRecruiterController — new Autopilot endpoints', () => {
   let controller: AiRecruiterController;
@@ -12,6 +13,7 @@ describe('AiRecruiterController — new Autopilot endpoints', () => {
     list: jest.fn().mockResolvedValue([]),
     decide: jest.fn().mockResolvedValue({ status: 'approved' }),
   };
+  const agentRuntime = { run: jest.fn() };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -20,6 +22,7 @@ describe('AiRecruiterController — new Autopilot endpoints', () => {
         { provide: AiRecruiterService, useValue: aiRecruiterService },
         { provide: AutopilotRulesService, useValue: autopilotRulesService },
         { provide: EmployerAiActionsService, useValue: actionsService },
+        { provide: AgentRuntimeService, useValue: agentRuntime },
       ],
     }).compile();
     controller = module.get(AiRecruiterController);
