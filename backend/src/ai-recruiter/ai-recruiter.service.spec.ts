@@ -222,7 +222,7 @@ describe('AiRecruiterService', () => {
         {
           id: 'auto-advance',
           name: 'Auto-advance strong applicants',
-          description: 'Propose advancing applicants scoring 91+ to screening.',
+          description: 'Propose advancing applicants scoring above 91 to screening.',
           enabled: false,
         },
       ]);

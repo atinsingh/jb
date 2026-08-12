@@ -246,7 +246,7 @@ export class AiRecruiterService {
     return {
       id: 'auto-advance',
       name: 'Auto-advance strong applicants',
-      description: `Propose advancing applicants scoring ${rule.scoreThreshold}+ to screening.`,
+      description: `Propose advancing applicants scoring above ${rule.scoreThreshold} to screening.`,
       enabled: Boolean(rule.enabled),
     };
   }
