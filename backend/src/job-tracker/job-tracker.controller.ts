@@ -173,7 +173,8 @@ export class JobTrackerController {
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiOperation({ summary: 'Generate next interview question' })
   async generateQuestion(@Param('id') id: string, @Request() req) {
-    return this.interviewPrepService.generateNextQuestion(id, req.user._id.toString());
+    const question = await this.interviewPrepService.generateNextQuestion(id, req.user._id.toString());
+    return { question };
   }
 
   @Post('interview-sessions/:id/submit-answer')
