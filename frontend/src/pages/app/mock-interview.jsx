@@ -152,7 +152,7 @@ export default function AppMockInterview() {
 
     try {
       const newSession = await createInterviewSession({ jobId, applicationId, title });
-      const nextQuestion = await generateInterviewQuestion(newSession._id);
+      const { question: nextQuestion } = await generateInterviewQuestion(newSession._id);
       setSession(newSession);
       setCurrentQuestion(nextQuestion);
       setQuestionNumber(1);
@@ -227,7 +227,7 @@ export default function AppMockInterview() {
     setPhase('loading-question');
     setErrorMessage('');
     try {
-      const q = await generateInterviewQuestion(session._id);
+      const { question: q } = await generateInterviewQuestion(session._id);
       setCurrentQuestion(q);
       setQuestionNumber((n) => n + 1);
       setPhase('answering');
