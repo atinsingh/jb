@@ -12,6 +12,8 @@ import { StoryBank, StoryBankDocument, STAREntry } from '../schemas/story-bank.s
 import { Job, JobDocument } from '../schemas/job.schema';
 import { LLMRoutingService, LLMFeature } from '../llm/llm-routing.service';
 import { LLMQuotaService } from '../llm/llm-quota.service';
+import { z } from 'zod';
+import { InterviewAnswerFeedbackSchema } from '@jobocate/contracts';
 
 @Injectable()
 export class InterviewPrepService {
@@ -190,12 +192,14 @@ export class InterviewPrepService {
         }
       }
 
+      const validated = InterviewAnswerFeedbackSchema.parse(parsed);
+
       // Add question and answer to session
       const interviewQuestion: InterviewQuestion = {
         question,
         answer,
-        score: parsed.score,
-        feedback: parsed.feedback,
+        score: validated.score,
+        feedback: validated.feedback,
         timestamp: new Date(),
       };
 
@@ -213,10 +217,16 @@ export class InterviewPrepService {
       );
 
       return {
-        score: parsed.score,
-        feedback: parsed.feedback,
+        score: validated.score,
+        feedback: validated.feedback,
       };
     } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        this.logger.error('Zod validation error evaluating answer:', error.errors);
+        throw new Error(
+          `Invalid feedback response format from LLM: ${error.errors.map((e) => e.message).join(', ')}`,
+        );
+      }
       this.logger.error('Error evaluating answer:', error);
       throw error;
     }
