@@ -164,9 +164,8 @@ export default function AppMockInterview() {
   };
 
   useEffect(() => {
-    if (!user || startedRef.current) return undefined;
+    if (!user || startedRef.current) return;
     startedRef.current = true;
-    let cancelled = false;
 
     (async () => {
       let detectedRole = role;
@@ -176,17 +175,13 @@ export default function AppMockInterview() {
         const first = apps[0];
         if (first) {
           detectedRole = { title: first.jobTitle || '', company: first.companyName || '', jobId: first.jobId, applicationId: first.id };
-          if (!cancelled) setRole(detectedRole);
+          setRole(detectedRole);
         }
       } catch {
         /* no application context available — practice generically */
       }
-      if (!cancelled) await startSession(detectedRole);
+      await startSession(detectedRole);
     })();
-
-    return () => {
-      cancelled = true;
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
