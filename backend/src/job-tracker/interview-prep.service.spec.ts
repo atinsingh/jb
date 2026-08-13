@@ -32,8 +32,10 @@ describe('InterviewPrepService', () => {
       status: MockInterviewStatus.IN_PROGRESS,
       questions: [],
       overallScore: undefined,
-      save: jest.fn().mockResolvedValue(undefined),
+      save: jest.fn(),
     };
+    // Mongoose's Document#save resolves with the document itself.
+    session.save.mockResolvedValue(session);
 
     const interviewSessionModel: any = {
       findOne: jest.fn().mockResolvedValue(session),
@@ -121,6 +123,108 @@ describe('InterviewPrepService', () => {
         { promptTokens: 5, completionTokens: 10 },
         { sessionId: 'session-1' },
       );
+    });
+  });
+
+  /**
+   * generateRubricScores and generateFeedbackSummary now run concurrently
+   * inside completeInterviewSession (Promise.all), so their two chat() calls
+   * are not guaranteed to happen in a fixed order — the mock branches on the
+   * system prompt's content instead of relying on call order.
+   */
+  const mockChatByPromptContent = (chat, responses) => {
+    chat.mockImplementation((options) => {
+      const systemContent = options.messages[0].content;
+      for (const [marker, response] of responses) {
+        if (systemContent.includes(marker)) return Promise.resolve(response);
+      }
+      return Promise.resolve({ content: '{}', usage: {} });
+    });
+  };
+
+  describe('generateRubricScores (via completeInterviewSession)', () => {
+    it('calls the LLM and returns validated per-category scores for an answered session', async () => {
+      const rubricScores = [
+        { category: 'Clarity', score: 80, feedback: 'Clear structure throughout.' },
+        { category: 'STAR Structure', score: 70, feedback: 'Missing a concrete result once.' },
+        { category: 'Job Fit', score: 90, feedback: 'Directly relevant experience.' },
+        { category: 'Conciseness', score: 60, feedback: 'Two answers ran long.' },
+      ];
+      const { service, session, chat } = buildService({
+        content: JSON.stringify({ score: 82, feedback: 'Good.' }),
+        usage: {},
+      });
+      session.questions = [
+        { question: 'Q1', answer: 'A1', score: 82, feedback: 'Good.', timestamp: new Date() },
+      ];
+      mockChatByPromptContent(chat, [
+        ['rubricScores', { content: JSON.stringify({ rubricScores }), usage: {} }],
+        ['"summary"', { content: JSON.stringify({ summary: 'Solid overall performance.' }), usage: {} }],
+      ]);
+
+      const completed = await service.completeInterviewSession('session-1', 'user-1');
+
+      expect(completed.rubricScores).toEqual(rubricScores);
+    });
+
+    it('skips the LLM call and returns zero scores when no questions were answered', async () => {
+      const { service, session, chat } = buildService({ content: '{}', usage: {} });
+      session.questions = [];
+
+      const completed = await service.completeInterviewSession('session-1', 'user-1');
+
+      expect(completed.rubricScores).toEqual([
+        { category: 'Clarity', score: 0, feedback: 'No questions answered yet.' },
+        { category: 'STAR Structure', score: 0, feedback: 'No questions answered yet.' },
+        { category: 'Job Fit', score: 0, feedback: 'No questions answered yet.' },
+        { category: 'Conciseness', score: 0, feedback: 'No questions answered yet.' },
+      ]);
+      expect(chat).not.toHaveBeenCalled();
+    });
+
+    it('rejects a malformed rubric response rather than returning an empty breakdown', async () => {
+      const { service, session, chat } = buildService({ content: '{}', usage: {} });
+      session.questions = [
+        { question: 'Q1', answer: 'A1', score: 82, feedback: 'Good.', timestamp: new Date() },
+      ];
+      // Summary gets a valid response so only the rubric call is the reason
+      // completeInterviewSession rejects — isolates which call failed.
+      mockChatByPromptContent(chat, [
+        ['rubricScores', { content: JSON.stringify({ notRubricScores: [] }), usage: {} }],
+        ['"summary"', { content: JSON.stringify({ summary: 'Fine.' }), usage: {} }],
+      ]);
+
+      await expect(
+        service.completeInterviewSession('session-1', 'user-1'),
+      ).rejects.toThrow(/Invalid rubric response format/);
+    });
+  });
+
+  describe('generateFeedbackSummary (via completeInterviewSession)', () => {
+    it('calls the LLM and returns a validated written summary for an answered session', async () => {
+      const rubricScores = [{ category: 'Clarity', score: 80, feedback: 'Good.' }];
+      const { service, session, chat } = buildService({ content: '{}', usage: {} });
+      session.questions = [
+        { question: 'Q1', answer: 'A1', score: 82, feedback: 'Good.', timestamp: new Date() },
+      ];
+      mockChatByPromptContent(chat, [
+        ['rubricScores', { content: JSON.stringify({ rubricScores }), usage: {} }],
+        ['"summary"', { content: JSON.stringify({ summary: 'Consistently structured, tighten conciseness.' }), usage: {} }],
+      ]);
+
+      const completed = await service.completeInterviewSession('session-1', 'user-1');
+
+      expect(completed.feedbackSummary).toBe('Consistently structured, tighten conciseness.');
+    });
+
+    it('skips the LLM call and returns a static message when no questions were answered', async () => {
+      const { service, session, chat } = buildService({ content: '{}', usage: {} });
+      session.questions = [];
+
+      const completed = await service.completeInterviewSession('session-1', 'user-1');
+
+      expect(completed.feedbackSummary).toBe('No questions answered yet.');
+      expect(chat).not.toHaveBeenCalled();
     });
   });
 });

@@ -13,7 +13,13 @@ import { Job, JobDocument } from '../schemas/job.schema';
 import { LLMRoutingService, LLMFeature } from '../llm/llm-routing.service';
 import { LLMQuotaService } from '../llm/llm-quota.service';
 import { z } from 'zod';
-import { InterviewAnswerFeedbackSchema } from '@jobocate/contracts';
+import {
+  InterviewAnswerFeedbackSchema,
+  InterviewRubricResponseSchema,
+  InterviewSummaryResponseSchema,
+} from '@jobocate/contracts';
+
+const RUBRIC_CATEGORIES = ['Clarity', 'STAR Structure', 'Job Fit', 'Conciseness'];
 
 @Injectable()
 export class InterviewPrepService {
@@ -257,11 +263,12 @@ export class InterviewPrepService {
         ? scores.reduce((sum, score) => sum + score, 0) / scores.length
         : 0;
 
-    // Generate rubric scores
-    const rubricScores = await this.generateRubricScores(session, userId);
-
-    // Generate feedback summary
-    const feedbackSummary = await this.generateFeedbackSummary(session, userId);
+    // Generate rubric scores and feedback summary concurrently — independent
+    // LLM calls with no ordering dependency between them.
+    const [rubricScores, feedbackSummary] = await Promise.all([
+      this.generateRubricScores(session, userId),
+      this.generateFeedbackSummary(session, userId),
+    ]);
 
     const completedAt = new Date();
     const duration = session.startedAt
@@ -285,21 +292,76 @@ export class InterviewPrepService {
     session: MockInterviewSessionDocument,
     userId: string,
   ): Promise<RubricScore[]> {
-    // Simple implementation - can be enhanced with LLM
-    const categories = ['Technical Skills', 'Communication', 'Problem Solving', 'Cultural Fit'];
-    const scores: RubricScore[] = [];
-
-    for (const category of categories) {
-      // Use average of question scores as category score
-      const categoryScore = session.overallScore || 0;
-      scores.push({
+    if (session.questions.length === 0) {
+      return RUBRIC_CATEGORIES.map((category) => ({
         category,
-        score: categoryScore,
-        feedback: `Average performance in ${category.toLowerCase()}`,
-      });
+        score: 0,
+        feedback: 'No questions answered yet.',
+      }));
     }
 
-    return scores;
+    await this.quotaService.enforceQuota(userId, LLMFeature.MOCK_INTERVIEW);
+
+    const provider = this.llmRoutingService.getProviderForFeature(LLMFeature.MOCK_INTERVIEW);
+    const config = this.llmRoutingService.getFeatureConfig(LLMFeature.MOCK_INTERVIEW);
+
+    let job: JobDocument | null = null;
+    if (session.jobId) {
+      job = await this.jobModel.findById(session.jobId);
+    }
+
+    const prompt = this.buildRubricPrompt(session, job);
+
+    try {
+      const response = await provider.chat({
+        messages: [
+          {
+            role: 'system',
+            content: `You are an experienced interviewer scoring a completed mock interview session. Return ONLY valid JSON: {"rubricScores": [{"category": "...", "score": 0-100, "feedback": "..."}]}. Include exactly these categories, in this order: ${RUBRIC_CATEGORIES.join(', ')}.`,
+          },
+          { role: 'user', content: prompt },
+        ],
+        model: config.model,
+        temperature: config.temperature,
+        maxTokens: config.maxTokens,
+      });
+
+      let parsed: any;
+      try {
+        parsed = JSON.parse(response.content);
+      } catch (error) {
+        const jsonMatch =
+          response.content.match(/```json\n([\s\S]*?)\n```/) ||
+          response.content.match(/```\n([\s\S]*?)\n```/);
+        if (jsonMatch) {
+          parsed = JSON.parse(jsonMatch[1]);
+        } else {
+          throw new Error('Invalid JSON response from LLM');
+        }
+      }
+
+      const validated = InterviewRubricResponseSchema.parse(parsed);
+
+      await this.quotaService.recordUsageAndIncrement(
+        userId,
+        LLMFeature.MOCK_INTERVIEW,
+        provider.getName(),
+        config.model,
+        response.usage,
+        { sessionId: (session._id as any).toString() },
+      );
+
+      return validated.rubricScores;
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        this.logger.error('Zod validation error scoring rubric:', error.errors);
+        throw new Error(
+          `Invalid rubric response format from LLM: ${error.errors.map((e) => e.message).join(', ')}`,
+        );
+      }
+      this.logger.error('Error generating rubric scores:', error);
+      throw error;
+    }
   }
 
   /**
@@ -313,26 +375,69 @@ export class InterviewPrepService {
       return 'No questions answered yet.';
     }
 
-    const questionCount = session.questions.length;
-    const avgScore = session.overallScore || 0;
-    const strengths = session.questions
-      .filter((q) => (q.score || 0) >= 80)
-      .map((q) => q.question)
-      .slice(0, 3);
-    const improvements = session.questions
-      .filter((q) => (q.score || 0) < 60)
-      .map((q) => q.question)
-      .slice(0, 3);
+    await this.quotaService.enforceQuota(userId, LLMFeature.MOCK_INTERVIEW);
 
-    return `You answered ${questionCount} questions with an average score of ${avgScore.toFixed(1)}/100. ${
-      strengths.length > 0
-        ? `Strengths: ${strengths.join(', ')}. `
-        : ''
-    }${
-      improvements.length > 0
-        ? `Areas for improvement: ${improvements.join(', ')}.`
-        : ''
-    }`;
+    const provider = this.llmRoutingService.getProviderForFeature(LLMFeature.MOCK_INTERVIEW);
+    const config = this.llmRoutingService.getFeatureConfig(LLMFeature.MOCK_INTERVIEW);
+
+    let job: JobDocument | null = null;
+    if (session.jobId) {
+      job = await this.jobModel.findById(session.jobId);
+    }
+
+    const prompt = this.buildSummaryPrompt(session, job);
+
+    try {
+      const response = await provider.chat({
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You are an experienced interviewer writing a closing summary for a mock interview session. Return ONLY valid JSON: {"summary": "..."}',
+          },
+          { role: 'user', content: prompt },
+        ],
+        model: config.model,
+        temperature: config.temperature,
+        maxTokens: config.maxTokens,
+      });
+
+      let parsed: any;
+      try {
+        parsed = JSON.parse(response.content);
+      } catch (error) {
+        const jsonMatch =
+          response.content.match(/```json\n([\s\S]*?)\n```/) ||
+          response.content.match(/```\n([\s\S]*?)\n```/);
+        if (jsonMatch) {
+          parsed = JSON.parse(jsonMatch[1]);
+        } else {
+          throw new Error('Invalid JSON response from LLM');
+        }
+      }
+
+      const validated = InterviewSummaryResponseSchema.parse(parsed);
+
+      await this.quotaService.recordUsageAndIncrement(
+        userId,
+        LLMFeature.MOCK_INTERVIEW,
+        provider.getName(),
+        config.model,
+        response.usage,
+        { sessionId: (session._id as any).toString() },
+      );
+
+      return validated.summary;
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        this.logger.error('Zod validation error summarizing session:', error.errors);
+        throw new Error(
+          `Invalid summary response format from LLM: ${error.errors.map((e) => e.message).join(', ')}`,
+        );
+      }
+      this.logger.error('Error generating feedback summary:', error);
+      throw error;
+    }
   }
 
   /**
@@ -379,6 +484,52 @@ export class InterviewPrepService {
     prompt += `- Clarity and structure\n`;
     prompt += `- Use of examples (STAR method)\n`;
     prompt += `- Alignment with job requirements`;
+
+    return prompt;
+  }
+
+  /**
+   * Build rubric-scoring prompt
+   */
+  private buildRubricPrompt(
+    session: MockInterviewSessionDocument,
+    job: JobDocument | null,
+  ): string {
+    let prompt = `Review this full mock interview session and score the candidate against exactly these ${RUBRIC_CATEGORIES.length} categories: ${RUBRIC_CATEGORIES.join(', ')}.\n\n`;
+
+    if (job) {
+      prompt += `Position: ${job.title} at ${job.companyName}\n\n`;
+    }
+
+    prompt += `Questions and answers:\n`;
+    session.questions.forEach((q, i) => {
+      prompt += `${i + 1}. Q: ${q.question}\n   A: ${q.answer || '(no answer given)'}\n   Per-answer score: ${q.score ?? 'n/a'}/100\n`;
+    });
+
+    prompt += `\nFor each of the ${RUBRIC_CATEGORIES.length} categories, give a 0-100 score and one sentence of specific feedback grounded in the answers above.`;
+
+    return prompt;
+  }
+
+  /**
+   * Build session-summary prompt
+   */
+  private buildSummaryPrompt(
+    session: MockInterviewSessionDocument,
+    job: JobDocument | null,
+  ): string {
+    let prompt = `Write a 2-3 sentence performance summary for this mock interview session.\n\n`;
+
+    if (job) {
+      prompt += `Position: ${job.title} at ${job.companyName}\n\n`;
+    }
+
+    prompt += `Questions and answers:\n`;
+    session.questions.forEach((q, i) => {
+      prompt += `${i + 1}. Q: ${q.question}\n   A: ${q.answer || '(no answer given)'}\n   Score: ${q.score ?? 'n/a'}/100\n   Feedback given: ${q.feedback || 'n/a'}\n`;
+    });
+
+    prompt += `\nSummarize overall strengths and the single most important area to improve. Be specific and reference the actual answers, not generic advice.`;
 
     return prompt;
   }
