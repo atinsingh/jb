@@ -7,6 +7,10 @@ import useMarketingTheme from '@/components/site/useMarketingTheme';
 import AppSidebar from '@/components/app/AppSidebar';
 import { appRoute } from '@/components/app/appRoutes';
 import { LoadingState, EmptyState, ErrorState } from '@/components/app/AppStates';
+import Card from '@/components/app/ui/Card';
+import Badge from '@/components/app/ui/Badge';
+import Button from '@/components/app/ui/Button';
+import PageHeader from '@/components/app/ui/PageHeader';
 import {
   getMyMatches,
   getMyApplications,
@@ -19,19 +23,19 @@ import { listResumes } from '@/services/resumeApi';
 // Presentational metadata for the KPI cards — labels and palette only. Values
 // are always computed from live data (empty => '—').
 const STAT_META = [
-  { label: 'Applied', icon: '↗', chipBg: 'var(--jb-a-card)', chipInk: '#8A7C5A', bg: 'var(--jb-a-card-alt)', border: 'var(--jb-a-line)', labelColor: 'var(--jb-a-ink-muted)', deltaColor: 'var(--jb-a-accent-2)', valueColor: 'var(--jb-a-ink)', subColor: 'var(--jb-a-ink-muted)' },
-  { label: 'Interviews', icon: '◷', chipBg: 'var(--jb-a-card)', chipInk: '#8A7C5A', bg: 'var(--jb-a-card-alt)', border: 'var(--jb-a-line)', labelColor: 'var(--jb-a-ink-muted)', deltaColor: 'var(--jb-a-accent-2)', valueColor: 'var(--jb-a-ink)', subColor: 'var(--jb-a-ink-muted)' },
-  { label: 'Avg. match', icon: '◎', chipBg: '#DCEFE3', chipInk: 'var(--jb-a-accent-2)', bg: 'var(--jb-a-tint)', border: '#CDE9D6', labelColor: '#1FA463', deltaColor: 'var(--jb-a-accent-2)', valueColor: 'var(--jb-a-accent-2)', subColor: '#5A8C6E' },
-  { label: 'Response rate', icon: '⤴', chipBg: 'var(--jb-a-card)', chipInk: '#8A7C5A', bg: 'var(--jb-a-card-alt)', border: 'var(--jb-a-line)', labelColor: 'var(--jb-a-ink-muted)', deltaColor: '#C9622E', valueColor: 'var(--jb-a-ink)', subColor: 'var(--jb-a-ink-muted)' },
+  { label: 'Applied', icon: '↗', chipBg: 'var(--jb-a-card)', chipInk: 'var(--jb-a-chip-neutral-ink)', bg: 'var(--jb-a-card-alt)', border: 'var(--jb-a-line)', labelColor: 'var(--jb-a-ink-muted)', deltaColor: 'var(--jb-a-accent-2)', valueColor: 'var(--jb-a-ink)', subColor: 'var(--jb-a-ink-muted)' },
+  { label: 'Interviews', icon: '◷', chipBg: 'var(--jb-a-card)', chipInk: 'var(--jb-a-chip-neutral-ink)', bg: 'var(--jb-a-card-alt)', border: 'var(--jb-a-line)', labelColor: 'var(--jb-a-ink-muted)', deltaColor: 'var(--jb-a-accent-2)', valueColor: 'var(--jb-a-ink)', subColor: 'var(--jb-a-ink-muted)' },
+  { label: 'Avg. match', icon: '◎', chipBg: 'var(--jb-a-chip-success-bg)', chipInk: 'var(--jb-a-accent-2)', bg: 'var(--jb-a-tint)', border: 'var(--jb-a-tint-line)', labelColor: 'var(--jb-a-accent-2)', deltaColor: 'var(--jb-a-accent-2)', valueColor: 'var(--jb-a-accent-2)', subColor: 'var(--jb-a-accent-muted)' },
+  { label: 'Response rate', icon: '⤴', chipBg: 'var(--jb-a-card)', chipInk: 'var(--jb-a-chip-neutral-ink)', bg: 'var(--jb-a-card-alt)', border: 'var(--jb-a-line)', labelColor: 'var(--jb-a-ink-muted)', deltaColor: 'var(--jb-a-status-warn)', valueColor: 'var(--jb-a-ink)', subColor: 'var(--jb-a-ink-muted)' },
 ];
 const emptyStats = () => STAT_META.map((m) => ({ ...m, value: '—', delta: '', sub: '' }));
 
 // Pipeline stage labels + colors are fixed UI; counts/percentages are data.
 const PIPE_META = [
   { stage: 'Applied', color: 'var(--jb-a-ink)' },
-  { stage: 'In review', color: '#C9622E' },
-  { stage: 'Interviewing', color: '#1FA463' },
-  { stage: 'Offers', color: '#5BD08C' },
+  { stage: 'In review', color: 'var(--jb-a-status-warn)' },
+  { stage: 'Interviewing', color: 'var(--jb-a-accent-2)' },
+  { stage: 'Offers', color: 'var(--jb-a-accent)' },
 ];
 const emptyPipeline = () => PIPE_META.map((p) => ({ ...p, count: '0', pct: '0%' }));
 
@@ -343,8 +347,8 @@ export default function AppDashboard() {
         #jbapp * { box-sizing: border-box; }
         #jbapp a, #jbapp a:hover { color: inherit; text-decoration: none; }
         #jbapp ::-webkit-scrollbar { width: 10px; height: 10px; }
-        #jbapp ::-webkit-scrollbar-thumb { background: #c9ccc6; border-radius: 10px; }
-        #jbapp button:focus-visible { outline: 2px solid #2f7d3a; outline-offset: 2px; }
+        #jbapp ::-webkit-scrollbar-thumb { background: var(--jb-a-line-strong); border-radius: 10px; }
+        #jbapp button:focus-visible { outline: 2px solid var(--jb-a-accent-2); outline-offset: 2px; }
         @keyframes jpslide { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
         @media (prefers-reduced-motion: reduce) { #jbapp * { animation: none !important; } }
         @media (max-width: 1100px) {
@@ -365,7 +369,7 @@ export default function AppDashboard() {
           <header style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 22, height: 60, padding: '0 28px', background: 'var(--jb-a-header)', borderBottom: `1px solid ${T.line}` }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 9, minWidth: 0 }}>
               <span style={{ fontFamily: T.mono, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: T.muted }}>Workspace</span>
-              <span aria-hidden style={{ color: '#BEBEBE' }}>/</span>
+              <span aria-hidden style={{ color: 'var(--jb-a-ink-muted)' }}>/</span>
               <span style={{ fontSize: 16, fontWeight: 700 }}>Dashboard</span>
             </div>
             <div style={{ flex: 1 }} />
@@ -397,7 +401,7 @@ export default function AppDashboard() {
               )}
             </button>
             <div style={{ position: 'relative', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--jb-a-control)', border: `1px solid ${T.line}`, borderRadius: 10, fontSize: 14, color: 'var(--jb-a-ink-2)' }}>
-              ◔<span style={{ position: 'absolute', top: -5, right: -5, minWidth: 18, height: 18, padding: '0 4px', borderRadius: 999, background: T.green, color: T.greenInk, fontFamily: T.mono, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #F5F5F5' }}>3</span>
+              ◔<span style={{ position: 'absolute', top: -5, right: -5, minWidth: 18, height: 18, padding: '0 4px', borderRadius: 999, background: T.green, color: T.greenInk, fontFamily: T.mono, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--jb-a-header)' }}>3</span>
             </div>
             <Link href="/app/settings" title="Account" style={{ display: 'flex', alignItems: 'center', gap: 9, height: 36, padding: '3px 11px 3px 3px', background: 'var(--jb-a-control)', border: `1px solid ${T.line}`, borderRadius: 999 }}>
               <span aria-hidden style={{ width: 28, height: 28, borderRadius: '50%', background: T.green, color: T.greenInk, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12 }}>{initials(userName) || '··'}</span>
@@ -411,7 +415,7 @@ export default function AppDashboard() {
 
               <>
                   {error && (
-                    <div style={{ padding: '12px 16px', background: '#FBEFE9', border: '1px solid #F0CDBD', borderRadius: 12, fontSize: 13.5, color: '#8A4A2E' }}>
+                    <div style={{ padding: '12px 16px', background: 'var(--jb-a-danger-bg)', border: '1px solid var(--jb-a-danger-line)', borderRadius: 12, fontSize: 13.5, color: 'var(--jb-a-danger-ink)' }}>
                       We couldn’t reach your live data just now.{' '}
                       <button type="button" onClick={() => window.location.reload()} style={{ marginLeft: 4, background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', color: 'inherit', font: 'inherit' }}>Retry</button>
                     </div>
@@ -437,8 +441,8 @@ export default function AppDashboard() {
                       </div>
                       <div style={{ flex: 1 }} />
                       <div style={{ display: 'flex', gap: 8 }}>
-                        <Link href={appRoute('App Auto-Apply.dc.html')} style={{ flex: 1, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, background: T.green, color: T.greenInk, fontSize: 14, fontWeight: 700 }}>Set up Auto-Apply</Link>
-                        <Link href="/app/settings" style={{ height: 40, padding: '0 14px', display: 'flex', alignItems: 'center', border: `1px solid var(--jb-a-ink-muted)`, borderRadius: 10, color: T.darkText, fontSize: 14, fontWeight: 600 }}>Preferences</Link>
+                        <Button href={appRoute('App Auto-Apply.dc.html')} style={{ flex: 1 }}>Set up Auto-Apply</Button>
+                        <Button variant="secondary" href="/app/settings" style={{ borderColor: 'var(--jb-a-ink-muted)', background: 'transparent', color: T.darkText }}>Preferences</Button>
                       </div>
                     </div>
                   </div>
@@ -446,13 +450,10 @@ export default function AppDashboard() {
                   {/* GET SET UP — real onboarding checklist driven by your actual data */}
                   {stepsDone < steps.length && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
-                        <h2 style={{ margin: 0, fontFamily: T.serif, fontSize: 26, fontWeight: 400 }}>Get set up</h2>
-                        <span style={{ fontSize: 14, color: T.muted }}>{stepsDone} of {steps.length} done — finish these to unlock better matches.</span>
-                      </div>
+                      <PageHeader title="Get set up" subtitle={`${stepsDone} of ${steps.length} done — finish these to unlock better matches.`} />
                       <div className="jp-actions" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
                         {steps.map((s, i) => (
-                          <div key={s.key} style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '20px 22px', background: T.card, border: `1px solid ${s.done ? T.tintLine : T.line2}`, borderLeft: `4px solid ${s.done ? T.green : T.line2}`, borderRadius: 16 }}>
+                          <Card key={s.key} accentLeft={s.done ? 'var(--jb-a-accent)' : 'var(--jb-a-line-strong)'} style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '20px 22px', borderColor: s.done ? 'var(--jb-a-tint-line)' : 'var(--jb-a-line-strong)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                               <span aria-hidden style={{ width: 22, height: 22, flexShrink: 0, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, background: s.done ? T.green : 'var(--jb-a-control)', color: s.done ? T.greenInk : T.muted, border: `1px solid ${s.done ? T.green : T.line2}` }}>{s.done ? '✓' : i + 1}</span>
                               <span style={{ fontSize: 16, fontWeight: 700 }}>{s.label}</span>
@@ -462,9 +463,9 @@ export default function AppDashboard() {
                             {s.done ? (
                               <span style={{ fontFamily: T.mono, fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: T.green2 }}>Done</span>
                             ) : (
-                              <Link href={s.href} style={{ alignSelf: 'flex-start', height: 38, padding: '0 16px', display: 'flex', alignItems: 'center', borderRadius: 9, background: T.green, color: T.greenInk, fontSize: 14, fontWeight: 700 }}>Start</Link>
+                              <Button href={s.href} style={{ alignSelf: 'flex-start', height: 38, padding: '0 16px', fontSize: 14 }}>Start</Button>
                             )}
-                          </div>
+                          </Card>
                         ))}
                       </div>
                     </div>
@@ -493,15 +494,12 @@ export default function AppDashboard() {
                   {/* MAIN: recommended + right column */}
                   <div className="jp-main" style={{ display: 'grid', gridTemplateColumns: '1.55fr 1fr', gap: 22, alignItems: 'start' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
-                        <h2 style={{ margin: 0, fontFamily: T.serif, fontSize: 26, fontWeight: 400 }}>Recommended for you</h2>
-                        <span style={{ fontSize: 14, color: T.muted }}>Estimated fit is a signal, not a guarantee.</span>
-                      </div>
+                      <PageHeader title="Recommended for you" subtitle="Estimated fit is a signal, not a guarantee." />
                       {!hasMatches && !busy && (
                         <div style={{ padding: '32px 24px', background: T.card, border: `1px dashed ${T.line2}`, borderRadius: 16, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
                           <div style={{ fontSize: 17, fontWeight: 700 }}>No matches yet</div>
                           <div style={{ fontSize: 14.5, color: T.ink2, maxWidth: '46ch', lineHeight: 1.55 }}>Add your résumé and set your job preferences — titles, locations, and salary — and we’ll rank roles by fit here.</div>
-                          <Link href="/app/settings" style={{ marginTop: 4, height: 40, padding: '0 18px', display: 'flex', alignItems: 'center', borderRadius: 10, background: T.green, color: T.greenInk, fontSize: 14, fontWeight: 700 }}>Set preferences</Link>
+                          <Button href="/app/settings" style={{ marginTop: 4 }}>Set preferences</Button>
                         </div>
                       )}
                       {recJobs.map((j, i) => (
@@ -516,7 +514,7 @@ export default function AppDashboard() {
                               <div style={{ fontSize: 14, color: T.ink2 }}>{j.meta}</div>
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                                 {j.skills.map((s) => (
-                                  <span key={s} style={{ fontSize: 12.5, padding: '3px 9px', borderRadius: 999, background: 'var(--jb-a-control)', color: T.ink2, border: `1px solid ${T.line}` }}>{s}</span>
+                                  <Badge key={s} tone="neutral">{s}</Badge>
                                 ))}
                               </div>
                             </div>
@@ -526,7 +524,7 @@ export default function AppDashboard() {
                                 <div style={{ fontSize: 12, color: T.muted }}>estimated fit</div>
                               </div>
                               <div style={{ display: 'flex', gap: 7 }}>
-                                <Link href={appRoute('App Matches.dc.html')} style={{ height: 38, padding: '0 16px', display: 'flex', alignItems: 'center', borderRadius: 9, background: T.green, color: T.greenInk, fontSize: 14, fontWeight: 700 }}>Apply</Link>
+                                <Button href={appRoute('App Matches.dc.html')} style={{ height: 38, padding: '0 16px' }}>Apply</Button>
                                 <button type="button" title="Save" style={{ width: 38, height: 38, border: `1px solid ${T.line2}`, borderRadius: 9, background: 'transparent', cursor: 'pointer', fontSize: 13 }}>♡</button>
                               </div>
                             </div>
@@ -536,7 +534,7 @@ export default function AppDashboard() {
                           </div>
                         </div>
                       ))}
-                      <Link href={appRoute('App Matches.dc.html')} style={{ alignSelf: 'flex-start', height: 42, padding: '0 18px', display: 'flex', alignItems: 'center', border: `1px solid ${T.line2}`, borderRadius: 10, background: T.card, fontSize: 14.5, fontWeight: 600 }}>See all matches</Link>
+                      <Button variant="secondary" href={appRoute('App Matches.dc.html')} style={{ alignSelf: 'flex-start', height: 42, padding: '0 18px', fontSize: 14.5 }}>See all matches</Button>
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
