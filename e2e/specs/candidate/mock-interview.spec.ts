@@ -74,7 +74,7 @@ test.describe('mock interview — real AI feedback loop', () => {
     // The four fixed rubric categories from the real LLM-scored breakdown —
     // proves the rubric call actually ran, not just the per-question one.
     for (const category of ['Clarity', 'STAR Structure', 'Job Fit', 'Conciseness']) {
-      await expect(page.getByText(category)).toBeVisible();
+      await expect(page.getByText(category, { exact: true })).toBeVisible();
     }
 
     await expect(page.getByRole('button', { name: /practice again/i })).toBeVisible();
