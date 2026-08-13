@@ -227,4 +227,37 @@ describe('InterviewPrepService', () => {
       expect(chat).not.toHaveBeenCalled();
     });
   });
+
+  describe('completeInterviewSession re-completion guard', () => {
+    it('calling completeInterviewSession on an already-completed session returns it unchanged without calling chat', async () => {
+      const rubricScores = [
+        { category: 'Clarity', score: 80, feedback: 'Clear.' },
+        { category: 'STAR Structure', score: 70, feedback: 'Good.' },
+        { category: 'Job Fit', score: 90, feedback: 'Relevant.' },
+        { category: 'Conciseness', score: 60, feedback: 'Concise.' },
+      ];
+      const { service, session, chat } = buildService({ content: '{}', usage: {} });
+      session.questions = [
+        { question: 'Q1', answer: 'A1', score: 82, feedback: 'Good.', timestamp: new Date() },
+      ];
+      mockChatByPromptContent(chat, [
+        ['rubricScores', { content: JSON.stringify({ rubricScores }), usage: {} }],
+        ['"summary"', { content: JSON.stringify({ summary: 'Fine overall.' }), usage: {} }],
+      ]);
+
+      // First completion
+      const firstCompletion = await service.completeInterviewSession('session-1', 'user-1');
+      expect(firstCompletion.status).toBe(MockInterviewStatus.COMPLETED);
+      expect(chat).toHaveBeenCalledTimes(2); // rubricScores + feedbackSummary
+
+      // Reset chat mock to verify it's not called on re-completion
+      jest.clearAllMocks();
+
+      // Second completion (re-completion) should return the session unchanged
+      const secondCompletion = await service.completeInterviewSession('session-1', 'user-1');
+
+      expect(secondCompletion).toEqual(firstCompletion);
+      expect(chat).not.toHaveBeenCalled();
+    });
+  });
 });

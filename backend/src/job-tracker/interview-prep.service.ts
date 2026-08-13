@@ -254,6 +254,10 @@ export class InterviewPrepService {
       throw new Error('Interview session not found');
     }
 
+    if (session.status === MockInterviewStatus.COMPLETED) {
+      return session;
+    }
+
     // Calculate overall score
     const scores = session.questions
       .map((q) => q.score)
@@ -322,8 +326,8 @@ export class InterviewPrepService {
           { role: 'user', content: prompt },
         ],
         model: config.model,
-        temperature: config.temperature,
-        maxTokens: config.maxTokens,
+        temperature: 0.3,
+        maxTokens: 2000,
       });
 
       let parsed: any;
@@ -398,8 +402,8 @@ export class InterviewPrepService {
           { role: 'user', content: prompt },
         ],
         model: config.model,
-        temperature: config.temperature,
-        maxTokens: config.maxTokens,
+        temperature: 0.3,
+        maxTokens: 2000,
       });
 
       let parsed: any;

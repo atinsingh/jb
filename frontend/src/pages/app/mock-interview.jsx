@@ -306,7 +306,7 @@ export default function AppMockInterview() {
             <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 12, color: '#4EE6A8' }}>{timer}</span>
             <button
               onClick={finishSession}
-              disabled={!session || phase === 'completing' || phase === 'submitting'}
+              disabled={!session || phase === 'completing' || phase === 'submitting' || phase === 'complete'}
               style={{
                 fontFamily: 'var(--jb-font-mono)',
                 fontSize: 11,
@@ -315,8 +315,8 @@ export default function AppMockInterview() {
                 color: '#9ECBB9',
                 padding: '6px 12px',
                 borderRadius: 4,
-                cursor: session && phase !== 'submitting' ? 'pointer' : 'default',
-                opacity: session && phase !== 'submitting' ? 1 : 0.5,
+                cursor: session && phase !== 'submitting' && phase !== 'complete' ? 'pointer' : 'default',
+                opacity: session && phase !== 'submitting' && phase !== 'complete' ? 1 : 0.5,
               }}
             >
               END SESSION
