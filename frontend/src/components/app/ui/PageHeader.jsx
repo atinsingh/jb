@@ -1,9 +1,10 @@
-export default function PageHeader({ title, subtitle, action }) {
+export default function PageHeader({ title, subtitle, action, level = 'h2' }) {
+  const Tag = level;
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
-      <h2 style={{ margin: 0, fontFamily: 'var(--jb-font-display)', fontSize: 26, fontWeight: 400, color: 'var(--jb-a-ink)' }}>
+      <Tag style={{ margin: 0, fontFamily: 'var(--jb-font-display)', fontSize: 26, fontWeight: 400, color: 'var(--jb-a-ink)' }}>
         {title}
-      </h2>
+      </Tag>
       {subtitle && (
         <span style={{ fontSize: 14, color: 'var(--jb-a-ink-muted)' }}>{subtitle}</span>
       )}
