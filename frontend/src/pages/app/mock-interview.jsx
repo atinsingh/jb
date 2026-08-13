@@ -114,7 +114,7 @@ export default function AppMockInterview() {
   const { user } = useAuth();
 
   const [role, setRole] = useState({ title: '', company: '', jobId: undefined, applicationId: undefined });
-  const [phase, setPhase] = useState('loading'); // loading | answering | submitting | feedback-ready | loading-question | completing | complete | error | complete-error
+  const [phase, setPhase] = useState('loading'); // loading | answering | submitting | feedback-ready | loading-question | completing | complete | error | question-error | complete-error
   const [errorMessage, setErrorMessage] = useState('');
 
   const [session, setSession] = useState(null);
@@ -238,7 +238,7 @@ export default function AppMockInterview() {
       setPhase('answering');
     } catch (err) {
       setErrorMessage(err?.message || 'Could not load the next question.');
-      setPhase('error');
+      setPhase('question-error');
     }
   };
 
@@ -311,7 +311,7 @@ export default function AppMockInterview() {
             <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 12, color: '#4EE6A8' }}>{timer}</span>
             <button
               onClick={finishSession}
-              disabled={!session || phase === 'completing'}
+              disabled={!session || phase === 'completing' || phase === 'submitting'}
               style={{
                 fontFamily: 'var(--jb-font-mono)',
                 fontSize: 11,
@@ -320,8 +320,8 @@ export default function AppMockInterview() {
                 color: '#9ECBB9',
                 padding: '6px 12px',
                 borderRadius: 4,
-                cursor: session ? 'pointer' : 'default',
-                opacity: session ? 1 : 0.5,
+                cursor: session && phase !== 'submitting' ? 'pointer' : 'default',
+                opacity: session && phase !== 'submitting' ? 1 : 0.5,
               }}
             >
               END SESSION
@@ -412,14 +412,15 @@ export default function AppMockInterview() {
                           </button>
                           <button
                             onClick={nextQuestion}
+                            disabled={phase === 'submitting'}
                             style={{
                               background: 'transparent',
                               border: '1px solid #2A3D36',
-                              color: '#7A978C',
+                              color: phase === 'submitting' ? '#4F6B62' : '#7A978C',
                               padding: '10px 16px',
                               borderRadius: 5,
                               fontSize: 13,
-                              cursor: 'pointer',
+                              cursor: phase === 'submitting' ? 'default' : 'pointer',
                             }}
                           >
                             SKIP
@@ -474,6 +475,12 @@ export default function AppMockInterview() {
           {phase === 'error' && (
             <div style={{ padding: '24px 24px 56px', maxWidth: 720, width: '100%', margin: '0 auto' }}>
               <ErrorPanel message={errorMessage} onRetry={() => startSession(role)} retryLabel="Try again" />
+            </div>
+          )}
+
+          {phase === 'question-error' && (
+            <div style={{ padding: '24px 24px 56px', maxWidth: 720, width: '100%', margin: '0 auto' }}>
+              <ErrorPanel message={errorMessage} onRetry={nextQuestion} retryLabel="Retry question" />
             </div>
           )}
 
