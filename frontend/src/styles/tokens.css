@@ -119,6 +119,16 @@
   --jb-a-blue-ink: #bcd4e0;
   --jb-a-blue-line: rgba(157, 182, 196, 0.3);
 
+  /* New tokens closing dashboard.jsx's stray-hex gaps — see
+     docs/superpowers/specs/2026-08-13-candidate-flow-design-unification.md */
+  --jb-a-chip-neutral-ink: #8a7c5a;
+  --jb-a-chip-success-bg: rgba(91, 208, 140, 0.16);
+  --jb-a-accent-muted: rgba(143, 214, 163, 0.75);
+  --jb-a-status-warn: #c9622e;
+  --jb-a-danger-bg: rgba(224, 120, 86, 0.14);
+  --jb-a-danger-line: rgba(224, 120, 86, 0.32);
+  --jb-a-danger-ink: #e0a89e;
+
   /* Inverted accent card — the dark panel that sits inside the stage (the
      Auto-Apply card, the funnel). On the light stage it is near-black for
      contrast; on the dark stage it lifts slightly instead, since going darker
@@ -214,6 +224,18 @@ html[data-jb-theme='light'] {
   --jb-a-blue-tint: #e8eef2;
   --jb-a-blue-ink: #3e5a6b;
   --jb-a-blue-line: #c7d6de;
+
+  /* Light-theme companions to the dark block above — these are the exact
+     hex values dashboard.jsx already hardcoded before this pass, since the
+     light theme is meant to be a pixel-for-pixel no-op against the
+     existing design. */
+  --jb-a-chip-neutral-ink: #8a7c5a;
+  --jb-a-chip-success-bg: #dcefe3;
+  --jb-a-accent-muted: #5a8c6e;
+  --jb-a-status-warn: #c9622e;
+  --jb-a-danger-bg: #fbefe9;
+  --jb-a-danger-line: #f0cdbd;
+  --jb-a-danger-ink: #8a4a2e;
 
   --jb-a-invert: #2a2f28;
   --jb-a-invert-panel: #363c34;
