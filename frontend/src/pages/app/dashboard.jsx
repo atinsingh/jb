@@ -23,19 +23,19 @@ import { listResumes } from '@/services/resumeApi';
 // Presentational metadata for the KPI cards — labels and palette only. Values
 // are always computed from live data (empty => '—').
 const STAT_META = [
-  { label: 'Applied', icon: '↗', chipBg: 'var(--jb-a-card)', chipInk: 'var(--jb-a-chip-neutral-ink)', bg: 'var(--jb-a-card-alt)', border: 'var(--jb-a-line)', labelColor: 'var(--jb-a-ink-muted)', deltaColor: 'var(--jb-a-accent-2)', valueColor: 'var(--jb-a-ink)', subColor: 'var(--jb-a-ink-muted)' },
-  { label: 'Interviews', icon: '◷', chipBg: 'var(--jb-a-card)', chipInk: 'var(--jb-a-chip-neutral-ink)', bg: 'var(--jb-a-card-alt)', border: 'var(--jb-a-line)', labelColor: 'var(--jb-a-ink-muted)', deltaColor: 'var(--jb-a-accent-2)', valueColor: 'var(--jb-a-ink)', subColor: 'var(--jb-a-ink-muted)' },
-  { label: 'Avg. match', icon: '◎', chipBg: 'var(--jb-a-chip-success-bg)', chipInk: 'var(--jb-a-accent-2)', bg: 'var(--jb-a-tint)', border: 'var(--jb-a-tint-line)', labelColor: 'var(--jb-a-accent-2)', deltaColor: 'var(--jb-a-accent-2)', valueColor: 'var(--jb-a-accent-2)', subColor: 'var(--jb-a-accent-muted)' },
-  { label: 'Response rate', icon: '⤴', chipBg: 'var(--jb-a-card)', chipInk: 'var(--jb-a-chip-neutral-ink)', bg: 'var(--jb-a-card-alt)', border: 'var(--jb-a-line)', labelColor: 'var(--jb-a-ink-muted)', deltaColor: 'var(--jb-a-status-warn)', valueColor: 'var(--jb-a-ink)', subColor: 'var(--jb-a-ink-muted)' },
+  { label: 'Applied' },
+  { label: 'Interviews' },
+  { label: 'Avg. match' },
+  { label: 'Response rate' },
 ];
 const emptyStats = () => STAT_META.map((m) => ({ ...m, value: '—', delta: '', sub: '' }));
 
 // Pipeline stage labels + colors are fixed UI; counts/percentages are data.
 const PIPE_META = [
-  { stage: 'Applied', color: 'var(--jb-a-ink)' },
-  { stage: 'In review', color: 'var(--jb-a-status-warn)' },
-  { stage: 'Interviewing', color: 'var(--jb-a-accent-2)' },
-  { stage: 'Offers', color: 'var(--jb-a-accent)' },
+  { stage: 'Applied' },
+  { stage: 'In review' },
+  { stage: 'Interviewing' },
+  { stage: 'Offers' },
 ];
 const emptyPipeline = () => PIPE_META.map((p) => ({ ...p, count: '0', pct: '0%' }));
 
@@ -429,7 +429,7 @@ export default function AppDashboard() {
                     </div>
 
                     {/* Auto-apply status — honest: it isn't running until the user sets it up */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 18, padding: '22px 24px', background: T.dark, border: `1px solid ${T.darkLine}`, borderRadius: 16, color: T.darkText }}>
+                    <Card variant="invert" style={{ display: 'flex', flexDirection: 'column', gap: 18, padding: '22px 24px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '4px 10px', borderRadius: 999, background: T.darkPanel, border: `1px solid ${T.darkLine}` }}>
                           <span aria-hidden style={{ width: 7, height: 7, borderRadius: '50%', background: T.darkMuted }} />
@@ -444,7 +444,7 @@ export default function AppDashboard() {
                         <Button href={appRoute('App Auto-Apply.dc.html')} style={{ flex: 1 }}>Set up Auto-Apply</Button>
                         <Button variant="secondary" href="/app/settings" style={{ borderColor: 'var(--jb-a-ink-muted)', background: 'transparent', color: T.darkText }}>Preferences</Button>
                       </div>
-                    </div>
+                    </Card>
                   </div>
 
                   {/* GET SET UP — real onboarding checklist driven by your actual data */}
@@ -496,11 +496,11 @@ export default function AppDashboard() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
                       <PageHeader title="Recommended for you" subtitle="Estimated fit is a signal, not a guarantee." />
                       {!hasMatches && !busy && (
-                        <div style={{ padding: '32px 24px', background: T.card, border: `1px dashed ${T.line2}`, borderRadius: 16, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+                        <Card variant="dashed" style={{ padding: '32px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
                           <div style={{ fontSize: 17, fontWeight: 700 }}>No matches yet</div>
                           <div style={{ fontSize: 14.5, color: T.ink2, maxWidth: '46ch', lineHeight: 1.55 }}>Add your résumé and set your job preferences — titles, locations, and salary — and we’ll rank roles by fit here.</div>
                           <Button href="/app/settings" style={{ marginTop: 4 }}>Set preferences</Button>
-                        </div>
+                        </Card>
                       )}
                       {recJobs.map((j, i) => (
                         <div key={i} style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 16, overflow: 'hidden' }}>
@@ -562,7 +562,7 @@ export default function AppDashboard() {
                       </div>
 
                       {/* Recent activity (dark) */}
-                      <div style={{ padding: '20px 22px', background: T.dark, border: `1px solid ${T.darkLine}`, borderRadius: 16, display: 'flex', flexDirection: 'column', gap: 16, color: T.darkText }}>
+                      <Card variant="invert" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}><h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--jb-a-header)' }}>Recent activity</h3></div>
                         {hasActivity ? (
                           overnight.map((a, i) => (
@@ -572,7 +572,7 @@ export default function AppDashboard() {
                           <div style={{ fontSize: 14, color: T.darkMuted, lineHeight: 1.55 }}>No activity yet. Applications you send will show up here.</div>
                         )}
                         <Link href="/app/tracker" style={{ height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid var(--jb-a-ink-muted)`, borderRadius: 10, color: T.darkText, fontSize: 14, fontWeight: 600 }}>Open full activity log</Link>
-                      </div>
+                      </Card>
                     </div>
                   </div>
 
