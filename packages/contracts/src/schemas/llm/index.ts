@@ -194,3 +194,36 @@ export type RecruiterScorecardResponse = z.infer<
   typeof RecruiterScorecardResponseSchema
 >;
 
+/**
+ * Mock Interview Schemas (job-tracker interview-prep feature)
+ *
+ * Validate the raw LLM output for the candidate mock-interview practice loop:
+ * per-answer scoring, end-of-session rubric breakdown, and end-of-session
+ * summary. Mirror the `CoverLetterResponseSchema` convention above — these
+ * validate the model's own JSON, not the enriched Mongoose document shape.
+ */
+export const InterviewAnswerFeedbackSchema = z.object({
+  score: z.number().min(0).max(100),
+  feedback: z.string(),
+});
+
+export type InterviewAnswerFeedback = z.infer<typeof InterviewAnswerFeedbackSchema>;
+
+export const InterviewRubricScoreSchema = z.object({
+  category: z.string(),
+  score: z.number().min(0).max(100),
+  feedback: z.string(),
+});
+
+export const InterviewRubricResponseSchema = z.object({
+  rubricScores: z.array(InterviewRubricScoreSchema).min(1),
+});
+
+export type InterviewRubricScore = z.infer<typeof InterviewRubricScoreSchema>;
+export type InterviewRubricResponse = z.infer<typeof InterviewRubricResponseSchema>;
+
+export const InterviewSummaryResponseSchema = z.object({
+  summary: z.string(),
+});
+
+export type InterviewSummaryResponse = z.infer<typeof InterviewSummaryResponseSchema>;
