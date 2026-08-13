@@ -11,8 +11,8 @@ export default function Badge({ tone = 'neutral', children, style, ...rest }) {
       color: 'var(--jb-a-accent-2)',
     },
     warn: {
-      background: 'var(--jb-a-tint)',
-      border: '1px solid var(--jb-a-status-warn)',
+      background: 'var(--jb-a-warn-bg)',
+      border: '1px solid var(--jb-a-warn-line)',
       color: 'var(--jb-a-status-warn)',
     },
     danger: {
