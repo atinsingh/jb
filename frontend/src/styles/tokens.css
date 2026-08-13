@@ -121,13 +121,15 @@
 
   /* New tokens closing dashboard.jsx's stray-hex gaps — see
      docs/superpowers/specs/2026-08-13-candidate-flow-design-unification.md */
-  --jb-a-chip-neutral-ink: #8a7c5a;
+  --jb-a-chip-neutral-ink: #c4b184;
   --jb-a-chip-success-bg: rgba(91, 208, 140, 0.16);
   --jb-a-accent-muted: rgba(143, 214, 163, 0.75);
-  --jb-a-status-warn: #c9622e;
+  --jb-a-status-warn: #e08a52;
   --jb-a-danger-bg: rgba(224, 120, 86, 0.14);
   --jb-a-danger-line: rgba(224, 120, 86, 0.32);
   --jb-a-danger-ink: #e0a89e;
+  --jb-a-warn-bg: rgba(201, 98, 46, 0.14);
+  --jb-a-warn-line: rgba(201, 98, 46, 0.32);
 
   /* Inverted accent card — the dark panel that sits inside the stage (the
      Auto-Apply card, the funnel). On the light stage it is near-black for
@@ -236,6 +238,8 @@ html[data-jb-theme='light'] {
   --jb-a-danger-bg: #fbefe9;
   --jb-a-danger-line: #f0cdbd;
   --jb-a-danger-ink: #8a4a2e;
+  --jb-a-warn-bg: #fbeee5;
+  --jb-a-warn-line: #f0dcc8;
 
   --jb-a-invert: #2a2f28;
   --jb-a-invert-panel: #363c34;
