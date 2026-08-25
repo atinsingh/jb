@@ -23,10 +23,9 @@ export default function AppLogin() {
   // (/app/login?as=employer). Copy + accent adapt; the flow is otherwise
   // identical and the post-login redirect stays role-aware.
   const asEmployer = router.query.as === 'employer';
-  // Accent is one of two known brand colours, so we branch static Tailwind
-  // classes rather than compute a colour at runtime.
-  const accentDot = asEmployer ? 'bg-[#4263EB]' : 'bg-jb-green';
-  const accentText = asEmployer ? 'text-[#4263EB]' : 'text-jb-green';
+  // The employer variant used to carry its own blue accent. It no longer needs
+  // to: --jb-a-accent IS that blue now, so both surfaces share one colour and
+  // only the copy differs.
   const copy = asEmployer
     ? {
         badge: 'Welcome back',
@@ -89,163 +88,211 @@ export default function AppLogin() {
 
   // Shared field classes: the focus ring replaces the old styled-jsx
   // `#jblogin input:focus` rule.
-  const fieldClass =
-    'w-full font-sans text-[15px] text-jb-ink bg-jb-paper border border-jb-line-input rounded-xl px-[15px] py-[13px] ' +
-    'placeholder:text-jb-ink-ghost transition-[box-shadow,border-color] duration-150 ' +
-    'focus:outline-none focus:border-jb-green focus:shadow-[0_0_0_3px_rgba(31,164,99,0.15)]';
-  const oauthBtnClass =
-    'flex-1 flex items-center justify-center gap-[9px] bg-jb-paper border border-jb-line-input rounded-xl p-3 ' +
-    'cursor-pointer font-sans text-sm font-semibold text-jb-ink';
+  const fieldStyle = {
+    height: 50,
+    width: '100%',
+    padding: '0 14px',
+    border: '1px solid var(--jb-a-line-strong)',
+    borderRadius: 9,
+    background: 'var(--jb-a-card)',
+    fontFamily: 'inherit',
+    fontSize: 15,
+    color: 'var(--jb-a-ink)',
+  };
+
+  const oauthBtnStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    height: 50,
+    width: '100%',
+    borderRadius: 9,
+    border: '1px solid var(--jb-a-line-strong)',
+    background: 'var(--jb-a-card)',
+    fontFamily: 'inherit',
+    fontSize: 15,
+    fontWeight: 600,
+    color: 'var(--jb-a-ink)',
+    cursor: 'pointer',
+  };
 
   return (
     <>
       <Head>
-        <title>Log in — Jobocate</title>
+        <title>Sign in · Jobocate</title>
       </Head>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 min-h-screen bg-jb-cream font-sans text-jb-ink">
-        {/* FORM SIDE */}
-        <div className="flex flex-col px-6 py-10 sm:px-14">
-          <Link href={appRoute('Jobocate Home.dc.html')} className="flex items-center gap-[9px] no-underline">
-            {/* Was a hand-rolled "Jobocate." wordmark, so the auth screens
-                carried a different logo from every other page. */}
-            <Logo size={26} />
+      <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--jb-a-card)', color: 'var(--jb-a-ink)', fontFamily: 'var(--jb-font-sans)' }}>
+        {/* ── FORM ──────────────────────────────────────────────────────── */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: 'clamp(28px, 5vw, 44px) clamp(20px, 5vw, 52px)', overflow: 'auto' }}>
+          <Link href={appRoute('Jobocate Home.dc.html')} style={{ display: 'inline-flex', alignItems: 'center', gap: 9, textDecoration: 'none', color: 'inherit', alignSelf: 'flex-start' }}>
+            <Logo size={23} accent="var(--jb-a-accent)" />
           </Link>
 
-          <div className="flex-1 flex flex-col justify-center w-full max-w-[400px] mx-auto animate-rise-in">
-            <div className="inline-flex self-start items-center gap-2 border border-jb-line-input rounded-full px-[13px] py-[6px] mb-[22px]">
-              <span className={`w-1.5 h-1.5 rounded-full ${accentDot}`} />
-              <span className="font-mono text-[11px] tracking-[0.1em] uppercase text-jb-ink-muted">
-                {copy.badge}
-              </span>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 26, maxWidth: 460, width: '100%', margin: '0 auto', paddingTop: 32, paddingBottom: 32 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <h1 style={{ margin: 0, fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 'var(--jb-a-display-sm)', lineHeight: 1.05, letterSpacing: '-0.02em' }}>
+                Welcome back.
+              </h1>
+              <span style={{ fontSize: 16, color: 'var(--jb-a-ink-2)' }}>{copy.sub}</span>
             </div>
 
-            <h1 className="font-display font-normal text-[46px] leading-[1.02] tracking-[-0.01em] mb-2.5">
-              {copy.heading[0]}
-              <br />
-              {copy.heading[1]}
-            </h1>
-            <p className="text-[15.5px] text-jb-ink-muted mb-[30px]">{copy.sub}</p>
-
-            {/* OAUTH BUTTONS */}
-            <div className="flex gap-[11px] mb-[22px]">
-              <button type="button" onClick={() => startOAuth('google')} className={oauthBtnClass}>
-                <span className="w-[18px] h-[18px] rounded-full bg-[conic-gradient(from_-45deg,#EA4335,#FBBC05,#34A853,#4285F4,#EA4335)]" />
-                Google
+            {/* OAuth. The marks stay in each provider's own brand colour —
+                they identify a third party, so they are the one place on this
+                surface where a literal colour is correct. */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button type="button" onClick={() => startOAuth('google')} style={oauthBtnStyle}>
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: '50%',
+                    background: 'conic-gradient(from -45deg, #EA4335, #FBBC05, #34A853, #4285F4, #EA4335)',
+                  }}
+                />
+                Continue with Google
               </button>
-              <button type="button" onClick={() => startOAuth('linkedin')} className={oauthBtnClass}>
-                <span className="w-[18px] h-[18px] rounded bg-[#0A66C2] text-white flex items-center justify-center font-display font-extrabold text-[11px]">
+              <button type="button" onClick={() => startOAuth('linkedin')} style={oauthBtnStyle}>
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: 4,
+                    background: '#0A66C2',
+                    color: '#FFFFFF',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 800,
+                    fontSize: 11,
+                  }}
+                >
                   in
                 </span>
-                LinkedIn
+                Continue with LinkedIn
               </button>
             </div>
 
-            <div className="flex items-center gap-3.5 mb-[22px]">
-              <span className="flex-1 h-px bg-jb-line-3" />
-              <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-jb-ink-ghost">
-                or with email
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <span style={{ flex: 1, height: 1, background: 'var(--jb-a-line-soft)' }} />
+              <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--jb-a-ink-warm)' }}>
+                or email
               </span>
-              <span className="flex-1 h-px bg-jb-line-3" />
+              <span style={{ flex: 1, height: 1, background: 'var(--jb-a-line-soft)' }} />
             </div>
 
-            <label htmlFor="login-email" className="block text-[13px] font-semibold text-jb-ink-heading mb-[7px]">Email</label>
-            <input
-              id="login-email"
-              name="email"
-              autoComplete="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className={`${fieldClass} mb-[18px]`}
-            />
-
-            <div className="flex items-center justify-between mb-[7px]">
-              <label htmlFor="login-password" className="text-[13px] font-semibold text-jb-ink-heading">Password</label>
-              <a href="#" className="text-[13px] font-semibold text-jb-green-text no-underline">
-                Forgot?
-              </a>
-            </div>
-            <input
-              id="login-password"
-              name="password"
-              autoComplete="current-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleEmailLogin(e); }}
-              className={`${fieldClass} mb-[22px]`}
-            />
-
-            {error ? (
-              <div className="text-[13px] text-jb-danger bg-jb-danger-tint border border-jb-danger-line rounded-[10px] px-[13px] py-2.5 mb-3.5">
-                {error}
-              </div>
-            ) : null}
-
-            {/* Primary action: email/password sign-in via AuthContext. */}
-            <button
-              type="button"
-              onClick={handleEmailLogin}
-              disabled={submitting}
-              className="flex items-center justify-center gap-[9px] w-full bg-jb-ink text-jb-cream text-base font-semibold p-[15px] rounded-full border-none cursor-pointer font-sans"
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleEmailLogin(e);
+              }}
+              style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
             >
-              {submitting ? 'Signing in…' : 'Log in'} <span className="text-[18px]">→</span>
-            </button>
+              <label htmlFor="login-email" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--jb-a-ink-2)' }}>Email</span>
+                <input
+                  id="login-email"
+                  name="email"
+                  autoComplete="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  style={fieldStyle}
+                />
+              </label>
 
-            <p className="text-sm text-jb-ink-muted text-center mt-[26px]">
+              <label htmlFor="login-password" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={{ display: 'flex', alignItems: 'baseline' }}>
+                  <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600, color: 'var(--jb-a-ink-2)' }}>Password</span>
+                  <Link href="/forgot-password" style={{ fontSize: 13, color: 'var(--jb-a-accent)', fontWeight: 600, textDecoration: 'none' }}>
+                    Forgot?
+                  </Link>
+                </span>
+                <input
+                  id="login-password"
+                  name="password"
+                  autoComplete="current-password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  style={fieldStyle}
+                />
+              </label>
+
+              {error ? (
+                <div
+                  role="alert"
+                  style={{
+                    fontSize: 13.5,
+                    color: 'var(--jb-a-danger-ink)',
+                    background: 'var(--jb-a-danger-bg)',
+                    border: '1px solid var(--jb-a-danger-line)',
+                    borderRadius: 9,
+                    padding: '10px 13px',
+                  }}
+                >
+                  {error}
+                </div>
+              ) : null}
+
+              <button
+                type="submit"
+                disabled={submitting}
+                style={{
+                  height: 52,
+                  border: 0,
+                  borderRadius: 9,
+                  background: 'var(--jb-a-accent)',
+                  color: 'var(--jb-a-accent-ink)',
+                  fontFamily: 'inherit',
+                  fontSize: 15.5,
+                  fontWeight: 600,
+                  marginTop: 4,
+                  cursor: submitting ? 'not-allowed' : 'pointer',
+                  opacity: submitting ? 0.6 : 1,
+                }}
+              >
+                {submitting ? 'Signing in…' : 'Sign in'}
+              </button>
+            </form>
+
+            <span style={{ fontSize: 14.5, color: 'var(--jb-a-ink-2)' }}>
               New here?{' '}
-              <Link href={copy.signupHref} className={`${accentText} font-semibold no-underline`}>
+              <Link href={copy.signupHref} style={{ fontWeight: 600, color: 'var(--jb-a-accent)', textDecoration: 'none' }}>
                 Create an account
-              </Link>
-            </p>
+              </Link>{' '}
+              — free, no card.
+            </span>
           </div>
 
-          <div className="font-mono text-[11px] text-jb-ink-ghost">© 2026 Jobocate</div>
+          <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: 'var(--jb-a-ink-faint)' }}>© 2026 Jobocate</span>
         </div>
 
-        {/* BRAND SIDE — hidden on mobile so the form gets the full width. */}
-        <div className="relative overflow-hidden bg-jb-deep p-12 hidden md:flex md:flex-col md:justify-between">
-          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_80%_10%,rgba(31,164,99,0.32),transparent_55%),radial-gradient(circle_at_10%_100%,rgba(31,164,99,0.18),transparent_50%)]" />
-
-          <div className="relative font-mono text-[11px] tracking-[0.14em] uppercase text-jb-green-on-dark">
+        {/* ── PANEL ─────────────────────────────────────────────────────
+            The mockup fills this with a customer quote and labels it
+            "Illustrative — swap for a real one before launch". We have no real
+            one, and the stat card that used to live here ("14 new matches",
+            "6 auto-applied") was invented. So the panel states how the product
+            actually behaves, which is true today and needs no attribution.
+            Hidden below 900px so the form gets the full width. */}
+        <aside className="jb-auth-aside" style={{ width: 300, flexShrink: 0, background: 'var(--jb-a-invert)', color: 'var(--jb-a-invert-ink)', padding: '44px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: 20 }}>
+          <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--jb-a-invert-muted)' }}>
             — {copy.aside}
-          </div>
+          </span>
+          <span style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 30, lineHeight: 1.2 }}>{copy.promise}</span>
+          <span style={{ fontSize: 14, lineHeight: 1.5, color: 'var(--jb-a-invert-muted)' }}>{copy.trust}</span>
+        </aside>
 
-          <div className="relative">
-            <div className="bg-[#1e1c15] border border-[#2c2a22] rounded-2xl p-5 shadow-[0_30px_60px_-28px_rgba(0,0,0,0.6)] mb-6">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-[13px] font-bold text-[#fbf8f1]">While you were away</span>
-                <span className="font-mono text-[11px] text-jb-green-on-dark">● live</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2.5">
-                <div className="bg-jb-deep rounded-[10px] p-[13px]">
-                  <div className="font-mono text-2xl font-semibold text-[#fbf8f1]">{copy.stat1[0]}</div>
-                  <div className="text-xs text-jb-ink-subtle">{copy.stat1[1]}</div>
-                </div>
-                <div className="bg-jb-deep rounded-[10px] p-[13px]">
-                  <div className="font-mono text-2xl font-semibold text-jb-green-on-dark">{copy.stat2[0]}</div>
-                  <div className="text-xs text-jb-ink-subtle">{copy.stat2[1]}</div>
-                </div>
-              </div>
-            </div>
-
-            {/*
-              An attributed testimonial ran here — "Marcus Johnson, Product
-              Manager at Stripe" for candidates, "Dana Whitfield, Head of Talent
-              at Northwind" for employers. Neither person nor customer exists.
-              Replaced with a factual statement of how the product behaves.
-            */}
-            <p className="font-display text-[30px] leading-[1.2] text-[#f2ede2] m-0 max-w-[420px]">
-              {copy.promise}
-            </p>
-          </div>
-
-          <div className="relative flex items-center gap-2 text-[13px] text-jb-ink-faint">
-            <span className={accentText}>✓</span>
-            {copy.trust}
-          </div>
-        </div>
+        <style jsx>{`
+          @media (max-width: 900px) {
+            .jb-auth-aside {
+              display: none;
+            }
+          }
+        `}</style>
       </div>
     </>
   );

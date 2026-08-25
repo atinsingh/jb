@@ -1,0 +1,143 @@
+- generic [active] [ref=f1e1]:
+  - generic [ref=f1e2]:
+    - generic [ref=f1e3]:
+      - generic [ref=f1e5]:
+        - generic [ref=f1e6]:
+          - link "Jobocate home" [ref=f1e7] [cursor=pointer]:
+            - /url: /
+            - img "Jobocate" [ref=f1e8]:
+              - generic [ref=f1e13]: jobocate
+          - generic [ref=f1e14]:
+            - button "Notifications" [ref=f1e15] [cursor=pointer]: ◔
+            - button "Collapse sidebar" [ref=f1e17] [cursor=pointer]: «
+        - button "⌕ Search & jump… ⌘K" [ref=f1e18] [cursor=pointer]:
+          - generic [ref=f1e19]: ⌕
+          - generic [ref=f1e20]: Search & jump…
+          - generic [ref=f1e21]: ⌘K
+        - generic [ref=f1e22]:
+          - generic [ref=f1e23]: Workspace
+          - generic [ref=f1e24]:
+            - link "Dashboard" [ref=f1e25] [cursor=pointer]:
+              - /url: /app/dashboard
+            - link "Job Matches" [ref=f1e34] [cursor=pointer]:
+              - /url: /app/matches
+            - link "Job Profiles" [ref=f1e41] [cursor=pointer]:
+              - /url: /app/job-profiles
+            - link "Saved" [ref=f1e48] [cursor=pointer]:
+              - /url: /app/saved
+            - link "Applications" [ref=f1e54] [cursor=pointer]:
+              - /url: /app/tracker
+            - link "Offers" [ref=f1e62] [cursor=pointer]:
+              - /url: /app/offers
+            - link "Auto-Apply" [ref=f1e71] [cursor=pointer]:
+              - /url: /app/auto-apply
+          - generic [ref=f1e78]: Toolkit
+          - generic [ref=f1e79]:
+            - link "Resumes" [ref=f1e80] [cursor=pointer]:
+              - /url: /app/resume-library
+            - link "Interview Prep" [ref=f1e86] [cursor=pointer]:
+              - /url: /app/interview
+            - link "Live Interview LIVE" [ref=f1e92] [cursor=pointer]:
+              - /url: /app/live-interview
+              - generic [ref=f1e96]: Live Interview
+              - generic [ref=f1e97]: LIVE
+          - generic [ref=f1e98]: Premium
+          - generic [ref=f1e99]:
+            - link "Concierge ✦" [ref=f1e100] [cursor=pointer]:
+              - /url: /app/concierge
+              - generic [ref=f1e106]: Concierge
+              - generic [ref=f1e107]: ✦
+            - link "Messages ✦" [ref=f1e108] [cursor=pointer]:
+              - /url: /app/messages
+              - generic [ref=f1e116]: Messages
+              - generic [ref=f1e117]: ✦
+          - link "Auto-apply credits — / — this week" [ref=f1e118] [cursor=pointer]:
+            - /url: /app/auto-apply
+            - generic [ref=f1e119]: Auto-apply credits
+            - generic [ref=f1e120]:
+              - generic [ref=f1e121]: —
+              - generic [ref=f1e122]: / — this week
+          - link "Settings" [ref=f1e125] [cursor=pointer]:
+            - /url: /app/settings
+          - generic [ref=f1e132]:
+            - link "AL Ada Lovelace Free plan" [ref=f1e133] [cursor=pointer]:
+              - /url: /app/settings
+              - generic [ref=f1e134]: AL
+              - generic [ref=f1e135]:
+                - generic [ref=f1e136]: Ada Lovelace
+                - generic [ref=f1e137]: Free plan
+            - button "Log out" [ref=f1e138] [cursor=pointer]
+      - main [ref=f1e142]:
+        - heading "Job profiles" [level=1] [ref=f1e144]
+        - generic [ref=f1e146]:
+          - paragraph [ref=f1e147]: Each profile is a separate search. The countries you target here decide which jobs you see — and auto-apply never runs outside them.
+          - generic [ref=f1e166]:
+            - heading "New profile" [level=2] [ref=f1e167]
+            - generic [ref=f1e168]:
+              - generic [ref=f1e169]:
+                - generic [ref=f1e170]: Profile name
+                - textbox "Profile name" [ref=f1e171]:
+                  - /placeholder: Backend — Canada
+              - generic [ref=f1e172]:
+                - generic [ref=f1e173]:
+                  - generic [ref=f1e174]: Role
+                  - textbox "Role" [ref=f1e175]:
+                    - /placeholder: Senior Backend Engineer
+                - generic [ref=f1e176]:
+                  - generic [ref=f1e177]: Level
+                  - textbox "Level" [ref=f1e178]:
+                    - /placeholder: senior
+              - generic [ref=f1e179]:
+                - generic [ref=f1e180]: Target countries
+                - paragraph [ref=f1e181]: Where you want to work — not where you live now.
+                - textbox "Target countries" [ref=f1e182]:
+                  - /placeholder: Search countries…
+                - listbox "Available countries" [ref=f1e183]:
+                  - option "+ United States" [ref=f1e184] [cursor=pointer]
+                  - option "+ Canada" [ref=f1e185] [cursor=pointer]
+                  - option "+ United Kingdom" [ref=f1e186] [cursor=pointer]
+                  - option "+ Ireland" [ref=f1e187] [cursor=pointer]
+                  - option "+ Germany" [ref=f1e188] [cursor=pointer]
+                  - option "+ France" [ref=f1e189] [cursor=pointer]
+                  - option "+ Netherlands" [ref=f1e190] [cursor=pointer]
+                  - option "+ Spain" [ref=f1e191] [cursor=pointer]
+                  - option "+ Portugal" [ref=f1e192] [cursor=pointer]
+                  - option "+ Poland" [ref=f1e193] [cursor=pointer]
+                  - option "+ India" [ref=f1e194] [cursor=pointer]
+                  - option "+ Singapore" [ref=f1e195] [cursor=pointer]
+                  - option "+ Japan" [ref=f1e196] [cursor=pointer]
+                  - option "+ Australia" [ref=f1e197] [cursor=pointer]
+                  - option "+ New Zealand" [ref=f1e198] [cursor=pointer]
+                  - option "+ United Arab Emirates" [ref=f1e199] [cursor=pointer]
+                  - option "+ Brazil" [ref=f1e200] [cursor=pointer]
+                  - option "+ Mexico" [ref=f1e201] [cursor=pointer]
+                - paragraph [ref=f1e202]: With none selected, matching falls back to the country in your preferences.
+              - generic [ref=f1e203]:
+                - generic [ref=f1e204]:
+                  - generic [ref=f1e205]: Workplace
+                  - combobox "Workplace" [ref=f1e206]:
+                    - option "Remote" [selected]
+                    - option "Hybrid"
+                    - option "On-site"
+                - generic [ref=f1e207]:
+                  - generic [ref=f1e208]: Minimum salary
+                  - spinbutton "Minimum salary" [ref=f1e209]
+              - generic [ref=f1e210]:
+                - generic [ref=f1e211]: Skills
+                - textbox "Skills" [ref=f1e212]:
+                  - /placeholder: typescript, postgres, kubernetes
+                - paragraph [ref=f1e213]: Comma-separated.
+              - generic [ref=f1e214]:
+                - generic [ref=f1e215]: Minimum match score — 75%
+                - slider "Minimum match score — 75%" [ref=f1e216]: "75"
+              - generic [ref=f1e217] [cursor=pointer]:
+                - checkbox "Prepare applications automatically Jobocate fills applications for matches above your threshold and holds them for your approval. Nothing is ever submitted without you." [ref=f1e218]
+                - generic [ref=f1e219]:
+                  - text: Prepare applications automatically
+                  - generic [ref=f1e220]: Jobocate fills applications for matches above your threshold and holds them for your approval. Nothing is ever submitted without you.
+              - generic [ref=f1e221]:
+                - button "Save profile" [ref=f1e222] [cursor=pointer]
+                - button "Cancel" [ref=f1e223] [cursor=pointer]
+    - region "Notifications Alt+T"
+  - button "Open Next.js Dev Tools" [ref=f1e156] [cursor=pointer]
+  - alert [ref=f1e160]

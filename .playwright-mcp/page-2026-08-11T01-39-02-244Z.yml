@@ -1,0 +1,146 @@
+- generic [active] [ref=f5e1]:
+  - generic [ref=f5e2]:
+    - generic [ref=f5e3]:
+      - generic [ref=f5e5]:
+        - generic [ref=f5e6]:
+          - link "Jobocate RECRUITER" [ref=f5e7] [cursor=pointer]:
+            - /url: /employer/dashboard
+            - img "Jobocate" [ref=f5e8]:
+              - generic [ref=f5e13]: jobocate
+            - generic [ref=f5e14]: RECRUITER
+          - generic [ref=f5e15]:
+            - button "⌕" [ref=f5e16] [cursor=pointer]
+            - button "◔" [ref=f5e17] [cursor=pointer]
+            - button "«" [ref=f5e18] [cursor=pointer]
+        - link "＋ Post a job" [ref=f5e19] [cursor=pointer]:
+          - /url: /employer/jobs/post
+          - generic [ref=f5e20]: ＋
+          - text: Post a job
+        - generic [ref=f5e21]:
+          - generic [ref=f5e22]: Hiring
+          - generic [ref=f5e23]:
+            - link "Dashboard" [ref=f5e24] [cursor=pointer]:
+              - /url: /employer/dashboard
+            - link "Jobs" [ref=f5e33] [cursor=pointer]:
+              - /url: /employer/jobs
+            - link "Candidates" [ref=f5e40] [cursor=pointer]:
+              - /url: /employer/candidates
+            - link "Interviews" [ref=f5e47] [cursor=pointer]:
+              - /url: /employer/interviews
+            - link "Offers" [ref=f5e54] [cursor=pointer]:
+              - /url: /employer/dashboard
+          - generic [ref=f5e61]:
+            - generic [ref=f5e62]: AI
+            - generic [ref=f5e63]: ✦
+          - generic [ref=f5e64]:
+            - link "Autopilot" [ref=f5e65] [cursor=pointer]:
+              - /url: /employer/autopilot
+            - link "Copilot" [ref=f5e72] [cursor=pointer]:
+              - /url: /employer/copilot
+            - link "Sourcing Agent" [ref=f5e79] [cursor=pointer]:
+              - /url: /employer/sourcing
+          - generic [ref=f5e86]: Engage
+          - generic [ref=f5e87]:
+            - link "Talent Search" [ref=f5e88] [cursor=pointer]:
+              - /url: /employer/candidates
+            - link "Messages" [ref=f5e95] [cursor=pointer]:
+              - /url: /employer/messages
+            - link "Analytics" [ref=f5e104] [cursor=pointer]:
+              - /url: /employer/dashboard
+          - generic [ref=f5e112]: Company
+          - generic [ref=f5e113]:
+            - link "Company Profile" [ref=f5e114] [cursor=pointer]:
+              - /url: /app
+            - link "Team" [ref=f5e125] [cursor=pointer]:
+              - /url: /employer/profile
+            - link "Settings" [ref=f5e134] [cursor=pointer]:
+              - /url: /employer/profile
+          - link "✦ AI hiring Autopilot, Copilot, and the Sourcing Agent help you screen and reach candidates faster. See plans →" [ref=f5e141] [cursor=pointer]:
+            - /url: /app
+            - generic [ref=f5e142]:
+              - generic [ref=f5e143]: ✦
+              - generic [ref=f5e144]: AI hiring
+            - generic [ref=f5e145]: Autopilot, Copilot, and the Sourcing Agent help you screen and reach candidates faster.
+            - generic [ref=f5e146]:
+              - text: See plans
+              - generic [ref=f5e147]: →
+          - generic [ref=f5e149]:
+            - link "GH Grace Hopper Recruiter workspace" [ref=f5e150] [cursor=pointer]:
+              - /url: /employer/profile
+              - generic [ref=f5e151]: GH
+              - generic [ref=f5e152]:
+                - generic [ref=f5e153]: Grace Hopper
+                - generic [ref=f5e154]: Recruiter workspace
+            - button "Log out" [ref=f5e155] [cursor=pointer]
+      - main [ref=f5e159]:
+        - generic [ref=f5e160]:
+          - link "← Back to jobs" [ref=f5e161] [cursor=pointer]:
+            - /url: /employer/jobs
+          - generic [ref=f5e162]: Hiring · Post a job
+          - button "Save as draft" [ref=f5e163] [cursor=pointer]
+          - button "Publish" [ref=f5e164] [cursor=pointer]
+        - generic [ref=f5e165]:
+          - generic [ref=f5e166]:
+            - heading "Post a job" [level=1] [ref=f5e167]
+            - paragraph [ref=f5e168]: Fill in the details below to post a new role. Fields marked with * are required.
+          - generic [ref=f5e169]:
+            - button "1 Job Information" [ref=f5e170] [cursor=pointer]:
+              - generic [ref=f5e171]: "1"
+              - text: Job Information
+            - button "2 Company Details" [ref=f5e172] [cursor=pointer]:
+              - generic [ref=f5e173]: "2"
+              - text: Company Details
+            - button "3 Requirements" [ref=f5e174] [cursor=pointer]:
+              - generic [ref=f5e175]: "3"
+              - text: Requirements
+            - button "4 Preview & Submit" [ref=f5e176] [cursor=pointer]:
+              - generic [ref=f5e177]: "4"
+              - text: Preview & Submit
+          - generic [ref=f5e178]:
+            - generic [ref=f5e179]:
+              - generic [ref=f5e180]:
+                - heading "Job Information" [level=3] [ref=f5e181]
+                - paragraph [ref=f5e182]: Basic information about the job position.
+              - generic [ref=f5e183]:
+                - generic [ref=f5e184]:
+                  - generic [ref=f5e185]: Job Title *
+                  - textbox "e.g. Senior Frontend Developer" [ref=f5e186]
+                - generic [ref=f5e187]:
+                  - generic [ref=f5e188]:
+                    - generic [ref=f5e189]: Job Type
+                    - combobox [ref=f5e190] [cursor=pointer]:
+                      - option "Full Time" [selected]
+                      - option "Part Time"
+                      - option "Contract"
+                      - option "Temporary"
+                      - option "Internship"
+                      - option "Freelance"
+                  - generic [ref=f5e191]:
+                    - generic [ref=f5e192]: Location *
+                    - textbox "e.g. New York, NY or Remote" [ref=f5e193]
+                - generic [ref=f5e194]:
+                  - generic [ref=f5e195]:
+                    - generic [ref=f5e196]: Minimum Salary ($)
+                    - spinbutton "e.g. 60000" [ref=f5e197]
+                  - generic [ref=f5e198]:
+                    - generic [ref=f5e199]: Maximum Salary ($)
+                    - spinbutton "e.g. 90000" [ref=f5e200]
+                  - generic [ref=f5e201]:
+                    - generic [ref=f5e202]: Per
+                    - combobox [ref=f5e203] [cursor=pointer]:
+                      - option "Year" [selected]
+                      - option "Month"
+                      - option "Week"
+                      - option "Hour"
+                - generic [ref=f5e204] [cursor=pointer]:
+                  - checkbox "This is a remote position" [ref=f5e205]
+                  - generic [ref=f5e206]: This is a remote position
+                - generic [ref=f5e207]:
+                  - generic [ref=f5e208]: Job Description *
+                  - textbox "Describe the job responsibilities, required skills, and other details…" [ref=f5e209]
+            - generic [ref=f5e210]:
+              - button "← Back" [disabled] [ref=f5e211]
+              - button "Next →" [ref=f5e212] [cursor=pointer]
+    - region "Notifications Alt+T"
+  - button "Open Next.js Dev Tools" [ref=f5e218] [cursor=pointer]
+  - alert [ref=f5e222]

@@ -1,0 +1,82 @@
+- generic [active] [ref=f7e1]:
+  - generic [ref=f7e2]:
+    - generic [ref=f7e3]:
+      - generic [ref=f7e5]:
+        - generic [ref=f7e6]:
+          - link "Jobocate home" [ref=f7e7] [cursor=pointer]:
+            - /url: /
+            - img "Jobocate" [ref=f7e8]:
+              - generic [ref=f7e13]: jobocate
+          - generic [ref=f7e14]:
+            - button "Notifications" [ref=f7e15] [cursor=pointer]: ◔
+            - button "Collapse sidebar" [ref=f7e17] [cursor=pointer]: «
+        - button "⌕ Search & jump… ⌘K" [ref=f7e18] [cursor=pointer]:
+          - generic [ref=f7e19]: ⌕
+          - generic [ref=f7e20]: Search & jump…
+          - generic [ref=f7e21]: ⌘K
+        - generic [ref=f7e22]:
+          - generic [ref=f7e23]: Workspace
+          - generic [ref=f7e24]:
+            - link "Dashboard" [ref=f7e25] [cursor=pointer]:
+              - /url: /app/dashboard
+            - link "Job Matches" [ref=f7e34] [cursor=pointer]:
+              - /url: /app/matches
+            - link "Job Profiles" [ref=f7e41] [cursor=pointer]:
+              - /url: /app/job-profiles
+            - link "Saved" [ref=f7e48] [cursor=pointer]:
+              - /url: /app/saved
+            - link "Applications" [ref=f7e54] [cursor=pointer]:
+              - /url: /app/tracker
+            - link "Offers" [ref=f7e62] [cursor=pointer]:
+              - /url: /app/offers
+            - link "Auto-Apply" [ref=f7e71] [cursor=pointer]:
+              - /url: /app/auto-apply
+          - generic [ref=f7e78]: Toolkit
+          - generic [ref=f7e79]:
+            - link "Resumes" [ref=f7e80] [cursor=pointer]:
+              - /url: /app/resume-library
+            - link "Interview Prep" [ref=f7e86] [cursor=pointer]:
+              - /url: /app/interview
+            - link "Live Interview LIVE" [ref=f7e92] [cursor=pointer]:
+              - /url: /app/live-interview
+              - generic [ref=f7e96]: Live Interview
+              - generic [ref=f7e97]: LIVE
+          - generic [ref=f7e98]: Premium
+          - generic [ref=f7e99]:
+            - link "Concierge ✦" [ref=f7e100] [cursor=pointer]:
+              - /url: /app/concierge
+              - generic [ref=f7e106]: Concierge
+              - generic [ref=f7e107]: ✦
+            - link "Messages ✦" [ref=f7e108] [cursor=pointer]:
+              - /url: /app/messages
+              - generic [ref=f7e116]: Messages
+              - generic [ref=f7e117]: ✦
+          - link "Auto-apply credits — / — this week" [ref=f7e118] [cursor=pointer]:
+            - /url: /app/auto-apply
+            - generic [ref=f7e119]: Auto-apply credits
+            - generic [ref=f7e120]:
+              - generic [ref=f7e121]: —
+              - generic [ref=f7e122]: / — this week
+          - link "Settings" [ref=f7e125] [cursor=pointer]:
+            - /url: /app/settings
+          - generic [ref=f7e132]:
+            - link "AL Ada Lovelace Free plan" [ref=f7e133] [cursor=pointer]:
+              - /url: /app/settings
+              - generic [ref=f7e134]: AL
+              - generic [ref=f7e135]:
+                - generic [ref=f7e136]: Ada Lovelace
+                - generic [ref=f7e137]: Free plan
+            - button "Log out" [ref=f7e138] [cursor=pointer]
+      - main [ref=f7e142]:
+        - generic [ref=f7e143]:
+          - link "‹ Toolkit / Resumes" [ref=f7e144] [cursor=pointer]:
+            - /url: /app/resume-library
+          - generic [ref=f7e145]: Saved · just now
+          - generic [ref=f7e147] [cursor=pointer]: Import file
+          - button "Export PDF" [ref=f7e148] [cursor=pointer]
+          - button "Tailor to a job ✦" [ref=f7e149] [cursor=pointer]
+        - status [ref=f7e150]:
+          - generic [ref=f7e152]: Loading your résumé…
+    - region "Notifications Alt+T"
+  - button "Open Next.js Dev Tools" [ref=f7e158] [cursor=pointer]
+  - alert [ref=f7e162]

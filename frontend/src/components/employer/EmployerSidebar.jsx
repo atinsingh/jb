@@ -121,9 +121,9 @@ const Glyph = {
 
 /* --------------------------------------------------------------- data --- */
 // command palette destinations (mirrors the dc Component.destinations())
-const I_TINT = '#1E2438', I_INK = '#8DA2F5';
-const N_TINT = '#24221B', N_INK = '#B8B1A4';
-const G_TINT = '#1E2D24', G_INK = '#5BD08C';
+const I_TINT = 'var(--jb-a-tint)', I_INK = 'var(--jb-a-accent)';
+const N_TINT = 'var(--jb-a-control)', N_INK = 'var(--jb-a-ink-warm)';
+const G_TINT = 'var(--jb-a-invert-panel)', G_INK = 'var(--jb-a-accent)';
 
 const DESTINATIONS = [
   { key: 'post', label: 'Post a job', hint: 'Create a new req', dc: 'Employer Post Job.dc.html', tag: '+', tint: I_TINT, ink: I_INK },
@@ -249,26 +249,28 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
     borderRadius: 11,
     fontSize: 14.5,
     fontWeight: on ? 700 : 500,
-    color: on ? '#FBF8F1' : '#B8B1A4',
-    background: on ? (ai ? 'rgba(31,164,99,0.14)' : 'rgba(66,99,235,0.14)') : 'transparent',
+    // The active label used to be white on a dark rail. The rail is light now,
+    // so the active state is carried by the accent instead.
+    color: on ? 'var(--jb-a-accent)' : 'var(--jb-a-ink-2)',
+    background: on ? 'var(--jb-a-tint)' : 'transparent',
     textDecoration: 'none',
   });
 
   const NavItem = ({ it }) => {
     const on = active === it.key;
     const ai = !!it.ai;
-    const accent = ai ? '#1FA463' : '#4263EB';
+    const accent = ai ? 'var(--jb-a-accent)' : 'var(--jb-a-accent)';
     const showDot = (!!it.dot && narrow) || (!!it.badge && narrow);
     return (
       <Link href={appRoute(it.dc)} title={it.label} className="em-nav" style={navStyle(on, ai)}>
         <span style={{ position: 'absolute', left: -14, top: 9, bottom: 9, width: 3, borderRadius: '0 3px 3px 0', background: on ? accent : 'transparent' }} />
-        <span style={{ flexShrink: 0, display: 'flex', color: on ? (ai ? '#5BD08C' : '#8DA2F5') : (ai ? '#5A8A6E' : '#7A7367') }}>{Glyph[it.glyph]}</span>
+        <span style={{ flexShrink: 0, display: 'flex', color: on ? (ai ? 'var(--jb-a-accent)' : 'var(--jb-a-accent)') : (ai ? 'var(--jb-a-ink-warm)' : 'var(--jb-a-ink-warm)') }}>{Glyph[it.glyph]}</span>
         {wide && <span style={{ flex: 1 }}>{it.label}</span>}
         {it.badge && wide && (
-          <span style={{ flexShrink: 0, fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, color: '#FFFFFF', background: accent, borderRadius: 999, padding: '2px 7px' }}>{it.badge}</span>
+          <span style={{ flexShrink: 0, fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, color: 'var(--jb-a-card)', background: accent, borderRadius: 999, padding: '2px 7px' }}>{it.badge}</span>
         )}
         {showDot && (
-          <span style={{ position: 'absolute', top: 8, right: 8, width: 7, height: 7, borderRadius: '50%', background: accent, border: '1.5px solid #15140F' }} />
+          <span style={{ position: 'absolute', top: 8, right: 8, width: 7, height: 7, borderRadius: '50%', background: accent, border: '1.5px solid var(--jb-a-rail)' }} />
         )}
         {it.dot && wide && (
           <span style={{ flexShrink: 0, width: 7, height: 7, borderRadius: '50%', background: accent }} />
@@ -279,17 +281,17 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
 
   const sectionLabel = (txt, opts = {}) => {
     const { mt = 6, ai = false } = opts;
-    if (!wide) return <div style={{ height: 1, background: '#221F18', margin: '14px 8px' }} />;
+    if (!wide) return <div style={{ height: 1, background: 'var(--jb-a-control)', margin: '14px 8px' }} />;
     if (ai) {
       return (
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: `${mt}px 10px 10px` }}>
-          <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#6B6456' }}>{txt}</span>
-          <span style={{ color: '#5BD08C', fontSize: 11 }}>✦</span>
+          <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--jb-a-ink-warm)' }}>{txt}</span>
+          <span style={{ color: 'var(--jb-a-accent)', fontSize: 11 }}>✦</span>
         </div>
       );
     }
     return (
-      <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#6B6456', padding: `${mt}px 10px 10px` }}>{txt}</div>
+      <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--jb-a-ink-warm)', padding: `${mt}px 10px 10px` }}>{txt}</div>
     );
   };
 
@@ -302,9 +304,9 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    border: '1px solid #2C2A22',
-    background: '#1E1C15',
-    color: '#8A8378',
+    border: '1px solid var(--jb-a-line-strong)',
+    background: 'var(--jb-a-rail)',
+    color: 'var(--jb-a-ink-warm)',
     borderRadius: 8,
     cursor: 'pointer',
     fontSize: 13,
@@ -320,32 +322,38 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
         top: 0,
         alignSelf: 'flex-start',
         flexShrink: 0,
+        // The rail header overflowed its 250px width and painted over the page
+        // title sitting next to it (a "RECRUITER" chip alongside the wordmark
+        // and three icon buttons measured ~308px; the chip is gone now, since
+        // every screen behind this rail is the recruiter surface). Clip here so
+        // nothing can escape the rail regardless of what the header grows to.
+        overflow: 'hidden',
         fontFamily: 'var(--jb-font-sans)',
         zIndex: 30,
       }}
     >
       <style>{`
         #emside-root a { text-decoration:none; }
-        #emside-root .em-nav:hover { background:#221F18 !important; }
+        #emside-root .em-nav:hover { background:var(--jb-a-control) !important; }
         #empanel::-webkit-scrollbar { width:8px; }
-        #empanel::-webkit-scrollbar-thumb { background:#34322A; border-radius:8px; }
-        #empalette input::placeholder { color:#6B6456; }
+        #empanel::-webkit-scrollbar-thumb { background:var(--jb-a-line); border-radius:8px; }
+        #empalette input::placeholder { color:var(--jb-a-ink-warm); }
         #empalette input:focus { outline:none; }
-        .em-pal-row:hover { background:#24221B; }
-        .em-notif-row:hover { background:#221F18; }
-        .em-postjob:hover { background:#364FC7 !important; }
+        .em-pal-row:hover { background:var(--jb-a-control); }
+        .em-notif-row:hover { background:var(--jb-a-control); }
+        .em-postjob:hover { background:var(--jb-a-accent-deep) !important; }
         @keyframes empop { from { opacity:0; transform:translateY(8px) scale(0.98); } to { opacity:1; transform:translateY(0) scale(1); } }
         @keyframes emfade { from { opacity:0; } to { opacity:1; } }
       `}</style>
 
       {/* MOBILE HAMBURGER */}
       {mobile && !drawerOpen && (
-        <button onClick={() => setDrawerOpen(true)} title="Menu" style={{ position: 'fixed', top: 14, left: 14, zIndex: 70, width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#15140F', color: '#FBF8F1', border: '1px solid #2C2A22', borderRadius: 12, cursor: 'pointer', fontSize: 18, boxShadow: '0 8px 20px -8px rgba(0,0,0,0.4)' }}>☰</button>
+        <button onClick={() => setDrawerOpen(true)} title="Menu" style={{ position: 'fixed', top: 14, left: 14, zIndex: 70, width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--jb-a-ink)', color: 'var(--jb-a-card)', border: '1px solid var(--jb-a-line-strong)', borderRadius: 12, cursor: 'pointer', fontSize: 18, boxShadow: 'var(--jb-a-shadow-lift)' }}>☰</button>
       )}
 
       {/* MOBILE SCRIM */}
       {mobile && drawerOpen && (
-        <div onClick={() => setDrawerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 75, background: 'rgba(16,15,11,0.5)', animation: 'emfade 0.2s ease' }} />
+        <div onClick={() => setDrawerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 75, background: 'var(--jb-a-scrim)', animation: 'emfade 0.2s ease' }} />
       )}
 
       {/* PANEL */}
@@ -359,9 +367,9 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
           zIndex: mobile ? 80 : 1,
           transform: mobile ? (drawerOpen ? 'translateX(0)' : 'translateX(-110%)') : 'none',
           transition: 'transform 0.25s ease',
-          boxShadow: mobile ? '0 30px 60px -20px rgba(0,0,0,0.6)' : 'none',
-          background: '#15140F',
-          color: '#B8B1A4',
+          boxShadow: mobile ? '0 30px 60px -20px var(--jb-a-scrim)' : 'none',
+          background: 'var(--jb-a-rail)',
+          color: 'var(--jb-a-ink-warm)',
           display: 'flex',
           flexDirection: 'column',
         }}
@@ -369,14 +377,13 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
         {/* HEADER */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: narrow ? 'center' : 'space-between', gap: 8, padding: '18px 14px 16px' }}>
           {wide && (
-            <Link href={appRoute('Employer Dashboard.dc.html')} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 9 }}>
-              <Logo theme="dark" size={24} accent="#8DA2F5" />
-              <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.12em', color: '#8DA2F5', background: '#1E2438', border: '1px solid #2E3A63', borderRadius: 5, padding: '3px 6px' }}>RECRUITER</span>
+            <Link href={appRoute('Employer Dashboard.dc.html')} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 9, overflow: 'hidden' }}>
+              <Logo size={24} accent="var(--jb-a-accent)" />
             </Link>
           )}
           {narrow && (
             <Link href={appRoute('Employer Dashboard.dc.html')} aria-label="Jobocate home" style={{ display: 'flex' }}>
-              <Logo theme="dark" size={26} mark accent="#8DA2F5" />
+              <Logo size={26} mark accent="var(--jb-a-accent)" />
             </Link>
           )}
           <div style={{ display: 'flex', gap: 6 }}>
@@ -387,7 +394,7 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
               <button onClick={() => setNotifOpen((n) => !n)} title="Notifications" style={{ ...iconBtn, position: 'relative' }}>
                 ◔
                 {NOTIFS.length > 0 && (
-                  <span style={{ position: 'absolute', top: 5, right: 5, width: 6, height: 6, borderRadius: '50%', background: '#4263EB', border: '1.5px solid #1E1C15' }} />
+                  <span style={{ position: 'absolute', top: 5, right: 5, width: 6, height: 6, borderRadius: '50%', background: 'var(--jb-a-accent)', border: '1.5px solid var(--jb-a-rail)' }} />
                 )}
               </button>
             )}
@@ -402,14 +409,14 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
 
         {/* POST A JOB (primary CTA) */}
         {wide && (
-          <Link href={appRoute('Employer Post Job.dc.html')} className="em-postjob" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, margin: '0 14px 14px', padding: 12, background: '#4263EB', borderRadius: 11, fontSize: 14.5, fontWeight: 700, color: '#FFFFFF' }}>
+          <Link href={appRoute('Employer Post Job.dc.html')} className="em-postjob" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, margin: '0 14px 14px', padding: 12, background: 'var(--jb-a-accent)', borderRadius: 11, fontSize: 14.5, fontWeight: 700, color: 'var(--jb-a-card)' }}>
             <span style={{ fontSize: 17, lineHeight: 1, fontWeight: 400 }}>＋</span> Post a job
           </Link>
         )}
         {narrow && (
           <>
-            <Link href={appRoute('Employer Post Job.dc.html')} className="em-postjob" title="Post a job" style={{ width: 46, height: 44, margin: '0 auto 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#4263EB', borderRadius: 11, color: '#FFFFFF', fontSize: 20, fontWeight: 400 }}>＋</Link>
-            <button onClick={() => { setPaletteOpen(true); setQuery(''); }} title="Search" style={{ width: 46, height: 42, margin: '0 auto 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1E1C15', border: '1px solid #2C2A22', borderRadius: 10, cursor: 'pointer', color: '#8A8378', fontSize: 15 }}>⌕</button>
+            <Link href={appRoute('Employer Post Job.dc.html')} className="em-postjob" title="Post a job" style={{ width: 46, height: 44, margin: '0 auto 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--jb-a-accent)', borderRadius: 11, color: 'var(--jb-a-card)', fontSize: 20, fontWeight: 400 }}>＋</Link>
+            <button onClick={() => { setPaletteOpen(true); setQuery(''); }} title="Search" style={{ width: 46, height: 42, margin: '0 auto 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--jb-a-card)', border: '1px solid var(--jb-a-line)', borderRadius: 10, cursor: 'pointer', color: 'var(--jb-a-ink-warm)', fontSize: 15 }}>⌕</button>
           </>
         )}
 
@@ -436,37 +443,37 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
           </div>
 
           {wide && (
-            <Link href={appRoute('Employer Upgrade.dc.html')} style={{ marginTop: 22, padding: 16, border: '1px solid #2C2A22', borderRadius: 14, background: 'linear-gradient(160deg, #1E2A22, #15140F)', display: 'block' }}>
+            <Link href={appRoute('Employer Upgrade.dc.html')} style={{ marginTop: 22, padding: 16, border: '1px solid var(--jb-a-line-strong)', borderRadius: 14, background: 'linear-gradient(160deg, var(--jb-a-tint), var(--jb-a-ink))', display: 'block' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                <span style={{ color: '#5BD08C', fontSize: 11 }}>✦</span>
-                <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#5BD08C' }}>AI hiring</span>
+                <span style={{ color: 'var(--jb-a-accent)', fontSize: 11 }}>✦</span>
+                <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--jb-a-accent)' }}>AI hiring</span>
               </div>
-              <div style={{ fontSize: 13.5, lineHeight: 1.5, color: '#D8D2C4', marginBottom: 12 }}>
+              <div style={{ fontSize: 13.5, lineHeight: 1.5, color: 'var(--jb-a-ink-2)', marginBottom: 12 }}>
                 Autopilot, Copilot, and the Sourcing Agent help you screen and reach candidates faster.
               </div>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: '#8DA2F5' }}>See plans <span>→</span></span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: 'var(--jb-a-accent)' }}>See plans <span>→</span></span>
             </Link>
           )}
 
           <div style={{ flex: 1, minHeight: 18 }} />
 
           {wide ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '12px 10px 4px', marginTop: 8, borderTop: '1px solid #2C2A22' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '12px 10px 4px', marginTop: 8, borderTop: '1px solid var(--jb-a-line-strong)' }}>
               <Link href={appRoute('Employer Settings.dc.html')} style={{ display: 'flex', alignItems: 'center', gap: 11, flex: 1, minWidth: 0, textDecoration: 'none' }}>
-                <span style={{ width: 36, height: 36, flexShrink: 0, borderRadius: '50%', background: '#4263EB', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13 }}>{initials}</span>
+                <span style={{ width: 36, height: 36, flexShrink: 0, borderRadius: '50%', background: 'var(--jb-a-accent)', color: 'var(--jb-a-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13 }}>{initials}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#FBF8F1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</div>
-                  <div style={{ fontSize: 11.5, color: '#8A8378', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{subLabel}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--jb-a-ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--jb-a-ink-warm)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{subLabel}</div>
                 </div>
               </Link>
-              <button type="button" onClick={() => auth.logout && auth.logout()} title="Log out" aria-label="Log out" style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, border: '1px solid #2C2A22', background: 'transparent', color: '#8A8378', cursor: 'pointer' }}>
+              <button type="button" onClick={() => auth.logout && auth.logout()} title="Log out" aria-label="Log out" style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, border: '1px solid var(--jb-a-line-strong)', background: 'transparent', color: 'var(--jb-a-ink-warm)', cursor: 'pointer' }}>
                 <svg {...svgProps}><path d="M15 12H4" /><path d="M8 8l-4 4 4 4" /><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" /></svg>
               </button>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '12px 0 2px', marginTop: 8, borderTop: '1px solid #2C2A22' }}>
-              <Link href={appRoute('Employer Settings.dc.html')} title={`${displayName} · ${subLabel}`} style={{ width: 36, height: 36, borderRadius: '50%', background: '#4263EB', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, textDecoration: 'none' }}>{initials}</Link>
-              <button type="button" onClick={() => auth.logout && auth.logout()} title="Log out" aria-label="Log out" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, border: '1px solid #2C2A22', background: 'transparent', color: '#8A8378', cursor: 'pointer' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '12px 0 2px', marginTop: 8, borderTop: '1px solid var(--jb-a-line-strong)' }}>
+              <Link href={appRoute('Employer Settings.dc.html')} title={`${displayName} · ${subLabel}`} style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--jb-a-accent)', color: 'var(--jb-a-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, textDecoration: 'none' }}>{initials}</Link>
+              <button type="button" onClick={() => auth.logout && auth.logout()} title="Log out" aria-label="Log out" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, border: '1px solid var(--jb-a-line-strong)', background: 'transparent', color: 'var(--jb-a-ink-warm)', cursor: 'pointer' }}>
                 <svg {...svgProps}><path d="M15 12H4" /><path d="M8 8l-4 4 4 4" /><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" /></svg>
               </button>
             </div>
@@ -476,26 +483,26 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
 
       {/* COMMAND PALETTE */}
       {paletteOpen && (
-        <div onClick={() => setPaletteOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(16,15,11,0.55)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '12vh', animation: 'emfade 0.15s ease' }}>
-          <div id="empalette" onClick={(e) => e.stopPropagation()} style={{ width: 'min(92vw,560px)', background: '#1A1813', border: '1px solid #2C2A22', borderRadius: 16, boxShadow: '0 40px 80px -30px rgba(0,0,0,0.7)', overflow: 'hidden', animation: 'empop 0.18s ease' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '16px 18px', borderBottom: '1px solid #2C2A22' }}>
-              <span style={{ color: '#6B6456', fontSize: 16 }}>⌕</span>
-              <input value={query} onChange={(e) => setQuery(e.target.value)} autoFocus placeholder="Search screens & actions…" style={{ flex: 1, background: 'none', border: 'none', fontFamily: 'inherit', fontSize: 16, color: '#FBF8F1' }} />
-              <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#6B6456', border: '1px solid #2C2A22', borderRadius: 5, padding: '2px 6px' }}>ESC</span>
+        <div onClick={() => setPaletteOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'var(--jb-a-scrim)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '12vh', animation: 'emfade 0.15s ease' }}>
+          <div id="empalette" onClick={(e) => e.stopPropagation()} style={{ width: 'min(92vw,560px)', background: 'var(--jb-a-card)', border: '1px solid var(--jb-a-line)', borderRadius: 16, boxShadow: 'var(--jb-a-shadow-lift)', overflow: 'hidden', animation: 'empop 0.18s ease' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '16px 18px', borderBottom: '1px solid var(--jb-a-line-strong)' }}>
+              <span style={{ color: 'var(--jb-a-ink-warm)', fontSize: 16 }}>⌕</span>
+              <input value={query} onChange={(e) => setQuery(e.target.value)} autoFocus placeholder="Search screens & actions…" style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontFamily: 'inherit', fontSize: 16, color: 'var(--jb-a-ink)' }} />
+              <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: 'var(--jb-a-ink-warm)', border: '1px solid var(--jb-a-line-strong)', borderRadius: 5, padding: '2px 6px' }}>ESC</span>
             </div>
             <div style={{ maxHeight: '50vh', overflowY: 'auto', padding: 8 }}>
               {filtered.map((r) => (
-                <Link key={r.key} href={appRoute(r.dc)} className="em-pal-row" style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '11px 12px', borderRadius: 10, color: '#E4DECF' }}>
+                <Link key={r.key} href={appRoute(r.dc)} className="em-pal-row" style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '11px 12px', borderRadius: 10, color: 'var(--jb-a-line)' }}>
                   <span style={{ width: 32, height: 32, flexShrink: 0, borderRadius: 8, background: r.tint, color: r.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--jb-font-mono)', fontWeight: 600, fontSize: 11 }}>{r.tag}</span>
                   <span style={{ flex: 1 }}>
-                    <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: '#FBF8F1' }}>{r.label}</span>
-                    <span style={{ display: 'block', fontSize: 12, color: '#8A8378' }}>{r.hint}</span>
+                    <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: 'var(--jb-a-ink)' }}>{r.label}</span>
+                    <span style={{ display: 'block', fontSize: 12, color: 'var(--jb-a-ink-warm)' }}>{r.hint}</span>
                   </span>
-                  <span style={{ color: '#6B6456', fontSize: 14 }}>↵</span>
+                  <span style={{ color: 'var(--jb-a-ink-warm)', fontSize: 14 }}>↵</span>
                 </Link>
               ))}
               {filtered.length === 0 && (
-                <div style={{ padding: 24, textAlign: 'center', fontSize: 13.5, color: '#6B6456' }}>No matches for “{query}”.</div>
+                <div style={{ padding: 24, textAlign: 'center', fontSize: 13.5, color: 'var(--jb-a-ink-warm)' }}>No matches for “{query}”.</div>
               )}
             </div>
           </div>
@@ -505,23 +512,23 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
       {/* NOTIFICATIONS */}
       {notifOpen && (
         <div onClick={() => setNotifOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 88, animation: 'emfade 0.12s ease' }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ position: 'fixed', left: mobile ? 14 : collapsed ? 84 : 260, top: 84, width: 340, maxWidth: '88vw', background: '#1A1813', border: '1px solid #2C2A22', borderRadius: 16, boxShadow: '0 40px 80px -30px rgba(0,0,0,0.7)', overflow: 'hidden', animation: 'empop 0.18s ease' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px 18px', borderBottom: '1px solid #2C2A22' }}>
-              <span style={{ fontSize: 15, fontWeight: 700, color: '#FBF8F1' }}>Notifications</span>
-              <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#8DA2F5' }}>{NOTIFS.length} new</span>
+          <div onClick={(e) => e.stopPropagation()} style={{ position: 'fixed', left: mobile ? 14 : collapsed ? 84 : 260, top: 84, width: 340, maxWidth: '88vw', background: 'var(--jb-a-card)', border: '1px solid var(--jb-a-line)', borderRadius: 16, boxShadow: 'var(--jb-a-shadow-lift)', overflow: 'hidden', animation: 'empop 0.18s ease' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px 18px', borderBottom: '1px solid var(--jb-a-line-strong)' }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--jb-a-ink)' }}>Notifications</span>
+              <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: 'var(--jb-a-accent)' }}>{NOTIFS.length} new</span>
             </div>
             <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
               {NOTIFS.map((n, i) => (
-                <Link key={i} href={appRoute(n.dc)} className="em-notif-row" style={{ display: 'flex', gap: 12, padding: '13px 18px', borderBottom: '1px solid #221F18' }}>
+                <Link key={i} href={appRoute(n.dc)} className="em-notif-row" style={{ display: 'flex', gap: 12, padding: '13px 18px', borderBottom: '1px solid var(--jb-a-control)' }}>
                   <span style={{ width: 32, height: 32, flexShrink: 0, borderRadius: 8, background: n.tint, color: n.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--jb-font-mono)', fontWeight: 600, fontSize: 11 }}>{n.tag}</span>
                   <span style={{ flex: 1 }}>
-                    <span style={{ display: 'block', fontSize: 13.5, lineHeight: 1.45, color: '#E4DECF' }}>{n.text}</span>
-                    <span style={{ display: 'block', fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#8A8378', marginTop: 3 }}>{n.time}</span>
+                    <span style={{ display: 'block', fontSize: 13.5, lineHeight: 1.45, color: 'var(--jb-a-line)' }}>{n.text}</span>
+                    <span style={{ display: 'block', fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: 'var(--jb-a-ink-warm)', marginTop: 3 }}>{n.time}</span>
                   </span>
                 </Link>
               ))}
               {NOTIFS.length === 0 && (
-                <div style={{ padding: '28px 18px', textAlign: 'center', fontSize: 13.5, color: '#8A8378' }}>You’re all caught up — no notifications yet.</div>
+                <div style={{ padding: '28px 18px', textAlign: 'center', fontSize: 13.5, color: 'var(--jb-a-ink-warm)' }}>You’re all caught up — no notifications yet.</div>
               )}
             </div>
           </div>

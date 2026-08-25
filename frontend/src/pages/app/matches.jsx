@@ -6,6 +6,13 @@ import Link from 'next/link';
 import AppSidebar from '@/components/app/AppSidebar';
 import { appRoute } from '@/components/app/appRoutes';
 import { LoadingState, EmptyState, ErrorState } from '@/components/app/AppStates';
+import Button from '@/components/app/ui/Button';
+import Badge from '@/components/app/ui/Badge';
+import Chip from '@/components/app/ui/Chip';
+import Toggle from '@/components/app/ui/Toggle';
+import MonoLabel from '@/components/app/ui/MonoLabel';
+import PageHeader from '@/components/app/ui/PageHeader';
+import FitScore from '@/components/app/ui/FitScore';
 import {
   getMyMatches,
   getJobRecommendations,
@@ -31,6 +38,12 @@ const MATCH_OPTS = [
   { key: 70, label: '70%+ · Good' },
   { key: 60, label: '60%+ · Possible' },
 ];
+// Salary-floor slider bounds, in thousands. The range covers the bands this
+// product actually sees; SALARY_MIN doubles as the "off" position, so the
+// control reads "Any" rather than "$80k and above" until it is moved.
+const SALARY_MIN = 80;
+const SALARY_MAX = 260;
+
 const LEVELS = ['intern', 'entry', 'junior', 'mid', 'senior', 'lead', 'staff', 'principal', 'manager', 'director', 'vp', 'executive'];
 
 const seniorityIndex = (title = '') => {
@@ -77,8 +90,8 @@ const within7d = (d) => !!d && (Date.now() - new Date(d).getTime()) / 86400000 <
 
 /* ----------------------------------------------------------- normalize --- */
 const TINTS = [
-  { bg: '#EAF6EE', fg: '#157A49' },
-  { bg: '#F4EFE4', fg: '#1B1A16' },
+  { bg: 'var(--jb-a-tint)', fg: 'var(--jb-a-accent)' },
+  { bg: 'var(--jb-a-control)', fg: 'var(--jb-a-ink)' },
 ];
 
 const initialsOf = (name) => {
@@ -138,6 +151,12 @@ const normalizeMatch = (m, i) => {
     location: job.location || job.workLocation || 'Location',
     type: job.type || job.jobType || job.employmentType || 'Full-time',
     salary: formatSalary(job),
+    // Numeric floor in thousands, for the salary slider. Null means the
+    // posting published no band — see the note under the slider.
+    salaryMinK: (() => {
+      const v = job.salaryMin ?? job.minSalary;
+      return v ? Math.round(Number(v) / 1000) : null;
+    })(),
     match: score != null ? `${Math.round(score)}%` : null,
     matchNum: score != null ? Math.round(score) : null,
     // The scorer weights skills heavily, so a posting that listed none produces
@@ -166,8 +185,31 @@ const normalizeMatch = (m, i) => {
   };
 };
 
-// Shared card shell.
-const CARD = 'bg-jb-paper border border-jb-line-2 rounded-[18px] p-[22px]';
+// The three columns the design reveals when a row is expanded. Every line is
+// built from a field the scorer actually returned — when a field is missing we
+// say so plainly instead of writing filler, because a fabricated reason is
+// worse than an absent one on a screen whose whole promise is "here is why".
+const reasonsFor = (m) => {
+  const skills = (m.matchedSkills || []).filter(Boolean).slice(0, 6);
+  const gaps = (m.missingSkills || []).filter(Boolean).slice(0, 6);
+  const logistics = [m.location, m.type, m.salary].filter(Boolean).join(' · ');
+  return [
+    {
+      k: 'Skills',
+      v: skills.length
+        ? `${skills.join(', ')} — all present in your profile.`
+        : m.reason || 'The posting did not list enough skills to compare against yours.',
+    },
+    {
+      k: 'Gaps',
+      v: gaps.length
+        ? `${gaps.join(', ')} — asked for, and not on your profile yet.`
+        : 'Nothing they asked for is obviously missing from your profile.',
+    },
+    { k: 'Logistics', v: logistics || 'The posting did not say where or on what terms.' },
+  ];
+};
+
 
 /* ----------------------------------------------------------- component --- */
 export default function AppMatches() {
@@ -186,11 +228,14 @@ export default function AppMatches() {
   // empty state can explain itself instead of showing a bare shrug.
   const [impact, setImpact] = useState(null);
   const [detail, setDetail] = useState(null); // the job whose full JD is open
-  const [filters, setFilters] = useState({ remote: false, role: null, minMatch: null, seniority: null, thisWeek: false });
+  const [filters, setFilters] = useState({ remote: false, role: null, minMatch: null, seniority: null, thisWeek: false, salaryFloor: SALARY_MIN });
+  const [sort, setSort] = useState('fit');
+  const [openRow, setOpenRow] = useState(null); // id of the expanded row
 
   const setFilter = (k, v) => setFilters((p) => ({ ...p, [k]: p[k] === v ? (typeof v === 'boolean' ? false : null) : v }));
-  const resetFilters = () => setFilters({ remote: false, role: null, minMatch: null, seniority: null, thisWeek: false });
-  const anyFilter = filters.remote || filters.role || filters.minMatch || filters.seniority || filters.thisWeek;
+  const resetFilters = () => setFilters({ remote: false, role: null, minMatch: null, seniority: null, thisWeek: false, salaryFloor: SALARY_MIN });
+  const anyFilter =
+    filters.remote || filters.role || filters.minMatch || filters.seniority || filters.thisWeek || filters.salaryFloor > SALARY_MIN;
 
   const visibleJobs = jobs.filter((j) => {
     if (filters.remote && j.workplaceType !== 'REMOTE') return false;
@@ -198,8 +243,18 @@ export default function AppMatches() {
     if (filters.minMatch && (j.matchNum == null || j.matchNum < filters.minMatch)) return false;
     if (filters.role && roleFamilyOf(j.role) !== filters.role) return false;
     if (filters.seniority && !seniorityMatches(j.role, filters.seniority)) return false;
+    // A posting with no published band is unknown, not low — keep it.
+    if (filters.salaryFloor > SALARY_MIN && j.salaryMinK != null && j.salaryMinK < filters.salaryFloor) return false;
     return true;
   });
+
+  // Sorting happens after filtering so the rank the user sees is the rank of
+  // what is actually on screen. Unscored rows sink rather than lead.
+  const sortedJobs = [...visibleJobs].sort((a, b) =>
+    sort === 'fit'
+      ? (b.matchNum ?? -1) - (a.matchNum ?? -1)
+      : new Date(b.scrapedAt || 0) - new Date(a.scrapedAt || 0),
+  );
 
   const load = useCallback(async (opts = {}) => {
     setLoading(true);
@@ -323,269 +378,330 @@ export default function AppMatches() {
   return (
     <>
       <Head>
-        <title>Job Matches — Jobocate</title>
+        <title>Matches · Jobocate</title>
       </Head>
 
-      <div className="flex min-h-screen bg-jb-cream font-sans text-jb-ink [&_::-webkit-scrollbar]:w-2 [&_::-webkit-scrollbar]:h-2 [&_::-webkit-scrollbar-thumb]:bg-jb-line-3 [&_::-webkit-scrollbar-thumb]:rounded-lg">
+      <div style={{ display: 'flex', height: '100vh', background: 'var(--jb-a-stage)', color: 'var(--jb-a-ink)', fontFamily: 'var(--jb-font-sans)', overflow: 'hidden' }}>
         <AppSidebar active="matches" />
 
-        <main className="flex-1 min-w-0 flex flex-col">
-          {/* HEADER */}
-          <header className="sticky top-0 z-20 flex items-center flex-wrap gap-3 px-5 py-[15px] bg-[rgba(247,243,234,0.85)] backdrop-blur-[10px] border-b border-jb-line">
-            <div className="font-mono text-[11.5px] tracking-[0.1em] uppercase text-jb-ink-faint">Workspace / Job Matches</div>
-            <div className="flex-1 min-w-[12px]" />
-            {/* flexible search so the header can't push wider than the viewport */}
-            <div className="flex items-center gap-[9px] bg-jb-paper border border-jb-line-3 rounded-full px-[15px] py-[9px] flex-[1_1_180px] max-w-[280px] min-w-0">
-              <span className="text-jb-ink-ghost text-sm">⌕</span>
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') runSearch(); }}
-                placeholder="Search roles, companies…"
-                aria-label="Search roles"
-                className="flex-1 border-none bg-transparent font-sans text-sm text-jb-ink min-w-0 focus:outline-none"
-              />
-              <span className="font-mono text-[11px] text-jb-ink-ghost border border-jb-line-3 rounded-[5px] px-[5px] py-px">↵</span>
-            </div>
-            {/* Was "Auto-apply all ✦" — the loudest control on the page promised
-                exactly the bulk-blast behaviour this product positions against,
-                and linked to a settings page rather than applying to anything.
-                Now it describes its destination, and is styled as secondary so
-                it stops competing with the per-role Apply action. */}
-            <Link
-              href={appRoute('App Auto-Apply.dc.html')}
-              className="inline-flex items-center gap-[7px] border border-jb-line-2 text-jb-ink text-[13.5px] font-semibold px-4 py-2.5 rounded-full no-underline hover:bg-jb-surface-2"
-            >
-              Auto-apply settings
-            </Link>
-          </header>
-
-          <div className="px-8 pt-[30px] pb-12 w-full">
-            {/* TITLE */}
-            <div className="flex items-end justify-between gap-6 mb-[22px]">
-              <div>
-                <h1 className="font-display font-normal text-[40px] leading-none tracking-[-0.01em] mb-2">
-                  {browsing ? 'Open roles' : 'Your matches'}
-                </h1>
-                <p className="text-[15.5px] text-jb-ink-muted m-0">
-                  {browsing ? (
-                    <>
-                      <b className="text-jb-ink">{total} roles</b> you’re eligible for
-                      {targetCountries.length ? (
-                        <> · in or remote to {targetCountries.join(', ')}</>
-                      ) : candidateCountry ? (
-                        <> · in or remote to {candidateCountry}</>
-                      ) : (
-                        <> · <Link href="/app/preferences" className="text-jb-green-text font-semibold">set your job preferences</Link> to filter by location</>
-                      )}
-                      {query ? <> · “{query}”</> : null}
-                    </>
-                  ) : (
-                    <>
-                      <b className="text-jb-ink">{total} roles</b> fit your profile · <span className="text-jb-green-text font-semibold">{newToday} new today</span>
-                    </>
-                  )}
-                </p>
-              </div>
-            </div>
-
-            {/* FILTER BAR */}
-            <div className="flex items-center gap-2 flex-wrap mb-5">
-              <FilterChip label="All matches" active={!anyFilter} onClick={resetFilters} />
-              <FilterChip label="Remote" active={filters.remote} onClick={() => setFilter('remote', true)} />
-              <FilterDropdown label="Role" value={filters.role} options={ROLE_FAMILIES.map((r) => ({ key: r, label: r }))} onSelect={(v) => setFilter('role', v)} />
-              <FilterDropdown label="Min match" value={filters.minMatch} options={MATCH_OPTS} onSelect={(v) => setFilter('minMatch', v)} />
-              <FilterDropdown label="Seniority" value={filters.seniority} options={SENIORITY_OPTS} onSelect={(v) => setFilter('seniority', v)} />
-              <FilterChip label="This week" active={filters.thisWeek} onClick={() => setFilter('thisWeek', true)} />
-              <div className="flex-1" />
-              <span className="font-mono text-xs text-jb-ink-subtle">
-                {anyFilter ? `${visibleJobs.length} shown` : browsing ? 'Latest roles' : 'Sorted by match'}
-              </span>
-            </div>
-
-            {/* ERROR STATE */}
-            {error && !loading && (
-              <div className={CARD}>
-                <ErrorState error={error} onRetry={load} />
-              </div>
+        {/* ── FILTER RAIL ───────────────────────────────────────────────── */}
+        <aside
+          aria-label="Filters"
+          style={{
+            width: 268,
+            flexShrink: 0,
+            borderRight: '1px solid var(--jb-a-line)',
+            background: 'var(--jb-a-rail)',
+            padding: '28px 24px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 30,
+            overflow: 'auto',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            <span style={{ fontSize: 15, fontWeight: 600 }}>Filters</span>
+            <span style={{ flex: 1 }} />
+            {anyFilter && (
+              <Button variant="quiet" onClick={resetFilters} style={{ fontSize: 13.5 }}>
+                Reset
+              </Button>
             )}
+          </div>
 
-            {/* JOB CARDS */}
-            <div className="flex flex-col gap-3">
-              {loading
-                ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
-                : error
-                ? null
-                : visibleJobs.map((job, i) => {
-                    const on = job.jobId ? !!interested[job.jobId] : false;
-                    return (
-                      <div key={job.id || i} onClick={() => job.jobId && setDetail(job)} className={`${CARD} transition-[border-color] duration-150 hover:border-jb-green ${job.jobId ? 'cursor-pointer' : 'cursor-default'}`}>
-                        <div className="flex items-start gap-4">
-                          <CompanyAvatar logoUrl={job.logoUrl} initials={job.logo} bg={job.bg} fg={job.fg} />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2.5 mb-[5px]">
-                              <h3 className="text-[17.5px] font-bold m-0">{job.role}</h3>
-                              {job.isNew && <span className="font-mono text-[11px] font-semibold text-jb-green-ink bg-jb-green px-2 py-0.5 rounded-full">NEW</span>}
-                            </div>
-                            <div className="flex items-center gap-[9px] text-[13.5px] text-jb-ink-muted mb-3.5 flex-wrap">
-                              <span className="font-semibold text-jb-ink">{job.company}</span>
-                              {job.location && <><span className="text-[#c9bfac]">·</span><span>{job.location}</span></>}
-                              {job.type && <><span className="text-[#c9bfac]">·</span><span>{job.type}</span></>}
-                              {job.salary && <><span className="text-[#c9bfac]">·</span><span className="font-mono text-jb-green-text">{job.salary}</span></>}
-                            </div>
-                            <div className="flex items-center gap-[7px] flex-wrap">
-                              {job.tags.map((t, ti) => (
-                                <span key={ti} className="text-xs font-medium text-jb-ink-muted bg-[#f4efe4] rounded-[7px] px-2.5 py-[5px]">{t}</span>
+          {/* Match quality — single-choice, so it is a real radiogroup rather
+              than a row of toggle buttons. */}
+          <div role="radiogroup" aria-label="Match quality" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <MonoLabel>Match quality</MonoLabel>
+            {MATCH_OPTS.map((o) => {
+              const on = filters.minMatch === o.key;
+              return (
+                <button
+                  key={o.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => setFilter('minMatch', o.key)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    background: 'none',
+                    border: 0,
+                    padding: 0,
+                    fontFamily: 'inherit',
+                    fontSize: 14.5,
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    color: on ? 'var(--jb-a-ink)' : 'var(--jb-a-ink-2)',
+                  }}
+                >
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: '50%',
+                      border: `1.5px solid ${on ? 'var(--jb-a-accent)' : 'var(--jb-a-line-strong)'}`,
+                      background: 'var(--jb-a-card)',
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: on ? 'var(--jb-a-accent)' : 'transparent' }} />
+                  </span>
+                  <span>{o.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <MonoLabel>Seniority</MonoLabel>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {SENIORITY_OPTS.map((s) => (
+                <Chip key={s.key} selected={filters.seniority === s.key} onClick={() => setFilter('seniority', s.key)}>
+                  {s.label}
+                </Chip>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <MonoLabel>Role family</MonoLabel>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {ROLE_FAMILIES.map((f) => (
+                <Chip key={f} selected={filters.role === f} onClick={() => setFilter('role', f)}>
+                  {f}
+                </Chip>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <MonoLabel>Base salary floor</MonoLabel>
+            <span style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+              <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 22, fontWeight: 600 }}>
+                {filters.salaryFloor > SALARY_MIN ? `$${filters.salaryFloor}k` : 'Any'}
+              </span>
+              {filters.salaryFloor > SALARY_MIN && <span style={{ fontSize: 13, color: 'var(--jb-a-ink-3)' }}>and above</span>}
+            </span>
+            <input
+              type="range"
+              min={SALARY_MIN}
+              max={SALARY_MAX}
+              step={5}
+              value={filters.salaryFloor}
+              aria-label="Minimum base salary in thousands"
+              onChange={(e) => setFilters((p) => ({ ...p, salaryFloor: Number(e.target.value) }))}
+              style={{ width: '100%', accentColor: 'var(--jb-a-accent)' }}
+            />
+            <span style={{ fontSize: 12.5, lineHeight: 1.45, color: 'var(--jb-a-ink-3)' }}>
+              Roles that don’t publish a band stay in the list — an unknown salary isn’t a low one.
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Toggle checked={filters.remote} label="Remote only" onChange={() => setFilter('remote', !filters.remote)} />
+              <span style={{ fontSize: 14.5 }}>Remote only</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Toggle checked={filters.thisWeek} label="Posted this week" onChange={() => setFilter('thisWeek', !filters.thisWeek)} />
+              <span style={{ fontSize: 14.5 }}>Posted this week</span>
+            </div>
+          </div>
+        </aside>
+
+        {/* ── LIST ──────────────────────────────────────────────────────── */}
+        <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <PageHeader
+            title="Matches"
+            level="h1"
+            action={
+              <>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    runSearch();
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+                >
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search roles…"
+                    aria-label="Search roles"
+                    style={{
+                      height: 34,
+                      width: 190,
+                      padding: '0 12px',
+                      borderRadius: 999,
+                      border: '1px solid var(--jb-a-line)',
+                      background: 'var(--jb-a-card)',
+                      fontFamily: 'inherit',
+                      fontSize: 13.5,
+                      color: 'var(--jb-a-ink)',
+                    }}
+                  />
+                </form>
+                <span style={{ fontSize: 14, color: 'var(--jb-a-ink-3)' }}>Sort</span>
+                <button
+                  type="button"
+                  onClick={() => setSort((s) => (s === 'fit' ? 'newest' : 'fit'))}
+                  style={{ background: 'none', border: 0, padding: 0, fontFamily: 'inherit', fontSize: 14, fontWeight: 600, color: 'var(--jb-a-ink)', cursor: 'pointer' }}
+                >
+                  {sort === 'fit' ? 'Best fit' : 'Newest'}
+                </button>
+              </>
+            }
+          />
+
+          <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 'clamp(28px, 4vw, 44px) clamp(20px, 4vw, 44px) 64px' }}>
+            {loading && <LoadingState label="Finding roles you're eligible for…" />}
+            {!loading && error && <ErrorState error={error} onRetry={() => load({})} />}
+
+            {!loading && !error && (
+              <>
+                <h2
+                  style={{
+                    margin: 0,
+                    fontFamily: 'var(--jb-font-display)',
+                    fontWeight: 400,
+                    fontSize: 'var(--jb-a-display-md)',
+                    lineHeight: 1.04,
+                    letterSpacing: '-0.02em',
+                    maxWidth: '22ch',
+                  }}
+                >
+                  {sortedJobs.length
+                    ? `${sortedJobs.length} role${sortedJobs.length === 1 ? '' : 's'} you're eligible for.`
+                    : 'Nothing clears your filters yet.'}
+                </h2>
+                <p style={{ margin: '14px 0 0', fontSize: 17, lineHeight: 1.55, color: 'var(--jb-a-ink-2)', maxWidth: '58ch' }}>
+                  {browsing
+                    ? 'Filtered to the countries you can legally work in. Open any row to see the reasoning — fit is a signal, never a promise.'
+                    : 'Ranked on skills, seniority and availability. Open any row to see the reasoning — fit is a signal, never a promise.'}
+                </p>
+
+                {sortedJobs.length === 0 && (
+                  <div style={{ marginTop: 32 }}>
+                    <EmptyState
+                      title={anyFilter ? 'No roles match these filters' : 'No eligible roles yet'}
+                      hint={
+                        anyFilter
+                          ? 'Loosen a filter — the match-quality floor is usually the one doing the work.'
+                          : impact
+                            ? `${impact.totalJobs ?? impact.total ?? 0} roles in the pool, none of them in ${targetCountries.length ? targetCountries.join(', ') : 'your target countries'} yet.`
+                            : 'Add a résumé and your preferences, and roles start arriving here ranked by fit.'
+                      }
+                      action={
+                        anyFilter ? (
+                          <Button onClick={resetFilters}>Reset filters</Button>
+                        ) : (
+                          <Button href="/app/preferences">Set preferences</Button>
+                        )
+                      }
+                    />
+                  </div>
+                )}
+
+                {sortedJobs.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', marginTop: 38, borderTop: '1px solid var(--jb-a-ink)' }}>
+                    {sortedJobs.map((m, i) => {
+                      const open = openRow === m.id;
+                      const saved = m.jobId ? !!interested[m.jobId] : false;
+                      const primary = i === 0;
+                      return (
+                        <div
+                          key={m.id}
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            borderBottom: '1px solid var(--jb-a-line-soft)',
+                            background: open ? 'var(--jb-a-tint-wash)' : 'transparent',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 22, padding: '20px 18px 20px 6px', flexWrap: 'wrap' }}>
+                            <button
+                              type="button"
+                              onClick={() => setOpenRow(open ? null : m.id)}
+                              aria-expanded={open}
+                              style={{
+                                flex: '1 1 340px',
+                                minWidth: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 22,
+                                background: 'none',
+                                border: 0,
+                                padding: 0,
+                                fontFamily: 'inherit',
+                                textAlign: 'left',
+                                color: 'inherit',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <FitScore fit={m.matchNum} caption="fit" style={{ width: 60, flexShrink: 0 }} />
+                              <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                <span style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+                                  <span style={{ fontSize: 19, fontWeight: 600 }}>{m.role}</span>
+                                  <span style={{ fontSize: 16, color: 'var(--jb-a-ink-soft)' }}>{m.company}</span>
+                                  {m.isNew && <Badge tone="flag">New today</Badge>}
+                                  {m.lowConfidence && <Badge tone="neutral">Estimated</Badge>}
+                                </span>
+                                <span style={{ fontSize: 14.5, color: 'var(--jb-a-ink-3)' }}>
+                                  {[m.location, m.type, m.salary].filter(Boolean).join(' · ')}
+                                </span>
+                              </span>
+                            </button>
+
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                              <Button
+                                variant="icon"
+                                aria-label={saved ? `Remove ${m.role} from saved` : `Save ${m.role}`}
+                                aria-pressed={saved}
+                                onClick={() => toggleInterest(m)}
+                                style={{ color: saved ? 'var(--jb-a-accent)' : 'var(--jb-a-ink-soft)' }}
+                              >
+                                {saved ? '♥' : '♡'}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant={primary ? 'primary' : 'secondary'}
+                                onClick={() => setDetail(m)}
+                              >
+                                {primary ? 'Review' : 'Open'}
+                              </Button>
+                            </span>
+                          </div>
+
+                          {open && (
+                            <div style={{ display: 'flex', gap: 36, padding: '0 18px 24px 88px', flexWrap: 'wrap' }}>
+                              {reasonsFor(m).map((r) => (
+                                <span key={r.k} style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                  <MonoLabel style={{ letterSpacing: '0.14em' }}>{r.k}</MonoLabel>
+                                  <span style={{ fontSize: 14.5, lineHeight: 1.5, color: 'var(--jb-a-ink-2)' }}>{r.v}</span>
+                                </span>
                               ))}
                             </div>
-                          </div>
-                          <div className="flex-shrink-0 flex flex-col items-end gap-3.5">
-                            <div className="text-right">
-                              {/* A score derived from a posting that listed no
-                                  skills is a default, not a measurement. Showing
-                                  a confident "60% match" beside our own note that
-                                  "skills weren't listed on this posting" is false
-                                  precision, so low-confidence scores are rendered
-                                  muted and labelled as an estimate. */}
-                              {job.match ? (
-                                <>
-                                  <div
-                                    className={`font-mono text-2xl font-semibold leading-none ${
-                                      job.lowConfidence ? 'text-jb-ink-subtle' : 'text-jb-green-text'
-                                    }`}
-                                    title={job.lowConfidence ? 'This posting listed no skills, so the score is a rough estimate.' : undefined}
-                                  >
-                                    {job.match}
-                                  </div>
-                                  <div className="text-[11px] text-jb-ink-subtle font-mono">
-                                    {job.lowConfidence ? 'estimate' : 'match'}
-                                  </div>
-                                </>
-                              ) : job.source ? (
-                                <span className="font-mono text-[11px] font-semibold text-jb-ink-subtle bg-[#f4efe4] px-[9px] py-1 rounded-full">via {job.source}</span>
-                              ) : null}
-                            </div>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={(e) => { e.stopPropagation(); toggleInterest(job); }}
-                                title={on ? 'Saved as interested' : 'Mark as interested'}
-                                aria-label={on ? 'Saved as interested' : 'Mark as interested'}
-                                className={`w-10 h-10 rounded-[11px] cursor-pointer text-base hover:bg-[#f4efe4] ${on ? 'border border-jb-green bg-jb-green-tint text-jb-green-text' : 'border border-jb-line-3 bg-jb-paper text-jb-ink-subtle'}`}
-                              >
-                                {on ? '♥' : '♡'}
-                              </button>
-                              {job.externalUrl ? (
-                                <a href={job.externalUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-2 bg-jb-ink text-jb-cream text-[13.5px] font-semibold px-[18px] py-[11px] rounded-[11px] no-underline hover:bg-[#2a2820]">Apply →</a>
-                              ) : (
-                                <Link href={appRoute('App Apply.dc.html')} className="inline-flex items-center gap-2 bg-jb-ink text-jb-cream text-[13.5px] font-semibold px-[18px] py-[11px] rounded-[11px] no-underline hover:bg-[#2a2820]">Apply →</Link>
-                              )}
-                            </div>
-                          </div>
+                          )}
                         </div>
-                        {(job.eligibility || job.reason) && (
-                          <div className="mt-4 pt-[15px] border-t border-jb-soft-2 flex flex-col gap-[9px]">
-                            {job.eligibility && (
-                              <div className="flex items-center gap-2.5 flex-wrap">
-                                <EligBadge status={job.eligibility.status} label={job.eligibility.label} />
-                                <span className="text-[13px] text-jb-ink-muted">{job.eligibility.geographyExplanation}</span>
-                                {/* "Eligible with conditions" without naming the
-                                    condition makes the candidate guess. The
-                                    engine already produces a reason per soft
-                                    finding — show it. */}
-                                {(job.eligibility.reasons || [])
-                                  .filter((r) => r.severity === 'soft')
-                                  .slice(0, 1)
-                                  .map((r) => (
-                                    <span key={r.code} className="text-[13px] text-[#8A6100]">
-                                      — {r.message}
-                                    </span>
-                                  ))}
-                              </div>
-                            )}
-                            {job.reason && (
-                              <div className="flex items-center gap-2.5">
-                                {/* This eyebrow labels a category, so it keeps the
-                                    mono/uppercase treatment used for eyebrows
-                                    elsewhere. The scorer's verdict ("Possible
-                                    match") used to be rendered here instead —
-                                    uppercased into "POSSIBLE MATCH", which read as
-                                    debug output and merely restated the "72% match"
-                                    above it. The verdict now lives in the detail
-                                    modal, where a verdict belongs. */}
-                                <span className="font-mono text-[11px] tracking-[0.06em] uppercase text-jb-green flex-shrink-0">{browsing ? 'About' : 'Why it fits'}</span>
-                                <span className="text-[13px] text-jb-ink-muted overflow-hidden text-ellipsis whitespace-nowrap">{job.reason}</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-            </div>
-
-            {/* EMPTY STATE — explains itself with real pool counts rather than
-                falling back to an unfiltered, out-of-country job list. */}
-            {!loading && !error && jobs.length === 0 && (
-              <div className={`${CARD} px-[30px] py-5`}>
-                {impact && impact.poolSize > 0 && targetCountries.length > 0 ? (
-                  <EmptyState
-                    icon="◎"
-                    title={`No roles in ${targetCountries.join(', ')} right now`}
-                    hint={`${impact.poolSize} jobs in the pool · ${impact.excludedByGeography} outside your target countries · ${impact.excludedByPreference} filtered by your preferences · ${impact.belowMinMatch} below your match threshold.`}
-                    action={
-                      <Link
-                        href={appRoute('App Job Profiles.dc.html')}
-                        className="mt-1 inline-flex items-center gap-2 font-sans text-[13.5px] font-semibold text-jb-green-text no-underline"
-                      >
-                        Widen your target countries →
-                      </Link>
-                    }
-                  />
-                ) : impact && impact.poolSize === 0 ? (
-                  <EmptyState
-                    icon="◎"
-                    title="No roles ingested yet"
-                    hint="The job pool is empty — roles from company boards will appear here once ingested."
-                  />
-                ) : !targetCountries.length ? (
-                  <EmptyState
-                    icon="◎"
-                    title="Tell us where you're looking"
-                    hint="Set the countries you're targeting and we'll only show roles you can actually take."
-                    action={
-                      <Link
-                        href={appRoute('App Job Profiles.dc.html')}
-                        className="mt-1 inline-flex items-center gap-2 font-sans text-[13.5px] font-semibold text-jb-green-text no-underline"
-                      >
-                        Set up a job profile →
-                      </Link>
-                    }
-                  />
-                ) : (
-                  <EmptyState
-                    icon="◎"
-                    title={query ? 'No roles found' : 'No roles yet'}
-                    hint={query ? 'Try a different search term.' : 'Roles from company boards will appear here once ingested.'}
-                  />
+                      );
+                    })}
+                  </div>
                 )}
-              </div>
-            )}
-            {!loading && !error && jobs.length > 0 && visibleJobs.length === 0 && (
-              <div className={`${CARD} px-[30px] py-5`}>
-                <EmptyState
-                  icon="⚑"
-                  title="No roles match these filters"
-                  hint="Loosen a filter to see more roles."
-                  action={<button type="button" onClick={resetFilters} className="mt-1 font-sans text-[13.5px] font-semibold text-jb-green-text bg-transparent border-none cursor-pointer">Clear filters</button>}
-                />
-              </div>
-            )}
 
-            {/* LOAD MORE */}
-            {!loading && !error && jobs.length > 0 && remaining > 0 && (
-              <div className="flex justify-center mt-[26px]">
-                <button onClick={browsing ? loadMore : undefined} className="font-sans text-sm font-semibold text-jb-ink bg-jb-paper border border-jb-line-input rounded-full px-[26px] py-[13px] cursor-pointer hover:bg-[#f4efe4]">Load {Math.min(remaining, 60)} more {browsing ? 'roles' : 'matches'}</button>
-              </div>
+                {remaining > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'center', marginTop: 32 }}>
+                    <Button variant="secondary" onClick={loadMore}>
+                      Load {Math.min(remaining, 40)} more
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </main>
@@ -624,12 +740,12 @@ const decodeAndSanitize = (html) => {
 // Tailwind replacement for the old `.jb-jd` styled-jsx block. The injected
 // markup can't carry utility classes, so we target its elements here.
 const JD_PROSE =
-  'text-sm leading-[1.7] text-[#2a2820] ' +
-  '[&_h1]:text-[15px] [&_h1]:font-bold [&_h1]:mt-[18px] [&_h1]:mb-2 [&_h1]:text-jb-ink ' +
-  '[&_h2]:text-[15px] [&_h2]:font-bold [&_h2]:mt-[18px] [&_h2]:mb-2 [&_h2]:text-jb-ink ' +
-  '[&_h3]:text-[15px] [&_h3]:font-bold [&_h3]:mt-[18px] [&_h3]:mb-2 [&_h3]:text-jb-ink ' +
+  'text-sm leading-[1.7] text-[var(--jb-a-ink-2)] ' +
+  '[&_h1]:text-[15px] [&_h1]:font-bold [&_h1]:mt-[18px] [&_h1]:mb-2 [&_h1]:text-[var(--jb-a-ink)] ' +
+  '[&_h2]:text-[15px] [&_h2]:font-bold [&_h2]:mt-[18px] [&_h2]:mb-2 [&_h2]:text-[var(--jb-a-ink)] ' +
+  '[&_h3]:text-[15px] [&_h3]:font-bold [&_h3]:mt-[18px] [&_h3]:mb-2 [&_h3]:text-[var(--jb-a-ink)] ' +
   '[&_p]:mb-3 [&_ul]:mb-3.5 [&_ul]:pl-5 [&_ol]:mb-3.5 [&_ol]:pl-5 [&_li]:mb-1.5 ' +
-  '[&_a]:text-jb-green-text [&_b]:text-jb-ink [&_strong]:text-jb-ink [&_img]:max-w-full';
+  '[&_a]:text-[var(--jb-a-accent)] [&_b]:text-[var(--jb-a-ink)] [&_strong]:text-[var(--jb-a-ink)] [&_img]:max-w-full';
 
 function JobDetailModal({ job, saved, onToggleSave, onClose }) {
   const [full, setFull] = useState(null);
@@ -659,30 +775,30 @@ function JobDetailModal({ job, saved, onToggleSave, onClose }) {
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-[90] bg-[rgba(27,26,22,0.45)] backdrop-blur-[2px] flex justify-end"
+      className="fixed inset-0 z-[90] bg-[var(--jb-a-scrim)] backdrop-blur-[2px] flex justify-end"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-[720px] max-w-[94vw] h-screen bg-jb-cream border-l border-jb-line flex flex-col"
+        className="w-[720px] max-w-[94vw] h-screen bg-[var(--jb-a-stage)] border-l border-[var(--jb-a-line)] flex flex-col"
       >
         {/* header */}
-        <div className="flex items-start gap-3.5 px-6 py-5 border-b border-jb-line">
+        <div className="flex items-start gap-3.5 px-6 py-5 border-b border-[var(--jb-a-line)]">
           <CompanyAvatar logoUrl={job.logoUrl} initials={job.logo} bg={job.bg} fg={job.fg} />
           <div className="flex-1 min-w-0">
             <h2 className="text-xl font-bold mb-1 leading-[1.2]">{job.role}</h2>
-            <div className="text-[13.5px] text-jb-ink-muted">
-              <span className="font-semibold text-jb-ink">{job.company}</span>
+            <div className="text-[13.5px] text-[var(--jb-a-ink-2)]">
+              <span className="font-semibold text-[var(--jb-a-ink)]">{job.company}</span>
               {job.location && <> · {job.location}</>}
               {job.type && <> · {job.type}</>}
             </div>
             {job.eligibility && (
               <div className="flex items-center gap-[9px] mt-2 flex-wrap">
                 <EligBadge status={job.eligibility.status} label={job.eligibility.label} />
-                <span className="text-[12.5px] text-[#6b655a]">{job.eligibility.geographyExplanation}</span>
+                <span className="text-[12.5px] text-[var(--jb-a-ink-3)]">{job.eligibility.geographyExplanation}</span>
               </div>
             )}
           </div>
-          <button onClick={onClose} aria-label="Close" className="w-8 h-8 rounded-lg border border-[#e0d8c7] bg-jb-paper cursor-pointer text-[15px] text-[#6b655a] flex-shrink-0">✕</button>
+          <button onClick={onClose} aria-label="Close" className="w-8 h-8 rounded-lg border border-[var(--jb-a-line)] bg-[var(--jb-a-card)] cursor-pointer text-[15px] text-[var(--jb-a-ink-3)] flex-shrink-0">✕</button>
         </div>
 
         {/* eligibility reasons */}
@@ -692,7 +808,7 @@ function JobDetailModal({ job, saved, onToggleSave, onClose }) {
               <span
                 key={i}
                 title={r.code}
-                className={`text-[11.5px] px-2.5 py-1 rounded-full ${r.severity === 'hard' ? 'bg-[#FBEDE4] text-[#9B4A2F]' : r.severity === 'soft' ? 'bg-jb-amber-tint text-[#B26A29]' : 'bg-[#EFEAE0] text-[#6b655a]'}`}
+                className={`text-[11.5px] px-2.5 py-1 rounded-full ${r.severity === 'hard' ? 'bg-[var(--jb-a-danger-bg)] text-[var(--jb-a-danger-ink)]' : r.severity === 'soft' ? 'bg-[var(--jb-a-offer-bg)] text-[var(--jb-a-offer-ink)]' : 'bg-[var(--jb-a-control)] text-[var(--jb-a-ink-3)]'}`}
               >
                 {r.message}
               </span>
@@ -705,29 +821,29 @@ function JobDetailModal({ job, saved, onToggleSave, onClose }) {
           {job.tags?.length > 0 && (
             <div className="flex gap-[7px] flex-wrap mb-5">
               {job.tags.map((t, i) => (
-                <span key={i} className="text-xs font-medium text-jb-ink-muted bg-[#f4efe4] rounded-[7px] px-2.5 py-[5px]">{t}</span>
+                <span key={i} className="text-xs font-medium text-[var(--jb-a-ink-2)] bg-[var(--jb-a-control)] rounded-[7px] px-2.5 py-[5px]">{t}</span>
               ))}
             </div>
           )}
           {job.match && (
-            <div className="mb-[22px] p-4 rounded-[14px] border border-jb-line bg-jb-paper">
+            <div className="mb-[22px] p-4 rounded-[14px] border border-[var(--jb-a-line)] bg-[var(--jb-a-card)]">
               <div className={`flex items-baseline gap-2.5 ${job.matchedSkills?.length || job.missingSkills?.length ? 'mb-3' : ''}`}>
-                <span className="font-mono text-[22px] font-semibold text-jb-green-text leading-none">{job.match}</span>
+                <span className="font-mono text-[22px] font-semibold text-[var(--jb-a-accent)] leading-none">{job.match}</span>
                 <span className="text-[15px] font-bold">{job.matchLabel || 'Match'}</span>
               </div>
               {job.matchedSkills?.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 items-center mb-2">
-                  <span className="text-[11.5px] text-jb-ink-subtle mr-1">Your skills:</span>
+                  <span className="text-[11.5px] text-[var(--jb-a-ink-3)] mr-1">Your skills:</span>
                   {job.matchedSkills.map((s, i) => (
-                    <span key={i} className="text-xs font-semibold text-jb-green-text bg-jb-green-tint rounded-md px-[9px] py-[3px]">✓ {s}</span>
+                    <span key={i} className="text-xs font-semibold text-[var(--jb-a-accent)] bg-[var(--jb-a-tint)] rounded-md px-[9px] py-[3px]">✓ {s}</span>
                   ))}
                 </div>
               )}
               {job.missingSkills?.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 items-center mb-3">
-                  <span className="text-[11.5px] text-jb-ink-subtle mr-1">Not in profile:</span>
+                  <span className="text-[11.5px] text-[var(--jb-a-ink-3)] mr-1">Not in profile:</span>
                   {job.missingSkills.map((s, i) => (
-                    <span key={i} className="text-xs text-jb-ink-subtle bg-[#f4efe4] rounded-md px-[9px] py-[3px]">{s}</span>
+                    <span key={i} className="text-xs text-[var(--jb-a-ink-3)] bg-[var(--jb-a-control)] rounded-md px-[9px] py-[3px]">{s}</span>
                   ))}
                 </div>
               )}
@@ -735,12 +851,12 @@ function JobDetailModal({ job, saved, onToggleSave, onClose }) {
                 <div className="flex flex-col gap-1.5 mt-1">
                   {job.matchFactors.map((f, i) => (
                     <div key={i} className="flex items-center gap-2.5">
-                      <span className="w-32 flex-shrink-0 text-[11.5px] text-[#6b655a]">{f.label}</span>
-                      <div className="flex-1 h-[5px] rounded-full bg-jb-soft-2 overflow-hidden">
+                      <span className="w-32 flex-shrink-0 text-[11.5px] text-[var(--jb-a-ink-3)]">{f.label}</span>
+                      <div className="flex-1 h-[5px] rounded-full bg-[var(--jb-a-control)] overflow-hidden">
                         {/* width is data-driven → inline */}
-                        <div className="h-full bg-jb-green" style={{ width: `${Math.round((f.value || 0) * 100)}%` }} />
+                        <div className="h-full bg-[var(--jb-a-accent)]" style={{ width: `${Math.round((f.value || 0) * 100)}%` }} />
                       </div>
-                      <span className="w-8 text-right font-mono text-[11px] text-[#b7ae9c]">{Math.round((f.weight || 0) * 100)}%</span>
+                      <span className="w-8 text-right font-mono text-[11px] text-[var(--jb-a-ink-faint)]">{Math.round((f.weight || 0) * 100)}%</span>
                     </div>
                   ))}
                 </div>
@@ -748,7 +864,7 @@ function JobDetailModal({ job, saved, onToggleSave, onClose }) {
             </div>
           )}
 
-          <div className="font-mono text-[11px] tracking-[0.1em] uppercase text-jb-ink-faint mb-3">
+          <div className="font-mono text-[11px] tracking-[0.1em] uppercase text-[var(--jb-a-ink-faint)] mb-3">
             Job description
           </div>
           {loading ? (
@@ -763,18 +879,18 @@ function JobDetailModal({ job, saved, onToggleSave, onClose }) {
         </div>
 
         {/* footer actions */}
-        <div className="flex gap-2.5 px-6 py-3.5 border-t border-jb-line bg-jb-cream">
+        <div className="flex gap-2.5 px-6 py-3.5 border-t border-[var(--jb-a-line)] bg-[var(--jb-a-stage)]">
           <button
             onClick={onToggleSave}
             title={saved ? 'Saved' : 'Save'}
             aria-label={saved ? 'Saved' : 'Save'}
-            className={`w-11 h-11 rounded-xl cursor-pointer text-[17px] ${saved ? 'border border-jb-green bg-jb-green-tint text-jb-green-text' : 'border border-jb-line-3 bg-jb-paper text-jb-ink-subtle'}`}
+            className={`w-11 h-11 rounded-xl cursor-pointer text-[17px] ${saved ? 'border border-[var(--jb-a-accent)] bg-[var(--jb-a-tint)] text-[var(--jb-a-accent)]' : 'border border-[var(--jb-a-line-strong)] bg-[var(--jb-a-card)] text-[var(--jb-a-ink-3)]'}`}
           >
             {saved ? '♥' : '♡'}
           </button>
           <div className="flex-1" />
           {applyUrl && (
-            <a href={applyUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-jb-ink text-jb-cream text-[14.5px] font-bold px-[26px] py-[13px] rounded-xl no-underline">
+            <a href={applyUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-[var(--jb-a-ink)] text-[var(--jb-a-card)] text-[14.5px] font-bold px-[26px] py-[13px] rounded-xl no-underline">
               Apply on {job.source || 'company site'} →
             </a>
           )}
@@ -790,8 +906,8 @@ function CompanyAvatar({ logoUrl, initials, bg, fg }) {
   // bg/fg are per-company data → inline; the frame is static.
   return (
     <span
-      className="w-[52px] h-[52px] flex-shrink-0 rounded-[13px] overflow-hidden flex items-center justify-center font-bold text-[17px] border border-[#eee7d9]"
-      style={{ background: ok ? '#FFFFFF' : bg, color: fg }}
+      className="w-[52px] h-[52px] flex-shrink-0 rounded-[13px] overflow-hidden flex items-center justify-center font-bold text-[17px] border border-[var(--jb-a-line)]"
+      style={{ background: ok ? 'var(--jb-a-card)' : bg, color: fg }}
     >
       {ok ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -806,96 +922,11 @@ function CompanyAvatar({ logoUrl, initials, bg, fg }) {
 function EligBadge({ status, label }) {
   const ok = status === 'ELIGIBLE';
   return (
-    <span className={`text-[11px] font-bold px-[9px] py-[3px] rounded-full ${ok ? 'bg-jb-green-tint text-jb-green-text' : 'bg-jb-amber-tint text-[#B26A29]'}`}>
+    <span className={`text-[11px] font-bold px-[9px] py-[3px] rounded-full ${ok ? 'bg-[var(--jb-a-tint)] text-[var(--jb-a-accent)]' : 'bg-[var(--jb-a-offer-bg)] text-[var(--jb-a-offer-ink)]'}`}>
       {ok ? '✓ ' : '◑ '}
       {label}
     </span>
   );
 }
 
-function FilterChip({ label, active, onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex items-center gap-[7px] font-sans text-[13.5px] font-semibold rounded-full px-[15px] py-2 cursor-pointer ${active ? 'text-jb-green-ink bg-jb-green border border-jb-green' : 'text-jb-ink-heading bg-jb-paper border border-jb-line-3'}`}
-    >
-      {label}
-    </button>
-  );
-}
-
-function FilterDropdown({ label, value, options, onSelect }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-  useEffect(() => {
-    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
-  }, []);
-  const active = value != null && value !== false;
-  const selLabel = active ? options.find((o) => o.key === value)?.label || label : label;
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className={`inline-flex items-center gap-[7px] font-sans text-[13.5px] font-semibold rounded-full px-[15px] py-2 cursor-pointer ${active ? 'text-jb-green-text bg-jb-green-tint border border-jb-green' : 'text-jb-ink-heading bg-jb-paper border border-jb-line-3'}`}
-      >
-        {selLabel}
-        <span className="text-[11px] text-jb-ink-faint">▼</span>
-      </button>
-      {open && (
-        <div className="absolute top-[42px] left-0 z-30 min-w-[190px] bg-jb-paper border border-jb-line rounded-xl shadow-[0_18px_40px_-20px_rgba(27,26,22,0.4)] p-1.5">
-          {options.map((o) => (
-            <button
-              key={o.key}
-              type="button"
-              onClick={() => { onSelect(o.key); setOpen(false); }}
-              className={`block w-full text-left px-2.5 py-2 rounded-lg border-none cursor-pointer font-sans text-[13px] ${value === o.key ? 'bg-jb-green-tint text-jb-green-text' : 'bg-transparent text-[#2a2820]'}`}
-            >
-              {o.label}
-            </button>
-          ))}
-          {active && (
-            <button
-              type="button"
-              onClick={() => { onSelect(value); setOpen(false); }}
-              className="block w-full text-left px-2.5 py-2 mt-1 border-none border-t border-[#f1ebdf] bg-transparent cursor-pointer font-sans text-[12.5px] text-jb-ink-subtle"
-            >
-              Clear
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 /* ----------------------------------------------------------- skeleton --- */
-function SkeletonCard() {
-  const bar = 'bg-[linear-gradient(90deg,#F1EBDD_25%,#F7F2E7_37%,#F1EBDD_63%)] bg-[length:480px_100%] animate-jb-shimmer rounded-[7px]';
-  return (
-    <div className={CARD}>
-      <div className="flex items-start gap-4">
-        <span className={`w-[52px] h-[52px] flex-shrink-0 rounded-[13px] ${bar}`} />
-        <div className="flex-1 min-w-0">
-          <div className={`w-[220px] h-[18px] mb-2.5 ${bar}`} />
-          <div className={`w-[300px] h-[13px] mb-4 ${bar}`} />
-          <div className="flex gap-[7px]">
-            <span className={`w-[78px] h-[26px] ${bar}`} />
-            <span className={`w-16 h-[26px] ${bar}`} />
-            <span className={`w-[70px] h-[26px] ${bar}`} />
-          </div>
-        </div>
-        <div className="flex-shrink-0 flex flex-col items-end gap-3.5">
-          <div className={`w-12 h-7 ${bar}`} />
-          <div className="flex gap-2">
-            <span className={`w-10 h-10 ${bar}`} />
-            <span className={`w-[82px] h-10 ${bar}`} />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}

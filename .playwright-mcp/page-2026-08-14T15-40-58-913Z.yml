@@ -1,0 +1,58 @@
+- generic [active] [ref=f5e1]:
+  - generic [ref=f5e2]:
+    - generic [ref=f5e3]:
+      - generic [ref=f5e4]:
+        - generic [ref=f5e5]:
+          - link [ref=f5e6] [cursor=pointer]:
+            - /url: /
+            - img "Jobocate" [ref=f5e7]:
+              - generic [ref=f5e12]: jobocate
+          - generic [ref=f5e15]: Step 1 of 3
+        - generic [ref=f5e16]:
+          - generic [ref=f5e17]:
+            - generic [ref=f5e18]:
+              - generic [ref=f5e19]: "1"
+              - generic [ref=f5e20]: Résumé
+            - generic [ref=f5e22]:
+              - generic [ref=f5e23]: "2"
+              - generic [ref=f5e24]: Profile
+            - generic [ref=f5e26]:
+              - generic [ref=f5e27]: "3"
+              - generic [ref=f5e28]: Preferences
+          - heading "Add your résumé" [level=1] [ref=f5e29]
+          - paragraph [ref=f5e30]: We’ll read it once and turn it into a profile, matches and tailored applications.
+          - generic [ref=f5e31]:
+            - button "↑ Drop your résumé here PDF or DOCX, up to 10MB — or browse files" [ref=f5e32] [cursor=pointer]:
+              - generic [ref=f5e33]: ↑
+              - generic [ref=f5e34]:
+                - generic [ref=f5e35]: Drop your résumé here
+                - generic [ref=f5e36]: PDF or DOCX, up to 10MB — or browse files
+            - link "Don’t have one? Skip — build one →" [ref=f5e37] [cursor=pointer]:
+              - /url: /app/resume-builder
+          - button "Continue →" [disabled] [ref=f5e39]:
+            - text: Continue
+            - generic [ref=f5e40]: →
+        - generic [ref=f5e41]: © 2026 Jobocate
+      - generic [ref=f5e42]:
+        - generic [ref=f5e43]: — Setting up your copilot
+        - generic [ref=f5e44]:
+          - paragraph [ref=f5e45]: 3 steps to your first matches.
+          - generic [ref=f5e46]:
+            - generic [ref=f5e47]:
+              - generic [ref=f5e48]: "1"
+              - generic [ref=f5e49]: Add your résumé
+            - generic [ref=f5e50]:
+              - generic [ref=f5e51]: "2"
+              - generic [ref=f5e52]: Confirm your profile
+            - generic [ref=f5e53]:
+              - generic [ref=f5e54]: "3"
+              - generic [ref=f5e55]: Set your preferences
+          - generic [ref=f5e56]:
+            - generic [ref=f5e57]: 48h
+            - generic [ref=f5e58]: Most members get their first interview request within two days of finishing setup.
+        - generic [ref=f5e59]:
+          - generic [ref=f5e60]: ✓
+          - text: Free to start · You approve every application
+    - region "Notifications Alt+T"
+  - button "Open Next.js Dev Tools" [ref=f5e66] [cursor=pointer]
+  - alert [ref=f5e70]

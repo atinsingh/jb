@@ -1,0 +1,6 @@
+[      98ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3001/_next/static/chunks/1yi7_react-dom_1papa4l._.js:15305
+[     107ms] [LOG] [HMR] connected @ http://localhost:3001/_next/static/chunks/1z9r_next_dist_0bkp3wz._.js:1226
+[     171ms] [WARNING] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior @ http://localhost:3001/_next/static/chunks/1z9r_next_dist_0bkp3wz._.js:1226
+[    2674ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3001/_next/static/chunks/1z9r_next_dist_0bkp3wz._.js:1226
+[   16956ms] [LOG] [Fast Refresh] done in 14383ms @ http://localhost:3001/_next/static/chunks/1z9r_next_dist_0bkp3wz._.js:1226
+[   17059ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3001/_next/static/chunks/1z9r_next_dist_0bkp3wz._.js:1226

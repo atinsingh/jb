@@ -1,0 +1,322 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - link "Skip to content" [ref=e5] [cursor=pointer]:
+          - /url: "#main"
+        - banner [ref=e6]:
+          - navigation "Main" [ref=e7]:
+            - link "Jobocate home" [ref=e8] [cursor=pointer]:
+              - /url: /
+              - img "Jobocate" [ref=e9]:
+                - generic [ref=e14]: jobocate
+            - generic [ref=e15]:
+              - link "Find Jobs" [ref=e16] [cursor=pointer]:
+                - /url: /jobs
+              - button "Product" [ref=e18] [cursor=pointer]
+              - link "For Employers" [ref=e21] [cursor=pointer]:
+                - /url: /employers
+              - link "Pricing" [ref=e22] [cursor=pointer]:
+                - /url: /pricing
+              - button "Resources" [ref=e24] [cursor=pointer]
+            - generic [ref=e27]:
+              - button "Switch to dark mode" [ref=e28] [cursor=pointer]
+              - link "Hiring dashboard" [ref=e31] [cursor=pointer]:
+                - /url: /employer/dashboard
+      - main [ref=e32]:
+        - generic [ref=e34]:
+          - generic [ref=e35]:
+            - generic [ref=e36]: FLIGHT PLAN · APPLY → INTERVIEW → OFFER
+            - heading "The shortest flight path to an offer." [level=1] [ref=e37]
+            - paragraph [ref=e38]: Jobocate charts your job search — where you are, what’s next, and the roles most likely to take you all the way. Every waypoint explained, every send approved by you.
+            - generic [ref=e39]:
+              - link "Chart my route" [ref=e40] [cursor=pointer]:
+                - /url: /app/signup
+              - link "Browse open roles" [ref=e41] [cursor=pointer]:
+                - /url: /jobs
+            - generic [ref=e42]: FREE TO START — NOTHING SENDS WITHOUT YOUR SAY-SO
+          - region "A sample application journey" [ref=e43]:
+            - img "Route from applied through interview to offer" [ref=e44]:
+              - generic [ref=e53]: APPLIED
+              - generic [ref=e54]: VIEWED
+              - generic [ref=e55]: YOU ARE HERE · INTERVIEW
+              - generic [ref=e56]: FINAL ROUND
+              - generic [ref=e57]: OFFER
+          - generic [ref=e58]:
+            - generic [ref=e59]: ELIGIBILITY-CHECKED MATCHES
+            - generic [ref=e60]: YOU APPROVE EVERY APPLICATION
+            - generic [ref=e61]: FREE TO START · CANCEL ANYTIME
+          - generic [ref=e62]:
+            - generic [ref=e63]:
+              - generic [ref=e64]:
+                - generic [ref=e65]: HOW IT WORKS
+                - heading "Three waypoints. One offer." [level=2] [ref=e66]
+              - paragraph [ref=e67]: Job search is a sequence — so we built it like one. Check in once, board only the flights worth taking.
+            - generic [ref=e68]:
+              - article [ref=e69]:
+                - generic [ref=e70]:
+                  - generic [ref=e71]: WAYPOINT 01
+                  - generic [ref=e72]: i.
+                - heading "Real matches, not keyword luck" [level=3] [ref=e73]
+                - paragraph [ref=e74]: Ranked on skills, experience and availability — never a black box. Every match opens to show exactly why it fits.
+              - article [ref=e75]:
+                - generic [ref=e76]:
+                  - generic [ref=e77]: WAYPOINT 02
+                  - generic [ref=e78]: ii.
+                - heading "You hold every boarding pass" [level=3] [ref=e79]
+                - paragraph [ref=e80]: Nothing is submitted without your approval. Auto-apply, if you turn it on, files only within the limits you set.
+              - article [ref=e81]:
+                - generic [ref=e82]:
+                  - generic [ref=e83]: WAYPOINT 03
+                  - generic [ref=e84]: iii.
+                - heading "Written from your real experience" [level=3] [ref=e85]
+                - paragraph [ref=e86]: Each application is tailored to the role from what you’ve actually done. No invented qualifications, ever.
+          - region "FLIGHT MANIFEST — YOUR APPLICATIONS" [ref=e87]:
+            - generic [ref=e88]:
+              - generic [ref=e89]:
+                - generic [ref=e90]:
+                  - generic [ref=e91]: FLIGHT MANIFEST — YOUR APPLICATIONS
+                  - generic [ref=e92]: Every application, live, in one place. Example shown.
+                - generic [ref=e93]: UPDATED JUST NOW
+              - generic [ref=e95]:
+                - generic [ref=e96]: Sr Product Designer
+                - generic [ref=e97]:
+                  - generic [ref=e98]: M
+                  - text: Meridian
+                - generic [ref=e99]: "92"
+                - generic [ref=e101]:
+                  - generic [ref=e102]: INTERVIEW
+                  - generic [ref=e103]: 60%
+              - generic [ref=e106]:
+                - generic [ref=e107]: Design Lead
+                - generic [ref=e108]:
+                  - generic [ref=e109]: J
+                  - text: Juniper
+                - generic [ref=e110]: "89"
+                - generic [ref=e112]:
+                  - generic [ref=e113]: OFFER
+                  - generic [ref=e114]: 95%
+              - generic [ref=e117]:
+                - generic [ref=e118]: Frontend Engineer
+                - generic [ref=e119]:
+                  - generic [ref=e120]: C
+                  - text: Cobalt Labs
+                - generic [ref=e121]: "86"
+                - generic [ref=e123]:
+                  - generic [ref=e124]: SCREENING
+                  - generic [ref=e125]: 35%
+              - generic [ref=e128]:
+                - generic [ref=e129]: Product Designer
+                - generic [ref=e130]:
+                  - generic [ref=e131]: A
+                  - text: Aster Health
+                - generic [ref=e132]: "84"
+                - generic [ref=e134]:
+                  - generic [ref=e135]: APPLIED
+                  - generic [ref=e136]: 15%
+          - generic [ref=e139]:
+            - generic [ref=e140]:
+              - heading "Apply to 5 roles that fit — not 50 that don’t." [level=2] [ref=e141]
+              - paragraph [ref=e142]: "Most job bots optimise for volume: blast applications everywhere and hope. Jobocate optimises for landing — the right roles, on your terms, with the reasoning shown."
+            - generic [ref=e143]:
+              - generic [ref=e144]:
+                - generic [ref=e145]: STANDBY — TYPICAL AUTO-APPLIERS
+                - generic [ref=e146]:
+                  - generic [ref=e147]: ✕
+                  - text: Spray applications at any job
+                - generic [ref=e148]:
+                  - generic [ref=e149]: ✕
+                  - text: Auto-send without asking you
+                - generic [ref=e150]:
+                  - generic [ref=e151]: ✕
+                  - text: “95% more likely” black-box promises
+                - generic [ref=e152]:
+                  - generic [ref=e153]: ✕
+                  - text: Hidden auto-renewals and credit packs
+                - generic [ref=e154]:
+                  - generic [ref=e155]: ✕
+                  - text: Candidate-only — employers never see the other side
+              - generic [ref=e156]:
+                - generic [ref=e157]: DIRECT — JOBOCATE
+                - generic [ref=e158]:
+                  - generic [ref=e159]: ✓
+                  - text: Only roles you’re actually eligible for
+                - generic [ref=e160]:
+                  - generic [ref=e161]: ✓
+                  - text: You approve every send
+                - generic [ref=e162]:
+                  - generic [ref=e163]: ✓
+                  - text: Every match opens to show exactly why
+                - generic [ref=e164]:
+                  - generic [ref=e165]: ✓
+                  - text: Free forever tier · cancel anytime
+                - generic [ref=e166]:
+                  - generic [ref=e167]: ✓
+                  - text: "Two-sided: verified employers meet you directly"
+          - generic [ref=e169]:
+            - generic [ref=e170]:
+              - generic [ref=e171]: FOR EMPLOYERS
+              - heading "Meet candidates cleared for arrival." [level=2] [ref=e172]
+              - paragraph [ref=e173]: Post a structured role and Jobocate ranks candidates on job-related criteria — with the reasoning shown. From posting to shortlist without the sorting.
+              - generic [ref=e174]:
+                - link "Post a job" [ref=e175] [cursor=pointer]:
+                  - /url: /employers
+                - link "Explore employer tools" [ref=e176] [cursor=pointer]:
+                  - /url: /employers
+            - generic [ref=e177]:
+              - generic [ref=e178]:
+                - generic [ref=e179]: ARRIVALS
+                - generic [ref=e180]: ● 3 CLEARED FOR YOU
+              - generic [ref=e181]:
+                - generic [ref=e182]: Candidate · A.R.
+                - generic [ref=e183]: Sr Product Designer
+                - generic [ref=e184]: "44"
+                - generic [ref=e185]: SHORTLISTED
+              - generic [ref=e186]:
+                - generic [ref=e187]: Candidate · M.K.
+                - generic [ref=e188]: Product Designer
+                - generic [ref=e189]: "41"
+                - generic [ref=e190]: SCREENING
+              - generic [ref=e191]:
+                - generic [ref=e192]: Candidate · J.T.
+                - generic [ref=e193]: Design Lead
+                - generic [ref=e194]: "42"
+                - generic [ref=e195]: NEW
+          - generic [ref=e196]:
+            - heading "Questions, answered." [level=2] [ref=e197]
+            - generic [ref=e198]:
+              - generic [ref=e199]:
+                - button "Does Jobocate apply to jobs for me automatically?" [expanded] [ref=e200] [cursor=pointer]:
+                  - generic [ref=e202]: −
+                - paragraph [ref=e203]: Only if you turn on auto-apply — and only within the limits you set. Leave review mode on and nothing is ever submitted without your approval.
+              - button "What exactly gets verified?" [ref=e205] [cursor=pointer]:
+                - generic [ref=e207]: +
+              - button "Is it really free to start?" [ref=e209] [cursor=pointer]:
+                - generic [ref=e211]: +
+              - button "Do employers see everything about me?" [ref=e213] [cursor=pointer]:
+                - generic [ref=e215]: +
+          - generic [ref=e217]:
+            - generic [ref=e218]: FINAL CALL
+            - heading "Cleared for takeoff." [level=2] [ref=e219]
+            - paragraph [ref=e220]: Build your pass in a few minutes and see the roles worth your time — free, and always under your control.
+            - link "Chart my route →" [ref=e221] [cursor=pointer]:
+              - /url: /app/signup
+            - generic [ref=e222]: FREE FOREVER TIER · CANCEL ANYTIME
+      - contentinfo [ref=e223]:
+        - heading "Site footer" [level=2] [ref=e224]
+        - generic [ref=e225]:
+          - generic [ref=e226]:
+            - generic [ref=e227]:
+              - link "Jobocate home" [ref=e228] [cursor=pointer]:
+                - /url: /
+                - img "Jobocate" [ref=e229]:
+                  - generic [ref=e234]: jobocate
+              - paragraph [ref=e235]: An AI career and hiring platform. Candidates stay in control of every application; employers reach better-matched people faster.
+            - navigation "Footer" [ref=e236]:
+              - generic [ref=e237]:
+                - heading "Candidates" [level=3] [ref=e238]
+                - list [ref=e239]:
+                  - listitem [ref=e240]:
+                    - link "Find Jobs" [ref=e241] [cursor=pointer]:
+                      - /url: /jobs
+                  - listitem [ref=e242]:
+                    - link "Resume Builder" [ref=e243] [cursor=pointer]:
+                      - /url: /features/resume-builder
+                  - listitem [ref=e244]:
+                    - link "Auto-Apply" [ref=e245] [cursor=pointer]:
+                      - /url: /features/auto-apply
+                  - listitem [ref=e246]:
+                    - link "Application Tracker" [ref=e247] [cursor=pointer]:
+                      - /url: /app/tracker
+                  - listitem [ref=e248]:
+                    - link "Interview Preparation" [ref=e249] [cursor=pointer]:
+                      - /url: /features/interview-prep
+              - generic [ref=e250]:
+                - heading "Employers" [level=3] [ref=e251]
+                - list [ref=e252]:
+                  - listitem [ref=e253]:
+                    - link "Post a Job" [ref=e254] [cursor=pointer]:
+                      - /url: /employer/jobs/post
+                  - listitem [ref=e255]:
+                    - link "Candidate Search" [ref=e256] [cursor=pointer]:
+                      - /url: /employer/talent-pool
+                  - listitem [ref=e257]:
+                    - link "AI Candidate Matching" [ref=e258] [cursor=pointer]:
+                      - /url: /employer/sourcing
+                  - listitem [ref=e259]:
+                    - link "Hiring Pipeline" [ref=e260] [cursor=pointer]:
+                      - /url: /employer/candidates
+                  - listitem [ref=e261]:
+                    - link "Employer Pricing" [ref=e262] [cursor=pointer]:
+                      - /url: /employers/pricing
+              - generic [ref=e263]:
+                - heading "Product" [level=3] [ref=e264]
+                - list [ref=e265]:
+                  - listitem [ref=e266]:
+                    - link "Job Matching" [ref=e267] [cursor=pointer]:
+                      - /url: /features/job-matching
+                  - listitem [ref=e268]:
+                    - link "Cover Letters" [ref=e269] [cursor=pointer]:
+                      - /url: /features/cover-letters
+                  - listitem [ref=e270]:
+                    - link "Pricing" [ref=e271] [cursor=pointer]:
+                      - /url: /pricing
+                  - listitem [ref=e272]:
+                    - link "Enterprise" [ref=e273] [cursor=pointer]:
+                      - /url: /enterprise
+                  - listitem [ref=e274]:
+                    - link "Book a demo" [ref=e275] [cursor=pointer]:
+                      - /url: /demo
+              - generic [ref=e276]:
+                - heading "Resources" [level=3] [ref=e277]
+                - list [ref=e278]:
+                  - listitem [ref=e279]:
+                    - link "Blog" [ref=e280] [cursor=pointer]:
+                      - /url: /blog
+                  - listitem [ref=e281]:
+                    - link "Help Center" [ref=e282] [cursor=pointer]:
+                      - /url: /app/help
+                  - listitem [ref=e283]:
+                    - link "Sitemap" [ref=e284] [cursor=pointer]:
+                      - /url: /sitemap
+              - generic [ref=e285]:
+                - heading "Company" [level=3] [ref=e286]
+                - list [ref=e287]:
+                  - listitem [ref=e288]:
+                    - link "About" [ref=e289] [cursor=pointer]:
+                      - /url: /about
+                  - listitem [ref=e290]:
+                    - link "Contact" [ref=e291] [cursor=pointer]:
+                      - /url: /contact
+                  - listitem [ref=e292]:
+                    - link "For Employers" [ref=e293] [cursor=pointer]:
+                      - /url: /employers
+              - generic [ref=e294]:
+                - heading "Trust & Legal" [level=3] [ref=e295]
+                - list [ref=e296]:
+                  - listitem [ref=e297]:
+                    - link "Responsible AI" [ref=e298] [cursor=pointer]:
+                      - /url: /#responsible-ai
+                  - listitem [ref=e299]:
+                    - link "Report a job" [ref=e300] [cursor=pointer]:
+                      - /url: /contact
+                  - listitem [ref=e301]:
+                    - link "Security" [ref=e302] [cursor=pointer]:
+                      - /url: /security
+                  - listitem [ref=e303]:
+                    - link "Privacy" [ref=e304] [cursor=pointer]:
+                      - /url: /privacy
+                  - listitem [ref=e305]:
+                    - link "Terms" [ref=e306] [cursor=pointer]:
+                      - /url: /terms
+                  - listitem [ref=e307]:
+                    - link "Cookie settings" [ref=e308] [cursor=pointer]:
+                      - /url: /cookies
+                  - listitem [ref=e309]:
+                    - link "GDPR" [ref=e310] [cursor=pointer]:
+                      - /url: /gdpr
+          - generic [ref=e311]:
+            - paragraph [ref=e312]: © 2026 Jobocate. All rights reserved.
+            - paragraph [ref=e313]: Jobocate uses AI to assist applications and ranking. People make the final decisions.
+    - region "Notifications Alt+T"
+  - alert [ref=e314]

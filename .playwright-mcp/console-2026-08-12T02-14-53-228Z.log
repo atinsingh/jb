@@ -1,0 +1,239 @@
+[    5205ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://pagead2.googlesyndication.com/bg/yQ1ZEylnsXIyF7if62X1hSIj7AdytWEYswERqBPOWRU.js:0
+[    9151ms] [LOG] url https://events.clemson.edu/live/widget/6/exclude_group/Facilities/exclude_group/Cooperative%20Extension%20Service @ https://events.clemson.edu/live/resource/js/%5Clivewhale%5Cthirdparty%5Cjquery%5Cjquery.no-conflict-header.js/%5Clivewhale%5Cthirdparty%5Cjquery%5Cjquery.js/%5Clivewhale%5Cthirdparty%5Cjquery%5Cjquery.no-conflict-footer.js/%5Clivewhale%5Cscripts%5Clib%5Cdate%5Cformatter.js/%5Clivewhale%5Cscripts%5Clib%5Cdate%5Ctimezone.js/%5Clivewhale%5Cscripts%5Clib%5Cdate%5Cuser.js/%5Clivewhale%5Cplugins%5Cjquery%5Cjquery.lw-widget.js:30
+[    9886ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://pagead2.googlesyndication.com/bg/yQ1ZEylnsXIyF7if62X1hSIj7AdytWEYswERqBPOWRU.js:0
+[   15318ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://pagead2.googlesyndication.com/bg/yQ1ZEylnsXIyF7if62X1hSIj7AdytWEYswERqBPOWRU.js:0
+[   16046ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://static.doubleclick.net/instream/ad_status.js:0
+[   16546ms] [WARNING] A speculation rule set was inserted into the document but will be ignored. This might happen, for example, if it was previously inserted into another document, or if it was created using the innerHTML setter. @ https://www.google.com/search?q=cramson+&sca_esv=ac817c92a4461940&ei=INd7ap-0HuHx0PEPuo2TsQ0&biw=1512&bih=811&ved=0ahUKEwifxM66gpqWAxXhODQIHbrGJNYQ4dUDCBA&uact=5&oq=cramson+&gs_lp=Egxnd3Mtd2l6LXNlcnAiCGNyYW1zb24gMg0QABiABBiKBRhDGLEDMgUQABiABDINEC4YQxixAxiABBiKBTINEAAYgAQYigUYQxixAzINEC4YgAQYigUYQxixAzIKEAAYgAQYigUYQzIMEC4YgAQYChgLGLEDMg8QLhiABBgKGAsYsQMYgwEyDBAuGIAEGAoYCxixAzIMEAAYgAQYChgLGLEDSIgeULkDWIoYcAF4AZABAJgB7gGgAZgPqgEFMC45LjK4AQPIAQD4AQGYAgmgAp8KwgIKEAAYRxjWBBiwA8ICDRAAGIAEGIoFGEMYsAPCAhcQLhjcBhi4BhjaBhjYAhjIAxiwA9gBAcICFxAuGNgCGLgGGNoGGNwGGMgDGLAD2AEBwgILEAAYgAQYigUYkQLCAhEQLhiABBiKBRiRAhjHARjRA8ICFBAuGIAEGIoFGLEDGIMBGMcBGK8BwgIOEC4YgAQYsQMYxwEY0QPCAg4QLhjHARixAxjRAxiABMICCBAAGIAEGLEDwgILEAAYgAQYsQMYgwHCAggQLhiABBixA8ICChAuGIAEGIoFGEPCAhEQLhiABBixAxjJAxjHARjRA8ICCxAAGIAEGIoFGJIDwgIREC4YgAQYsQMYgwEYxwEY0QPCAg4QABiABBiKBRiRAhixA8ICERAuGIAEGIoFGJECGMcBGK8BwgILEC4YgAQYxwEYrwHCAhAQABiABBiKBRhDGLEDGIMBmAMAiAYBkAYTugYGCAEQARgZkgcDMS44oAfjpgGyBwMwLji4B5sKwgcFMC44LjHIBw-ACAE&sclient=gws-wiz-serp:35
+[   27020ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://pagead2.googlesyndication.com/bg/yQ1ZEylnsXIyF7if62X1hSIj7AdytWEYswERqBPOWRU.js:0
+[   28912ms] [LOG] JQMIGRATE: Migrate is installed, version 3.4.1 @ https://www.commandeducation.com/wp-includes/js/jquery/jquery-migrate.min.js?ver=3.4.1:1
+[   28934ms] [WARNING] [GTM4WP] Google Tag Manager container code placement set to OFF !!! @ https://www.commandeducation.com/our-results/?kw=crimson%20education&cpn=23821720288&keyword_session_id=vt~adwords|kt~crimson%20education|mt~e|ta~807706206226&_vsrefdom=wordstream&utm_term=crimson%20education&utm_campaign=Search_NonBrand_IvyLeague&utm_source=adwords&utm_medium=ppc&hsa_acc=2938603199&hsa_cam=23821720288&hsa_grp=196245587437&hsa_ad=807706206226&hsa_src=g&hsa_tgt=kwd-326518395297&hsa_kw=crimson%20education&hsa_mt=e&hsa_net=adwords&hsa_ver=3&gad_source=1&gad_campaignid=23821720288&gbraid=0AAAAADA2UGzNfTSB02g1l0qIfHinAMajE&gclid=EAIaIQobChMI8dWtxYKalgMVRM3CBB2-IyKZEAAYASAAEgK5C_D_BwE:425
+[   28934ms] [WARNING] [GTM4WP] Data layer codes are active but GTM container must be loaded using custom coding !!! @ https://www.commandeducation.com/our-results/?kw=crimson%20education&cpn=23821720288&keyword_session_id=vt~adwords|kt~crimson%20education|mt~e|ta~807706206226&_vsrefdom=wordstream&utm_term=crimson%20education&utm_campaign=Search_NonBrand_IvyLeague&utm_source=adwords&utm_medium=ppc&hsa_acc=2938603199&hsa_cam=23821720288&hsa_grp=196245587437&hsa_ad=807706206226&hsa_src=g&hsa_tgt=kwd-326518395297&hsa_kw=crimson%20education&hsa_mt=e&hsa_net=adwords&hsa_ver=3&gad_source=1&gad_campaignid=23821720288&gbraid=0AAAAADA2UGzNfTSB02g1l0qIfHinAMajE&gclid=EAIaIQobChMI8dWtxYKalgMVRM3CBB2-IyKZEAAYASAAEgK5C_D_BwE:426
+[   29058ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://snap.licdn.com/li.lms-analytics/insight.min.js:0
+[   29221ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://js.hs-analytics.net/analytics/1786500600000/22812419.js:0
+[   29663ms] [WARNING] [Meta Pixel] - Duplicate Pixel ID: 2024755224462973. @ https://connect.facebook.net/en_US/fbevents.js:193
+[   29676ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://snap.licdn.com/li.lms-analytics/insight.min.js:0
+[   29676ms] [LOG] [HS DIAG] {origin: https://www.commandeducation.com, type: , eventName: , idSummary: } {action: FB_LOG, logMessage: Duplicate Pixel ID: 2024755224462973., logType: Meta Pixel Error, error: Object, pixelId: 2024755224462973} @ :0
+[   29861ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://stats.g.doubleclick.net/g/collect?v=2&tid=G-ZH8KWLXCDK&cid=2017623973.1786500923&gtm=45je68a1v897930491z89111691603za20gzb9111691603zd9111691603&rcb=9&aip=1&dma=0&gcd=13l3l3l3l1l1&npa=0&frm=0&tag_exp=115938465~115938469~118897920~118897930~119367802~119367810~119381663~119527020~119896802~120385422:0
+[   31970ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://pagead2.googlesyndication.com/bg/yQ1ZEylnsXIyF7if62X1hSIj7AdytWEYswERqBPOWRU.js:0
+[   34517ms] [ERROR] Failed to load resource: the server responded with a status of 429 () @ https://crimsoneducation.org/:0
+[   34608ms] [ERROR] Failed to load resource: the server responded with a status of 429 () @ https://crimsoneducation.org/favicon.ico:0
+[   34836ms] [LOG] Error @ https://crimsoneducation.org/.well-known/vercel/security/static/challenge.v2.min.js:0
+[   35944ms] [ERROR] Failed to load resource: the server responded with a status of 429 () @ https://www.crimsoneducation.org/:0
+[   36030ms] [ERROR] Failed to load resource: the server responded with a status of 429 () @ https://www.crimsoneducation.org/favicon.ico:0
+[   36202ms] [LOG] Error @ https://www.crimsoneducation.org/.well-known/vercel/security/static/challenge.v2.min.js:0
+[   38592ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://api.country.is/:0
+[   38683ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://a.quora.com/qevents.js:0
+[   38699ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://static.ads-twitter.com/uwt.js:0
+[   38699ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://munchkin.marketo.net/munchkin.js:0
+[   38699ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://d.line-scdn.net/n/line_tag/public/release/v1/lt.js:0
+[   38699ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://bat.bing.com/bat.js:0
+[   38699ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://snap.licdn.com/li.lms-analytics/insight.min.js:0
+[   38699ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://tags.srv.stackadapt.com/events.js:0
+[   38724ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://analytics.tiktok.com/i18n/pixel/events.js?sdkid=D7SS7FBC77UEKU3Q0AV0&lib=ttq:0
+[   38967ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://api.country.is/:0
+[   38967ms] [ERROR] Error fetching country: TypeError: Failed to fetch
+    at https://www.crimsoneducation.org/_next/static/chunks/app/layout-2ce32539e90e310b.js:1:679827
+    at https://www.crimsoneducation.org/_next/static/chunks/app/layout-2ce32539e90e310b.js:1:680088
+    at o0 (https://www.crimsoneducation.org/_next/static/chunks/a27e6d64-e158a76480b5027a.js:1:88668)
+    at e (https://www.crimsoneducation.org/_next/static/chunks/a27e6d64-e158a76480b5027a.js:1:105315)
+    at ux (https://www.crimsoneducation.org/_next/static/chunks/a27e6d64-e158a76480b5027a.js:1:105586)
+    at uS (https://www.crimsoneducation.org/_next/static/chunks/a27e6d64-e158a76480b5027a.js:1:104441)
+    at ux (https://www.crimsoneducation.org/_next/static/chunks/a27e6d64-e158a76480b5027a.js:1:104602)
+    at uS (https://www.crimsoneducation.org/_next/static/chunks/a27e6d64-e158a76480b5027a.js:1:104441)
+    at ux (https://www.crimsoneducation.org/_next/static/chunks/a27e6d64-e158a76480b5027a.js:1:104602)
+    at uS (https://www.crimsoneducation.org/_next/static/chunks/a27e6d64-e158a76480b5027a.js:1:104441) @ https://www.crimsoneducation.org/_next/static/chunks/5234-69c4ce345b6af40c.js:6
+[   39420ms] [LOG] FingerprintJS result: {visitorId: undefined, confidence: Object, components: Object, version: 3.4.2} @ https://www.crimsoneducation.org/_next/static/chunks/5234-69c4ce345b6af40c.js:6
+[   39542ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://browser-intake-datadoghq.eu/api/v2/logs?ddsource=browser&dd-api-key=pub80447276a286a9623c80e7cce7e56d7e&dd-evp-origin-version=6.18.1&dd-evp-origin=browser&dd-request-id=70f1b5bc-903a-4e1b-ad3b-617c9216d1df:0
+[   39543ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://browser-intake-datadoghq.eu/api/v2/logs?ddsource=browser&dd-api-key=pub80447276a286a9623c80e7cce7e56d7e&dd-evp-origin-version=6.18.1&dd-evp-origin=browser&dd-request-id=69932d32-0687-4e2e-8fff-3e4e64a2f3fd:0
+[   39544ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://browser-intake-datadoghq.eu/api/v2/logs?ddsource=browser&dd-api-key=pub80447276a286a9623c80e7cce7e56d7e&dd-evp-origin-version=6.18.1&dd-evp-origin=browser&dd-request-id=2ff79cdc-076f-44a3-bdb1-d31ba730e9cb:0
+[   39583ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://stats.g.doubleclick.net/g/collect?v=2&tid=G-NDSKJR0T3G&cid=818813816.1786500933&gtm=45g92e68b0h2v884974981z876109443za20gzb76109443zd76109443&rcb=1&aip=1&dma=0&gcd=13l3l3l3l1l1&npa=0&frm=0&tag_exp=115938465~115938468~118897920~118897930~119367802~119367810~119527019~119896803:0
+[   39595ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://api.country.is/:0
+[   40710ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://api.country.is/:0
+[   41596ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://api.country.is/:0
+[   41596ms] [ERROR] Error fetching user location: Failed to fetch @ https://www.crimsoneducation.org/_next/static/chunks/5234-69c4ce345b6af40c.js:6
+[   41959ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://alb.reddit.com/rp.gif?ts=1786500935141&id=t2_1vt2xd8k&event=PageVisit&m.itemCount=&m.value=&m.valueDecimal=&m.currency=&m.transactionId=&m.customEventName=&m.products=&m.conversionId=&uuid=923ce16a-e47b-47f2-92d7-4d10b6ec3f55&aaid=&external_id=&idfa=&integration=reddit&partner=&partner_version=&opt_out=0&sh=1512&sw=982&v=rdt_dfcb27f0&dpm=&dpcc=&dprc=&esurl=https%3A%2F%2Fwww.crimsoneducation.org%2Fus&db=tsc-0.isc-0.pp-0.fetch-1.mo-1.iframe-0.ww-0.qsa-1.srv_cfg-0.src_pid-0:0
+[   69607ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://browser-intake-datadoghq.eu/api/v2/logs?ddsource=browser&dd-api-key=pub80447276a286a9623c80e7cce7e56d7e&dd-evp-origin-version=6.18.1&dd-evp-origin=browser&dd-request-id=5a235370-93be-4661-924c-1f74a199c039:0
+[   69610ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://browser-intake-datadoghq.eu/api/v2/logs?ddsource=browser&dd-api-key=pub80447276a286a9623c80e7cce7e56d7e&dd-evp-origin-version=6.18.1&dd-evp-origin=browser&dd-request-id=fc4b9d49-7d0a-4263-9a35-f98d06f7c1fc:0
+[   89166ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://alb.reddit.com/rp.gif?ts=1786500982288&id=t2_1vt2xd8k&event=PageVisit&m.itemCount=&m.value=&m.valueDecimal=&m.currency=&m.transactionId=&m.customEventName=&m.products=&m.conversionId=&uuid=923ce16a-e47b-47f2-92d7-4d10b6ec3f55&aaid=&external_id=&idfa=&integration=reddit&partner=&partner_version=&opt_out=0&sh=1512&sw=982&v=rdt_dfcb27f0&dpm=&dpcc=&dprc=&esurl=https%3A%2F%2Fwww.crimsoneducation.org%2Fus%2Fadmissions%2Fmiddle-school-university-prep&db=tsc-0.isc-0.pp-0.fetch-1.mo-1.iframe-0.ww-0.qsa-1.src_pid-0:0
+[   89181ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://munchkin.marketo.net/munchkin.js:0
+[   89181ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://snap.licdn.com/li.lms-analytics/insight.min.js:0
+[   89181ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://d.line-scdn.net/n/line_tag/public/release/v1/lt.js:0
+[   89182ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://analytics.tiktok.com/i18n/pixel/events.js?sdkid=D7SS7FBC77UEKU3Q0AV0&lib=ttq:0
+[   89203ms] [ERROR] [fraudblocker] Duplicate Booting. Stopping. @ https://www.crimsoneducation.org/_next/static/chunks/5234-69c4ce345b6af40c.js:6
+[   91272ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://api.country.is/:0
+[  100993ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://alb.reddit.com/rp.gif?ts=1786500994148&id=t2_1vt2xd8k&event=PageVisit&m.itemCount=&m.value=&m.valueDecimal=&m.currency=&m.transactionId=&m.customEventName=&m.products=&m.conversionId=&uuid=923ce16a-e47b-47f2-92d7-4d10b6ec3f55&aaid=&external_id=&idfa=&integration=reddit&partner=&partner_version=&opt_out=0&sh=1512&sw=982&v=rdt_dfcb27f0&dpm=&dpcc=&dprc=&esurl=https%3A%2F%2Fwww.crimsoneducation.org%2Fus&db=tsc-0.isc-0.pp-0.fetch-1.mo-1.iframe-0.ww-0.qsa-1.src_pid-0:0
+[  101005ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://alb.reddit.com/rp.gif?ts=1786500994215&id=t2_1vt2xd8k&event=PageVisit&m.itemCount=&m.value=&m.valueDecimal=&m.currency=&m.transactionId=&m.customEventName=&m.products=&m.conversionId=&uuid=923ce16a-e47b-47f2-92d7-4d10b6ec3f55&aaid=&external_id=&idfa=&integration=reddit&partner=&partner_version=&opt_out=0&sh=1512&sw=982&v=rdt_dfcb27f0&dpm=&dpcc=&dprc=&esurl=https%3A%2F%2Fwww.crimsoneducation.org%2Fus&db=tsc-0.isc-0.pp-0.fetch-1.mo-1.iframe-0.ww-0.qsa-1.src_pid-0:0
+[  101005ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://munchkin.marketo.net/munchkin.js:0
+[  101005ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://snap.licdn.com/li.lms-analytics/insight.min.js:0
+[  101006ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://d.line-scdn.net/n/line_tag/public/release/v1/lt.js:0
+[  101006ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://analytics.tiktok.com/i18n/pixel/events.js?sdkid=D7SS7FBC77UEKU3Q0AV0&lib=ttq:0
+[  101006ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://api.country.is/:0
+[  101012ms] [ERROR] [fraudblocker] Duplicate Booting. Stopping. @ https://www.crimsoneducation.org/_next/static/chunks/5234-69c4ce345b6af40c.js:6
+[  101012ms] [ERROR] [fraudblocker] Duplicate Booting. Stopping. @ https://www.crimsoneducation.org/_next/static/chunks/5234-69c4ce345b6af40c.js:6
+[  102008ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://api.country.is/:0
+[  103083ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://api.country.is/:0
+[  104010ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://api.country.is/:0
+[  104010ms] [ERROR] Error fetching user location: Failed to fetch @ https://www.crimsoneducation.org/_next/static/chunks/5234-69c4ce345b6af40c.js:6
+[  108936ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://alb.reddit.com/rp.gif?ts=1786501002107&id=t2_1vt2xd8k&event=PageVisit&m.itemCount=&m.value=&m.valueDecimal=&m.currency=&m.transactionId=&m.customEventName=&m.products=&m.conversionId=&uuid=923ce16a-e47b-47f2-92d7-4d10b6ec3f55&aaid=&external_id=&idfa=&integration=reddit&partner=&partner_version=&opt_out=0&sh=1512&sw=982&v=rdt_dfcb27f0&dpm=&dpcc=&dprc=&esurl=https%3A%2F%2Fwww.crimsoneducation.org%2Fus%2Fadmissions%2Fivy-league-college-consultant&db=tsc-0.isc-0.pp-0.fetch-1.mo-1.iframe-0.ww-0.qsa-1.src_pid-0:0
+[  108937ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://munchkin.marketo.net/munchkin.js:0
+[  108937ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://snap.licdn.com/li.lms-analytics/insight.min.js:0
+[  108937ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://d.line-scdn.net/n/line_tag/public/release/v1/lt.js:0
+[  108937ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://analytics.tiktok.com/i18n/pixel/events.js?sdkid=D7SS7FBC77UEKU3Q0AV0&lib=ttq:0
+[  108959ms] [ERROR] [fraudblocker] Duplicate Booting. Stopping. @ https://www.crimsoneducation.org/_next/static/chunks/5234-69c4ce345b6af40c.js:6
+[  111022ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://api.country.is/:0
+[  119206ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://browser-intake-datadoghq.eu/api/v2/logs?ddsource=browser&dd-api-key=pub80447276a286a9623c80e7cce7e56d7e&dd-evp-origin-version=6.18.1&dd-evp-origin=browser&dd-request-id=a1844ad2-d837-4303-83bc-ba7f298fe625:0
+[  119206ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://browser-intake-datadoghq.eu/api/v2/logs?ddsource=browser&dd-api-key=pub80447276a286a9623c80e7cce7e56d7e&dd-evp-origin-version=6.18.1&dd-evp-origin=browser&dd-request-id=8541b02c-b229-4e1f-b39b-16c080cec63e:0
+[  181874ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://alb.reddit.com/rp.gif?ts=1786501075066&id=t2_1vt2xd8k&event=PageVisit&m.itemCount=&m.value=&m.valueDecimal=&m.currency=&m.transactionId=&m.customEventName=&m.products=&m.conversionId=&uuid=923ce16a-e47b-47f2-92d7-4d10b6ec3f55&aaid=&external_id=&idfa=&integration=reddit&partner=&partner_version=&opt_out=0&sh=1512&sw=982&v=rdt_dfcb27f0&dpm=&dpcc=&dprc=&esurl=https%3A%2F%2Fwww.crimsoneducation.org%2Fus%2Fabout-us&db=tsc-0.isc-0.pp-0.fetch-1.mo-1.iframe-0.ww-0.qsa-1.src_pid-0:0
+[  181883ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://munchkin.marketo.net/munchkin.js:0
+[  181883ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://snap.licdn.com/li.lms-analytics/insight.min.js:0
+[  181883ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://d.line-scdn.net/n/line_tag/public/release/v1/lt.js:0
+[  181883ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://analytics.tiktok.com/i18n/pixel/events.js?sdkid=D7SS7FBC77UEKU3Q0AV0&lib=ttq:0
+[  181953ms] [ERROR] [fraudblocker] Duplicate Booting. Stopping. @ https://www.crimsoneducation.org/_next/static/chunks/5234-69c4ce345b6af40c.js:6
+[  184043ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://api.country.is/:0
+[  203162ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://alb.reddit.com/rp.gif?ts=1786501096359&id=t2_1vt2xd8k&event=PageVisit&m.itemCount=&m.value=&m.valueDecimal=&m.currency=&m.transactionId=&m.customEventName=&m.products=&m.conversionId=&uuid=923ce16a-e47b-47f2-92d7-4d10b6ec3f55&aaid=&external_id=&idfa=&integration=reddit&partner=&partner_version=&opt_out=0&sh=1512&sw=982&v=rdt_dfcb27f0&dpm=&dpcc=&dprc=&esurl=https%3A%2F%2Fwww.crimsoneducation.org%2Fus%2Fabout-us%2Flocations&db=tsc-0.isc-0.pp-0.fetch-1.mo-1.iframe-0.ww-0.qsa-1.src_pid-0:0
+[  203173ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://munchkin.marketo.net/munchkin.js:0
+[  203173ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://snap.licdn.com/li.lms-analytics/insight.min.js:0
+[  203173ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://d.line-scdn.net/n/line_tag/public/release/v1/lt.js:0
+[  203173ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://analytics.tiktok.com/i18n/pixel/events.js?sdkid=D7SS7FBC77UEKU3Q0AV0&lib=ttq:0
+[  203217ms] [ERROR] [fraudblocker] Duplicate Booting. Stopping. @ https://www.crimsoneducation.org/_next/static/chunks/5234-69c4ce345b6af40c.js:6
+[  205305ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://api.country.is/:0
+[  211955ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://browser-intake-datadoghq.eu/api/v2/logs?ddsource=browser&dd-api-key=pub80447276a286a9623c80e7cce7e56d7e&dd-evp-origin-version=6.18.1&dd-evp-origin=browser&dd-request-id=ca774671-c74c-4e08-823a-9d883423ac64:0
+[  211956ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://browser-intake-datadoghq.eu/api/v2/logs?ddsource=browser&dd-api-key=pub80447276a286a9623c80e7cce7e56d7e&dd-evp-origin-version=6.18.1&dd-evp-origin=browser&dd-request-id=9ac009e3-6195-48d1-8498-f07f4bc70715:0
+[  237959ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://pagead2.googlesyndication.com/bg/yQ1ZEylnsXIyF7if62X1hSIj7AdytWEYswERqBPOWRU.js:0
+[  238638ms] [WARNING] A speculation rule set was inserted into the document but will be ignored. This might happen, for example, if it was previously inserted into another document, or if it was created using the innerHTML setter. @ https://www.google.com/search?q=crimsoneducation+canada&sca_esv=ac817c92a4461940&source=hp&ei=Bdh7ar-QMf7Kp84P48W-6Ao&iflsig=ABILxe8AAAAAanvmFdLJfZJo0xBa6STCuMGMjGc49Jai&ved=0ahUKEwj_pvqng5qWAxV-5ckDHeOiD60Q4dUDCA8&uact=5&oq=crimsoneducation+canada&gs_lp=Egdnd3Mtd2l6Ihdjcmltc29uZWR1Y2F0aW9uIGNhbmFkYTIHEAAYgAQYDTIGEAAYFhgeMgYQABgWGB4yBhAAGBYYHjIGEAAYFhgeMgsQABiABBiKBRiGAzIFEAAY7wUyBRAAGO8FMgUQABjvBUiPFlAAWOYPcAB4AJABAJgByQGgAaoJqgEFMC43LjG4AQPIAQD4AQL4AQGYAgigAr0JwgISEC4YgAQYChgLGLEDGMcBGNEDwgIJEAAYgAQYChgLwgIJEC4YgAQYChgLwgIIEAAYgAQYogSYAwCSBwUwLjcuMaAH2j-yBwUwLjcuMbgHvQnCBwU1LjEuMsgHDYAIAQ&sclient=gws-wiz:42
+[  247275ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://api.country.is/:0
+[  247275ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://api.country.is/:0
+[  247431ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://a.quora.com/qevents.js:0
+[  247432ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://munchkin.marketo.net/munchkin.js:0
+[  247432ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://snap.licdn.com/li.lms-analytics/insight.min.js:0
+[  247432ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://static.ads-twitter.com/uwt.js:0
+[  247432ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://d.line-scdn.net/n/line_tag/public/release/v1/lt.js:0
+[  247432ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://bat.bing.com/bat.js:0
+[  247432ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://tags.srv.stackadapt.com/events.js:0
+[  247432ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://analytics.tiktok.com/i18n/pixel/events.js?sdkid=D7SS7FBC77UEKU3Q0AV0&lib=ttq:0
+[  247659ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://api.country.is/:0
+[  247659ms] [ERROR] Error fetching country: TypeError: Failed to fetch
+    at https://www.crimsoneducation.org/_next/static/chunks/app/layout-2ce32539e90e310b.js:1:679827
+    at https://www.crimsoneducation.org/_next/static/chunks/app/layout-2ce32539e90e310b.js:1:680088
+    at o0 (https://www.crimsoneducation.org/_next/static/chunks/a27e6d64-e158a76480b5027a.js:1:88668)
+    at e (https://www.crimsoneducation.org/_next/static/chunks/a27e6d64-e158a76480b5027a.js:1:105315)
+    at ux (https://www.crimsoneducation.org/_next/static/chunks/a27e6d64-e158a76480b5027a.js:1:105586)
+    at uS (https://www.crimsoneducation.org/_next/static/chunks/a27e6d64-e158a76480b5027a.js:1:104441)
+    at ux (https://www.crimsoneducation.org/_next/static/chunks/a27e6d64-e158a76480b5027a.js:1:104602)
+    at uS (https://www.crimsoneducation.org/_next/static/chunks/a27e6d64-e158a76480b5027a.js:1:104441)
+    at ux (https://www.crimsoneducation.org/_next/static/chunks/a27e6d64-e158a76480b5027a.js:1:104602)
+    at uS (https://www.crimsoneducation.org/_next/static/chunks/a27e6d64-e158a76480b5027a.js:1:104441) @ https://www.crimsoneducation.org/_next/static/chunks/5234-69c4ce345b6af40c.js:6
+[  247796ms] [LOG] FingerprintJS result: {visitorId: undefined, confidence: Object, components: Object, version: 3.4.2} @ https://www.crimsoneducation.org/_next/static/chunks/5234-69c4ce345b6af40c.js:6
+[  247803ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://browser-intake-datadoghq.eu/api/v2/logs?ddsource=browser&dd-api-key=pub80447276a286a9623c80e7cce7e56d7e&dd-evp-origin-version=6.18.1&dd-evp-origin=browser&dd-request-id=7d098998-eb1d-47c9-97ec-36eeb2cebdc5:0
+[  247803ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://browser-intake-datadoghq.eu/api/v2/logs?ddsource=browser&dd-api-key=pub80447276a286a9623c80e7cce7e56d7e&dd-evp-origin-version=6.18.1&dd-evp-origin=browser&dd-request-id=7ce621b2-a133-4b53-aa41-001ca32054f8:0
+[  247804ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://browser-intake-datadoghq.eu/api/v2/logs?ddsource=browser&dd-api-key=pub80447276a286a9623c80e7cce7e56d7e&dd-evp-origin-version=6.18.1&dd-evp-origin=browser&dd-request-id=54679ecb-b339-490b-9730-e47cc75d98a8:0
+[  247974ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://www.clarity.ms/tag/v9lekykvcw?ref=gtm:0
+[  248277ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://api.country.is/:0
+[  248278ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://api.country.is/:0
+[  249350ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://api.country.is/:0
+[  250280ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://api.country.is/:0
+[  250280ms] [ERROR] Error fetching user location: Failed to fetch @ https://www.crimsoneducation.org/_next/static/chunks/5234-69c4ce345b6af40c.js:6
+[  250280ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://api.country.is/:0
+[  250280ms] [ERROR] Error fetching user location: Failed to fetch @ https://www.crimsoneducation.org/_next/static/chunks/5234-69c4ce345b6af40c.js:6
+[  278281ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://browser-intake-datadoghq.eu/api/v2/logs?ddsource=browser&dd-api-key=pub80447276a286a9623c80e7cce7e56d7e&dd-evp-origin-version=6.18.1&dd-evp-origin=browser&dd-request-id=5cfbf6a6-c4f9-41e7-b722-f83c85e93f84:0
+[  278281ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://browser-intake-datadoghq.eu/api/v2/logs?ddsource=browser&dd-api-key=pub80447276a286a9623c80e7cce7e56d7e&dd-evp-origin-version=6.18.1&dd-evp-origin=browser&dd-request-id=8ca4637b-d43f-497f-b91f-6267523c9869:0
+[  379203ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://cdn.taboola.com/libtrc/ndtv/loader.js:0
+[  379203ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://sb.scorecardresearch.com/beacon.js:0
+[  379203ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://delivery.adrecover.com/27265/adRecover.js:0
+[  379203ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://s.go-mpulse.net/boomerang/HWZRJ-J5QJF-WUSXD-JYWTR-U3CKM:0
+[  379237ms] [WARNING] Allow attribute will take precedence over 'allowfullscreen'. @ https://www.ndtv.com/:25589
+[  379362ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://s.go-mpulse.net/boomerang/HWZRJ-J5QJF-WUSXD-JYWTR-U3CKM:0
+[  379380ms] [WARNING] The value "100%" for key "width" was truncated to its numeric prefix. @ https://www.ndtv.com/video/embed-player/?site=classic&id=LIVE_BG24x7&autostart=1&pWidth=436pHeight=245&category=embed&cube=0:4
+[  379562ms] [LOG] __html5playerdata for Live TV: {switchurl: , id: LIVE_BG24x7, isLive: true, autostart: true, forcestart: false} @ https://www.ndtv.com/video/embed-player/?site=classic&id=LIVE_BG24x7&autostart=1&pWidth=436pHeight=245&category=embed&cube=0:46
+[  379602ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://events.newsroom.bi/ingest.php:0
+[  379625ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://securepubads.g.doubleclick.net/tag/js/gpt.js?network-code=23348076616:0
+[  379625ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://carbon-cdn.ccgateway.net/script?id=www.ndtv.com&parentId=77b2147262:0
+[  379722ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://trc.taboola.com/1010811/log/3/unip?en=page_view&gtmcb=2065516863:0
+[  379748ms] [WARNING] NetworkGateway: domain "ads" is not registered @ https://static.tblcontent.com/libtrc/ndtv/loader.privacy.js:0
+[  379753ms] [WARNING] adgb - not initialized. @ https://static.tblcontent.com/libtrc/ndtv/loader.privacy.js:0
+[  379755ms] [WARNING] NetworkGateway: domain "tx" is not registered @ https://static.tblcontent.com/libtrc/ndtv/loader.privacy.js:0
+[  380474ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://securepubads.g.doubleclick.net/tag/js/gpt.js:0
+[  380489ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://trc.taboola.com/1010811/log/3/unip?en=page_view&gtmcb=1457873639:0
+[  380494ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://events.newsroom.bi/data/rfv.php:0
+[  380494ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://events.newsroom.bi/data2/rfv.php:0
+[  380561ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://stats.g.doubleclick.net/g/collect?v=2&tid=G-EDK4P8CHKM&cid=1761628775.1786501274&gtm=45je68a1v9189189525za20gzb76535019zd76535019&rcb=12&aip=1&dma=0&gcd=13l3l3l3l1l1&npa=0&frm=1&tag_exp=115616986~115938465~115938469~118897920~118897930~119367802~119367810~119404703~119527020~119896803:0
+[  380562ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://stats.g.doubleclick.net/g/collect?v=2&tid=G-XQCGTLW8NV&cid=1761628775.1786501274&gtm=45je68a1v873431283z876535019za20gzb76535019zd76535019&rcb=9&aip=1&dma=0&gcd=13l3l3l3l1l1&npa=0&frm=0&tag_exp=115938465~115938469~118395334~118897920~118897930~119367802~119367810~119404702~119527019~119896803~120125305:0
+[  380754ms] [WARNING] Response contains unsupported feature: motion-ads @ https://static.tblcontent.com/libtrc/ndtv/loader.privacy.js:0
+[  380754ms] [WARNING] Response contains unsupported feature: video-tag @ https://static.tblcontent.com/libtrc/ndtv/loader.privacy.js:0
+[  380754ms] [WARNING] Response contains unsupported feature: video-single-manager @ https://static.tblcontent.com/libtrc/ndtv/loader.privacy.js:0
+[  380762ms] [WARNING] NetworkGateway: domain "crt" is not registered @ https://static.tblcontent.com/libtrc/ndtv/loader.privacy.js:0
+[  380763ms] [WARNING] NetworkGateway: domain "crtn" is not registered @ https://static.tblcontent.com/libtrc/ndtv/loader.privacy.js:0
+[  380815ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://cdn.taboola.com/static/1e/1e20e8ff-b903-43c3-81e2-8f9e185614d9.svg:0
+[  380966ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://sync-tm.everesttech.net/upi/pid/ACY3VSlh?redir=https%3A%2F%2Fs.amazon-adsystem.com%2Fecm3%3Fex%3Dadobe3pb.com%26id%3D%24%7BTM_USER_ID%7D&gdpr=0:0
+[  380966ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://csync.loopme.me/?pubid=11405&redirect=https%3A%2F%2Fs.amazon-adsystem.com%2Fecm3%3Fex%3Dloopme.com%26id%3D%7Bviewer_token%7D&gdpr=0:0
+[  380973ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://ad.360yield.com/server_match?callback=https%3A%2F%2Fs.amazon-adsystem.com%2Fecm3%3Fex%3Dazerion.com%26id%3D%7BPUB_USER_ID%7D&gdpr=0:0
+[  380973ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://cs.media.net/cksync?cs=31&type=tam&redirect=https%3A%2F%2Fs.amazon-adsystem.com%2Fecm3%3Fex%3Dmedia.net%26id%3D%3Cvsid%3E&gdpr=0:0
+[  380973ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://onetag-sys.com/match/?int_id=113&callback=https%3A%2F%2Fs.amazon-adsystem.com%2Fecm3%3Fex%3Donetag.com%26id%3D%24%7BUSER_TOKEN%7D&gdpr=0:0
+[  380974ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://creativecdn.com/cm-notify?pi=amazon&gdpr=0:0
+[  380975ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://jadserve.postrelease.com/suid/101959?ntv_r=https%3A%2F%2Fs.amazon-adsystem.com%2Fecm3%3Fex%3Dnativo.com%26id%3DNTV_USER_ID&gdpr=0:0
+[  380975ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://um.simpli.fi/amazon/https%3A%2F%2Fs.amazon-adsystem.com%2Fecm3%3Fex%3Dsimpli.fi%26id%3D?gdpr=0:0
+[  380975ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://match.prod.bidr.io/cookie-sync/amzn?redirect=https%3A%2F%2Fs.amazon-adsystem.com%2Fecm3%3Fex%3Dbeeswax.com%26id%3D%24UID&gdpr=0:0
+[  380987ms] [LOG] HLS js loaded!! @ https://cdn.ndtv.com/vp/static/js/initvidplayerDAI.min.new.js?v=2026-08-12-7:0
+[  381009ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://pixel.rubiconproject.com/exchange/sync.php?p=a9us&gdpr=0:0
+[  381028ms] [WARNING] NetworkGateway: domain "gfa" is not registered @ https://static.tblcontent.com/libtrc/ndtv/loader.privacy.js:0
+[  381044ms] [WARNING] "Montserrat" does not appear to be a valid Google Font. Aborting load. @ https://static.tblcontent.com/libtrc/ndtv/loader.privacy.js:0
+[  381092ms] [LOG] chapObj {} 1.78 true @ https://cdn.ndtv.com/vp/static/js/initvidplayerDAI.min.new.js?v=2026-08-12-7:0
+[  381135ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://stats.g.doubleclick.net/g/collect?v=2&tid=G-M7E3P87KRC&cid=1761628775.1786501274&gtm=45je68a1v9193413719za200zd9193413719&rcb=2&aip=1&dma=0&gcd=13l3l3l3l1l1&npa=0&frm=0&tag_exp=115938465~115938469~118897920~118897930~119367802~119367810~119527020~119896803:0
+[  381184ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://stats.g.doubleclick.net/g/collect?v=2&tid=G-WHYDFTB5HJ&cid=1761628775.1786501274&gtm=45je68a1v9177575135z876535019za20gzb76535019zd76535019&rcb=19&aip=1&dma=0&gcd=13l3l3l3l1l1&npa=0&frm=0&tag_exp=115616986~115938465~115938469~118897920~118897930~119367802~119367810~119404702~119527019~119896802:0
+[  381522ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://cdn.izooto.com/scripts/dbbe89d47703ab400e6d7332c8b4ffb71a510fb1.js:0
+[  381522ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://www.clarity.ms/tag/tb4zvl8rfv:0
+[  381533ms] [LOG] iframe holder div:  JSHandle@node @ https://cdn.ndtv.com/vp/static/js/docking-ndpl.min.js:0
+[  381535ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://ssl.google-analytics.com/ga.js:0
+[  381590ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://pagead2.googlesyndication.com/omsdk/releases/live/omweb-v1.js:0
+[  381686ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://image6.pubmatic.com/AdServer/PugMaster?sec=1&async=1&kdntuid=1&rnd=71613724&p=156011&s=165626&a=0&ptask=ALL&np=0&fp=0&rp=0&mpc=0&spug=1&coppa=0&gdpr=0&gdpr_consent=&us_privacy=&gpp=&gpp_sid=:0
+[  381765ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://a.sportradarserving.com/sync?ssp=bidswitch&bidswitch_ssp_id=bidline&gdpr=&gdpr_consent=:0
+[  381852ms] Uncaught ReferenceError: $ is not defined
+    at e (https://cdn.ndtv.com/common/js/main-trc-ndtv_5.js:18:39)
+[  381912ms] [LOG] comscore js loaded!! @ https://cdn.ndtv.com/vp/static/js/initvidplayerDAI.min.new.js?v=2026-08-12-7:0
+[  381913ms] [LOG] creating new stream tag object @ https://cdn.ndtv.com/vp/static/js/initvidplayerDAI.min.new.js?v=2026-08-12-7:0
+[  381914ms] [LOG] comscoreMeta preroll  @ https://cdn.ndtv.com/vp/static/js/initvidplayerDAI.min.new.js?v=2026-08-12-7:0
+[  382075ms] [LOG] all scripts loaded @ https://cdn.ndtv.com/c/authors/static/js/common.js?ver=V-2:111
+[  382075ms] [LOG] Common script loaded @ https://cdn.ndtv.com/c/authors/static/js/config.js?ver=w.1.4:84
+[  382329ms] [LOG] muted check: mainVid.muted= true mute= true mutestart= true vpmute= 1 ndtv24x7 @ https://cdn.ndtv.com/vp/static/js/initvidplayerDAI.min.new.js?v=2026-08-12-7:0
+[  382329ms] [LOG] lastTag;->  &impl=s&gdfp_req=1&env=vp&output=vast&unviewed_position_start=1&vpmute=1&plcmt=1&url=https://www.ndtv.com/video/embed-player/?site=classic&id=LIVE_BG24x7&autostart=1&pWidth=436pHeight=245&category=embed&cube=0&description_url=https%3A%2F%2Fwww.ndtv.com%2Fvideo%2Fembed-player%2F%3Fsite%3Dclassic%26id%3DLIVE_BG24x7%26autostart%3D1%26pWidth%3D436pHeight%3D245%26category%3Dembed%26cube%3D0%26&hl=en @ https://cdn.ndtv.com/vp/static/js/initvidplayerDAI.min.new.js?v=2026-08-12-7:0
+[  382329ms] [LOG] in InitGimaSetup @ https://cdn.ndtv.com/vp/static/js/initvidplayerDAI.min.new.js?v=2026-08-12-7:0
+[  382447ms] Uncaught TypeError: $(...).isInViewport is not a function
+    at <anonymous> (https://cdn.ndtv.com/common/js/main-trc-ndtv_5.js:14:317)
+    at each (https://cdn.ndtv.com/c/jquery-3.6.0.min.js?ver=undefined:1:3002)
+    at <anonymous> (https://cdn.ndtv.com/common/js/main-trc-ndtv_5.js:4:204)
+    at next (https://www.gstatic.com/firebasejs/6.0.4/firebase-firestore.js:0:335997)
+    at <anonymous> (https://www.gstatic.com/firebasejs/6.0.4/firebase-firestore.js:0:306770)
+[  382450ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://s0.2mdn.net/instream/video/client.js:0
+[  380966ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://sync-tm.everesttech.net/upi/pid/ACY3VSlh?redir=https%3A%2F%2Fs.amazon-adsystem.com%2Fecm3%3Fex%3Dadobe3pb.com%26id%3D%24%7BTM_USER_ID%7D&gdpr=0:0
+[  380966ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://csync.loopme.me/?pubid=11405&redirect=https%3A%2F%2Fs.amazon-adsystem.com%2Fecm3%3Fex%3Dloopme.com%26id%3D%7Bviewer_token%7D&gdpr=0:0
+[  380973ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://ad.360yield.com/server_match?callback=https%3A%2F%2Fs.amazon-adsystem.com%2Fecm3%3Fex%3Dazerion.com%26id%3D%7BPUB_USER_ID%7D&gdpr=0:0
+[  380973ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://cs.media.net/cksync?cs=31&type=tam&redirect=https%3A%2F%2Fs.amazon-adsystem.com%2Fecm3%3Fex%3Dmedia.net%26id%3D%3Cvsid%3E&gdpr=0:0
+[  380973ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://onetag-sys.com/match/?int_id=113&callback=https%3A%2F%2Fs.amazon-adsystem.com%2Fecm3%3Fex%3Donetag.com%26id%3D%24%7BUSER_TOKEN%7D&gdpr=0:0
+[  380974ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://creativecdn.com/cm-notify?pi=amazon&gdpr=0:0
+[  380975ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://jadserve.postrelease.com/suid/101959?ntv_r=https%3A%2F%2Fs.amazon-adsystem.com%2Fecm3%3Fex%3Dnativo.com%26id%3DNTV_USER_ID&gdpr=0:0
+[  380975ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://um.simpli.fi/amazon/https%3A%2F%2Fs.amazon-adsystem.com%2Fecm3%3Fex%3Dsimpli.fi%26id%3D?gdpr=0:0
+[  380975ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://match.prod.bidr.io/cookie-sync/amzn?redirect=https%3A%2F%2Fs.amazon-adsystem.com%2Fecm3%3Fex%3Dbeeswax.com%26id%3D%24UID&gdpr=0:0
+[  381009ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://pixel.rubiconproject.com/exchange/sync.php?p=a9us&gdpr=0:0
+[  381765ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://a.sportradarserving.com/sync?ssp=bidswitch&bidswitch_ssp_id=bidline&gdpr=&gdpr_consent=:0
+[  382498ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://pubads.g.doubleclick.net/gampad/ads?sz=400x300%7C640x360%7C320x240%7C480x360%7C360x640%7C240x320%7C360x480%7C300x400&iu=%2F23348076616%2Fndtv_desktop_news_24x7_live_pre&gdfp_req=1&env=vp&output=xml_vast4&unviewed_position_start=1&vpmute=1&plcmt=1&url=https%3A%2F%2Fwww.ndtv.com%2Fvideo%2Fembed-player%2F%3Fsite%3Dclassic&id=LIVE_BG24x7&autostart=1&pWidth=436pHeight%3D245&category=embed&cube=0&description_url=https%3A%2F%2Fwww.ndtv.com%2Fvideo%2Fembed-player%2F%3Fsite%3Dclassic%26id%3DLIVE_BG24x7%26autostart%3D1%26pWidth%3D436pHeight%3D245%26category%3Dembed%26cube%3D0%26&hl=en&cust_params=mediatype%3Dlive&vpa=auto&sdkv=h.3.784.0&osd=2&frm=1&vis=1&sdr=1&is_amp=0&uach=WyJtYWNPUyIsIjI2LjQuMSIsImFybSIsIiIsIjE1MS4wLjc5MjIuNzciLG51bGwsMCxudWxsLCI2NCIsW1siTm90PUE_QnJhbmQiLCI5OS4wLjAuMCJdLFsiR29vZ2xlIENocm9tZSIsIjE1MS4wLjc5MjIuNzciXSxbIkNocm9taXVtIiwiMTUxLjAuNzkyMi43NyJdXSwwXQ..&u_so=l&ctv=0&sdki=100000445&ptt=20&vo=0&adk=298554313&sdk_apis=2%2C7%2C8&omid_p=Google1%2Fh.3.784.0&media_url=blob%3Ahttps%253a%2F%2Fwww.ndtv.com%2Ff9eb4869-835a-4054-b81e-734b63147e93&sid=DC4BA860-FC16-4190-9434-2B4041EDBAC3&htps=10&eid=95322027%2C95331589%2C95332046%2C95396036&ref=https%3A%2F%2Fwww.ndtv.com%2F&top=https%3A%2F%2Fwww.ndtv.com%2F&loc=https%3A%2F%2Fwww.ndtv.com%2Fvideo%2Fembed-player%2F%3Fsite%3Dclassic%26id%3DLIVE_BG24x7%26autostart%3D1%26pWidth%3D436pHeight%3D245%26category%3Dembed%26cube%3D0&dlt=1786501272602&idt=2745&dt=1786501275679&cookie_enabled=1&eoidce=1&pvsid=8124806656443775&correlator=4024848199915310&scor=1211361906361182&pied=CgwSCgi-2vf0rYfX5SsKDBIKCJ3x-YXm6fK9Zg..&ged=ve4_td3_er687.1127.687.1127_vi0.0.811.1512_vp0_eb16616:0
+[  382499ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://pubads.g.doubleclick.net/gampad/ads?sz=400x300%7C640x360%7C320x240%7C480x360%7C360x640%7C240x320%7C360x480%7C300x400&iu=%2F23348076616%2Fndtv_desktop_news_24x7_live_pre&gdfp_req=1&env=vp&output=xml_vast4&unviewed_position_start=1&vpmute=1&plcmt=1&url=https%3A%2F%2Fwww.ndtv.com%2Fvideo%2Fembed-player%2F%3Fsite%3Dclassic&id=LIVE_BG24x7&autostart=1&pWidth=436pHeight%3D245&category=embed&cube=0&description_url=https%3A%2F%2Fwww.ndtv.com%2Fvideo%2Fembed-player%2F%3Fsite%3Dclassic%26id%3DLIVE_BG24x7%26autostart%3D1%26pWidth%3D436pHeight%3D245%26category%3Dembed%26cube%3D0%26&hl=en&cust_params=mediatype%3Dlive&vpa=auto&sdkv=h.3.784.0&osd=2&frm=1&vis=1&sdr=1&is_amp=0&uach=WyJtYWNPUyIsIjI2LjQuMSIsImFybSIsIiIsIjE1MS4wLjc5MjIuNzciLG51bGwsMCxudWxsLCI2NCIsW1siTm90PUE_QnJhbmQiLCI5OS4wLjAuMCJdLFsiR29vZ2xlIENocm9tZSIsIjE1MS4wLjc5MjIuNzciXSxbIkNocm9taXVtIiwiMTUxLjAuNzkyMi43NyJdXSwwXQ..&u_so=l&ctv=0&sdki=100000445&ptt=20&vo=0&adk=298554313&sdk_apis=2%2C7%2C8&omid_p=Google1%2Fh.3.784.0&media_url=blob%3Ahttps%253a%2F%2Fwww.ndtv.com%2Ff9eb4869-835a-4054-b81e-734b63147e93&sid=DC4BA860-FC16-4190-9434-2B4041EDBAC3&htps=10&eid=95322027%2C95331589%2C95332046%2C95396036&ref=https%3A%2F%2Fwww.ndtv.com%2F&top=https%3A%2F%2Fwww.ndtv.com%2F&loc=https%3A%2F%2Fwww.ndtv.com%2Fvideo%2Fembed-player%2F%3Fsite%3Dclassic%26id%3DLIVE_BG24x7%26autostart%3D1%26pWidth%3D436pHeight%3D245%26category%3Dembed%26cube%3D0&dlt=1786501272602&idt=2745&dt=1786501275679&cookie_enabled=1&eoidce=1&pvsid=8124806656443775&correlator=4024848199915310&scor=1211361906361182&pied=CgwSCgi-2vf0rYfX5SsKDBIKCJ3x-YXm6fK9Zg..&ged=ve4_td3_er687.1127.687.1127_vi0.0.811.1512_vp0_eb16616:0
+[  382506ms] [LOG] in InitGimaSetup @ https://cdn.ndtv.com/vp/static/js/initvidplayerDAI.min.new.js?v=2026-08-12-7:0
+[  382512ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://s0.2mdn.net/instream/video/client.js:0
+[  382566ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://csync.loopme.me/?pubid=11405&redirect=https%3A%2F%2Fs.amazon-adsystem.com%2Fecm3%3Fex%3Dloopme.com%26id%3D%7Bviewer_token%7D&gdpr=0:0
+[  382566ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://sync-tm.everesttech.net/upi/pid/ACY3VSlh?redir=https%3A%2F%2Fs.amazon-adsystem.com%2Fecm3%3Fex%3Dadobe3pb.com%26id%3D%24%7BTM_USER_ID%7D&gdpr=0:0
+[  382566ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://ad.360yield.com/server_match?callback=https%3A%2F%2Fs.amazon-adsystem.com%2Fecm3%3Fex%3Dazerion.com%26id%3D%7BPUB_USER_ID%7D&gdpr=0:0
+[  382566ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://onetag-sys.com/match/?int_id=113&callback=https%3A%2F%2Fs.amazon-adsystem.com%2Fecm3%3Fex%3Donetag.com%26id%3D%24%7BUSER_TOKEN%7D&gdpr=0:0
+[  382566ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://cs.media.net/cksync?cs=31&type=tam&redirect=https%3A%2F%2Fs.amazon-adsystem.com%2Fecm3%3Fex%3Dmedia.net%26id%3D%3Cvsid%3E&gdpr=0:0
+[  382566ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://um.simpli.fi/amazon/https%3A%2F%2Fs.amazon-adsystem.com%2Fecm3%3Fex%3Dsimpli.fi%26id%3D?gdpr=0:0
+[  382566ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://jadserve.postrelease.com/suid/101959?ntv_r=https%3A%2F%2Fs.amazon-adsystem.com%2Fecm3%3Fex%3Dnativo.com%26id%3DNTV_USER_ID&gdpr=0:0
+[  382566ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://creativecdn.com/cm-notify?pi=amazon&gdpr=0:0
+[  382566ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://match.prod.bidr.io/cookie-sync/amzn?redirect=https%3A%2F%2Fs.amazon-adsystem.com%2Fecm3%3Fex%3Dbeeswax.com%26id%3D%24UID&gdpr=0:0
+[  382567ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://pixel.rubiconproject.com/exchange/sync.php?p=a9us&gdpr=0:0
+[  381686ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://image6.pubmatic.com/AdServer/PugMaster?sec=1&async=1&kdntuid=1&rnd=71613724&p=156011&s=165626&a=0&ptask=ALL&np=0&fp=0&rp=0&mpc=0&spug=1&coppa=0&gdpr=0&gdpr_consent=&us_privacy=&gpp=&gpp_sid=:0
+[  383156ms] [LOG] comscoreMeta LIVE  @ https://cdn.ndtv.com/vp/static/js/initvidplayerDAI.min.new.js?v=2026-08-12-7:0
+[  383800ms] [LOG] comscoreMeta LIVE  @ https://cdn.ndtv.com/vp/static/js/initvidplayerDAI.min.new.js?v=2026-08-12-7:0
+[  384498ms] [LOG] filter_arr [Object, Object] @ https://cdn.ndtv.com/vp/static/js/initvidplayerDAI.min.new.js?v=2026-08-12-7:0
+[  384498ms] [LOG] == performing for preroll == @ https://cdn.ndtv.com/vp/static/js/initvidplayerDAI.min.new.js?v=2026-08-12-7:0
+[  384498ms] [LOG] == performing for pre_End_FOT_false == @ https://cdn.ndtv.com/vp/static/js/initvidplayerDAI.min.new.js?v=2026-08-12-7:0
+[  384498ms] [LOG] == performing for preroll == @ https://cdn.ndtv.com/vp/static/js/initvidplayerDAI.min.new.js?v=2026-08-12-7:0
+[  384498ms] [LOG] == performing for pre_End_FOT_true == @ https://cdn.ndtv.com/vp/static/js/initvidplayerDAI.min.new.js?v=2026-08-12-7:0

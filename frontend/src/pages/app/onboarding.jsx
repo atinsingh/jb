@@ -6,6 +6,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { appRoute } from '@/components/app/appRoutes';
 import { useAuth } from '@/context/AuthContext';
+import Button from '@/components/app/ui/Button';
+import Pill from '@/components/app/ui/Pill';
+import Toggle from '@/components/app/ui/Toggle';
+import MonoLabel from '@/components/app/ui/MonoLabel';
+import Logo from '@/components/brand/Logo';
 import {
   uploadResume,
   getUserProfile,
@@ -38,7 +43,6 @@ const HEADS = [
   { h: 'Confirm your profile', s: 'Here’s what we pulled. Fix anything that looks off.' },
   { h: 'What are you looking for?', s: 'This tunes your matches and what Auto-Apply will send.' },
 ];
-const BRAND_STEPS = ['Add your résumé', 'Confirm your profile', 'Set your preferences'];
 
 export default function AppOnboarding() {
   const router = useRouter();
@@ -110,8 +114,13 @@ export default function AppOnboarding() {
   const isProfile = step === 1;
   const isPrefs = step === 2;
   const canContinue = !(step === 0 && !uploaded);
-  const progress = `${((step + 1) / 3) * 100}%`;
   const stepLabel = `Step ${step + 1} of 3`;
+
+  // Suggestion chips. Anything the résumé parse produced goes first — a static
+  // list of design titles is useless to a backend engineer — and the generic
+  // options follow so there is always something to click.
+  const roleOptions = [...new Set([headline, ...ALL_ROLES].filter(Boolean))];
+  const locOptions = [...new Set([location, ...ALL_LOCS].filter(Boolean))];
 
   // ---- handlers ----------------------------------------------------------
   const handleFile = async (file) => {
@@ -198,425 +207,384 @@ export default function AppOnboarding() {
     }
   };
 
-  // ---- shared styles -----------------------------------------------------
-  const inputStyle = {
-    width: '100%',
-    fontFamily: 'inherit',
-    fontSize: 15,
-    color: '#1B1A16',
-    background: '#FFFEFB',
-    border: '1px solid #D9D0BE',
-    borderRadius: 12,
-    padding: '12px 14px',
-  };
-  const labelStyle = { fontSize: 12.5, fontWeight: 600, color: '#46413A', marginBottom: 6, display: 'block' };
-
-  const chip = (on) => ({
-    fontFamily: 'inherit',
-    fontSize: 13.5,
-    fontWeight: 600,
-    color: on ? '#0C2C1C' : '#46413A',
-    background: on ? '#1FA463' : '#FFFEFB',
-    border: `1px solid ${on ? '#1FA463' : '#D9D0BE'}`,
-    borderRadius: 999,
-    padding: '8px 15px',
-    cursor: 'pointer',
-  });
-
   return (
     <>
       <Head>
-        <title>Set up your copilot — Jobocate</title>
+        <title>Get started · Jobocate</title>
       </Head>
 
-      <style jsx global>{`
-        #jbob * {
-          box-sizing: border-box;
-        }
-        #jbob input::placeholder {
-          color: #a79e8f;
-        }
-        #jbob input:focus,
-        #jbob textarea:focus {
-          outline: none;
-          border-color: #1fa463;
-          box-shadow: 0 0 0 3px rgba(31, 164, 99, 0.15);
-        }
-        #jbob input[type='range'] {
-          -webkit-appearance: none;
-          appearance: none;
-          height: 6px;
-          border-radius: 999px;
-          background: #e6decf;
-        }
-        #jbob input[type='range']::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          width: 22px;
-          height: 22px;
-          border-radius: 50%;
-          background: #1fa463;
-          border: 3px solid #fffefb;
-          box-shadow: 0 1px 4px rgba(27, 26, 22, 0.25);
-          cursor: pointer;
-        }
-        #jbob input[type='range']::-moz-range-thumb {
-          width: 22px;
-          height: 22px;
-          border-radius: 50%;
-          background: #1fa463;
-          border: 3px solid #fffefb;
-          box-shadow: 0 1px 4px rgba(27, 26, 22, 0.25);
-          cursor: pointer;
-        }
-        @keyframes rbpop {
-          from {
-            opacity: 0;
-            transform: scale(0.97);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1);
-          }
-        }
-        @media (max-width: 900px) {
-          #jbob {
-            grid-template-columns: 1fr !important;
-          }
-          #jbob-brand {
-            display: none !important;
-          }
-        }
-        @media (max-width: 480px) {
-          #jbob .ob-wizard-side {
-            padding: 24px 20px 20px !important;
-          }
-          /* The full stepper (circle + label + connector, ×3) has no room on
-             a phone even in a single full-width column. The compact "Step X
-             of 3" label next to the progress bar already conveys the same
-             information, so the verbose stepper stands down here. */
-          #jbob .ob-stepper {
-            display: none !important;
-          }
-        }
-      `}</style>
-
       <div
-        id="jbob"
         style={{
-          display: 'grid',
-          gridTemplateColumns: '1.05fr 0.95fr',
+          display: 'flex',
+          flexDirection: 'column',
           minHeight: '100vh',
-          background: '#F7F3EA',
+          background: 'var(--jb-a-rail)',
+          color: 'var(--jb-a-ink)',
           fontFamily: 'var(--jb-font-sans)',
-          color: '#1B1A16',
         }}
       >
-        {/* ===== WIZARD SIDE ===== */}
-        <div className="ob-wizard-side" style={{ display: 'flex', flexDirection: 'column', padding: '34px 56px 28px' }}>
-          {/* top bar: logo + progress + step label */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <Link href="/" style={{ textDecoration: 'none' }}>
-              <span style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, letterSpacing: '-0.02em', fontSize: 23, color: '#1B1A16' }}>
-                Jobocate<span style={{ color: '#1FA463' }}>.</span>
-              </span>
-            </Link>
-            <div style={{ flex: 1, height: 3, borderRadius: 999, background: '#E6DECF', overflow: 'hidden' }}>
-              <div style={{ width: progress, height: '100%', background: '#1FA463', transition: 'width 0.35s ease' }} />
-            </div>
-            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#9A9286' }}>{stepLabel}</span>
-          </div>
+        {/* ── HEADER: logo + the three-step tracker ─────────────────────── */}
+        <header
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 16,
+            flexWrap: 'wrap',
+            rowGap: 10,
+            minHeight: 64,
+            padding: '12px clamp(16px, 4vw, 36px)',
+            background: 'var(--jb-a-card)',
+            borderBottom: '1px solid var(--jb-a-line)',
+            flexShrink: 0,
+          }}
+        >
+          <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 9, textDecoration: 'none', color: 'inherit' }}>
+            <Logo size={21} accent="var(--jb-a-accent)" />
+          </Link>
 
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', maxWidth: 480, width: '100%', margin: '0 auto' }}>
-            {/* STEPPER */}
-            <div className="ob-stepper" style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 26 }}>
-              {STEP_TITLES.map((t, i) => {
-                const done = i < step;
-                const cur = i === step;
-                return (
-                  <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ flex: 1 }} />
+
+          <ol style={{ display: 'flex', alignItems: 'center', gap: 18, listStyle: 'none', margin: 0, padding: 0, flexWrap: 'wrap' }}>
+            {STEP_TITLES.map((label, i) => {
+              const done = i < step;
+              const here = i === step;
+              return (
+                <li key={label}>
+                  <button
+                    type="button"
+                    // Only completed steps are navigable. Jumping forward past
+                    // an unfinished step would skip its save, so a future step
+                    // is disabled rather than silently doing nothing.
+                    disabled={i > step}
+                    aria-current={here ? 'step' : undefined}
+                    onClick={() => i <= step && setStep(i)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 7,
+                      background: 'none',
+                      border: 0,
+                      padding: 0,
+                      fontFamily: 'inherit',
+                      cursor: i <= step ? 'pointer' : 'default',
+                    }}
+                  >
                     <span
                       style={{
-                        width: 28,
-                        height: 28,
-                        flexShrink: 0,
+                        width: 20,
+                        height: 20,
                         borderRadius: '50%',
+                        border: `1.5px solid ${done || here ? 'var(--jb-a-accent)' : 'var(--jb-a-line-strong)'}`,
+                        background: done ? 'var(--jb-a-accent)' : 'var(--jb-a-card)',
+                        color: done ? 'var(--jb-a-accent-ink)' : here ? 'var(--jb-a-accent)' : 'var(--jb-a-ink-warm)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         fontFamily: 'var(--jb-font-mono)',
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: 600,
-                        color: cur ? '#0C2C1C' : done ? '#fff' : '#9A9286',
-                        background: cur || done ? '#1FA463' : '#FFFEFB',
-                        border: `1.5px solid ${cur || done ? '#1FA463' : '#D2C9B7'}`,
                       }}
                     >
-                      {done ? '✓' : String(i + 1)}
+                      {done ? '✓' : i + 1}
                     </span>
-                    <span style={{ fontSize: 13.5, fontWeight: 600, color: cur || done ? '#1B1A16' : '#9A9286' }}>{t}</span>
-                    {i < STEP_TITLES.length - 1 && <span style={{ width: 30, height: 1.5, background: '#D2C9B7', margin: '0 12px' }} />}
-                  </div>
-                );
-              })}
+                    <span style={{ fontSize: 13, fontWeight: here ? 600 : 500, color: here ? 'var(--jb-a-ink)' : 'var(--jb-a-ink-2)' }}>
+                      {label}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </header>
+
+        {/* ── BODY ──────────────────────────────────────────────────────── */}
+        <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 'clamp(32px, 5vw, 52px) clamp(20px, 4vw, 44px) 40px', display: 'flex', justifyContent: 'center' }}>
+          <div style={{ width: '100%', maxWidth: 720, display: 'flex', flexDirection: 'column', gap: 30 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <h1
+                style={{
+                  margin: 0,
+                  fontFamily: 'var(--jb-font-display)',
+                  fontWeight: 400,
+                  fontSize: 'var(--jb-a-display-sm)',
+                  lineHeight: 1.05,
+                  letterSpacing: '-0.02em',
+                }}
+              >
+                {HEADS[step].h}
+              </h1>
+              <p style={{ margin: 0, fontSize: 16.5, lineHeight: 1.5, color: 'var(--jb-a-ink-2)', maxWidth: '52ch' }}>
+                {HEADS[step].s}
+              </p>
             </div>
 
-            <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 38, lineHeight: 1.04, letterSpacing: '-0.01em', margin: '0 0 6px' }}>{HEADS[step].h}</h1>
-            <p style={{ fontSize: 15, color: '#5A544A', margin: '0 0 26px' }}>{HEADS[step].s}</p>
-
-            {/* hidden file input */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,.doc,.docx,application/pdf"
-              style={{ display: 'none' }}
-              onChange={(e) => handleFile(e.target.files && e.target.files[0])}
-            />
-
-            {/* STEP 1: UPLOAD */}
+            {/* ---- STEP 1: résumé --------------------------------------- */}
             {isUpload && (
-              <div style={{ animation: 'rbpop 0.25s ease' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.doc,.docx"
+                  onChange={(e) => handleFile(e.target.files?.[0])}
+                  style={{ display: 'none' }}
+                />
+
                 {!uploaded ? (
-                  <>
-                    <button
-                      onClick={onUploadClick}
+                  <button
+                    type="button"
+                    onClick={onUploadClick}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      handleFile(e.dataTransfer.files?.[0]);
+                    }}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 12,
+                      height: 280,
+                      width: '100%',
+                      border: '1.5px dashed var(--jb-a-line-dashed)',
+                      borderRadius: 14,
+                      background: 'var(--jb-a-card)',
+                      fontFamily: 'inherit',
+                      color: 'inherit',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 30 }}>
+                      Drop your résumé here
+                    </span>
+                    <span style={{ fontSize: 14.5, color: 'var(--jb-a-ink-3)' }}>
+                      PDF or DOCX, up to 10 MB. We read it once to fill your profile.
+                    </span>
+                    <span
                       style={{
-                        width: '100%',
-                        display: 'flex',
-                        flexDirection: 'column',
+                        display: 'inline-flex',
                         alignItems: 'center',
-                        gap: 14,
-                        background: '#FFFEFB',
-                        border: '2px dashed #D2C9B7',
-                        borderRadius: 18,
-                        padding: '44px 24px',
-                        cursor: 'pointer',
-                        fontFamily: 'inherit',
+                        height: 42,
+                        padding: '0 22px',
+                        borderRadius: 999,
+                        background: 'var(--jb-a-accent)',
+                        color: 'var(--jb-a-accent-ink)',
+                        fontSize: 14.5,
+                        fontWeight: 600,
+                        marginTop: 6,
                       }}
                     >
-                      <span style={{ width: 56, height: 56, borderRadius: '50%', background: '#EAF6EE', color: '#1FA463', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}>↑</span>
-                      <span style={{ textAlign: 'center' }}>
-                        <span style={{ display: 'block', fontSize: 16, fontWeight: 700, color: '#1B1A16' }}>Drop your résumé here</span>
-                        <span style={{ display: 'block', fontSize: 13.5, color: '#8A8378', marginTop: 3 }}>
-                          PDF or DOCX, up to 10MB — or <span style={{ color: '#157A49', fontWeight: 600 }}>browse files</span>
-                        </span>
-                      </span>
-                    </button>
-                    <Link href={appRoute('App Resume Builder.dc.html')} style={{ display: 'block', textAlign: 'center', fontSize: 13.5, fontWeight: 600, color: '#157A49', textDecoration: 'none', marginTop: 16 }}>
-                      Don’t have one? Skip — build one →
-                    </Link>
-                  </>
+                      Choose a file
+                    </span>
+                  </button>
                 ) : (
-                  <div style={{ background: '#FFFEFB', border: '1px solid #CDE9D6', borderRadius: 16, padding: 20 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                      <span style={{ width: 46, height: 46, flexShrink: 0, borderRadius: 11, background: '#EAF6EE', color: '#157A49', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--jb-font-mono)', fontWeight: 600, fontSize: 11 }}>PDF</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14.5, fontWeight: 700, color: '#1B1A16' }}>{fileName}</div>
-                        <div style={{ fontSize: 12.5, color: '#8A8378' }}>{fileSize} · {parsing ? 'reading…' : 'uploaded just now'}</div>
-                      </div>
-                      <button onClick={removeFile} title="Remove" style={{ flexShrink: 0, width: 32, height: 32, border: '1px solid #E1D9C9', background: '#FFFEFB', borderRadius: 9, cursor: 'pointer', color: '#A79E8F', fontSize: 14 }}>✕</button>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 16, paddingTop: 15, borderTop: '1px solid #F2ECE0' }}>
-                      <span style={{ width: 22, height: 22, flexShrink: 0, borderRadius: '50%', background: '#1FA463', color: '#0C2C1C', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>✓</span>
-                      <span style={{ fontSize: 13.5, color: '#157A49', fontWeight: 600 }}>
-                        {parsing ? 'Reading your experience, skills and education…' : 'We pulled your experience, skills and education.'}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 14,
+                      padding: '18px 20px',
+                      background: 'var(--jb-a-card)',
+                      border: '1px solid var(--jb-a-line)',
+                      borderRadius: 14,
+                    }}
+                  >
+                    <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <span style={{ fontSize: 15.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {fileName || 'Your résumé'}
                       </span>
-                    </div>
-                    {parseError && (
-                      <div style={{ fontSize: 12.5, color: '#C9622E', marginTop: 10 }}>{parseError}</div>
-                    )}
+                      <span style={{ fontSize: 13.5, color: 'var(--jb-a-ink-3)' }}>
+                        {parsing ? 'Reading it now…' : parseError ? parseError : `${fileSize} · read and ready`}
+                      </span>
+                    </span>
+                    <Button variant="secondary" size="sm" onClick={removeFile}>
+                      Replace
+                    </Button>
                   </div>
                 )}
+
+                <span style={{ fontSize: 14.5, color: 'var(--jb-a-ink-3)' }}>
+                  No résumé yet?{' '}
+                  <Link href="/app/resume" style={{ color: 'var(--jb-a-accent)', fontWeight: 600, textDecoration: 'none' }}>
+                    Start from a blank one
+                  </Link>{' '}
+                  — the builder walks you through it.
+                </span>
               </div>
             )}
 
-            {/* STEP 2: CONFIRM PROFILE */}
+            {/* ---- STEP 2: profile --------------------------------------- */}
             {isProfile && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 18, animation: 'rbpop 0.25s ease' }}>
-                <div style={{ display: 'flex', gap: 14 }}>
-                  <div style={{ flex: 1 }}>
-                    <label style={labelStyle}>Full name</label>
-                    <input value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label style={labelStyle}>Location</label>
-                    <input value={location} onChange={(e) => setLocation(e.target.value)} style={inputStyle} />
-                  </div>
-                </div>
-                <div>
-                  <label style={labelStyle}>Headline</label>
-                  <input value={headline} onChange={(e) => setHeadline(e.target.value)} style={inputStyle} />
-                </div>
-                <div>
-                  <label style={{ ...labelStyle, marginBottom: 8 }}>
-                    Top skills <span style={{ color: '#A79E8F', fontWeight: 500 }}>— tap × to remove</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+                {[
+                  { label: 'Full name', value: name, set: setName, placeholder: 'Your name' },
+                  { label: 'Current title', value: headline, set: setHeadline, placeholder: 'e.g. Senior Product Designer' },
+                  { label: 'Location', value: location, set: setLocation, placeholder: 'City, country' },
+                ].map((f) => (
+                  <label key={f.label} style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                    <MonoLabel>{f.label}</MonoLabel>
+                    <input
+                      type="text"
+                      value={f.value}
+                      placeholder={f.placeholder}
+                      onChange={(e) => f.set(e.target.value)}
+                      style={{
+                        height: 50,
+                        padding: '0 14px',
+                        border: '1px solid var(--jb-a-line-strong)',
+                        borderRadius: 9,
+                        background: 'var(--jb-a-card)',
+                        fontFamily: 'inherit',
+                        fontSize: 15.5,
+                        color: 'var(--jb-a-ink)',
+                      }}
+                    />
                   </label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {skills.map((label, i) => (
-                      <span key={`${label}-${i}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13.5, fontWeight: 500, color: '#1F4733', background: '#EAF6EE', border: '1px solid #CDE9D6', borderRadius: 999, padding: '7px 8px 7px 13px' }}>
-                        {label}
-                        <button onClick={() => removeSkill(i)} style={{ width: 18, height: 18, border: 'none', background: '#CDE9D6', color: '#157A49', borderRadius: '50%', cursor: 'pointer', fontSize: 11, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+                ))}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+                  <MonoLabel>Skills</MonoLabel>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+                    {skills.map((s, i) => (
+                      <span
+                        key={`${s}-${i}`}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          height: 34,
+                          padding: '0 8px 0 13px',
+                          borderRadius: 999,
+                          fontSize: 14,
+                          background: 'var(--jb-a-tint)',
+                          color: 'var(--jb-a-accent)',
+                          border: '1px solid var(--jb-a-tint-line)',
+                        }}
+                      >
+                        {s}
+                        <button
+                          type="button"
+                          onClick={() => removeSkill(i)}
+                          aria-label={`Remove ${s}`}
+                          style={{ border: 0, background: 'none', color: 'inherit', cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: '0 4px' }}
+                        >
+                          ×
+                        </button>
                       </span>
                     ))}
                     <input
                       value={skillDraft}
                       onChange={(e) => setSkillDraft(e.target.value)}
                       onKeyDown={onSkillKey}
-                      placeholder="+ add skill"
-                      style={{ fontFamily: 'inherit', fontSize: 13.5, color: '#1B1A16', background: '#FBF8F1', border: '1px dashed #D2C9B7', borderRadius: 999, padding: '7px 14px', width: 120 }}
+                      onBlur={addSkill}
+                      placeholder="Add a skill"
+                      aria-label="Add a skill"
+                      style={{
+                        height: 34,
+                        width: 130,
+                        padding: '0 13px',
+                        borderRadius: 999,
+                        border: '1px dashed var(--jb-a-line-strong)',
+                        background: 'var(--jb-a-card)',
+                        fontFamily: 'inherit',
+                        fontSize: 14,
+                        color: 'var(--jb-a-ink)',
+                      }}
                     />
                   </div>
                 </div>
               </div>
             )}
 
-            {/* STEP 3: PREFERENCES */}
+            {/* ---- STEP 3: preferences ---------------------------------- */}
             {isPrefs && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 22, animation: 'rbpop 0.25s ease' }}>
-                <div>
-                  <label style={{ ...labelStyle, marginBottom: 10 }}>Target roles</label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {ALL_ROLES.map((r) => (
-                      <button key={r} onClick={() => toggleRole(r)} style={chip(selRoles.includes(r))}>{r}</button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 30 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+                  <MonoLabel>Roles</MonoLabel>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+                    {roleOptions.map((r) => (
+                      <Pill key={r} selected={selRoles.includes(r)} onClick={() => toggleRole(r)}>
+                        {r}
+                      </Pill>
                     ))}
                   </div>
                 </div>
 
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                    <label style={{ fontSize: 12.5, fontWeight: 600, color: '#46413A' }}>Locations</label>
-                    <button
-                      onClick={() => setRemote((v) => !v)}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 9, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: remote ? '#157A49' : '#8A8378', background: 'none', border: 'none', cursor: 'pointer' }}
-                    >
-                      Open to remote
-                      <span style={{ width: 40, height: 23, borderRadius: 999, background: remote ? '#1FA463' : '#D2C9B7', position: 'relative', transition: 'background 0.2s' }}>
-                        <span style={{ position: 'absolute', top: 2, left: remote ? 19 : 2, width: 19, height: 19, borderRadius: '50%', background: '#FFFFFF', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left 0.2s' }} />
-                      </span>
-                    </button>
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {ALL_LOCS.map((l) => (
-                      <button key={l} onClick={() => toggleLoc(l)} style={chip(selLocs.includes(l))}>{l}</button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+                  <MonoLabel>Locations</MonoLabel>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+                    {locOptions.map((l) => (
+                      <Pill key={l} selected={selLocs.includes(l)} onClick={() => toggleLoc(l)}>
+                        {l}
+                      </Pill>
                     ))}
                   </div>
-                </div>
-
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                    <label style={{ fontSize: 12.5, fontWeight: 600, color: '#46413A' }}>Minimum base salary</label>
-                    <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 15, fontWeight: 600, color: '#157A49' }}>${salary}k+</span>
-                  </div>
-                  <input type="range" min="80" max="300" step="5" value={salary} onChange={(e) => setSalary(Number(e.target.value))} style={{ width: '100%' }} />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#A79E8F', marginTop: 6 }}>
-                    <span>$80k</span>
-                    <span>$300k+</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 4 }}>
+                    <Toggle checked={remote} label="Open to remote" onChange={() => setRemote((v) => !v)} />
+                    <span style={{ fontSize: 14.5 }}>Open to remote</span>
                   </div>
                 </div>
 
-                <button
-                  onClick={() => setAutoApply((v) => !v)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 14,
-                    textAlign: 'left',
-                    background: autoApply ? '#EAF6EE' : '#FFFEFB',
-                    border: `1.5px solid ${autoApply ? '#1FA463' : '#E6DECF'}`,
-                    borderRadius: 14,
-                    padding: '16px 18px',
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                  }}
-                >
-                  <span style={{ width: 40, height: 40, flexShrink: 0, borderRadius: 11, background: autoApply ? '#1FA463' : '#F2ECE0', color: autoApply ? '#0C2C1C' : '#A79E8F', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17 }}>✦</span>
-                  <span style={{ flex: 1 }}>
-                    <span style={{ display: 'block', fontSize: 14.5, fontWeight: 700, color: '#1B1A16' }}>Enable Auto-Apply</span>
-                    <span style={{ display: 'block', fontSize: 12.5, color: '#8A8378' }}>We’ll apply to your strongest matches automatically — you review everything.</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <span style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                    <MonoLabel>Base salary floor</MonoLabel>
+                    <span style={{ flex: 1 }} />
+                    <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 20, fontWeight: 600 }}>${salary}k</span>
                   </span>
-                  <span style={{ width: 44, height: 25, flexShrink: 0, borderRadius: 999, background: autoApply ? '#1FA463' : '#D2C9B7', position: 'relative', transition: 'background 0.2s' }}>
-                    <span style={{ position: 'absolute', top: 2, left: autoApply ? 21 : 2, width: 21, height: 21, borderRadius: '50%', background: '#FFFFFF', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left 0.2s' }} />
+                  <input
+                    type="range"
+                    min={40}
+                    max={300}
+                    step={5}
+                    value={salary}
+                    aria-label="Minimum base salary in thousands"
+                    onChange={(e) => setSalary(Number(e.target.value))}
+                    style={{ width: '100%', accentColor: 'var(--jb-a-accent)' }}
+                  />
+                </div>
+
+                {/* The consent panel. It is the one tinted block on the screen
+                    because it is the one place the user is handing over a
+                    standing permission — the emphasis is the point. */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '18px 20px', background: 'var(--jb-a-tint)', borderRadius: 11 }}>
+                  <Toggle size="lg" checked={autoApply} label="Draft applications for my best matches" onChange={() => setAutoApply((v) => !v)} />
+                  <span style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span style={{ fontSize: 15, fontWeight: 600 }}>Draft applications for my best matches</span>
+                    <span style={{ fontSize: 14, lineHeight: 1.45, color: 'var(--jb-a-tint-ink)' }}>
+                      Nothing sends until you approve it. You can change the limits or switch this off any time.
+                    </span>
                   </span>
-                </button>
+                </div>
               </div>
             )}
-
-            {/* FOOTER NAV */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 30 }}>
-              {step > 0 && (
-                <button onClick={back} style={{ fontFamily: 'inherit', fontSize: 14.5, fontWeight: 600, color: '#1B1A16', background: '#FFFEFB', border: '1px solid #D9D0BE', borderRadius: 999, padding: '13px 22px', cursor: 'pointer' }}>← Back</button>
-              )}
-              <div style={{ flex: 1 }} />
-              {step < 2 ? (
-                <button
-                  onClick={next}
-                  disabled={!canContinue}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 9,
-                    fontFamily: 'inherit',
-                    fontSize: 15,
-                    fontWeight: 700,
-                    color: canContinue ? '#0C2C1C' : '#8FB7A1',
-                    background: canContinue ? '#1FA463' : '#CFE6D8',
-                    border: 'none',
-                    borderRadius: 999,
-                    padding: '14px 26px',
-                    cursor: canContinue ? 'pointer' : 'default',
-                  }}
-                >
-                  Continue <span>→</span>
-                </button>
-              ) : (
-                <button
-                  onClick={finish}
-                  disabled={saving}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 9, fontFamily: 'inherit', fontSize: 15, fontWeight: 700, color: '#0C2C1C', background: '#1FA463', border: 'none', borderRadius: 999, padding: '14px 26px', cursor: saving ? 'default' : 'pointer' }}
-                >
-                  {saving ? 'Saving…' : 'Go to dashboard'} <span>→</span>
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#A79E8F' }}>© 2026 Jobocate</div>
-        </div>
-
-        {/* ===== BRAND SIDE ===== */}
-        <div id="jbob-brand" style={{ position: 'relative', overflow: 'hidden', background: '#15140F', padding: 48, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 85% 8%, rgba(31,164,99,0.34), transparent 55%), radial-gradient(circle at 5% 100%, rgba(31,164,99,0.18), transparent 50%)', pointerEvents: 'none' }} />
-
-          <div style={{ position: 'relative', fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#5BD08C' }}>— Setting up your copilot</div>
-
-          <div style={{ position: 'relative' }}>
-            <p style={{ fontFamily: 'var(--jb-font-display)', fontSize: 38, lineHeight: 1.08, color: '#F2EDE2', margin: '0 0 30px', maxWidth: 430 }}>3 steps to your first matches.</p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 34 }}>
-              {BRAND_STEPS.map((label, i) => {
-                const done = i < step;
-                const cur = i === step;
-                return (
-                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '15px 17px', background: cur ? '#1E2D24' : '#1A1813', border: `1px solid ${cur ? '#2F5C42' : '#2C2A22'}`, borderRadius: 13 }}>
-                    <span style={{ width: 30, height: 30, flexShrink: 0, borderRadius: '50%', background: done || cur ? '#1FA463' : '#15140F', border: `1.5px solid ${done || cur ? '#1FA463' : '#3A382E'}`, color: done || cur ? '#0C2C1C' : '#6B6456', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--jb-font-mono)', fontWeight: 600, fontSize: 12 }}>
-                      {done ? '✓' : String(i + 1)}
-                    </span>
-                    <span style={{ fontSize: 14.5, fontWeight: cur ? 700 : 500, color: cur ? '#FBF8F1' : done ? '#C7D8CC' : '#8A8378' }}>{label}</span>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 30, fontWeight: 600, color: '#5BD08C' }}>48h</span>
-              <span style={{ fontSize: 14, lineHeight: 1.4, color: '#9A9286', maxWidth: 250 }}>Most members get their first interview request within two days of finishing setup.</span>
-            </div>
-          </div>
-
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#9A9286' }}>
-            <span style={{ color: '#1FA463' }}>✓</span>
-            Free to start · You approve every application
           </div>
         </div>
+
+        {/* ── FOOTER ────────────────────────────────────────────────────── */}
+        <footer
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            padding: '18px clamp(20px, 4vw, 44px)',
+            background: 'var(--jb-a-card)',
+            borderTop: '1px solid var(--jb-a-line)',
+            flexShrink: 0,
+          }}
+        >
+          <Button variant="quiet" onClick={back} disabled={step === 0} style={{ color: step === 0 ? 'var(--jb-a-ink-faint)' : 'var(--jb-a-ink-2)', fontSize: 14.5 }}>
+            Back
+          </Button>
+          <span style={{ flex: 1 }} />
+          <span style={{ fontSize: 14, color: 'var(--jb-a-ink-3)' }}>{stepLabel}</span>
+          <Button
+            onClick={isPrefs ? finish : next}
+            disabled={!canContinue || saving}
+            style={!canContinue || saving ? { opacity: 0.55, cursor: 'not-allowed' } : null}
+          >
+            {saving ? 'Saving…' : isPrefs ? 'See my matches' : 'Continue'}
+          </Button>
+        </footer>
       </div>
     </>
   );

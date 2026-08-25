@@ -1,0 +1,8 @@
+[     143ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[    1401ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/1yi7_react-dom_1papa4l._.js:15305
+[    1412ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[   39807ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:8000/api/job-profiles:0
+[  385372ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[  385643ms] [LOG] [Fast Refresh] done in 372ms @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[  504075ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[  504183ms] [LOG] [Fast Refresh] done in 209ms @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226

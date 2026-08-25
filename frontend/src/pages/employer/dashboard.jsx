@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import EmployerSidebar from '@/components/employer/EmployerSidebar';
@@ -15,7 +15,7 @@ import {
   employerProfileApi,
 } from '@/services/employerApi';
 
-const FUNNEL_COLORS = ['#5C7CEF', '#4263EB', '#364FC7', '#2A3E9E', '#1FA463'];
+const FUNNEL_COLORS = ['var(--jb-a-accent-soft)', 'var(--jb-a-accent)', 'var(--jb-a-accent-deep)', 'var(--jb-a-accent-deep)', 'var(--jb-a-accent)'];
 
 // Format an ISO timestamp into { time, ampm }.
 function clockParts(iso) {
@@ -39,32 +39,21 @@ function isToday(iso) {
   );
 }
 
-const typeStyle = (t) =>
-  t === 'Video'
-    ? { color: '#364FC7', bg: '#EDF0FE', border: '#C7D2FB' }
-    : t === 'Onsite'
-    ? { color: '#157A49', bg: '#EAF6EE', border: '#CDE9D6' }
-    : { color: '#9A6A2E', bg: '#FBF1E2', border: '#EAD9BE' };
-
 const tone = (t) => {
-  if (t === 'indigo') return { dotBg: '#EDF0FE', dotBorder: '#C7D2FB', icon: '•', iconColor: '#4263EB' };
-  if (t === 'green') return { dotBg: '#EAF6EE', dotBorder: '#CDE9D6', icon: '✓', iconColor: '#157A49' };
-  return { dotBg: '#F2ECE0', dotBorder: '#E1D9C9', icon: '•', iconColor: '#A79E8F' };
+  if (t === 'indigo') return { dotBg: 'var(--jb-a-tint)', dotBorder: 'var(--jb-a-tint-line)', icon: '•', iconColor: 'var(--jb-a-accent)' };
+  if (t === 'green') return { dotBg: 'var(--jb-a-tint)', dotBorder: 'var(--jb-a-tint-line)', icon: '✓', iconColor: 'var(--jb-a-accent)' };
+  return { dotBg: 'var(--jb-a-control)', dotBorder: 'var(--jb-a-line)', icon: '•', iconColor: 'var(--jb-a-ink-faint)' };
 };
 
 export default function EmployerDashboard() {
   // Count-up animation matching the dc DCLogic componentDidMount.
-  const [p, setP] = useState(0);
-  const rafRef = useRef(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   // Real data only — starts empty, populated from the backend.
-  const [statTargets, setStatTargets] = useState([]);
   const [funnelRaw, setFunnelRaw] = useState([]);
   const [jobsRaw, setJobsRaw] = useState([]);
-  const [actRaw, setActRaw] = useState([]);
   const [ivRaw, setIvRaw] = useState([]);
   const [firstName, setFirstName] = useState('');
   const [companyName, setCompanyName] = useState('');
@@ -94,13 +83,6 @@ export default function EmployerDashboard() {
         { label: 'Interview', target: stats.interview || 0 },
         { label: 'Offer', target: stats.offer || 0 },
         { label: 'Hired', target: stats.hired || 0 },
-      ]);
-
-      setStatTargets([
-        { label: 'Active jobs', target: activeJobs.length, suffix: '', trend: `${jobsArr.length} total`, trendColor: '#8A8378' },
-        { label: 'New applicants', target: stats.applied || 0, suffix: '', trend: `${stats.applied || 0} awaiting review`, trendColor: '#4263EB' },
-        { label: 'In interview', target: stats.interview || 0, suffix: '', trend: `${stats.offer || 0} at offer`, trendColor: '#8A8378' },
-        { label: 'Hired', target: stats.hired || 0, suffix: '', trend: 'all time', trendColor: '#157A49' },
       ]);
 
       setJobsRaw(
@@ -134,15 +116,6 @@ export default function EmployerDashboard() {
           }),
       );
 
-      setActRaw(
-        Array.isArray(autopilot?.activity)
-          ? autopilot.activity.slice(0, 5).map((a) => ({
-              text: `${a.name} — ${String(a.event || '').replace(/_/g, ' ')}`,
-              time: 'recent',
-              t: a.event === 'received' ? 'indigo' : 'green',
-            }))
-          : [],
-      );
     } catch (err) {
       setError(err);
     } finally {
@@ -167,506 +140,293 @@ export default function EmployerDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    const dur = 950;
-    const start = performance.now();
-    const ease = (t) => 1 - Math.pow(1 - t, 3);
-    const tick = (now) => {
-      const t = Math.min((now - start) / dur, 1);
-      setP(ease(t));
-      if (t < 1) rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, []);
+  // "Thu 21 Aug" — see the note on the candidate dashboard's `today`.
+  const todayLabel = (() => {
+    const d = new Date();
+    const weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
+    const month = d.toLocaleDateString('en-US', { month: 'short' });
+    return `${weekday} ${d.getDate()} ${month}`;
+  })();
 
-  const n = (target) => Math.round(target * p);
+  const openRoles = jobsRaw.length;
+  const topRole = jobsRaw[0]?.title || '';
+  const screened = funnelRaw.find((f) => f.label === 'Screened')?.target || 0;
+  const applicants = funnelRaw.find((f) => f.label === 'Applicants')?.target || 0;
 
-  const stats = statTargets.map((s) => ({
-    label: s.label,
-    value: String(n(s.target)) + s.suffix,
-    trend: s.trend,
-    trendColor: s.trendColor,
-  }));
-
-  const max = funnelRaw[0]?.target || 1;
-  const funnel = funnelRaw.map((f, i) => {
-    const pctOfMax = Math.max((f.target / max) * 100, 7);
-    const prevTarget = i === 0 ? 0 : funnelRaw[i - 1].target;
-    const conv =
-      i === 0 ? 'start' : (prevTarget ? Math.round((f.target / prevTarget) * 100) : 0) + '%';
+  /* The hero answers "what decision is open right now", from the pipeline the
+     employer already has. Screening clearance outranks raw applicant volume
+     because a screened candidate is waiting on a human; an unscreened one is
+     still waiting on the funnel. */
+  const hero = (() => {
+    if (screened > 0 && topRole) {
+      return {
+        eyebrow: 'Needs a decision',
+        title: `${screened} candidate${screened === 1 ? '' : 's'} cleared screening for ${topRole}.`,
+        deck: 'Ranked on job-related criteria only, with the reasoning attached to each one.',
+        primary: { label: 'Review shortlist', href: '/employer/screening' },
+        secondary: { label: 'Open the role', href: '/employer/jobs' },
+      };
+    }
+    if (applicants > 0) {
+      return {
+        eyebrow: 'In the pipeline',
+        title: `${applicants} applicant${applicants === 1 ? '' : 's'} across ${openRoles} open role${openRoles === 1 ? '' : 's'}.`,
+        deck: 'Nothing has cleared screening yet. Screening ranks on job-related criteria and shows its reasoning.',
+        primary: { label: 'Open screening', href: '/employer/screening' },
+        secondary: { label: 'See all roles', href: '/employer/jobs' },
+      };
+    }
+    if (openRoles === 0) {
+      return {
+        eyebrow: 'Nothing open',
+        title: 'No roles are live yet.',
+        deck: 'Post one and candidates start arriving ranked, with the reasoning attached.',
+        primary: { label: 'Post a role', href: '/employer/jobs/post' },
+        secondary: null,
+      };
+    }
     return {
-      label: f.label,
-      color: FUNNEL_COLORS[i] || '#4263EB',
-      count: String(n(f.target)),
-      width: pctOfMax * p + '%',
-      conv,
-      convColor: i === 0 ? '#A79E8F' : i === funnelRaw.length - 1 ? '#157A49' : '#8A8378',
+      eyebrow: 'All quiet',
+      title: `${openRoles} role${openRoles === 1 ? '' : 's'} live, no applicants yet.`,
+      deck: 'Distribution takes a few days to build up. Widening the location or seniority band usually helps first.',
+      primary: { label: 'Check distribution', href: '/employer/distribution' },
+      secondary: { label: 'See all roles', href: '/employer/jobs' },
     };
-  });
+  })();
 
-  const jobs = jobsRaw.map((j, i, arr) => ({
-    ...j,
-    divider: i < arr.length - 1 ? '#F2ECE0' : 'transparent',
-  }));
-
-  const interviews = ivRaw.map((iv) => {
-    const ts = typeStyle(iv.type);
-    return { ...iv, typeColor: ts.color, typeBg: ts.bg, typeBorder: ts.border };
-  });
-
-  const todayLabel = new Date().toLocaleDateString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  });
-
-  const activity = actRaw.map((a, i, arr) => ({
-    ...tone(a.t),
-    text: a.text,
-    time: a.time,
-    connector: i < arr.length - 1,
+  // Flex weights taper 5 → 1.4 so the funnel reads as a funnel even when the
+  // real counts are flat or zero. Counts are still the literal numbers.
+  const FUNNEL_FLEX = [5, 4, 3, 2, 1.4];
+  const funnel = funnelRaw.map((f, i) => ({
+    label: f.label,
+    count: String(f.target),
+    color: FUNNEL_COLORS[i] || 'var(--jb-a-accent)',
+    flex: FUNNEL_FLEX[i] ?? 1,
+    conv:
+      i === 0 || !funnelRaw[i - 1]?.target
+        ? ''
+        : `${Math.round((f.target / funnelRaw[i - 1].target) * 100)}% of ${funnelRaw[i - 1].label.toLowerCase()}`,
   }));
 
   return (
     <>
       <Head>
-        <title>Dashboard — Jobocate for Employers</title>
+        <title>Hiring · Jobocate for Employers</title>
       </Head>
 
-      <style jsx global>{`
-        #emapp ::-webkit-scrollbar {
-          width: 8px;
-        }
-        #emapp ::-webkit-scrollbar-thumb {
-          background: #e1d9c9;
-          border-radius: 8px;
-        }
-        #emapp a.em-job:hover {
-          opacity: 0.85;
-        }
-        #emapp a.em-iv:hover {
-          border-color: #4263eb;
-        }
-        #emapp a.em-post:hover {
-          background: #364fc7;
-        }
-      `}</style>
-
-      <div
-        id="emapp"
-        style={{
-          display: 'flex',
-          minHeight: '100vh',
-          background: '#F7F3EA',
-          fontFamily: 'var(--jb-font-sans)',
-          color: '#1B1A16',
-        }}
-      >
+      <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--jb-a-stage)', color: 'var(--jb-a-ink)', fontFamily: 'var(--jb-font-sans)' }}>
         <EmployerSidebar active="dashboard" />
 
-        <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          {/* HEADER */}
+        <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <header
             style={{
-              position: 'sticky',
-              top: 0,
-              zIndex: 20,
               display: 'flex',
               alignItems: 'center',
-              gap: 20,
-              padding: '15px 32px',
-              background: 'rgba(247,243,234,0.85)',
-              backdropFilter: 'blur(10px)',
-              borderBottom: '1px solid #E7E0D2',
+              gap: 16,
+              flexWrap: 'wrap',
+              rowGap: 10,
+              minHeight: 64,
+              padding: '12px clamp(20px, 4vw, 44px)',
+              borderBottom: '1px solid var(--jb-a-line)',
+              background: 'var(--jb-a-header)',
+              flexShrink: 0,
             }}
           >
-            <div
-              style={{
-                fontFamily: 'var(--jb-font-mono)',
-                fontSize: 11.5,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                color: '#9A9286',
-              }}
-            >
-              {companyName ? `${companyName} · Hiring / Dashboard` : 'Hiring / Dashboard'}
-            </div>
-            <div style={{ flex: 1 }} />
+            <h1 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>
+              {companyName ? `${companyName} · Hiring` : 'Hiring'}
+            </h1>
+            <span style={{ flex: 1 }} />
+            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--jb-a-ink-3)' }}>
+              {todayLabel}
+            </span>
             <Link
-              href={appRoute('Employer Post Job.dc.html')}
-              className="em-post"
+              href="/employer/jobs/post"
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 8,
-                background: '#4263EB',
-                color: '#FFFFFF',
-                fontSize: 13.5,
-                fontWeight: 700,
-                padding: '10px 18px',
+                height: 34,
+                padding: '0 16px',
                 borderRadius: 999,
+                background: 'var(--jb-a-accent)',
+                color: 'var(--jb-a-accent-ink)',
+                fontSize: 13.5,
+                fontWeight: 600,
                 textDecoration: 'none',
               }}
             >
-              <span style={{ fontSize: 15, fontWeight: 400 }}>＋</span> Post a job
+              Post a role
             </Link>
           </header>
 
-          <div style={{ padding: '20px 16px 40px', maxWidth: 1180, width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
-            {/* GREETING */}
-            <div style={{ marginBottom: 24 }}>
-              <h1
-                style={{
-                  fontFamily: 'var(--jb-font-display)',
-                  fontWeight: 400,
-                  fontSize: 40,
-                  lineHeight: 1,
-                  letterSpacing: '-0.01em',
-                  margin: '0 0 8px',
-                }}
-              >
-                {firstName ? `Good morning, ${firstName}.` : 'Good morning.'}
-              </h1>
-              <p style={{ fontSize: 15.5, color: '#5A544A', margin: 0 }}>
-                Here&rsquo;s where hiring stands today ·{' '}
-                <span style={{ fontFamily: 'var(--jb-font-mono)', color: '#8A8378' }}>{todayLabel}</span>
-              </p>
-            </div>
+          <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 'clamp(28px, 4vw, 44px) clamp(20px, 4vw, 44px) 64px' }}>
+            <div style={{ maxWidth: 1180 }}>
+              {loading && <LoadingState label="Loading your pipeline…" />}
+              {!loading && error && <ErrorState error={error} onRetry={load} />}
 
-            {loading ? (
-              <LoadingState label="Loading dashboard…" />
-            ) : error ? (
-              <ErrorState error={error} onRetry={load} />
-            ) : (
-             <>
-            {/* STAT CARDS */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 16 }}>
-              {stats.map((s) => (
-                <div
-                  key={s.label}
-                  style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 16, padding: 20 }}
-                >
-                  <div
+              {!loading && !error && (
+                <>
+                  <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--jb-a-accent)' }}>
+                    {hero.eyebrow}
+                  </span>
+                  <h2
                     style={{
-                      fontFamily: 'var(--jb-font-mono)',
-                      fontSize: 11,
-                      letterSpacing: '0.06em',
-                      textTransform: 'uppercase',
-                      color: '#9A9286',
-                      marginBottom: 12,
+                      margin: '16px 0 0',
+                      fontFamily: 'var(--jb-font-display)',
+                      fontWeight: 400,
+                      fontSize: 'var(--jb-a-display-lg)',
+                      lineHeight: 1.02,
+                      letterSpacing: '-0.02em',
+                      maxWidth: '24ch',
                     }}
                   >
-                    {s.label}
-                  </div>
-                  <div
-                    style={{
-                      fontFamily: 'var(--jb-font-mono)',
-                      fontSize: 34,
-                      fontWeight: 600,
-                      lineHeight: 1,
-                      color: '#1B1A16',
-                      marginBottom: 8,
-                    }}
-                  >
-                    {s.value}
-                  </div>
-                  <div
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: s.trendColor,
-                    }}
-                  >
-                    {s.trend}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* FUNNEL */}
-            <div
-              style={{
-                background: '#FFFEFB',
-                border: '1px solid #E6DECF',
-                borderRadius: 18,
-                padding: 24,
-                marginBottom: 16,
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: 18,
-                }}
-              >
-                <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Hiring funnel</h2>
-                <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#8A8378' }}>
-                  All open roles · last 30 days
-                </span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-                {funnel.map((f) => (
-                  <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                    <span style={{ width: 88, flexShrink: 0, fontSize: 13, fontWeight: 600, color: '#5A544A' }}>
-                      {f.label}
-                    </span>
-                    <div style={{ flex: 1, height: 34, background: '#F4EFE4', borderRadius: 8, overflow: 'hidden' }}>
-                      <div
-                        style={{
-                          width: f.width,
-                          height: '100%',
-                          background: f.color,
-                          borderRadius: 8,
-                          display: 'flex',
-                          alignItems: 'center',
-                          padding: '0 12px',
-                          transition: 'width 0.2s ease',
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontFamily: 'var(--jb-font-mono)',
-                            fontSize: 13,
-                            fontWeight: 600,
-                            color: '#FFFFFF',
-                          }}
-                        >
-                          {f.count}
-                        </span>
-                      </div>
-                    </div>
-                    <span
+                    {hero.title}
+                  </h2>
+                  <p style={{ margin: '18px 0 0', fontSize: 17.5, lineHeight: 1.55, color: 'var(--jb-a-ink-2)', maxWidth: '60ch' }}>
+                    {hero.deck}
+                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 28, flexWrap: 'wrap' }}>
+                    <Link
+                      href={hero.primary.href}
                       style={{
-                        width: 56,
-                        flexShrink: 0,
-                        textAlign: 'right',
-                        fontFamily: 'var(--jb-font-mono)',
-                        fontSize: 11.5,
-                        color: f.convColor,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        height: 48,
+                        padding: '0 26px',
+                        borderRadius: 999,
+                        background: 'var(--jb-a-accent)',
+                        color: 'var(--jb-a-accent-ink)',
+                        fontSize: 15.5,
+                        fontWeight: 600,
+                        textDecoration: 'none',
                       }}
                     >
-                      {f.conv}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* TWO COLUMN */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'stretch' }}>
-              {/* LEFT */}
-              <div style={{ flex: 1.5, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {/* JOBS NEEDING ATTENTION */}
-                <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18, padding: 22 }}>
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      marginBottom: 14,
-                    }}
-                  >
-                    <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Jobs needing attention</h2>
-                    <Link
-                      href={appRoute('Employer Jobs.dc.html')}
-                      style={{ fontSize: 13, fontWeight: 600, color: '#4263EB', textDecoration: 'none' }}
-                    >
-                      All jobs →
+                      {hero.primary.label}
                     </Link>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    {jobs.map((j) => (
+                    {hero.secondary && (
                       <Link
-                        key={j.title}
-                        href={appRoute('Employer Candidates.dc.html')}
-                        className="em-job"
+                        href={hero.secondary.href}
                         style={{
-                          display: 'flex',
+                          display: 'inline-flex',
                           alignItems: 'center',
-                          gap: 14,
-                          padding: '14px 0',
-                          borderBottom: `1px solid ${j.divider}`,
+                          height: 48,
+                          padding: '0 26px',
+                          borderRadius: 999,
+                          border: '1.5px solid var(--jb-a-line-btn)',
+                          background: 'var(--jb-a-card)',
+                          color: 'var(--jb-a-ink)',
+                          fontSize: 15.5,
+                          fontWeight: 600,
                           textDecoration: 'none',
                         }}
                       >
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 14.5, fontWeight: 700, color: '#1B1A16', marginBottom: 3 }}>
-                            {j.title}
-                          </div>
-                          <div style={{ fontSize: 12.5, color: '#8A8378' }}>{j.meta}</div>
-                        </div>
-                        <span style={{ fontSize: 12.5, color: '#C9622E', flexShrink: 0 }}>{j.note}</span>
-                        <span
-                          style={{
-                            flexShrink: 0,
-                            fontFamily: 'var(--jb-font-mono)',
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: '#FFFFFF',
-                            background: '#4263EB',
-                            borderRadius: 999,
-                            padding: '3px 9px',
-                          }}
-                        >
-                          {j.newCount} new
-                        </span>
-                        <span style={{ color: '#C9BFAC', flexShrink: 0 }}>→</span>
+                        {hero.secondary.label}
                       </Link>
-                    ))}
-                    {jobs.length === 0 && (
-                      <div style={{ padding: '14px 0', fontSize: 13, color: '#8A8378' }}>
-                        No open jobs yet.
-                      </div>
                     )}
                   </div>
-                </div>
 
-                {/* RECENT ACTIVITY */}
-                <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18, padding: 22 }}>
-                  <h2 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 16px' }}>Recent activity</h2>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    {activity.map((a, i) => (
-                      <div key={i} style={{ display: 'flex', gap: 13 }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
-                          <span
-                            style={{
-                              width: 18,
-                              height: 18,
-                              borderRadius: '50%',
-                              background: a.dotBg,
-                              border: `1.5px solid ${a.dotBorder}`,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: 11,
-                              color: a.iconColor,
-                            }}
-                          >
-                            {a.icon}
+                  {/* ── FUNNEL ─────────────────────────────────────────── */}
+                  <section style={{ marginTop: 56, paddingTop: 26, borderTop: '1px solid var(--jb-a-line-strong)' }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 20 }}>
+                      <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--jb-a-ink-3)' }}>
+                        Pipeline · all roles
+                      </span>
+                      <span style={{ flex: 1 }} />
+                    </div>
+                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                      {funnel.map((f) => (
+                        <div key={f.label} style={{ flex: `${f.flex} 1 130px`, display: 'flex', flexDirection: 'column', gap: 9 }}>
+                          <span aria-hidden="true" style={{ display: 'block', height: 8, borderRadius: 4, background: f.color }} />
+                          <span style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 24, fontWeight: 600 }}>{f.count}</span>
+                            <span style={{ fontSize: 13.5, color: 'var(--jb-a-ink-2)' }}>{f.label}</span>
+                            {f.conv && (
+                              <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, color: 'var(--jb-a-ink-warm)' }}>{f.conv}</span>
+                            )}
                           </span>
-                          {a.connector && (
-                            <span style={{ width: 2, flex: 1, minHeight: 16, background: '#EFE8DA' }} />
-                          )}
                         </div>
-                        <div style={{ paddingBottom: 15, flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13.5, lineHeight: 1.5, color: '#3A352C' }}>{a.text}</div>
-                          <div
-                            style={{
-                              fontFamily: 'var(--jb-font-mono)',
-                              fontSize: 11,
-                              color: '#A79E8F',
-                              marginTop: 3,
-                            }}
-                          >
-                            {a.time}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    {activity.length === 0 && (
-                      <div style={{ fontSize: 13, color: '#8A8378' }}>
-                        No recent activity.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+                      ))}
+                    </div>
+                  </section>
 
-              {/* RIGHT: TODAY'S INTERVIEWS */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18, padding: 22 }}>
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      marginBottom: 14,
-                    }}
-                  >
-                    <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Today&rsquo;s interviews</h2>
-                    <Link
-                      href={appRoute('Employer Interviews.dc.html')}
-                      style={{ fontSize: 13, fontWeight: 600, color: '#4263EB', textDecoration: 'none' }}
-                    >
-                      All →
-                    </Link>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
-                    {interviews.map((iv) => (
-                      <Link
-                        key={iv.name}
-                        href={appRoute('Employer Interviews.dc.html')}
-                        className="em-iv"
-                        style={{
-                          display: 'flex',
-                          gap: 13,
-                          padding: 14,
-                          background: '#FBF9F4',
-                          border: '1px solid #E6DECF',
-                          borderRadius: 13,
-                          textDecoration: 'none',
-                        }}
-                      >
-                        <div style={{ flexShrink: 0, textAlign: 'center', width: 54 }}>
-                          <div
-                            style={{
-                              fontFamily: 'var(--jb-font-mono)',
-                              fontSize: 14,
-                              fontWeight: 600,
-                              color: '#1B1A16',
-                            }}
-                          >
-                            {iv.time}
-                          </div>
-                          <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#A79E8F' }}>
-                            {iv.ampm}
-                          </div>
-                        </div>
-                        <div style={{ width: 1, background: '#E6DECF', flexShrink: 0 }} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-                            <span style={{ fontSize: 14, fontWeight: 700, color: '#1B1A16' }}>{iv.name}</span>
-                            <span
-                              style={{
-                                fontFamily: 'var(--jb-font-mono)',
-                                fontSize: 11,
-                                fontWeight: 600,
-                                color: iv.typeColor,
-                                background: iv.typeBg,
-                                border: `1px solid ${iv.typeBorder}`,
-                                padding: '2px 7px',
-                                borderRadius: 999,
-                              }}
-                            >
-                              {iv.type}
-                            </span>
-                          </div>
-                          <div style={{ fontSize: 12.5, color: '#8A8378' }}>
-                            {iv.req} · {iv.round}
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
-                    {interviews.length === 0 && (
-                      <div style={{ padding: '16px 4px', fontSize: 13, color: '#8A8378' }}>
-                        No interviews scheduled today.
+                  {/* ── OPEN ROLES + TODAY'S INTERVIEWS ────────────────── */}
+                  <div className="em-split" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 52, marginTop: 52 }}>
+                    <section style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, paddingBottom: 6 }}>
+                        <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--jb-a-ink-3)' }}>
+                          Open roles
+                        </span>
+                        <span style={{ flex: 1, height: 1, background: 'var(--jb-a-line-soft)' }} />
+                        <Link href="/employer/jobs" style={{ fontSize: 14, color: 'var(--jb-a-accent)', fontWeight: 600, textDecoration: 'none' }}>
+                          All roles →
+                        </Link>
                       </div>
-                    )}
+                      {jobsRaw.map((j) => (
+                        <div key={j.title} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '16px 0', borderBottom: '1px solid var(--jb-a-line-soft)' }}>
+                          <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            <span style={{ fontSize: 16, fontWeight: 600 }}>{j.title}</span>
+                            <span style={{ fontSize: 13.5, color: 'var(--jb-a-ink-3)' }}>{j.meta}</span>
+                          </span>
+                          <span style={{ width: 90, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 17, fontWeight: 600 }}>{j.newCount}</span>
+                            <span style={{ fontSize: 12, color: 'var(--jb-a-ink-warm)' }}>applicants</span>
+                          </span>
+                        </div>
+                      ))}
+                      {jobsRaw.length === 0 && (
+                        <EmptyState
+                          title="No open roles"
+                          hint="Post a role and applicants start arriving here."
+                          action={
+                            <Link href="/employer/jobs/post" style={{ color: 'var(--jb-a-accent)', fontWeight: 600, textDecoration: 'none' }}>
+                              Post a role →
+                            </Link>
+                          }
+                        />
+                      )}
+                    </section>
+
+                    <section style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, paddingBottom: 6 }}>
+                        <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--jb-a-ink-3)' }}>
+                          Today’s interviews
+                        </span>
+                        <span style={{ flex: 1, height: 1, background: 'var(--jb-a-line-soft)' }} />
+                      </div>
+                      {ivRaw.map((iv, i) => (
+                        <div key={`${iv.time}-${iv.name}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 0', borderBottom: '1px solid var(--jb-a-line-soft)' }}>
+                          <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 13.5, fontWeight: 600, width: 62, color: 'var(--jb-a-ink-warm)' }}>
+                            {iv.time}
+                            {iv.ampm}
+                          </span>
+                          <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <span style={{ fontSize: 15, fontWeight: 600 }}>{iv.name}</span>
+                            <span style={{ fontSize: 13, color: 'var(--jb-a-ink-3)' }}>{iv.req}</span>
+                          </span>
+                          <span style={{ fontSize: 12.5, color: 'var(--jb-a-ink-soft)' }}>{iv.round}</span>
+                        </div>
+                      ))}
+                      {ivRaw.length === 0 && (
+                        <div style={{ padding: '16px 0', fontSize: 13.5, color: 'var(--jb-a-ink-3)' }}>
+                          No interviews scheduled today.
+                        </div>
+                      )}
+                    </section>
                   </div>
-                </div>
-              </div>
+                </>
+              )}
             </div>
-             </>
-            )}
           </div>
         </main>
       </div>
+
+      <style jsx>{`
+        @media (max-width: 900px) {
+          .em-split {
+            grid-template-columns: 1fr !important;
+            gap: 40px !important;
+          }
+        }
+      `}</style>
     </>
   );
 }

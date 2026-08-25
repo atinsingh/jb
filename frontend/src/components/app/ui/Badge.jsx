@@ -1,38 +1,44 @@
+// Small status pill. On this surface a Badge is a rare thing — the design
+// replaced most badges with mono labels — so it is reserved for genuine state:
+// an application's stage, a flag on a match row, an offer.
+//
+// Radius is 5px, not 999px: the mockup's badges are rectangular so they read as
+// data cells in a table row, while the round pills are all actions.
 export default function Badge({ tone = 'neutral', children, style, ...rest }) {
   const toneStyle = {
-    neutral: {
-      background: 'var(--jb-a-control)',
-      border: '1px solid var(--jb-a-line)',
-      color: 'var(--jb-a-ink-2)',
+    neutral: { background: 'var(--jb-a-control)', color: 'var(--jb-a-chip-neutral-ink)' },
+    accent: { background: 'var(--jb-a-tint)', color: 'var(--jb-a-accent)' },
+    offer: { background: 'var(--jb-a-offer-bg)', color: 'var(--jb-a-offer-ink)' },
+    warn: { background: 'var(--jb-a-warn-bg)', color: 'var(--jb-a-offer-ink)' },
+    danger: { background: 'var(--jb-a-danger-bg)', color: 'var(--jb-a-danger-ink)' },
+    // The mono uppercase flag ("DRAFT READY") that sits beside a role title.
+    flag: {
+      background: 'var(--jb-a-tint)',
+      color: 'var(--jb-a-accent)',
+      fontFamily: 'var(--jb-font-mono)',
+      fontSize: 11,
+      fontWeight: 400,
+      letterSpacing: '0.1em',
+      textTransform: 'uppercase',
+      height: 22,
     },
-    success: {
-      background: 'var(--jb-a-chip-success-bg)',
-      border: '1px solid var(--jb-a-tint-line)',
-      color: 'var(--jb-a-accent-2)',
-    },
-    warn: {
-      background: 'var(--jb-a-warn-bg)',
-      border: '1px solid var(--jb-a-warn-line)',
-      color: 'var(--jb-a-status-warn)',
-    },
-    danger: {
-      background: 'var(--jb-a-danger-bg)',
-      border: '1px solid var(--jb-a-danger-line)',
-      color: 'var(--jb-a-danger-ink)',
-    },
-  }[tone];
-
-  const base = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    fontSize: 12.5,
-    fontWeight: 600,
-    padding: '3px 9px',
-    borderRadius: 999,
-  };
+  }[tone] || {};
 
   return (
-    <span style={{ ...base, ...toneStyle, ...style }} {...rest}>
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        height: 24,
+        padding: '0 10px',
+        borderRadius: 5,
+        fontSize: 12.5,
+        fontWeight: 600,
+        ...toneStyle,
+        ...style,
+      }}
+      {...rest}
+    >
       {children}
     </span>
   );

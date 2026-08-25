@@ -305,33 +305,33 @@ export default function AppResume() {
           height: 8px;
         }
         #jbapp ::-webkit-scrollbar-thumb {
-          background: #e1d9c9;
+          background: var(--jb-a-line);
           border-radius: 8px;
         }
         #jbapp input:focus,
         #jbapp textarea:focus {
           outline: none;
-          border-color: #1fa463;
-          box-shadow: 0 0 0 3px rgba(31, 164, 99, 0.15);
+          border-color: var(--jb-a-accent);
+          box-shadow: 0 0 0 3px var(--jb-a-tint);
         }
         #jbapp .jb-btn {
           transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease,
             box-shadow 0.16s ease;
         }
         #jbapp .jb-btn:hover {
-          background: #f4efe4;
+          background: var(--jb-a-control);
         }
         #jbapp .jb-btn:active {
           transform: translateY(1px);
         }
         #jbapp .jb-btn-green {
           transition: background 0.16s ease, transform 0.16s ease, box-shadow 0.2s ease;
-          box-shadow: 0 8px 20px -10px rgba(31, 164, 99, 0.7);
+          box-shadow: 0 8px 20px -10px var(--jb-a-tint-line);
         }
         #jbapp .jb-btn-green:hover {
-          background: #1b9159;
+          background: var(--jb-a-accent-hover);
           transform: translateY(-1px);
-          box-shadow: 0 12px 26px -10px rgba(31, 164, 99, 0.8);
+          box-shadow: 0 12px 26px -10px var(--jb-a-tint-line);
         }
         #jbapp .jb-sec {
           transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease,
@@ -339,31 +339,31 @@ export default function AppResume() {
         }
         #jbapp .jb-sec:hover {
           transform: translateY(-2px);
-          box-shadow: 0 10px 22px -14px rgba(27, 26, 22, 0.4);
+          box-shadow: 0 var(--jb-a-shadow-lift);
         }
         #jbapp .jb-add {
           transition: border-color 0.16s ease, color 0.16s ease, background 0.16s ease;
         }
         #jbapp .jb-add:hover {
-          border-color: #1fa463;
-          color: #157a49;
-          background: rgba(31, 164, 99, 0.05);
+          border-color: var(--jb-a-accent);
+          color: var(--jb-a-accent);
+          background: var(--jb-a-tint);
         }
         #jbapp .jb-empty {
           transition: border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
           cursor: pointer;
         }
         #jbapp .jb-empty:hover {
-          border-color: #1fa463;
-          background: rgba(31, 164, 99, 0.045);
-          color: #157a49;
+          border-color: var(--jb-a-accent);
+          background: var(--jb-a-tint);
+          color: var(--jb-a-accent);
         }
         #jbapp .jb-page {
           transition: box-shadow 0.3s ease;
         }
         #jbapp .jb-page:hover {
-          box-shadow: 0 40px 80px -40px rgba(27, 26, 22, 0.42),
-            0 3px 10px -5px rgba(27, 26, 22, 0.12);
+          box-shadow: 0 var(--jb-a-shadow-paper),
+            0 var(--jb-a-shadow-lift);
         }
         @keyframes jbskel {
           0% {
@@ -385,7 +385,7 @@ export default function AppResume() {
           }
           #jbapp .rb-editor-panel {
             border-right: none !important;
-            border-bottom: 1px solid #e7e0d2 !important;
+            border-bottom: 1px solid var(--jb-a-line) !important;
           }
         }
       `}</style>
@@ -395,9 +395,9 @@ export default function AppResume() {
         style={{
           display: 'flex',
           minHeight: '100vh',
-          background: '#F7F3EA',
+          background: 'var(--jb-a-stage-deep)',
           fontFamily: 'var(--jb-font-sans)',
-          color: '#1B1A16',
+          color: 'var(--jb-a-ink)',
         }}
       >
         <AppSidebar active="resume" />
@@ -415,9 +415,9 @@ export default function AppResume() {
               rowGap: 10,
               gap: 16,
               padding: '15px 32px',
-              background: 'rgba(247,243,234,0.85)',
+              background: 'var(--jb-a-card)',
               backdropFilter: 'blur(10px)',
-              borderBottom: '1px solid #E7E0D2',
+              borderBottom: '1px solid var(--jb-a-line)',
             }}
           >
             <a
@@ -427,7 +427,7 @@ export default function AppResume() {
                 fontSize: 11.5,
                 letterSpacing: '0.1em',
                 textTransform: 'uppercase',
-                color: '#9A9286',
+                color: 'var(--jb-a-ink-soft)',
                 textDecoration: 'none',
               }}
               title="Back to My Resumes"
@@ -436,8 +436,8 @@ export default function AppResume() {
             </a>
             {(id.name || id.title) && (
               <>
-                <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#C9BFAC' }}>·</span>
-                <span style={{ fontSize: 13.5, color: '#5A544A' }}>
+                <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: 'var(--jb-a-ink-faint)' }}>·</span>
+                <span style={{ fontSize: 13.5, color: 'var(--jb-a-ink-2)' }}>
                   {[id.name, id.title].filter(Boolean).join(' — ')}
                 </span>
               </>
@@ -450,7 +450,7 @@ export default function AppResume() {
                 gap: 6,
                 fontFamily: 'var(--jb-font-mono)',
                 fontSize: 12,
-                color: '#8A8378',
+                color: 'var(--jb-a-ink-warm)',
               }}
             >
               {/* `idle` used to fall through to "Saved · just now", so a résumé
@@ -465,14 +465,14 @@ export default function AppResume() {
                   borderRadius: '50%',
                   background:
                     saveState === 'error'
-                      ? '#B4472A'
+                      ? 'var(--jb-a-offer-ink)'
                       : saveState === 'saving'
-                        ? '#C9622E'
+                        ? 'var(--jb-a-status-offer)'
                         : saveState === 'saved'
-                          ? '#1FA463'
-                          : '#B8B0A0',
+                          ? 'var(--jb-a-accent)'
+                          : 'var(--jb-a-ink-faint)',
                   boxShadow:
-                    saveState === 'saved' ? '0 0 0 3px rgba(31,164,99,0.18)' : 'none',
+                    saveState === 'saved' ? '0 0 0 3px var(--jb-a-tint)' : 'none',
                 }}
               />
               {saveState === 'saving'
@@ -491,9 +491,9 @@ export default function AppResume() {
                 fontFamily: 'inherit',
                 fontSize: 13.5,
                 fontWeight: 600,
-                color: '#1B1A16',
-                background: '#FFFEFB',
-                border: '1px solid #D9D0BE',
+                color: 'var(--jb-a-ink)',
+                background: 'var(--jb-a-card)',
+                border: '1px solid var(--jb-a-line-strong)',
                 borderRadius: 999,
                 padding: '9px 16px',
                 cursor: 'pointer',
@@ -517,9 +517,9 @@ export default function AppResume() {
                 fontFamily: 'inherit',
                 fontSize: 13.5,
                 fontWeight: 600,
-                color: '#1B1A16',
-                background: '#FFFEFB',
-                border: '1px solid #D9D0BE',
+                color: 'var(--jb-a-ink)',
+                background: 'var(--jb-a-card)',
+                border: '1px solid var(--jb-a-line-strong)',
                 borderRadius: 999,
                 padding: '9px 16px',
                 cursor: exporting ? 'default' : 'pointer',
@@ -543,8 +543,8 @@ export default function AppResume() {
                 fontFamily: 'inherit',
                 fontSize: 13.5,
                 fontWeight: 700,
-                color: '#0C2C1C',
-                background: '#1FA463',
+                color: 'var(--jb-a-accent)',
+                background: 'var(--jb-a-accent)',
                 border: 'none',
                 borderRadius: 999,
                 padding: '9px 16px',
@@ -567,9 +567,9 @@ export default function AppResume() {
                 borderRadius: 12,
                 fontSize: 13,
                 fontWeight: 600,
-                background: notice.kind === 'ok' ? '#EAF6EE' : '#FBF1E8',
-                border: `1px solid ${notice.kind === 'ok' ? '#CDE9D6' : '#E9D8C2'}`,
-                color: notice.kind === 'ok' ? '#157A49' : '#8A5A22',
+                background: notice.kind === 'ok' ? 'var(--jb-a-tint)' : 'var(--jb-a-offer-bg)',
+                border: `1px solid ${notice.kind === 'ok' ? 'var(--jb-a-tint-line)' : 'var(--jb-a-warn-line)'}`,
+                color: notice.kind === 'ok' ? 'var(--jb-a-accent)' : 'var(--jb-a-offer-ink)',
               }}
             >
               {notice.text}
@@ -602,7 +602,7 @@ export default function AppResume() {
                 initial={{ opacity: 0, x: -14 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-                style={{ borderRight: '1px solid #E7E0D2', padding: '22px 24px', height: '100%' }}
+                style={{ borderRight: '1px solid var(--jb-a-line)', padding: '22px 24px', height: '100%' }}
               >
                 <RailTabs view={view} setView={setView} />
 
@@ -631,8 +631,8 @@ export default function AppResume() {
                   <div
                     style={{
                       background:
-                        'linear-gradient(180deg,#FFFEFB 0%,#FCF8F0 100%)',
-                      border: '1px solid #E6DECF',
+                        'linear-gradient(180deg,var(--jb-a-card) 0%,var(--jb-a-card) 100%)',
+                      border: '1px solid var(--jb-a-line)',
                       borderRadius: 16,
                       padding: 20,
                       marginBottom: 18,
@@ -644,7 +644,7 @@ export default function AppResume() {
                         <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 3 }}>
                           {completeness === 100 ? 'Résumé complete' : 'Résumé strength'}
                         </div>
-                        <div style={{ fontSize: 13, color: '#5A544A' }}>
+                        <div style={{ fontSize: 13, color: 'var(--jb-a-ink-2)' }}>
                           {completeness === 100
                             ? 'Every core section is filled in.'
                             : `${doneCount} of ${checklist.length} core sections done.`}
@@ -665,9 +665,9 @@ export default function AppResume() {
                               justifyContent: 'center',
                               fontSize: 11,
                               fontWeight: 700,
-                              color: c.done ? '#fff' : '#B7AE9C',
-                              background: c.done ? '#1FA463' : 'transparent',
-                              border: c.done ? 'none' : '1.5px solid #E0D8C7',
+                              color: c.done ? 'var(--jb-a-card)' : 'var(--jb-a-ink-faint)',
+                              background: c.done ? 'var(--jb-a-accent)' : 'transparent',
+                              border: c.done ? 'none' : '1.5px solid var(--jb-a-line)',
                             }}
                           >
                             {c.done ? '✓' : ''}
@@ -676,7 +676,7 @@ export default function AppResume() {
                             style={{
                               fontSize: 13,
                               fontWeight: 500,
-                              color: c.done ? '#5A544A' : '#9A9286',
+                              color: c.done ? 'var(--jb-a-ink-2)' : 'var(--jb-a-ink-soft)',
                               textDecoration: 'none',
                             }}
                           >
@@ -692,11 +692,11 @@ export default function AppResume() {
                 {data.suggestions.length > 0 && (
                   <div
                     style={{
-                      background: '#15140F',
+                      background: 'var(--jb-a-ink)',
                       borderRadius: 16,
                       padding: '18px 20px',
                       marginBottom: 22,
-                      color: '#F2EDE2',
+                      color: 'var(--jb-a-control)',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
@@ -706,7 +706,7 @@ export default function AppResume() {
                           fontSize: 11,
                           letterSpacing: '0.1em',
                           textTransform: 'uppercase',
-                          color: '#5BD08C',
+                          color: 'var(--jb-a-accent)',
                         }}
                       >
                         ✦ AI suggestions
@@ -715,7 +715,7 @@ export default function AppResume() {
                     {data.suggestions.map((s, i) => (
                       <div
                         key={i}
-                        style={{ display: 'flex', gap: 11, padding: '11px 0', borderBottom: '1px solid #2C2A22' }}
+                        style={{ display: 'flex', gap: 11, padding: '11px 0', borderBottom: '1px solid var(--jb-a-line-strong)' }}
                       >
                         <span
                           style={{
@@ -723,8 +723,8 @@ export default function AppResume() {
                             width: 20,
                             height: 20,
                             borderRadius: 6,
-                            background: 'rgba(31,164,99,0.18)',
-                            color: '#5BD08C',
+                            background: 'var(--jb-a-tint)',
+                            color: 'var(--jb-a-accent)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -734,14 +734,14 @@ export default function AppResume() {
                           {s.icon}
                         </span>
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, color: '#E4DECF', lineHeight: 1.45 }}>{s.text}</div>
+                          <div style={{ fontSize: 13, color: 'var(--jb-a-line)', lineHeight: 1.45 }}>{s.text}</div>
                           <button
                             type="button"
                             style={{
                               fontFamily: 'inherit',
                               fontSize: 12,
                               fontWeight: 600,
-                              color: '#5BD08C',
+                              color: 'var(--jb-a-accent)',
                               background: 'none',
                               border: 'none',
                               padding: '6px 0 0',
@@ -769,7 +769,7 @@ export default function AppResume() {
                   display: 'flex',
                   justifyContent: 'center',
                   background:
-                    'radial-gradient(130% 90% at 50% -10%, #FCFAF4 0%, #F3ECDE 55%, #EDE5D5 100%)',
+                    'radial-gradient(130% 90% at 50% -10%, var(--jb-a-card) 0%, var(--jb-a-control) 55%, var(--jb-a-line-strong) 100%)',
                   minHeight: '100%',
                 }}
               >
@@ -782,11 +782,11 @@ export default function AppResume() {
                   style={{
                     width: '100%',
                     maxWidth: 720,
-                    background: '#FFFFFF',
-                    border: '1px solid #EAE3D4',
+                    background: 'var(--jb-a-card)',
+                    border: '1px solid var(--jb-a-line)',
                     borderRadius: 12,
                     boxShadow:
-                      '0 30px 60px -35px rgba(27,26,22,0.35), 0 2px 8px -4px rgba(27,26,22,0.1)',
+                      '0 var(--jb-a-shadow-paper), 0 var(--jb-a-shadow-lift)',
                     overflow: 'hidden',
                   }}
                 >
@@ -819,16 +819,16 @@ function RailTabs({ view, setView }) {
         cursor: 'pointer',
         borderRadius: 8,
         transition: 'background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease',
-        background: view === key ? '#FFFEFB' : 'transparent',
-        color: view === key ? '#1B1A16' : '#8A8378',
-        boxShadow: view === key ? '0 1px 3px rgba(27,26,22,0.12)' : 'none',
+        background: view === key ? 'var(--jb-a-card)' : 'transparent',
+        color: view === key ? 'var(--jb-a-ink)' : 'var(--jb-a-ink-warm)',
+        boxShadow: view === key ? '0 var(--jb-a-shadow-lift)' : 'none',
       }}
     >
       {label}
     </button>
   );
   return (
-    <div style={{ display: 'flex', gap: 4, padding: 4, background: '#EFE9DD', borderRadius: 11, marginBottom: 18 }}>
+    <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--jb-a-control)', borderRadius: 11, marginBottom: 18 }}>
       {tab('edit', '✎  Edit')}
       {tab('design', '◈  Design')}
     </div>
@@ -843,7 +843,7 @@ function GroupLabel({ children }) {
         fontSize: 11,
         letterSpacing: '0.1em',
         textTransform: 'uppercase',
-        color: '#9A9286',
+        color: 'var(--jb-a-ink-soft)',
         margin: '4px 0 11px',
       }}
     >
@@ -873,9 +873,9 @@ function DesignPanel({ design, onChange }) {
                 style={{
                   borderRadius: 10,
                   overflow: 'hidden',
-                  background: '#fff',
-                  border: `2px solid ${sel ? t.accent : '#E6DECF'}`,
-                  boxShadow: sel ? `0 0 0 3px ${t.accentSoft}, 0 8px 18px -12px rgba(27,26,22,0.4)` : '0 4px 10px -8px rgba(27,26,22,0.3)',
+                  background: 'var(--jb-a-card)',
+                  border: `2px solid ${sel ? t.accent : 'var(--jb-a-line)'}`,
+                  boxShadow: sel ? `0 0 0 3px ${t.accentSoft}, 0 var(--jb-a-shadow-lift)` : '0 var(--jb-a-shadow-lift)',
                   transition: 'border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease',
                   transform: sel ? 'translateY(-1px)' : 'none',
                 }}
@@ -883,10 +883,10 @@ function DesignPanel({ design, onChange }) {
                 <Thumb theme={t} />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 7 }}>
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: sel ? '#1B1A16' : '#5A544A' }}>{tpl.name}</span>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: sel ? 'var(--jb-a-ink)' : 'var(--jb-a-ink-2)' }}>{tpl.name}</span>
                 {sel && <span style={{ color: t.accent, fontSize: 12 }}>✓</span>}
               </div>
-              <div style={{ fontSize: 11, color: '#9A9286', lineHeight: 1.3 }}>{tpl.blurb}</div>
+              <div style={{ fontSize: 11, color: 'var(--jb-a-ink-soft)', lineHeight: 1.3 }}>{tpl.blurb}</div>
             </button>
           );
         })}
@@ -909,8 +909,8 @@ function DesignPanel({ design, onChange }) {
                 borderRadius: '50%',
                 background: a.color,
                 cursor: 'pointer',
-                border: '2px solid #FFFEFB',
-                boxShadow: sel ? `0 0 0 2px ${a.color}` : '0 0 0 1px #E0D8C7',
+                border: '2px solid var(--jb-a-card)',
+                boxShadow: sel ? `0 0 0 2px ${a.color}` : '0 0 0 1px var(--jb-a-line)',
                 transition: 'transform 0.14s ease, box-shadow 0.14s ease',
                 transform: sel ? 'scale(1.12)' : 'none',
               }}
@@ -938,14 +938,14 @@ function DesignPanel({ design, onChange }) {
                 marginBottom: 7,
                 borderRadius: 10,
                 cursor: 'pointer',
-                background: sel ? '#FFFEFB' : 'transparent',
-                border: `1px solid ${sel ? t.accent : '#E6DECF'}`,
+                background: sel ? 'var(--jb-a-card)' : 'transparent',
+                border: `1px solid ${sel ? t.accent : 'var(--jb-a-line)'}`,
                 boxShadow: sel ? `0 0 0 2px ${t.accentSoft}` : 'none',
                 transition: 'border-color 0.16s ease, box-shadow 0.16s ease',
               }}
             >
-              <span style={{ fontFamily: f.heading, fontSize: 17, fontWeight: 500, color: '#1B1A16' }}>{f.name}</span>
-              <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '0.04em', color: '#9A9286' }}>{f.tag}</span>
+              <span style={{ fontFamily: f.heading, fontSize: 17, fontWeight: 500, color: 'var(--jb-a-ink)' }}>{f.name}</span>
+              <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '0.04em', color: 'var(--jb-a-ink-soft)' }}>{f.tag}</span>
             </button>
           );
         })}
@@ -953,7 +953,7 @@ function DesignPanel({ design, onChange }) {
 
       {/* DENSITY */}
       <GroupLabel>Density</GroupLabel>
-      <div style={{ display: 'flex', gap: 4, padding: 4, background: '#EFE9DD', borderRadius: 10 }}>
+      <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--jb-a-control)', borderRadius: 10 }}>
         {DENSITIES.map((d) => {
           const sel = design.densityId === d.id;
           return (
@@ -970,9 +970,9 @@ function DesignPanel({ design, onChange }) {
                 border: 'none',
                 borderRadius: 7,
                 cursor: 'pointer',
-                background: sel ? '#FFFEFB' : 'transparent',
-                color: sel ? '#1B1A16' : '#8A8378',
-                boxShadow: sel ? '0 1px 3px rgba(27,26,22,0.12)' : 'none',
+                background: sel ? 'var(--jb-a-card)' : 'transparent',
+                color: sel ? 'var(--jb-a-ink)' : 'var(--jb-a-ink-warm)',
+                boxShadow: sel ? '0 var(--jb-a-shadow-lift)' : 'none',
                 transition: 'background 0.16s ease, color 0.16s ease',
               }}
             >
@@ -985,45 +985,47 @@ function DesignPanel({ design, onChange }) {
   );
 }
 
+// The ATS score, in the design's language: a large Instrument Serif numeral
+// over a flat progress bar. It replaced a conic-gradient ring for a reason —
+// a ring reads as a gauge you are meant to fill, and an ATS score is not a
+// completion percentage. A bar under a number reads as a measurement.
 function ScoreRing({ value, label }) {
   const v = Math.max(0, Math.min(100, value || 0));
   return (
-    <div
-      style={{
-        position: 'relative',
-        width: 72,
-        height: 72,
-        flexShrink: 0,
-        borderRadius: '50%',
-        background: `conic-gradient(#1FA463 0% ${v}%, #EDE6D8 ${v}% 100%)`,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <div
-        style={{
-          width: 54,
-          height: 54,
-          borderRadius: '50%',
-          background: '#FFFEFB',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontFamily: 'var(--jb-font-mono)',
-          fontWeight: 600,
-          color: '#157A49',
-          lineHeight: 1,
-        }}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, minWidth: 0 }}>
+      <span style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+        <span
+          style={{
+            fontFamily: 'var(--jb-font-display)',
+            fontWeight: 400,
+            fontSize: 38,
+            lineHeight: 1,
+            color: 'var(--jb-a-accent)',
+          }}
+        >
+          {v}
+        </span>
+        <span style={{ fontSize: 14, color: 'var(--jb-a-ink-2)' }}>{label || 'ATS score'}</span>
+      </span>
+      <span
+        role="progressbar"
+        aria-valuenow={v}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={label || 'ATS score'}
+        style={{ display: 'block', height: 4, borderRadius: 2, background: 'var(--jb-a-line-soft)' }}
       >
-        <span style={{ fontSize: 19 }}>{v}{label ? '' : ''}</span>
-        {label && (
-          <span style={{ fontSize: 11, color: '#9A9286', marginTop: 2, letterSpacing: '0.06em' }}>
-            {label}
-          </span>
-        )}
-      </div>
+        <span
+          style={{
+            display: 'block',
+            width: `${v}%`,
+            height: '100%',
+            borderRadius: 2,
+            background: 'var(--jb-a-accent)',
+            transition: 'width 0.4s ease',
+          }}
+        />
+      </span>
     </div>
   );
 }
@@ -1085,7 +1087,7 @@ function ContentEditor({ data, onChange }) {
 
       <EditGroup label="Experience" action={<button type="button" onClick={addRole} style={addBtn}>+ Add role</button>}>
         {(data.experience || []).length === 0 && (
-          <div style={{ fontSize: 12.5, color: '#B7AE9C' }}>No roles yet — add your work experience.</div>
+          <div style={{ fontSize: 12.5, color: 'var(--jb-a-ink-faint)' }}>No roles yet — add your work experience.</div>
         )}
         {(data.experience || []).map((e, i) => (
           <div key={i} style={expCard}>
@@ -1100,7 +1102,7 @@ function ContentEditor({ data, onChange }) {
             <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
               {(e.bullets || []).map((b, bi) => (
                 <div key={bi} style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
-                  <span style={{ color: '#1FA463', marginTop: 9 }}>▪</span>
+                  <span style={{ color: 'var(--jb-a-accent)', marginTop: 9 }}>▪</span>
                   <textarea value={b} onChange={(ev) => setBullet(i, bi, ev.target.value)} rows={1} placeholder="Achievement / impact" style={{ ...eInp, resize: 'vertical', minHeight: 34 }} />
                   <button type="button" onClick={() => removeBullet(i, bi)} style={iconBtn}>×</button>
                 </div>
@@ -1118,7 +1120,7 @@ function EditGroup({ label, action, children }) {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9286' }}>{label}</span>
+        <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--jb-a-ink-soft)' }}>{label}</span>
         {action}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{children}</div>
@@ -1129,7 +1131,7 @@ function EditGroup({ label, action, children }) {
 function EInput({ label, value, onChange, placeholder }) {
   return (
     <label style={{ display: 'block' }}>
-      {label && <span style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: '#8A8378', marginBottom: 4 }}>{label}</span>}
+      {label && <span style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: 'var(--jb-a-ink-warm)', marginBottom: 4 }}>{label}</span>}
       <input value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} style={eInp} />
     </label>
   );
@@ -1146,9 +1148,9 @@ function SkillsInput({ skills, onAdd, onRemove }) {
       {skills.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
           {skills.map((s, i) => (
-            <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 500, background: '#F4EFE4', borderRadius: 6, padding: '4px 8px' }}>
+            <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 500, background: 'var(--jb-a-control)', borderRadius: 6, padding: '4px 8px' }}>
               {s}
-              <button type="button" onClick={() => onRemove(i)} aria-label={`Remove ${s}`} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#8A8378', fontSize: 13, lineHeight: 1, padding: 0 }}>×</button>
+              <button type="button" onClick={() => onRemove(i)} aria-label={`Remove ${s}`} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--jb-a-ink-warm)', fontSize: 13, lineHeight: 1, padding: 0 }}>×</button>
             </span>
           ))}
         </div>
@@ -1164,10 +1166,10 @@ function SkillsInput({ skills, onAdd, onRemove }) {
   );
 }
 
-const eInp = { width: '100%', padding: '8px 10px', borderRadius: 9, border: '1px solid #E0D8C7', background: '#FFFEFB', fontFamily: 'inherit', fontSize: 13, color: '#1B1A16', boxSizing: 'border-box' };
-const addBtn = { fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: '#157A49', background: 'none', border: 'none', cursor: 'pointer', padding: 0 };
-const iconBtn = { border: '1px solid #E0D8C7', background: '#FFFEFB', borderRadius: 7, cursor: 'pointer', color: '#8A8378', width: 26, height: 26, flexShrink: 0, fontSize: 15, lineHeight: 1 };
-const expCard = { border: '1px solid #E7E0D2', borderRadius: 12, padding: 12, background: '#FFFEFB' };
+const eInp = { width: '100%', padding: '8px 10px', borderRadius: 9, border: '1px solid var(--jb-a-line)', background: 'var(--jb-a-card)', fontFamily: 'inherit', fontSize: 13, color: 'var(--jb-a-ink)', boxSizing: 'border-box' };
+const addBtn = { fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: 'var(--jb-a-accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 };
+const iconBtn = { border: '1px solid var(--jb-a-line)', background: 'var(--jb-a-card)', borderRadius: 7, cursor: 'pointer', color: 'var(--jb-a-ink-warm)', width: 26, height: 26, flexShrink: 0, fontSize: 15, lineHeight: 1 };
+const expCard = { border: '1px solid var(--jb-a-line)', borderRadius: 12, padding: 12, background: 'var(--jb-a-card)' };
 
 /* ------------------------------------------------------ data mappers --- */
 // Merge a resume-builder document into the view model, keeping sample

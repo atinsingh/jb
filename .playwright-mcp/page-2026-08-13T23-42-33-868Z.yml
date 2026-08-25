@@ -1,0 +1,188 @@
+- generic [active] [ref=f20e1]:
+  - generic [ref=f20e2]:
+    - generic [ref=f20e3]:
+      - generic [ref=f20e5]:
+        - generic [ref=f20e6]:
+          - link "Jobocate home" [ref=f20e7] [cursor=pointer]:
+            - /url: /
+            - img "Jobocate" [ref=f20e8]:
+              - generic [ref=f20e13]: jobocate
+          - generic [ref=f20e14]:
+            - button "Notifications" [ref=f20e15] [cursor=pointer]: ◔
+            - button "Collapse sidebar" [ref=f20e17] [cursor=pointer]: «
+        - button "⌕ Search & jump… ⌘K" [ref=f20e18] [cursor=pointer]:
+          - generic [ref=f20e19]: ⌕
+          - generic [ref=f20e20]: Search & jump…
+          - generic [ref=f20e21]: ⌘K
+        - generic [ref=f20e22]:
+          - generic [ref=f20e23]: Workspace
+          - generic [ref=f20e24]:
+            - link "Dashboard" [ref=f20e25] [cursor=pointer]:
+              - /url: /app/dashboard
+            - link "Job Matches" [ref=f20e34] [cursor=pointer]:
+              - /url: /app/matches
+            - link "Job Profiles" [ref=f20e41] [cursor=pointer]:
+              - /url: /app/job-profiles
+            - link "Saved" [ref=f20e48] [cursor=pointer]:
+              - /url: /app/saved
+            - link "Applications" [ref=f20e54] [cursor=pointer]:
+              - /url: /app/tracker
+            - link "Offers" [ref=f20e62] [cursor=pointer]:
+              - /url: /app/offers
+            - link "Auto-Apply" [ref=f20e71] [cursor=pointer]:
+              - /url: /app/auto-apply
+          - generic [ref=f20e78]: Toolkit
+          - generic [ref=f20e79]:
+            - link "Resumes" [ref=f20e80] [cursor=pointer]:
+              - /url: /app/resume-library
+            - link "Interview Prep" [ref=f20e86] [cursor=pointer]:
+              - /url: /app/interview
+            - link "Live Interview LIVE" [ref=f20e92] [cursor=pointer]:
+              - /url: /app/live-interview
+              - generic [ref=f20e96]: Live Interview
+              - generic [ref=f20e97]: LIVE
+          - generic [ref=f20e98]: Premium
+          - generic [ref=f20e99]:
+            - link "Concierge ✦" [ref=f20e100] [cursor=pointer]:
+              - /url: /app/concierge
+              - generic [ref=f20e106]: Concierge
+              - generic [ref=f20e107]: ✦
+            - link "Messages ✦" [ref=f20e108] [cursor=pointer]:
+              - /url: /app/messages
+              - generic [ref=f20e116]: Messages
+              - generic [ref=f20e117]: ✦
+          - link "Auto-apply Let Jobocate prepare applications for your best matches. Set it up →" [ref=f20e118] [cursor=pointer]:
+            - /url: /app/auto-apply
+            - generic [ref=f20e119]: Auto-apply
+            - generic [ref=f20e120]:
+              - text: Let Jobocate prepare applications for your best matches.
+              - generic [ref=f20e121]: Set it up →
+          - link "Settings" [ref=f20e123] [cursor=pointer]:
+            - /url: /app/settings
+          - generic [ref=f20e130]:
+            - link "EC E2E Candidate Free plan" [ref=f20e131] [cursor=pointer]:
+              - /url: /app/settings
+              - generic [ref=f20e132]: EC
+              - generic [ref=f20e133]:
+                - generic [ref=f20e134]: E2E Candidate
+                - generic [ref=f20e135]: Free plan
+            - button "Log out" [ref=f20e136] [cursor=pointer]
+      - generic [ref=f20e140]:
+        - banner [ref=f20e141]:
+          - generic [ref=f20e142]:
+            - generic [ref=f20e143]: Workspace
+            - generic [ref=f20e144]: /
+            - generic [ref=f20e145]: Dashboard
+          - generic [ref=f20e146]:
+            - generic [ref=f20e147]: ⌕
+            - generic [ref=f20e148]: Search jobs, companies, tasks
+            - generic [ref=f20e149]: ⌘K
+          - button "Switch to dark mode" [ref=f20e150] [cursor=pointer]
+          - generic [ref=f20e153]:
+            - text: ◔
+            - generic [ref=f20e154]: "3"
+          - link "E2e" [ref=f20e155] [cursor=pointer]:
+            - /url: /app/settings
+            - generic [ref=f20e156]: EC
+        - generic [ref=f20e159]:
+          - generic [ref=f20e160]:
+            - generic [ref=f20e161]:
+              - generic [ref=f20e162]: Thursday, August 13
+              - heading "Good evening, E2e." [level=1] [ref=f20e163]
+              - generic [ref=f20e164]: Let's get your search moving — add a résumé, set your preferences, and review your matches.
+            - generic [ref=f20e165]:
+              - generic [ref=f20e166]: Auto-Apply off
+              - generic [ref=f20e170]: Let Jobocate apply to strong-fit roles for you, within rules you set — seniority, location, salary floor, and a daily cap. Every application pauses for your review before it’s sent.
+              - generic [ref=f20e171]:
+                - link "Set up Auto-Apply" [ref=f20e172] [cursor=pointer]:
+                  - /url: /app/auto-apply
+                - link "Preferences" [ref=f20e173] [cursor=pointer]:
+                  - /url: /app/settings
+          - generic [ref=f20e174]:
+            - generic [ref=f20e175]:
+              - heading "Get set up" [level=2] [ref=f20e176]
+              - generic [ref=f20e177]: 0 of 4 done — finish these to unlock better matches.
+            - generic [ref=f20e178]:
+              - generic [ref=f20e179]:
+                - generic [ref=f20e180]:
+                  - generic [ref=f20e181]: "1"
+                  - generic [ref=f20e182]: Add your résumé
+                - generic [ref=f20e183]: Import or build one
+                - link "Start" [ref=f20e184] [cursor=pointer]:
+                  - /url: /app/resume-library
+              - generic [ref=f20e185]:
+                - generic [ref=f20e186]:
+                  - generic [ref=f20e187]: "2"
+                  - generic [ref=f20e188]: Set job preferences
+                - generic [ref=f20e189]: Titles, locations, salary
+                - link "Start" [ref=f20e190] [cursor=pointer]:
+                  - /url: /app/settings
+              - generic [ref=f20e191]:
+                - generic [ref=f20e192]:
+                  - generic [ref=f20e193]: "3"
+                  - generic [ref=f20e194]: Review your matches
+                - generic [ref=f20e195]: Roles ranked by fit
+                - link "Start" [ref=f20e196] [cursor=pointer]:
+                  - /url: /app/matches
+              - generic [ref=f20e197]:
+                - generic [ref=f20e198]:
+                  - generic [ref=f20e199]: "4"
+                  - generic [ref=f20e200]: Turn on Auto-Apply
+                - generic [ref=f20e201]: Apply on autopilot
+                - link "Start" [ref=f20e202] [cursor=pointer]:
+                  - /url: /app/auto-apply
+          - generic [ref=f20e203]:
+            - generic [ref=f20e204]:
+              - generic [ref=f20e205]: This week
+              - generic [ref=f20e206]: Outcomes, not volume
+            - generic [ref=f20e207]:
+              - generic [ref=f20e208]: Applications sent
+              - generic [ref=f20e209]: —
+            - generic [ref=f20e210]:
+              - generic [ref=f20e211]: Interviews booked
+              - generic [ref=f20e212]: "0"
+            - generic [ref=f20e213]:
+              - generic [ref=f20e214]: Offers received
+              - generic [ref=f20e215]: "0"
+            - generic [ref=f20e216]:
+              - generic [ref=f20e217]: Response rate
+              - generic [ref=f20e218]: —
+          - generic [ref=f20e220]:
+            - generic [ref=f20e221]:
+              - generic [ref=f20e222]:
+                - heading "Recommended for you" [level=2] [ref=f20e223]
+                - generic [ref=f20e224]: Estimated fit is a signal, not a guarantee.
+              - link "See all matches" [ref=f20e225] [cursor=pointer]:
+                - /url: /app/matches
+            - generic [ref=f20e226]:
+              - generic [ref=f20e227]:
+                - generic [ref=f20e228]:
+                  - heading "Application funnel" [level=3] [ref=f20e229]
+                  - generic [ref=f20e230]: Last 30 days
+                - generic [ref=f20e232]:
+                  - generic [ref=f20e233]: Applied
+                  - generic [ref=f20e234]: "0"
+                - generic [ref=f20e238]:
+                  - generic [ref=f20e239]: In review
+                  - generic [ref=f20e240]: "0"
+                - generic [ref=f20e244]:
+                  - generic [ref=f20e245]: Interviewing
+                  - generic [ref=f20e246]: "0"
+                - generic [ref=f20e250]:
+                  - generic [ref=f20e251]: Offers
+                  - generic [ref=f20e252]: "0"
+                - link "View pipeline" [ref=f20e255] [cursor=pointer]:
+                  - /url: /app/tracker
+              - generic [ref=f20e256]:
+                - heading "Search health" [level=3] [ref=f20e257]
+                - paragraph [ref=f20e258]: No applications yet. Set your preferences and start applying — your response rate and pipeline health will show up here.
+                - generic [ref=f20e259]: Based on your activity, not guarantees.
+              - generic [ref=f20e260]:
+                - heading "Recent activity" [level=3] [ref=f20e262]
+                - generic [ref=f20e263]: No activity yet. Applications you send will show up here.
+                - link "Open full activity log" [ref=f20e264] [cursor=pointer]:
+                  - /url: /app/tracker
+          - generic [ref=f20e265]: Refreshing your data…
+    - region "Notifications Alt+T"
+  - button "Open Next.js Dev Tools" [ref=f20e271] [cursor=pointer]
+  - alert [ref=f20e275]

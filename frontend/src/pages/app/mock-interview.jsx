@@ -46,14 +46,16 @@ function ScoreMeter({ label, score }) {
         <span>{label}</span>
         <span>{score}</span>
       </div>
-      <div style={{ height: 5, background: '#1C2B26', borderRadius: 3 }}>
+      <div style={{ height: 5, background: '#1C2B26', borderRadius: 3, overflow: 'hidden' }}>
         <div
           style={{
-            width: `${Math.max(0, Math.min(100, score))}%`,
+            width: '100%',
             height: '100%',
             background: scoreColor(score),
             borderRadius: 3,
-            transition: 'width 0.3s ease',
+            transform: `scaleX(${Math.max(0, Math.min(100, score)) / 100})`,
+            transformOrigin: 'left',
+            transition: 'transform 0.3s ease',
           }}
         />
       </div>

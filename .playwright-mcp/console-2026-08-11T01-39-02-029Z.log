@@ -1,0 +1,578 @@
+[      72ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/1yi7_react-dom_1papa4l._.js:15305
+[      79ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[      79ms] [WARNING] [HMR] Invalid message: {"type":"isrManifest","data":{"/employer/jobs/post":true,"/employer/jobs/new":false,"/app/signup":true,"/app/matches":true,"/app/cover-letter":true,"/app/auto-apply":true,"/app/tracker":true,"/app/live-interview":true,"/app/apply":true,"/app/resume-generate":true,"/app/resume":true,"/app/job-profiles":true,"/":true}}
+TypeError: Cannot read properties of undefined (reading 'components')
+    at handleStaticIndicator (http://localhost:3000/_next/static/chunks/1y1v_next_dist_client_02myix4._.js:2792:46)
+    at processMessage (http://localhost:3000/_next/static/chunks/1y1v_next_dist_client_02myix4._.js:2806:17)
+    at http://localhost:3000/_next/static/chunks/1y1v_next_dist_client_02myix4._.js:2680:13
+    at WebSocket.handleMessage (http://localhost:3000/_next/static/chunks/1y1v_next_dist_client_02myix4._.js:2325:17) @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[  853102ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[  853108ms] [LOG] [Fast Refresh] done in 108ms @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[  942757ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[  943271ms] [LOG] [Fast Refresh] done in 616ms @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1339589ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1339750ms] [LOG] [Fast Refresh] done in 262ms @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1340602ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1340643ms] [LOG] [Fast Refresh] done in 143ms @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1348106ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1348156ms] [LOG] [Fast Refresh] done in 151ms @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1353905ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1353913ms] [LOG] [Fast Refresh] done in 109ms @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1361186ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1361216ms] [LOG] [Fast Refresh] done in 131ms @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1367418ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1367433ms] [LOG] [Fast Refresh] done in 115ms @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1388984ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1389200ms] [LOG] [Fast Refresh] done in 318ms @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1522234ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1522237ms] [LOG] [Fast Refresh] done in 104ms @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1588339ms] [WARNING] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1588430ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1588463ms] [LOG] [Fast Refresh] done in 154ms @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1647787ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1647895ms] [LOG] [Fast Refresh] done in 210ms @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1648981ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1648986ms] [LOG] [Fast Refresh] done in 106ms @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1656891ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1656958ms] [LOG] [Fast Refresh] done in 169ms @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1661625ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1661629ms] [LOG] [Fast Refresh] done in 105ms @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1666280ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1666332ms] [LOG] [Fast Refresh] done in 152ms @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1672937ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/_next/static/chunks/pages/employer/candidates/search.js:0
+[ 1672976ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/employer/candidates/search:0
+[ 1672991ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/1yi7_react-dom_1papa4l._.js:15305
+[ 1673002ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1673002ms] [WARNING] [HMR] Invalid message: {"type":"isrManifest","data":{"/employer/candidates/search":false,"/auth/success":true,"/app/dashboard":true,"/":true,"/employer/jobs/post":true,"/employer/jobs/new":false,"/app/signup":true,"/app/matches":true,"/app/cover-letter":true,"/app/auto-apply":true,"/app/tracker":true,"/app/live-interview":true,"/app/apply":true,"/app/resume-generate":true,"/app/resume":true,"/app/job-profiles":true}}
+TypeError: Cannot read properties of undefined (reading 'components')
+    at handleStaticIndicator (http://localhost:3000/_next/static/chunks/1y1v_next_dist_client_02myix4._.js:2792:46)
+    at processMessage (http://localhost:3000/_next/static/chunks/1y1v_next_dist_client_02myix4._.js:2806:17)
+    at http://localhost:3000/_next/static/chunks/1y1v_next_dist_client_02myix4._.js:2680:13
+    at WebSocket.handleMessage (http://localhost:3000/_next/static/chunks/1y1v_next_dist_client_02myix4._.js:2325:17) @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1675510ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/1yi7_react-dom_1papa4l._.js:15305
+[ 1675518ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1697680ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1697853ms] [LOG] [Fast Refresh] done in 175ms @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1724659ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 1724978ms] [LOG] [Fast Refresh] done in 398ms @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 2060834ms] [WARNING] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 2060925ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 2061021ms] [LOG] [Fast Refresh] done in 199ms @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 2117770ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 2117863ms] [LOG] [Fast Refresh] done in 196ms @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 2379047ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 2379230ms] [LOG] [Fast Refresh] done in 308ms @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 3668786ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 3668792ms] [LOG] [Fast Refresh] done in 108ms @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 3668934ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 3669100ms] [LOG] [Fast Refresh] done in 306ms @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 3673867ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 3673902ms] [LOG] [Fast Refresh] done in 137ms @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_1krwcwl._.js:1226
+[ 3927069ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_client_02myix4._.js:2343
+[ 3928071ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_client_02myix4._.js:2343
+[ 3929073ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_client_02myix4._.js:2343
+[ 3930075ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_client_02myix4._.js:2343
+[ 3931077ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_client_02myix4._.js:2343
+[ 3936083ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_client_02myix4._.js:2343
+[ 3941096ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_client_02myix4._.js:2343
+[ 3946112ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_client_02myix4._.js:2343
+[ 3951142ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_client_02myix4._.js:2343
+[ 3956196ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_client_02myix4._.js:2343
+[ 3961233ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_client_02myix4._.js:2343
+[ 3966407ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/1y1v_next_dist_client_02myix4._.js:2343
+[ 5177342ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/app/matches:0
+[ 5177890ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5177999ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5178099ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/public/tenant/branding:0
+[ 5178101ms] [ERROR] Failed to fetch tenant branding: AxiosError @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:51
+[ 5178113ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5180058ms] [LOG] Backend unavailable callback triggered - showing maintenance page @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5180059ms] [LOG] ❌ Backend unavailable - no response. Showing maintenance page. {code: ECONNABORTED, message: timeout of 2000ms exceeded, name: AxiosError} @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5180167ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5180280ms] [LOG] [Fast Refresh] done in 112ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5180950ms] [LOG] [Fast Refresh] done in 782ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5180950ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5181286ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5181287ms] [LOG] [Fast Refresh] done in 1ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5181871ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/app/matches?_rsc=1brq2:0
+[ 5182274ms] [LOG] [Fast Refresh] done in 988ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5182458ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/app/matches?_rsc=1brq2:0
+[ 5182800ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/app/matches:0
+[ 5183309ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5183399ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5183472ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/public/tenant/branding:0
+[ 5183473ms] [ERROR] Failed to fetch tenant branding: AxiosError @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:51
+[ 5202963ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5240972ms] [LOG] [Fast Refresh] done in 38187ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5241802ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5284926ms] [LOG] [Fast Refresh] done in 43121ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5290893ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5298552ms] [LOG] [Fast Refresh] done in 7660ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5298820ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5301241ms] [LOG] [Fast Refresh] done in 2420ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5306668ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/app/matches:0
+[ 5311779ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5311891ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5313409ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/public/tenant/branding:0
+[ 5313421ms] [ERROR] Failed to fetch tenant branding: AxiosError @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:51
+[ 5456005ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5475385ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5478518ms] [LOG] [Fast Refresh] done in 3132ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5479894ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/app/matches?_rsc=1brq2:0
+[ 5484212ms] [LOG] [Fast Refresh] done in 8828ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5484934ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/app/matches:0
+[ 5488399ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5488771ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5489182ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/public/tenant/branding:0
+[ 5489185ms] [ERROR] Failed to fetch tenant branding: AxiosError @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:51
+[ 5489822ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5498780ms] [LOG] [Fast Refresh] done in 8959ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5504325ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5578118ms] [LOG] [Fast Refresh] done in 73791ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5580043ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5609639ms] [LOG] [Fast Refresh] done in 29596ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5616713ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/app/matches?_rsc=1brq2:0
+[ 5619055ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=sTlOFEouvweJK1BBXTypW' failed:  @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 5620525ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=sTlOFEouvweJK1BBXTypW' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 5621528ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=sTlOFEouvweJK1BBXTypW' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 5622535ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=sTlOFEouvweJK1BBXTypW' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 5623544ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=sTlOFEouvweJK1BBXTypW' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 5624556ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=sTlOFEouvweJK1BBXTypW' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 5629570ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=sTlOFEouvweJK1BBXTypW' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 5634583ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=sTlOFEouvweJK1BBXTypW' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 5639615ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=sTlOFEouvweJK1BBXTypW' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 5643191ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/logo.svg:0
+[ 5644538ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/logo.svg:0
+[ 5644659ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=sTlOFEouvweJK1BBXTypW' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 5649739ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=sTlOFEouvweJK1BBXTypW' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 5654900ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=sTlOFEouvweJK1BBXTypW' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 5660210ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=sTlOFEouvweJK1BBXTypW' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 5698514ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/app/matches:0
+[ 5698975ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5699087ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5699189ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/public/tenant/branding:0
+[ 5699191ms] [ERROR] Failed to fetch tenant branding: AxiosError @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:51
+[ 5699200ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5699802ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5699831ms] [LOG] [Fast Refresh] done in 30ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5700153ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5700153ms] [LOG] [Fast Refresh] done in 1ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5700417ms] [LOG] [Fast Refresh] done in 264ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5700670ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5701216ms] [LOG] [Fast Refresh] done in 546ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5701259ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5701535ms] [LOG] [Fast Refresh] done in 276ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5703210ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/app/matches:0
+[ 5704829ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5704893ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 5704972ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/public/tenant/branding:0
+[ 5704973ms] [ERROR] Failed to fetch tenant branding: AxiosError @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:51
+[ 5725665ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=rnD9lXMve39tVbNweFpMO' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 5726666ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=rnD9lXMve39tVbNweFpMO' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 5727669ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=rnD9lXMve39tVbNweFpMO' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 5728672ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=rnD9lXMve39tVbNweFpMO' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 5729679ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=rnD9lXMve39tVbNweFpMO' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 5734681ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=rnD9lXMve39tVbNweFpMO' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 5739746ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=rnD9lXMve39tVbNweFpMO' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 5989558ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/app/matches:0
+[ 6423924ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/app/matches:0
+[ 6424643ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6424756ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6424851ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/public/tenant/branding:0
+[ 6424852ms] [ERROR] Failed to fetch tenant branding: AxiosError @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:51
+[ 6567183ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6571181ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6571708ms] [LOG] [Fast Refresh] done in 526ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6573036ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/app/matches?_rsc=1brq2:0
+[ 6573379ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6573482ms] [LOG] [Fast Refresh] done in 102ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6574951ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/app/matches:0
+[ 6581144ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6581459ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6582039ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/public/tenant/branding:0
+[ 6582041ms] [ERROR] Failed to fetch tenant branding: AxiosError @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:51
+[ 6582516ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6590849ms] [LOG] [Fast Refresh] done in 8333ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6591363ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6611951ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/app/matches:0
+[ 6612651ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6612741ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6613035ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/public/tenant/branding:0
+[ 6613036ms] [ERROR] Failed to fetch tenant branding: AxiosError @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:51
+[ 6615300ms] [WARNING] %c%s%c Failed to fetch home content from API, using fallback: background: #e6e6e6;background: light-dark(rgba(0,0,0,0.1), rgba(255,255,255,0.25));color: #000000;color: light-dark(#000000, #ffffff);border-radius: 2px  Server   TypeError: fetch failed
+    at getHomeContent (about://React/Server/webpack-internal:///(rsc)/./lib/marketing/home-content.ts?26:681:26)
+    at Function.all (<anonymous>:1:21)
+    at HomePage (about://React/Server/webpack-internal:///(rsc)/./app/page.tsx?27:28:30)
+    at resolveErrorDev (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3189:48)
+    at getOutlinedModel (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2426:22)
+    at parseModelString (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2625:15)
+    at Object.eval (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4545:18)
+    at JSON.parse (<anonymous>)
+    at initializeModelChunk (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:1829:26)
+    at getOutlinedModel (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2331:11)
+    at parseModelString (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2721:15)
+    at Array.eval (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4545:18)
+    at JSON.parse (<anonymous>)
+    at initializeModelChunk (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:1829:26)
+    at resolveConsoleEntry (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3480:13)
+    at processFullStringRow (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4396:11)
+    at processFullBinaryRow (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4292:7)
+    at processBinaryChunk (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4515:19)
+    at progress (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4789:9) @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6615300ms] [WARNING] %c%s%c Failed to fetch pricing from API, using fallback: background: #e6e6e6;background: light-dark(rgba(0,0,0,0.1), rgba(255,255,255,0.25));color: #000000;color: light-dark(#000000, #ffffff);border-radius: 2px  Server   TypeError: fetch failed
+    at getPricing (about://React/Server/webpack-internal:///(rsc)/./lib/marketing/pricing.ts?29:146:26)
+    at Function.all (<anonymous>:1:21)
+    at HomePage (about://React/Server/webpack-internal:///(rsc)/./app/page.tsx?27:28:30)
+    at resolveErrorDev (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3189:48)
+    at getOutlinedModel (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2426:22)
+    at parseModelString (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2625:15)
+    at Object.eval (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4545:18)
+    at JSON.parse (<anonymous>)
+    at initializeModelChunk (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:1829:26)
+    at getOutlinedModel (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2331:11)
+    at parseModelString (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2721:15)
+    at Array.eval (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4545:18)
+    at JSON.parse (<anonymous>)
+    at initializeModelChunk (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:1829:26)
+    at resolveConsoleEntry (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3480:13)
+    at processFullStringRow (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4396:11)
+    at processFullBinaryRow (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4292:7)
+    at processBinaryChunk (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4515:19)
+    at progress (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4789:9) @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6615646ms] [WARNING] Image with src "http://localhost:3000/logo.svg" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6641202ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6642509ms] [LOG] [Fast Refresh] done in 1308ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6642705ms] [WARNING] %c%s%c Failed to fetch home content from API, using fallback: background: #e6e6e6;background: light-dark(rgba(0,0,0,0.1), rgba(255,255,255,0.25));color: #000000;color: light-dark(#000000, #ffffff);border-radius: 2px  Server   TypeError: fetch failed
+    at getHomeContent (about://React/Server/webpack-internal:///(rsc)/./lib/marketing/home-content.ts?26:681:26)
+    at Function.all (<anonymous>:1:21)
+    at HomePage (about://React/Server/webpack-internal:///(rsc)/./app/page.tsx?27:28:30)
+    at resolveErrorDev (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3189:48)
+    at getOutlinedModel (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2426:22)
+    at parseModelString (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2625:15)
+    at Object.eval (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4545:18)
+    at JSON.parse (<anonymous>)
+    at initializeModelChunk (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:1829:26)
+    at getOutlinedModel (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2331:11)
+    at parseModelString (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2721:15)
+    at Array.eval (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4545:18)
+    at JSON.parse (<anonymous>)
+    at initializeModelChunk (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:1829:26)
+    at resolveConsoleEntry (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3480:13)
+    at processFullStringRow (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4396:11)
+    at processFullBinaryRow (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4292:7)
+    at processBinaryChunk (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4515:19)
+    at progress (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4789:9) @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6642706ms] [WARNING] %c%s%c Failed to fetch pricing from API, using fallback: background: #e6e6e6;background: light-dark(rgba(0,0,0,0.1), rgba(255,255,255,0.25));color: #000000;color: light-dark(#000000, #ffffff);border-radius: 2px  Server   TypeError: fetch failed
+    at getPricing (about://React/Server/webpack-internal:///(rsc)/./lib/marketing/pricing.ts?29:146:26)
+    at Function.all (<anonymous>:1:21)
+    at HomePage (about://React/Server/webpack-internal:///(rsc)/./app/page.tsx?27:28:30)
+    at resolveErrorDev (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3189:48)
+    at getOutlinedModel (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2426:22)
+    at parseModelString (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2625:15)
+    at Object.eval (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4545:18)
+    at JSON.parse (<anonymous>)
+    at initializeModelChunk (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:1829:26)
+    at getOutlinedModel (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2331:11)
+    at parseModelString (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2721:15)
+    at Array.eval (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4545:18)
+    at JSON.parse (<anonymous>)
+    at initializeModelChunk (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:1829:26)
+    at resolveConsoleEntry (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3480:13)
+    at processFullStringRow (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4396:11)
+    at processFullBinaryRow (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4292:7)
+    at processBinaryChunk (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4515:19)
+    at progress (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4789:9) @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6661839ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6663609ms] [LOG] [Fast Refresh] done in 1771ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6664567ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6664597ms] [WARNING] %c%s%c Failed to fetch home content from API, using fallback: background: #e6e6e6;background: light-dark(rgba(0,0,0,0.1), rgba(255,255,255,0.25));color: #000000;color: light-dark(#000000, #ffffff);border-radius: 2px  Server   TypeError: fetch failed
+    at getHomeContent (about://React/Server/webpack-internal:///(rsc)/./lib/marketing/home-content.ts?26:681:26)
+    at Function.all (<anonymous>:1:21)
+    at HomePage (about://React/Server/webpack-internal:///(rsc)/./app/page.tsx?27:28:30)
+    at resolveErrorDev (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3189:48)
+    at getOutlinedModel (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2426:22)
+    at parseModelString (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2625:15)
+    at Object.eval (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4545:18)
+    at JSON.parse (<anonymous>)
+    at initializeModelChunk (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:1829:26)
+    at getOutlinedModel (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2331:11)
+    at parseModelString (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2721:15)
+    at Array.eval (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4545:18)
+    at JSON.parse (<anonymous>)
+    at initializeModelChunk (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:1829:26)
+    at resolveConsoleEntry (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3480:13)
+    at processFullStringRow (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4396:11)
+    at processFullBinaryRow (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4292:7)
+    at processBinaryChunk (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4515:19)
+    at progress (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4789:9) @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6664598ms] [WARNING] %c%s%c Failed to fetch pricing from API, using fallback: background: #e6e6e6;background: light-dark(rgba(0,0,0,0.1), rgba(255,255,255,0.25));color: #000000;color: light-dark(#000000, #ffffff);border-radius: 2px  Server   TypeError: fetch failed
+    at getPricing (about://React/Server/webpack-internal:///(rsc)/./lib/marketing/pricing.ts?29:146:26)
+    at Function.all (<anonymous>:1:21)
+    at HomePage (about://React/Server/webpack-internal:///(rsc)/./app/page.tsx?27:28:30)
+    at resolveErrorDev (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3189:48)
+    at getOutlinedModel (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2426:22)
+    at parseModelString (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2625:15)
+    at Object.eval (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4545:18)
+    at JSON.parse (<anonymous>)
+    at initializeModelChunk (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:1829:26)
+    at getOutlinedModel (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2331:11)
+    at parseModelString (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2721:15)
+    at Array.eval (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4545:18)
+    at JSON.parse (<anonymous>)
+    at initializeModelChunk (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:1829:26)
+    at resolveConsoleEntry (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3480:13)
+    at processFullStringRow (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4396:11)
+    at processFullBinaryRow (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4292:7)
+    at processBinaryChunk (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4515:19)
+    at progress (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4789:9) @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6665051ms] [LOG] [Fast Refresh] done in 484ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6668940ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6669006ms] [WARNING] %c%s%c Failed to fetch home content from API, using fallback: background: #e6e6e6;background: light-dark(rgba(0,0,0,0.1), rgba(255,255,255,0.25));color: #000000;color: light-dark(#000000, #ffffff);border-radius: 2px  Server   TypeError: fetch failed
+    at getHomeContent (about://React/Server/webpack-internal:///(rsc)/./lib/marketing/home-content.ts?26:681:26)
+    at Function.all (<anonymous>:1:21)
+    at HomePage (about://React/Server/webpack-internal:///(rsc)/./app/page.tsx?27:28:30)
+    at resolveErrorDev (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3189:48)
+    at getOutlinedModel (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2426:22)
+    at parseModelString (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2625:15)
+    at Object.eval (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4545:18)
+    at JSON.parse (<anonymous>)
+    at initializeModelChunk (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:1829:26)
+    at getOutlinedModel (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2331:11)
+    at parseModelString (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2721:15)
+    at Array.eval (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4545:18)
+    at JSON.parse (<anonymous>)
+    at initializeModelChunk (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:1829:26)
+    at resolveConsoleEntry (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3480:13)
+    at processFullStringRow (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4396:11)
+    at processFullBinaryRow (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4292:7)
+    at processBinaryChunk (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4515:19)
+    at progress (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4789:9) @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6669006ms] [WARNING] %c%s%c Failed to fetch pricing from API, using fallback: background: #e6e6e6;background: light-dark(rgba(0,0,0,0.1), rgba(255,255,255,0.25));color: #000000;color: light-dark(#000000, #ffffff);border-radius: 2px  Server   TypeError: fetch failed
+    at getPricing (about://React/Server/webpack-internal:///(rsc)/./lib/marketing/pricing.ts?29:146:26)
+    at Function.all (<anonymous>:1:21)
+    at HomePage (about://React/Server/webpack-internal:///(rsc)/./app/page.tsx?27:28:30)
+    at resolveErrorDev (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3189:48)
+    at getOutlinedModel (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2426:22)
+    at parseModelString (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2625:15)
+    at Object.eval (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4545:18)
+    at JSON.parse (<anonymous>)
+    at initializeModelChunk (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:1829:26)
+    at getOutlinedModel (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2331:11)
+    at parseModelString (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:2721:15)
+    at Array.eval (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4545:18)
+    at JSON.parse (<anonymous>)
+    at initializeModelChunk (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:1829:26)
+    at resolveConsoleEntry (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3480:13)
+    at processFullStringRow (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4396:11)
+    at processFullBinaryRow (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4292:7)
+    at processBinaryChunk (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4515:19)
+    at progress (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:4789:9) @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6669088ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6669411ms] [WARNING] Image with src "http://localhost:3000/logo.svg" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6669445ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/public/tenant/branding:0
+[ 6669446ms] [ERROR] Failed to fetch tenant branding: AxiosError @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:51
+[ 6698694ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6701603ms] [LOG] [Fast Refresh] done in 2910ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6727795ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6729008ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6729622ms] [LOG] [Fast Refresh] done in 613ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6730696ms] [LOG] [Fast Refresh] done in 1688ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6733350ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6733429ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6733581ms] [WARNING] Image with src "http://localhost:3000/logo.svg" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6733593ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/public/tenant/branding:0
+[ 6733594ms] [ERROR] Failed to fetch tenant branding: AxiosError @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:51
+[ 6747798ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6748963ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6748998ms] [LOG] [Fast Refresh] done in 35ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6749893ms] [LOG] [Fast Refresh] done in 930ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6753107ms] [WARNING] The resource http://localhost:3000/_next/static/css/app/layout.css?v=1786419091741 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ http://localhost:3000/solutions/academies:0
+[ 6753107ms] [WARNING] The resource http://localhost:3000/_next/static/css/app/(marketing)/solutions/academies/page.css?v=1786419091741 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ http://localhost:3000/solutions/academies:0
+[ 6787124ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6787231ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6787418ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/public/tenant/branding:0
+[ 6787419ms] [ERROR] Failed to fetch tenant branding: AxiosError @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:51
+[ 6807895ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6810139ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6810227ms] [LOG] [Fast Refresh] done in 88ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6811259ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6811259ms] [LOG] [Fast Refresh] done in 1ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6811690ms] [LOG] [Fast Refresh] done in 431ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6812424ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6813235ms] [LOG] [Fast Refresh] done in 810ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6818485ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6819335ms] [LOG] [Fast Refresh] done in 851ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6842324ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6843498ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6843563ms] [LOG] [Fast Refresh] done in 66ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6844588ms] [LOG] [Fast Refresh] done in 1091ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6847118ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6847202ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6847310ms] [WARNING] Image with src "http://localhost:3000/logo.svg" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6847359ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/public/tenant/branding:0
+[ 6847359ms] [ERROR] Failed to fetch tenant branding: AxiosError @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:51
+[ 6861901ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6863153ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6863347ms] [LOG] [Fast Refresh] done in 193ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6864647ms] [LOG] [Fast Refresh] done in 1493ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6867255ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6867394ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6867561ms] [WARNING] Image with src "http://localhost:3000/logo.svg" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6867679ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/public/tenant/branding:0
+[ 6867681ms] [ERROR] Failed to fetch tenant branding: AxiosError @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:51
+[ 6906911ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6908152ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6908297ms] [LOG] [Fast Refresh] done in 145ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6909184ms] [LOG] [Fast Refresh] done in 1031ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6931401ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6933912ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6934043ms] [LOG] [Fast Refresh] done in 130ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6934798ms] [LOG] [Fast Refresh] done in 885ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6934863ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6936646ms] [LOG] [Fast Refresh] done in 1784ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6941080ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6941167ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6941286ms] [WARNING] Image with src "http://localhost:3000/logo.svg" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6941957ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/public/tenant/branding:0
+[ 6941958ms] [ERROR] Failed to fetch tenant branding: AxiosError @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:51
+[ 6953778ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6955139ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6956136ms] [LOG] [Fast Refresh] done in 997ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6956606ms] [LOG] [Fast Refresh] done in 1468ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 6998805ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7000477ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7001269ms] [LOG] [Fast Refresh] done in 792ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7001537ms] [LOG] [Fast Refresh] done in 1060ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7004774ms] [WARNING] The resource http://localhost:3000/_next/static/css/app/(marketing)/solutions/academies/page.css?v=1786419343359 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ http://localhost:3000/solutions/academies:0
+[ 7004774ms] [WARNING] The resource http://localhost:3000/_next/static/css/app/layout.css?v=1786419343359 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ http://localhost:3000/solutions/academies:0
+[ 7005584ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7007794ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7007836ms] [LOG] [Fast Refresh] done in 42ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7008515ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7008515ms] [LOG] [Fast Refresh] done in 0ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7009039ms] [LOG] [Fast Refresh] done in 524ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7010053ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7010614ms] [LOG] [Fast Refresh] done in 562ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7010636ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7012644ms] [LOG] [Fast Refresh] done in 2007ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7017886ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7018051ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7018167ms] [WARNING] Image with src "http://localhost:3000/logo.svg" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7018225ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/public/tenant/branding:0
+[ 7018226ms] [ERROR] Failed to fetch tenant branding: AxiosError @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:51
+[ 7074716ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7076053ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7076165ms] [LOG] [Fast Refresh] done in 111ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7079099ms] [LOG] [Fast Refresh] done in 3045ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7081909ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7082120ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7082310ms] [WARNING] Image with src "http://localhost:3000/logo.svg" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7082385ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/public/tenant/branding:0
+[ 7082387ms] [ERROR] Failed to fetch tenant branding: AxiosError @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:51
+[ 7096076ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7097221ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7097270ms] [LOG] [Fast Refresh] done in 49ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7097991ms] [LOG] [Fast Refresh] done in 769ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7101154ms] [WARNING] The resource http://localhost:3000/_next/static/css/app/layout.css?v=1786419439850 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ http://localhost:3000/solutions/academies:0
+[ 7101154ms] [WARNING] The resource http://localhost:3000/_next/static/css/app/(marketing)/solutions/academies/page.css?v=1786419439850 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ http://localhost:3000/solutions/academies:0
+[ 7127302ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7127373ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7127516ms] [WARNING] Image with src "http://localhost:3000/logo.svg" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7127526ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/public/tenant/branding:0
+[ 7127527ms] [ERROR] Failed to fetch tenant branding: AxiosError @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:51
+[ 7282229ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=22gWdJV52J-UH6fQkcr3h' failed: Error during WebSocket handshake: net::ERR_CONNECTION_RESET @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 7283231ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=22gWdJV52J-UH6fQkcr3h' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 7284233ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=22gWdJV52J-UH6fQkcr3h' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 7285235ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=22gWdJV52J-UH6fQkcr3h' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 7286237ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=22gWdJV52J-UH6fQkcr3h' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 7291240ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=22gWdJV52J-UH6fQkcr3h' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 7296244ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=22gWdJV52J-UH6fQkcr3h' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 7301249ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=22gWdJV52J-UH6fQkcr3h' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[ 7306770ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7310770ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7310899ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7311078ms] [WARNING] Image with src "http://localhost:3000/logo.svg" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7311305ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7312688ms] [LOG] [Fast Refresh] done in 1384ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7332139ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7333720ms] [LOG] [Fast Refresh] done in 1582ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7334757ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7335608ms] [LOG] [Fast Refresh] done in 851ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7337282ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7337436ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7337624ms] [WARNING] Image with src "http://localhost:3000/logo.svg" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7338013ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7338961ms] [LOG] [Fast Refresh] done in 948ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7341919ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7341991ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7342242ms] [WARNING] Image with src "http://localhost:3000/logo.svg" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7388033ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7389251ms] [LOG] [Fast Refresh] done in 1219ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7399655ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7400960ms] [LOG] [Fast Refresh] done in 1304ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7405114ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7406177ms] [LOG] [Fast Refresh] done in 1063ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7407550ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7407649ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7407838ms] [WARNING] Image with src "http://localhost:3000/logo.svg" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7456549ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7457840ms] [LOG] [Fast Refresh] done in 1292ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7458076ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7459258ms] [LOG] [Fast Refresh] done in 1183ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7459366ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7460179ms] [LOG] [Fast Refresh] done in 813ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7460231ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7460589ms] [LOG] [Fast Refresh] done in 358ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7461029ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7461479ms] [LOG] [Fast Refresh] done in 451ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7461555ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7461939ms] [LOG] [Fast Refresh] done in 383ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7462355ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7462875ms] [LOG] [Fast Refresh] done in 521ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7462951ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7463343ms] [LOG] [Fast Refresh] done in 393ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7463827ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7464630ms] [LOG] [Fast Refresh] done in 803ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7488998ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7489156ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 7489392ms] [WARNING] Image with src "http://localhost:3000/logo.svg" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 8269239ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 8296292ms] [LOG] [Fast Refresh] done in 27080ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 8330882ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 8331384ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[ 8331877ms] [WARNING] Image with src "http://localhost:3000/logo.svg" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[10499590ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[10503788ms] [LOG] [Fast Refresh] done in 4202ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[10505462ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[10505651ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[10567292ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[10568059ms] [LOG] [Fast Refresh] done in 768ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[10569590ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[10569689ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[10593293ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[10594106ms] [LOG] [Fast Refresh] done in 814ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[10595740ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[10595827ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[10778095ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[10779248ms] [LOG] [Fast Refresh] done in 1154ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[10781138ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[10781218ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[11373555ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[11382212ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[11382360ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[11383930ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[11384474ms] [LOG] Backend unavailable callback triggered - showing maintenance page @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[11384475ms] [LOG] ❌ Backend unavailable - no response. Showing maintenance page. {code: ECONNABORTED, message: timeout of 2000ms exceeded, name: AxiosError} @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[11384555ms] [LOG] [Fast Refresh] done in 626ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[11409454ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=y_JTtO69td-svA7fpQ4d-' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[11410455ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=y_JTtO69td-svA7fpQ4d-' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[11411537ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=y_JTtO69td-svA7fpQ4d-' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[11412539ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=y_JTtO69td-svA7fpQ4d-' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[11413542ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=y_JTtO69td-svA7fpQ4d-' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[11418546ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=y_JTtO69td-svA7fpQ4d-' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[11423549ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=y_JTtO69td-svA7fpQ4d-' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[11428552ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=y_JTtO69td-svA7fpQ4d-' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[11433569ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=y_JTtO69td-svA7fpQ4d-' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[11438630ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=y_JTtO69td-svA7fpQ4d-' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[11443638ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=y_JTtO69td-svA7fpQ4d-' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59
+[11448644ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=y_JTtO69td-svA7fpQ4d-' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/web-socket.js:59

@@ -1,19 +1,28 @@
-export default function PageHeader({ title, subtitle, action, level = 'h2' }) {
+// The 64px bar at the top of a screen: title on the left, controls on the right.
+// It is chrome, not content — the page's real heading is the <Hero> below it,
+// which is why the title here is a plain 15px sans span and defaults to h2.
+export default function PageHeader({ title, subtitle, action, level = 'h2', style }) {
   const Tag = level;
   return (
-    <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
-      <Tag style={{ margin: 0, fontFamily: 'var(--jb-font-display)', fontSize: 26, fontWeight: 400, color: 'var(--jb-a-ink)' }}>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 16,
+        height: 64,
+        padding: '0 44px',
+        borderBottom: '1px solid var(--jb-a-line)',
+        flexShrink: 0,
+        background: 'var(--jb-a-header)',
+        ...style,
+      }}
+    >
+      <Tag style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--jb-a-ink)' }}>
         {title}
       </Tag>
-      {subtitle && (
-        <span style={{ fontSize: 14, color: 'var(--jb-a-ink-muted)' }}>{subtitle}</span>
-      )}
-      {action && (
-        <>
-          <div style={{ flex: 1 }} />
-          {action}
-        </>
-      )}
+      {subtitle && <span style={{ fontSize: 14, color: 'var(--jb-a-ink-3)' }}>{subtitle}</span>}
+      <span style={{ flex: 1 }} />
+      {action}
     </div>
   );
 }

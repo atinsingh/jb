@@ -1,0 +1,65 @@
+- generic [active] [ref=f3e1]:
+  - generic [ref=f3e2]:
+    - generic [ref=f3e3]:
+      - generic [ref=f3e4]:
+        - link [ref=f3e5] [cursor=pointer]:
+          - /url: /
+          - img "Jobocate" [ref=f3e6]:
+            - generic [ref=f3e11]: jobocate
+        - generic [ref=f3e13]:
+          - generic [ref=f3e14]: Free to start
+          - heading "What brings you here?" [level=1] [ref=f3e17]
+          - paragraph [ref=f3e18]: Choose how you’ll use Jobocate — you can switch later.
+          - generic [ref=f3e19]:
+            - button "◎ I’m looking for a job Build a résumé, get matched, and auto-apply to roles that fit. ✓" [ref=f3e20] [cursor=pointer]:
+              - generic [ref=f3e21]: ◎
+              - generic [ref=f3e22]:
+                - generic [ref=f3e23]: I’m looking for a job
+                - generic [ref=f3e24]: Build a résumé, get matched, and auto-apply to roles that fit.
+              - generic [ref=f3e25]: ✓
+            - button "⛯ I’m hiring Post roles and let an AI recruiter screen, source and schedule." [ref=f3e26] [cursor=pointer]:
+              - generic [ref=f3e27]: ⛯
+              - generic [ref=f3e28]:
+                - generic [ref=f3e29]: I’m hiring
+                - generic [ref=f3e30]: Post roles and let an AI recruiter screen, source and schedule.
+          - button "Continue →" [ref=f3e32] [cursor=pointer]:
+            - text: Continue
+            - generic [ref=f3e33]: →
+          - paragraph [ref=f3e34]:
+            - text: Already have an account?
+            - link "Log in" [ref=f3e35] [cursor=pointer]:
+              - /url: /app/login
+        - generic [ref=f3e36]: © 2026 Jobocate
+      - generic [ref=f3e37]:
+        - generic [ref=f3e38]: — Free to start
+        - generic [ref=f3e39]:
+          - paragraph [ref=f3e40]: Set it up once. Wake up to interviews.
+          - generic [ref=f3e41]:
+            - generic [ref=f3e42]:
+              - generic [ref=f3e43]: ✓
+              - generic [ref=f3e44]: AI résumé & tailored cover letters
+            - generic [ref=f3e45]:
+              - generic [ref=f3e46]: ✓
+              - generic [ref=f3e47]: Daily matches ranked by real fit
+            - generic [ref=f3e48]:
+              - generic [ref=f3e49]: ✓
+              - generic [ref=f3e50]: Auto-apply to verified careers pages
+            - generic [ref=f3e51]:
+              - generic [ref=f3e52]: ✓
+              - generic [ref=f3e53]: Interview prep that actually helps
+          - generic [ref=f3e54]:
+            - generic [ref=f3e55]:
+              - generic [ref=f3e56]: Your first week, typically
+              - generic [ref=f3e57]: ● avg
+            - generic [ref=f3e58]:
+              - generic [ref=f3e59]:
+                - generic [ref=f3e60]: 120+
+                - generic [ref=f3e61]: ranked matches
+              - generic [ref=f3e62]:
+                - generic [ref=f3e63]: 48h
+                - generic [ref=f3e64]: to first interview
+        - generic [ref=f3e65]:
+          - generic [ref=f3e66]: ★★★★★
+          - text: Free forever tier · you approve every application
+    - region "Notifications Alt+T"
+  - alert [ref=f3e67]

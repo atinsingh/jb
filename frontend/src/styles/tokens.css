@@ -88,57 +88,123 @@
   /* =========================================================================
      APP STAGE — the signed-in content area (/app/*)
      =========================================================================
-     The app is a dark sidebar next to a content stage. The SIDEBAR stays dark
-     in both themes on purpose — it is the product's spine and the design
-     already treats it as a constant, the same call made for the marketing
-     footer. Only the stage flips.
+     Light-only, single palette — the /app surface has NO theme toggle. See
+     docs/superpowers/plans/2026-08-21-app-cobalt-editorial-redesign.md.
+     Do not reintroduce a conditional --jb-a-* block anywhere in this file.
 
-     Defaults here are the DARK stage, matching the marketing surface, and
-     [data-jb-theme='light'] restores the cream stage that shipped before —
-     so light mode is a pixel-for-pixel no-op against the current design.
+     Editorial and typography-led: white ground, near-black ink, structure from
+     1px warm-grey rules rather than cards or fills, and exactly ONE saturated
+     colour — the cobalt accent — spent on what needs attention (high fit,
+     active nav, primary action, urgent card). Amber is reserved for offers.
+     Green is retired from this surface entirely.
 
-     Contrast on --jb-a-stage (#101c14): ink 13.9:1, ink-muted 6.4:1.
+     There are two grey ramps on purpose and they are NOT interchangeable:
+     ink-2/-3/-soft are COOL (they sit on white, next to type) and ink-warm/
+     -faint plus every line token are WARM (they sit against the #fbfaf8 rail).
+     Mixing the ramps is what makes a light UI look muddy.
+
+     Measured contrast, on --jb-a-stage (#ffffff) / on --jb-a-rail (#fbfaf8):
+       ink        18.08 / 17.34      ink-soft   4.82 / 4.62
+       ink-2       8.33 /  7.98      ink-warm   5.25 / 5.03
+       ink-3       6.27 /  6.01      accent     7.11 / 6.81
+     All of the above pass AA for body text. Two exceptions, both deliberate:
+       ink-faint      2.92 — DECORATIVE ONLY (drag handles, inactive marks).
+       status-offer   4.48 — LARGE TEXT AND MARKS ONLY (the 44px offer figure,
+                             the 7px column dot). For amber small text use
+                             --jb-a-offer-ink (5.91) instead.
      ------------------------------------------------------------------------- */
-  --jb-a-stage: #101c14;
-  --jb-a-header: #14261a;
-  --jb-a-card: #16281c;
-  --jb-a-card-alt: #1b2f21;
-  --jb-a-control: #1b2f21;
-  --jb-a-line: rgba(242, 236, 219, 0.14);
-  --jb-a-line-strong: rgba(242, 236, 219, 0.22);
-  --jb-a-ink: #eef1e9;
-  --jb-a-ink-2: rgba(238, 241, 233, 0.82);
-  --jb-a-ink-muted: rgba(238, 241, 233, 0.62);
-  --jb-a-accent: #5bd08c;
-  --jb-a-accent-ink: #0e2e12;
-  --jb-a-accent-2: #8fd6a3;
-  --jb-a-tint: rgba(91, 208, 140, 0.12);
-  --jb-a-tint-line: rgba(91, 208, 140, 0.3);
-  --jb-a-blue: #9db6c4;
-  --jb-a-blue-tint: rgba(157, 182, 196, 0.14);
-  --jb-a-blue-ink: #bcd4e0;
-  --jb-a-blue-line: rgba(157, 182, 196, 0.3);
+  --jb-a-stage: #ffffff;
+  --jb-a-header: #ffffff;
+  --jb-a-card: #ffffff;
+  --jb-a-card-alt: #fbfaf8;
+  /* The warm off-white every secondary column sits on: the icon rail, the
+     Matches filter rail, the Applications board columns. */
+  --jb-a-rail: #fbfaf8;
+  /* One step deeper than the rail — the résumé workspace, where the white
+     paper has to read as a raised sheet against the ground behind it. */
+  --jb-a-stage-deep: #f4f3f0;
+  --jb-a-control: #f1f0ec;
 
-  /* New tokens closing dashboard.jsx's stray-hex gaps — see
-     docs/superpowers/specs/2026-08-13-candidate-flow-design-unification.md */
-  --jb-a-chip-neutral-ink: #c4b184;
-  --jb-a-chip-success-bg: rgba(91, 208, 140, 0.16);
-  --jb-a-accent-muted: rgba(143, 214, 163, 0.75);
-  --jb-a-status-warn: #e08a52;
-  --jb-a-danger-bg: rgba(224, 120, 86, 0.14);
-  --jb-a-danger-line: rgba(224, 120, 86, 0.32);
-  --jb-a-danger-ink: #e0a89e;
-  --jb-a-warn-bg: rgba(201, 98, 46, 0.14);
-  --jb-a-warn-line: rgba(201, 98, 46, 0.32);
+  /* Ink ramp — cool, for type on white. */
+  --jb-a-ink: #14161c;
+  --jb-a-ink-2: #4a4e58;
+  --jb-a-ink-3: #5b6070;
+  --jb-a-ink-soft: #6e727b;
+  /* Ink ramp — warm, for marks that sit against the rails. */
+  --jb-a-ink-warm: #6e6c66;
+  --jb-a-ink-faint: #9a9790;
+  /* Retained alias: --jb-a-ink-muted is this tier's old name and is still read
+     by the shared primitives. Points at the cool ramp's lightest text step. */
+  --jb-a-ink-muted: #6e727b;
 
-  /* Inverted accent card — the dark panel that sits inside the stage (the
-     Auto-Apply card, the funnel). On the light stage it is near-black for
-     contrast; on the dark stage it lifts slightly instead, since going darker
-     than the stage would make it disappear. */
-  --jb-a-invert: #0b170f;
-  --jb-a-invert-panel: #16281c;
-  --jb-a-invert-ink: #eef1e9;
-  --jb-a-invert-muted: rgba(238, 241, 233, 0.62);
+  /* Rules — warm, and the primary structural device on this surface. */
+  --jb-a-line: #e5e3dd;
+  --jb-a-line-soft: #eceae4;
+  --jb-a-line-strong: #dddad2;
+  --jb-a-line-btn: #d3d0c8;
+  --jb-a-line-dashed: #c9c6be;
+  --jb-a-chip-line: #e0ddd5;
+
+  /* The one colour. */
+  --jb-a-accent: #2b4acc;
+  --jb-a-accent-hover: #1e38a8;
+  --jb-a-accent-ink: #ffffff;
+  --jb-a-accent-deep: #3f55b5;
+  --jb-a-accent-soft: #7c8fe0;
+  --jb-a-tint: #eef1fd;
+  --jb-a-tint-line: #c6d0f7;
+  --jb-a-tint-wash: #fbfaff;
+  --jb-a-tint-ink: #3a4560;
+
+  /* Status. Amber means "an offer is on the table" or "this section needs a
+     fix" — the only non-cobalt colour on the surface. */
+  --jb-a-status-offer: #a66a12;
+  --jb-a-offer-bg: #fbf2e2;
+  --jb-a-offer-ink: #8a5a12;
+  --jb-a-chip-neutral-ink: #5b5e60;
+  --jb-a-dot-applied: #c8c6bf;
+  --jb-a-dot-review: #5b7186;
+
+  /* Retained aliases for primitives that still speak the old token names.
+     They resolve into the new system rather than keeping a second palette
+     alive — the green/cream values they used to hold are gone. */
+  --jb-a-accent-2: #2b4acc;
+  --jb-a-accent-muted: #5b6070;
+  --jb-a-status-warn: #a66a12;
+  --jb-a-warn-bg: #fbf2e2;
+  --jb-a-warn-line: #efdcb8;
+  --jb-a-danger-bg: #fdeeeb;
+  --jb-a-danger-line: #f4cfc7;
+  --jb-a-danger-ink: #a33c26;
+  --jb-a-chip-success-bg: #eef1fd;
+  --jb-a-blue: #2b4acc;
+  --jb-a-blue-tint: #eef1fd;
+  --jb-a-blue-ink: #2b4acc;
+  --jb-a-blue-line: #c6d0f7;
+
+  /* Inverted panel — the near-black column (the sign-in testimonial, the
+     first bar of the employer funnel). invert-ink on invert is 17.34. */
+  --jb-a-invert: #14161c;
+  --jb-a-invert-panel: #2a2d34;
+  --jb-a-invert-ink: #fbfaf8;
+  --jb-a-invert-muted: rgba(251, 250, 248, 0.6);
+
+  /* Two shadows, and only two. `paper` exists for one reason — the résumé
+     sheet lifting off --jb-a-stage-deep. `lift` is the small hover response on
+     a card that is genuinely draggable or clickable. Everything else on this
+     surface separates with a rule, not a shadow. */
+  --jb-a-shadow-paper: 0 24px 48px -28px rgba(20, 22, 28, 0.22);
+  --jb-a-shadow-lift: 0 10px 22px -14px rgba(20, 22, 28, 0.28);
+  /* Scrim behind a modal or drawer. */
+  --jb-a-scrim: rgba(20, 22, 28, 0.35);
+
+  /* Display steps. The scale is deliberately coarse — each screen picks ONE,
+     and the headline is the only thing on the page at that size. */
+  --jb-a-display-hero: 4rem; /* 64px — dashboard */
+  --jb-a-display-lg: 3.5rem; /* 56px — employer dashboard */
+  --jb-a-display-md: 3.25rem; /* 52px — matches */
+  --jb-a-display-sm: 2.875rem; /* 46px — applications, sign-in, onboarding */
+  --jb-a-display-stat: 2.75rem; /* 44px — the bare stat figures */
 }
 
 /* =========================================================================
@@ -204,47 +270,6 @@ html[data-jb-theme='light'] {
   --jb-nav-wash: rgba(252, 245, 236, 0.78);
   --jb-nav-wash-solid: rgba(252, 245, 236, 0.94);
   --jb-surface-raised: #fffefb;
-
-  /* App stage, light — the exact values the dashboard shipped with, so
-     switching to light is a no-op against the existing design. */
-  --jb-a-stage: #eff0ec;
-  --jb-a-header: #f5f5f5;
-  --jb-a-card: #f5f5f5;
-  --jb-a-card-alt: #fffefb;
-  --jb-a-control: #ecede9;
-  --jb-a-line: #dee0db;
-  --jb-a-line-strong: #c9ccc6;
-  --jb-a-ink: #2a2f28;
-  --jb-a-ink-2: #3e443c;
-  --jb-a-ink-muted: #5c625a;
-  --jb-a-accent: #4dbe55;
-  --jb-a-accent-ink: #0e2e12;
-  --jb-a-accent-2: #2f7d3a;
-  --jb-a-tint: #eef8ef;
-  --jb-a-tint-line: #cbe8ce;
-  --jb-a-blue: #9db6c4;
-  --jb-a-blue-tint: #e8eef2;
-  --jb-a-blue-ink: #3e5a6b;
-  --jb-a-blue-line: #c7d6de;
-
-  /* Light-theme companions to the dark block above — these are the exact
-     hex values dashboard.jsx already hardcoded before this pass, since the
-     light theme is meant to be a pixel-for-pixel no-op against the
-     existing design. */
-  --jb-a-chip-neutral-ink: #8a7c5a;
-  --jb-a-chip-success-bg: #dcefe3;
-  --jb-a-accent-muted: #5a8c6e;
-  --jb-a-status-warn: #c9622e;
-  --jb-a-danger-bg: #fbefe9;
-  --jb-a-danger-line: #f0cdbd;
-  --jb-a-danger-ink: #8a4a2e;
-  --jb-a-warn-bg: #fbeee5;
-  --jb-a-warn-line: #f0dcc8;
-
-  --jb-a-invert: #2a2f28;
-  --jb-a-invert-panel: #363c34;
-  --jb-a-invert-ink: #e9eae5;
-  --jb-a-invert-muted: #b4bab0;
 }
 
 /* =========================================================================
