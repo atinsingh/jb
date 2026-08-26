@@ -5,7 +5,7 @@ import { AuthProvider } from '@/context/AuthContext';
 import { ThemeProvider } from 'next-themes';
 import ThemeProviderWrapper from '@/components/theme/ThemeProviderWrapper';
 import Head from 'next/head';
-import { Instrument_Serif, Public_Sans, IBM_Plex_Mono } from 'next/font/google';
+import { Instrument_Serif, Public_Sans, IBM_Plex_Mono, Sora, DM_Mono } from 'next/font/google';
 
 /*
  * ============================================================================
@@ -49,6 +49,29 @@ const fontMono = IBM_Plex_Mono({
   fallback: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
 });
 
+// ---------------------------------------------------------------------------
+// Candidate v3 (marketing surface only). Sora + DM Mono are the v3 faces.
+//
+// Added ALONGSIDE the three above rather than replacing them: --jb-face-display
+// (Instrument Serif) is consumed by every migrated /app/* screen, and Sprint 1
+// scope is the homepage + candidate login only. These publish as
+// --jb-face-v3-* and are read exclusively by the .jbv3 token block in
+// tokens.css. When v3 reaches the rest of the app, collapse the two sets.
+// ---------------------------------------------------------------------------
+const fontV3Display = Sora({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  display: 'swap',
+  fallback: ['system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+});
+
+const fontV3Mono = DM_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500'],
+  display: 'swap',
+  fallback: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+});
+
 export default function App({ Component, pageProps }) {
   return (
     <ThemeProvider 
@@ -68,6 +91,8 @@ export default function App({ Component, pageProps }) {
             --jb-face-display: ${fontDisplay.style.fontFamily};
             --jb-face-sans: ${fontSans.style.fontFamily};
             --jb-face-mono: ${fontMono.style.fontFamily};
+            --jb-face-v3-display: ${fontV3Display.style.fontFamily};
+            --jb-face-v3-mono: ${fontV3Mono.style.fontFamily};
           }
         `}</style>
         <AuthProvider>

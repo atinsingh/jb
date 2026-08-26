@@ -1,0 +1,731 @@
+/*
+ * Marketing home, Candidate v3.
+ *
+ * Every colour is a var(--jb-v3-*) from the .jbv3 block in styles/tokens.css.
+ * There is deliberately no literal hex in this file: the light theme is a
+ * token swap on html[data-jb-theme='light'], so hard-coding a colour here
+ * would break the toggle silently.
+ *
+ * Layout note: the strips use `gap: 1px` over a line-coloured background.
+ * The gap IS the hairline. Do not add per-cell borders; they double up.
+ */
+
+.root {
+  position: relative;
+  background: var(--jb-v3-bg);
+  color: var(--jb-v3-fg);
+  font-family: var(--jb-v3-font-display);
+  font-size: 14px;
+  line-height: 1.45;
+  font-feature-settings: 'tnum' 1;
+  overflow-x: clip;
+}
+
+/* Dot field, masked so it fades out down the page. Fixed and inert. */
+.dots {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: radial-gradient(var(--jb-v3-dot) 0.8px, transparent 0.8px);
+  background-size: 26px 26px;
+  background-position: 13px 13px;
+  mask-image: radial-gradient(ellipse 130% 90% at 50% 0%, #000 8%, rgba(0, 0, 0, 0.35) 55%, transparent 92%);
+  -webkit-mask-image: radial-gradient(ellipse 130% 90% at 50% 0%, #000 8%, rgba(0, 0, 0, 0.35) 55%, transparent 92%);
+}
+
+.inner {
+  position: relative;
+  z-index: 1;
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 78px 28px 0;
+}
+
+/*
+ * Heading specificity note.
+ *
+ * PublicLayout ships a global rule for the marketing surface:
+ *   .jb-dark h1, .jb-dark h2, .jb-dark h3 {
+ *     font-family: var(--jb-font-display);  (Instrument Serif)
+ *     font-weight: 400;
+ *     letter-spacing: -0.01em;
+ *   }
+ * That is (0,1,1) and therefore beats a bare module class (0,1,0), so v3
+ * headings would silently render in the old serif at the wrong weight.
+ * Prefixing with .root lifts these to (0,2,0) and wins, without editing the
+ * shared layout that every other marketing page still depends on.
+ *
+ * Remove the .root prefixes once JOB-33 retires that global rule.
+ */
+/* --------------------------------------------------------------------- */
+/* Shared type                                                            */
+/* --------------------------------------------------------------------- */
+
+.monoLabel {
+  margin: 0 0 12px;
+  font-family: var(--jb-v3-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--jb-v3-fg-3);
+}
+
+.accent {
+  color: var(--jb-v3-accent);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --------------------------------------------------------------------- */
+/* Buttons                                                                */
+/* --------------------------------------------------------------------- */
+
+.btn {
+  display: inline-block;
+  border-radius: 2px;
+  padding: 11px 22px;
+  font-family: var(--jb-v3-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.btnPrimary {
+  background: var(--jb-v3-accent);
+  color: var(--jb-v3-accent-ink);
+  border: 1px solid var(--jb-v3-accent);
+}
+
+.btnPrimary:hover {
+  transform: translateY(-1px);
+}
+
+.btnGhost {
+  background: none;
+  border: 1px solid var(--jb-v3-line-2);
+  color: var(--jb-v3-fg-2);
+}
+
+.btnGhost:hover {
+  border-color: var(--jb-v3-accent);
+  color: var(--jb-v3-fg);
+}
+
+.btnSm {
+  padding: 10px 20px;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--jb-v3-accent);
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------------- */
+/* Hero                                                                   */
+/* --------------------------------------------------------------------- */
+
+.hero {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 60px;
+  align-items: end;
+  padding-bottom: 44px;
+  border-bottom: 1px solid var(--jb-v3-line);
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 22px;
+  font-family: var(--jb-v3-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--jb-v3-fg-3);
+}
+
+.blip {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--jb-v3-accent);
+  display: block;
+  flex: none;
+  animation: blip 1.8s ease-in-out infinite;
+}
+
+@keyframes blip {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+.root .h1 {
+  font-family: var(--jb-v3-font-display);
+  margin: 0 0 20px;
+  font-size: 62px;
+  font-weight: 600;
+  letter-spacing: -0.05em;
+  line-height: 0.98;
+  text-wrap: pretty;
+}
+
+.sub {
+  margin: 0 0 30px;
+  font-size: 16.5px;
+  color: var(--jb-v3-fg-2);
+  max-width: 420px;
+  text-wrap: pretty;
+}
+
+.ctaRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Coverage histogram ---------------------------------------------------- */
+
+.histWrap {
+  min-width: 0;
+}
+
+.hist {
+  display: flex;
+  gap: 2px;
+  align-items: flex-end;
+  height: 88px;
+}
+
+.tick {
+  flex: 1;
+  display: block;
+  min-width: 1px;
+  background: var(--jb-v3-tick-off);
+  transition: height 0.9s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.6s ease;
+}
+
+.tickOn {
+  background: var(--jb-v3-tick-on);
+}
+
+.axis {
+  position: relative;
+  height: 26px;
+  margin-top: 8px;
+}
+
+.axisMin,
+.axisMax,
+.thresholdLabel {
+  position: absolute;
+  top: 0;
+  font-family: var(--jb-v3-font-mono);
+  font-size: 9.5px;
+  color: var(--jb-v3-fg-3);
+}
+
+.axisMin { left: 0; }
+.axisMax { right: 0; }
+
+.thresholdLabel {
+  transform: translateX(-50%);
+  white-space: nowrap;
+  color: var(--jb-v3-accent);
+}
+
+.thresholdRule {
+  position: absolute;
+  top: -96px;
+  bottom: 14px;
+  width: 1px;
+  background: var(--jb-v3-accent);
+  opacity: 0.5;
+}
+
+/* --------------------------------------------------------------------- */
+/* Hairline strips                                                        */
+/* --------------------------------------------------------------------- */
+
+.strip {
+  display: grid;
+  gap: 1px;
+  background: var(--jb-v3-line);
+  border-bottom: 1px solid var(--jb-v3-line);
+}
+
+.strip2 { grid-template-columns: repeat(2, 1fr); }
+.strip3 { grid-template-columns: repeat(3, 1fr); }
+.strip4 { grid-template-columns: repeat(4, 1fr); }
+
+.cell {
+  background: var(--jb-v3-bg);
+  padding: 24px 24px 26px;
+}
+
+.cellPanel {
+  background: var(--jb-v3-panel);
+  padding: 22px 24px;
+}
+
+.statValue {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin: 0;
+  font-size: 38px;
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+
+.statUnit {
+  font-family: var(--jb-v3-font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--jb-v3-fg-3);
+}
+
+.metricValue {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+}
+
+/* --------------------------------------------------------------------- */
+/* Proof band                                                             */
+/* --------------------------------------------------------------------- */
+
+.proof {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  flex-wrap: wrap;
+  padding: 24px 0;
+  border-bottom: 1px solid var(--jb-v3-line);
+}
+
+.proof .monoLabel {
+  margin: 0;
+}
+
+.logos {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  flex-wrap: wrap;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.logo {
+  height: 26px;
+  width: auto;
+  object-fit: contain;
+  object-position: left center;
+  filter: grayscale(1);
+  opacity: 0.4;
+}
+
+/* --------------------------------------------------------------------- */
+/* Audience cells                                                         */
+/* --------------------------------------------------------------------- */
+
+.audience {
+  padding: 34px 30px 32px;
+}
+
+.root .h3 {
+  font-family: var(--jb-v3-font-display);
+  margin: 0 0 22px;
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+  max-width: 380px;
+  text-wrap: pretty;
+}
+
+.lines {
+  margin: 0;
+  border-bottom: 1px solid var(--jb-v3-line);
+}
+
+.line {
+  border-top: 1px solid var(--jb-v3-line);
+  padding: 13px 0;
+  display: grid;
+  grid-template-columns: 1fr 90px;
+  gap: 16px;
+  align-items: baseline;
+}
+
+.line dt {
+  font-size: 14px;
+  color: var(--jb-v3-fg-2);
+}
+
+.line dd {
+  margin: 0;
+  font-family: var(--jb-v3-font-mono);
+  font-size: 12px;
+  color: var(--jb-v3-fg);
+  text-align: right;
+}
+
+/* --------------------------------------------------------------------- */
+/* Mentors                                                                */
+/* --------------------------------------------------------------------- */
+
+.mentors {
+  border-bottom: 1px solid var(--jb-v3-line);
+  padding: 44px 0;
+}
+
+.mentorsHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 30px;
+  margin-bottom: 26px;
+}
+
+.root .h2 {
+  font-family: var(--jb-v3-font-display);
+  margin: 0 0 12px;
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+  max-width: 520px;
+  text-wrap: pretty;
+}
+
+.body {
+  margin: 0;
+  font-size: 15px;
+  color: var(--jb-v3-fg-2);
+  max-width: 460px;
+  text-wrap: pretty;
+}
+
+.mentorGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1px;
+  background: var(--jb-v3-line);
+  border: 1px solid var(--jb-v3-line);
+  border-radius: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.mentor {
+  background: var(--jb-v3-panel);
+  display: flex;
+  flex-direction: column;
+}
+
+.mentorAvatar {
+  height: 132px;
+  border-bottom: 1px solid var(--jb-v3-line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--jb-v3-accent-soft);
+}
+
+.mentorAvatar span {
+  font-family: var(--jb-v3-font-mono);
+  font-size: 22px;
+  letter-spacing: 0.08em;
+  color: var(--jb-v3-accent);
+}
+
+.mentorBody {
+  padding: 14px 16px 16px;
+}
+
+.root .mentorName {
+  font-family: var(--jb-v3-font-display);
+  margin: 0 0 5px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.mentorFocus {
+  margin: 0 0 10px;
+  font-family: var(--jb-v3-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--jb-v3-fg-3);
+  line-height: 1.4;
+}
+
+.mentorMeta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0;
+  font-family: var(--jb-v3-font-mono);
+  font-size: 10px;
+}
+
+.mentorRate {
+  color: var(--jb-v3-fg-3);
+}
+
+/* --------------------------------------------------------------------- */
+/* Capabilities ledger                                                    */
+/* --------------------------------------------------------------------- */
+
+.cap {
+  border-bottom: 1px solid var(--jb-v3-line);
+  padding: 30px 0;
+  display: grid;
+  grid-template-columns: 54px 200px 1fr 260px;
+  gap: 30px;
+  align-items: center;
+}
+
+.capN {
+  font-family: var(--jb-v3-font-mono);
+  font-size: 11px;
+  color: var(--jb-v3-accent);
+}
+
+.root .capK {
+  font-family: var(--jb-v3-font-display);
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.capV {
+  margin: 0;
+  font-size: 14.5px;
+  color: var(--jb-v3-fg-2);
+  text-wrap: pretty;
+}
+
+.spark {
+  overflow: visible;
+  justify-self: end;
+  max-width: 100%;
+  height: auto;
+}
+
+/* --------------------------------------------------------------------- */
+/* Testimonials                                                           */
+/* --------------------------------------------------------------------- */
+
+.quote {
+  margin: 0;
+  padding: 28px 24px;
+}
+
+.quoteBody {
+  margin: 0 0 14px;
+  font-size: 15.5px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.quote .monoLabel {
+  margin: 0;
+}
+
+/* --------------------------------------------------------------------- */
+/* Closing                                                                */
+/* --------------------------------------------------------------------- */
+
+.closing {
+  padding: 76px 0 84px;
+  text-align: center;
+}
+
+.root .closingH {
+  font-family: var(--jb-v3-font-display);
+  margin: 0 0 24px;
+  font-size: 42px;
+  font-weight: 600;
+  letter-spacing: -0.045em;
+}
+
+/* --------------------------------------------------------------------- */
+/* Responsive. The design is desktop-only, so every collapse below is a    */
+/* decision made here, not something inherited from the artboard.         */
+/* --------------------------------------------------------------------- */
+
+@media (max-width: 1100px) {
+  .cap {
+    grid-template-columns: 44px 160px 1fr;
+    gap: 20px;
+  }
+
+  /* The sparkline is decoration; it is the first thing to go when the row
+     gets tight, rather than squeezing the description to nothing. */
+  .spark {
+    display: none;
+  }
+
+}
+
+@media (max-width: 900px) {
+  .inner {
+    padding: 56px 20px 0;
+  }
+
+  .hero {
+    grid-template-columns: 1fr;
+    gap: 40px;
+    align-items: start;
+  }
+
+  .h1 {
+    font-size: 44px;
+  }
+
+  .strip4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .strip2,
+  .strip3 {
+    grid-template-columns: 1fr;
+  }
+
+  .mentorsHead {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+  }
+
+  .h2 {
+    font-size: 28px;
+  }
+}
+
+@media (max-width: 640px) {
+  .inner {
+    padding: 40px 16px 0;
+  }
+
+  .h1 {
+    font-size: 36px;
+  }
+
+  .sub {
+    font-size: 15.5px;
+  }
+
+  .strip4 {
+    grid-template-columns: 1fr;
+  }
+
+
+  .cap {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 24px 0;
+  }
+
+  .capN {
+    color: var(--jb-v3-accent);
+  }
+
+  .closing {
+    padding: 56px 0 64px;
+  }
+
+  .closingH {
+    font-size: 32px;
+  }
+
+  .ctaRow > .btn {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+}
+
+/* --------------------------------------------------------------------- */
+/* Reduced motion                                                         */
+/* --------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .blip {
+    animation: none;
+  }
+
+  .tick {
+    transition: none;
+  }
+
+  .btn,
+  .btnPrimary:hover {
+    transition: none;
+    transform: none;
+  }
+}
+
+/*
+ * Mentors below desktop.
+ *
+ * There are five mentors, and five does not divide into a 2- or 3-column grid
+ * without leaving a dead cell in the last row. Rather than pad the grid with
+ * an empty tile, the row becomes a scroll-snap carousel: five peers read
+ * naturally as something you flick through, and the partial card at the right
+ * edge is what tells the user there is more.
+ */
+@media (max-width: 1100px) {
+  .mentorGrid {
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .mentorGrid::-webkit-scrollbar {
+    display: none;
+  }
+
+  .mentor {
+    flex: 0 0 46%;
+    min-width: 0;
+    scroll-snap-align: start;
+    border-right: 1px solid var(--jb-v3-line);
+  }
+
+  .mentor:last-child {
+    border-right: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .mentor {
+    flex: 0 0 72%;
+  }
+}

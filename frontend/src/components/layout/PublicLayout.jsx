@@ -25,9 +25,9 @@ import SiteFooter from '@/components/site/SiteFooter';
  * @param {'candidate'|'employer'} variant — passed to SiteNav; 'employer'
  *   promotes the hiring CTA on the employer funnel pages.
  */
-export default function PublicLayout({ children, variant = 'candidate' }) {
+export default function PublicLayout({ children, variant = 'candidate', surface = 'flightplan' }) {
   return (
-    <div className="jb-dark">
+    <div className={surface === 'v3' ? 'jb-dark jbv3-chrome' : 'jb-dark'}>
       <SiteNav variant={variant} />
       <main id="main">{children}</main>
       <SiteFooter />

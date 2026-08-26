@@ -482,3 +482,165 @@ html[data-jb-theme='light'] {
     scroll-behavior: auto !important;
   }
 }
+
+/* ============================================================================
+   CANDIDATE v3 — MARKETING SURFACE ONLY
+   ============================================================================
+   Source of truth: "Jobocate Candidate v3.dc.html", artboard "Marketing home".
+
+   Deliberately a SEPARATE family from --jb-a-* rather than a rewrite of it.
+   --jb-a-* is consumed by ~32 already-migrated /app/* screens; Sprint 1 scope
+   is the homepage and candidate login only, so re-valuing --jb-a-* here would
+   silently restyle screens this design never covered. This block is scoped to
+   .jbv3 and cannot leak. (JOB-28 records the diff + this decision.)
+
+   Dark is the default because the marketing surface already runs dark by
+   default (useMarketingTheme -> html[data-jb-theme]), and v3 is dark-first.
+   The light values below are v3's own [data-theme="light"] pair, re-scoped to
+   this repo's existing html[data-jb-theme='light'] attribute.
+   ============================================================================ */
+.jbv3 {
+  --jb-v3-bg: #0b0b0c;
+  --jb-v3-panel: #111113;
+  --jb-v3-sunk: #08080a;
+
+  --jb-v3-line: #1f2023;
+  --jb-v3-line-2: #2e3035;
+
+  --jb-v3-fg: #f5f5f4;
+  --jb-v3-fg-2: #a5a6aa;
+  --jb-v3-fg-3: #7c7e84;
+
+  --jb-v3-accent: #2a5bff;
+  --jb-v3-accent-soft: rgba(42, 91, 255, 0.13);
+  --jb-v3-accent-line: rgba(42, 91, 255, 0.42);
+  --jb-v3-accent-faint: #c6d2ff;
+  --jb-v3-accent-ink: #ffffff;
+
+  --jb-v3-warn: #d9a03f;
+
+  /* Histogram: bars at or above the coverage threshold vs below it. */
+  --jb-v3-tick-on: #2a5bff;
+  --jb-v3-tick-off: #26282d;
+
+  /* Dot-grid field behind the page. */
+  --jb-v3-dot: rgba(255, 255, 255, 0.1);
+
+  --jb-v3-font-display: var(--jb-face-v3-display), system-ui, sans-serif;
+  --jb-v3-font-mono: var(--jb-face-v3-mono), ui-monospace, SFMono-Regular, monospace;
+}
+
+html[data-jb-theme='light'] .jbv3 {
+  --jb-v3-bg: #e8e4da;
+  --jb-v3-panel: #f7f5ef;
+  --jb-v3-sunk: #ded9cd;
+
+  --jb-v3-line: #cfc9b9;
+  --jb-v3-line-2: #b4ad99;
+
+  --jb-v3-fg: #1a1813;
+  --jb-v3-fg-2: #56513f;
+  --jb-v3-fg-3: #665f4e;
+
+  --jb-v3-accent: #1c3fbf;
+  --jb-v3-accent-soft: rgba(28, 63, 191, 0.1);
+  --jb-v3-accent-line: rgba(28, 63, 191, 0.38);
+  --jb-v3-accent-faint: #15308f;
+
+  --jb-v3-warn: #8a5a0c;
+
+  --jb-v3-tick-on: #1c3fbf;
+  --jb-v3-tick-off: #c9c2b0;
+
+  --jb-v3-dot: rgba(26, 24, 19, 0.16);
+}
+
+/* ============================================================================
+   CANDIDATE v3 CHROME
+   ============================================================================
+   Opt-in via <PublicLayout surface="v3">, which puts .jbv3-chrome next to
+   .jb-dark on the wrapper that holds SiteNav + <main> + SiteFooter.
+
+   Why remap primitives rather than restyle the chrome: PublicLayout already
+   rebinds ~186 cream --jb-* references onto the --jb-d-* dark scale, and
+   SiteNav/SiteFooter read the rebound names. Re-pointing the --jb-d-*
+   primitives therefore moves the whole chrome in one place, with no edit to
+   either component.
+
+   Without this the v3 page (#0b0b0c neutral) sits between a Flight Plan green
+   nav and footer (#0d2418), which reads as two different sites.
+
+   Accent note: the chrome collapses accent-fill and accent-text onto one
+   --jb-d-accent. Cobalt #2a5bff is ~3.6:1 on #0b0b0c and fails AA as text, so
+   this uses v3's own accent-foreground (#c6d2ff, ~11:1) which is legible as
+   text AND takes --jb-d-bg as ink when used as a fill. The cobalt-filled nav
+   CTA from the artboard is part of the nav rebuild (JOB-33), not this remap.
+   ============================================================================ */
+.jbv3-chrome {
+  --jb-d-bg: #0b0b0c;
+  --jb-d-gradient: #0b0b0c;
+  --jb-d-footer: #08080a;
+  --jb-d-panel: #111113;
+  --jb-d-panel-solid: #111113;
+  --jb-d-glass: rgba(245, 245, 244, 0.05);
+  --jb-d-glass-hi: rgba(245, 245, 244, 0.04);
+
+  --jb-d-ink: #f5f5f4;
+  --jb-d-ink-85: rgba(245, 245, 244, 0.85);
+  --jb-d-ink-70: rgba(245, 245, 244, 0.7);
+  --jb-d-ink-65: rgba(245, 245, 244, 0.65);
+  --jb-d-ink-55: rgba(245, 245, 244, 0.55);
+  --jb-d-ink-45: rgba(245, 245, 244, 0.45);
+
+  --jb-d-accent: #c6d2ff;
+  --jb-d-accent-hi: #dde5ff;
+  --jb-d-accent-tint: rgba(42, 91, 255, 0.16);
+  --jb-d-focus: #c6d2ff;
+
+  --jb-d-line: rgba(245, 245, 244, 0.1);
+  --jb-d-line-card: rgba(245, 245, 244, 0.13);
+  --jb-d-line-glass: rgba(245, 245, 244, 0.16);
+  --jb-d-line-strong: rgba(245, 245, 244, 0.2);
+  --jb-d-line-input: rgba(245, 245, 244, 0.24);
+  --jb-d-line-dashed: rgba(245, 245, 244, 0.3);
+  --jb-d-line-btn: rgba(245, 245, 244, 0.34);
+
+  /* Nav wash is defined at :root as a literal green, not derived from
+     --jb-d-bg, so it has to be re-stated here or the header stays green. */
+  --jb-nav-wash: rgba(11, 11, 12, 0.72);
+  --jb-nav-wash-solid: rgba(11, 11, 12, 0.92);
+}
+
+/* Light theme: v3's own cream pair, so the toggle still works on this page. */
+html[data-jb-theme='light'] .jbv3-chrome {
+  --jb-d-bg: #e8e4da;
+  --jb-d-gradient: #e8e4da;
+  --jb-d-footer: #ded9cd;
+  --jb-d-panel: #f7f5ef;
+  --jb-d-panel-solid: #f7f5ef;
+  --jb-d-glass: rgba(26, 24, 19, 0.04);
+  --jb-d-glass-hi: rgba(26, 24, 19, 0.03);
+
+  --jb-d-ink: #1a1813;
+  --jb-d-ink-85: rgba(26, 24, 19, 0.85);
+  --jb-d-ink-70: rgba(26, 24, 19, 0.72);
+  --jb-d-ink-65: rgba(26, 24, 19, 0.68);
+  --jb-d-ink-55: rgba(26, 24, 19, 0.6);
+  --jb-d-ink-45: rgba(26, 24, 19, 0.5);
+
+  --jb-d-accent: #1c3fbf;
+  --jb-d-accent-hi: #15308f;
+  --jb-d-accent-tint: rgba(28, 63, 191, 0.1);
+  --jb-d-focus: #1c3fbf;
+
+  --jb-d-line: rgba(26, 24, 19, 0.14);
+  --jb-d-line-card: rgba(26, 24, 19, 0.16);
+  --jb-d-line-glass: rgba(26, 24, 19, 0.18);
+  --jb-d-line-strong: rgba(26, 24, 19, 0.22);
+  --jb-d-line-input: rgba(26, 24, 19, 0.26);
+  --jb-d-line-dashed: rgba(26, 24, 19, 0.3);
+  --jb-d-line-btn: rgba(26, 24, 19, 0.36);
+
+  --jb-nav-wash: rgba(232, 228, 218, 0.78);
+  --jb-nav-wash-solid: rgba(232, 228, 218, 0.94);
+}

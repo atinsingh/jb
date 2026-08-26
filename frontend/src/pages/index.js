@@ -2,14 +2,14 @@
 
 import Head from 'next/head';
 import PublicLayout from '@/components/layout/PublicLayout';
-import HomeFlightPlan from '@/components/home/HomeFlightPlan';
+import HomeV3 from '@/components/home/v3/HomeV3';
 
 /**
- * Jobocate public homepage — Boarding Pass direction.
+ * Jobocate public homepage - Candidate v3 direction.
  *
- * The page used to own its chrome (its own inline header + footer), which is
- * why its menu diverged from every other marketing page. It is now on the
- * shared PublicLayout, so the header here is byte-for-byte the header on /jobs.
+ * Rebuilt against the approved "Jobocate Candidate v3" design bundle
+ * (artboard "Marketing home"). The page stays on the shared PublicLayout, so
+ * the header here is byte-for-byte the header on /jobs.
  *
  * Structured data is deliberately minimal — Organization only. No
  * AggregateRating / JobPosting / review markup: there is no verified rating
@@ -72,9 +72,11 @@ export default function JobocateHome() {
         />
       </Head>
 
-      <PublicLayout>
-        <div className="jb jbhome">
-          <HomeFlightPlan />
+      <PublicLayout surface="v3">
+        {/* .jb carries the shared focus-visible ring; .jbv3 scopes the
+            Candidate v3 token block in styles/tokens.css. */}
+        <div className="jb jbv3">
+          <HomeV3 />
         </div>
       </PublicLayout>
 
@@ -86,11 +88,6 @@ export default function JobocateHome() {
           html {
             scroll-behavior: auto;
           }
-        }
-        .jbhome {
-          background: transparent;
-          -webkit-font-smoothing: antialiased;
-          overflow-x: clip;
         }
       `}</style>
     </>
