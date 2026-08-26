@@ -29,30 +29,27 @@ export interface RouteSpec {
   skip?: string;
 }
 
-/** Marketing and legal surfaces — reachable signed out. */
+/**
+ * Marketing and legal surfaces — reachable signed out.
+ *
+ * Reduced to the Candidate v3 information architecture: the design defines
+ * three public screens (Product / Pricing / About), and this list keeps those
+ * plus the real product surface (/jobs), the employer logged-out funnel and
+ * the legal pages. Thirteen marketing and duplicate routes were deleted, not
+ * redirected — the site had never been deployed, so there was nothing to
+ * preserve.
+ */
 export const PUBLIC_ROUTES: RouteSpec[] = [
   { path: '/', name: 'home', audience: 'public' },
   { path: '/about', name: 'about', audience: 'public' },
   { path: '/pricing', name: 'pricing', audience: 'public' },
-  { path: '/contact', name: 'contact', audience: 'public' },
-  { path: '/demo', name: 'demo', audience: 'public' },
-  { path: '/enterprise', name: 'enterprise', audience: 'public' },
   { path: '/employers', name: 'employers landing', audience: 'public' },
   { path: '/employers/pricing', name: 'employer pricing', audience: 'public' },
-  { path: '/customers', name: 'customers', audience: 'public' },
-  { path: '/blogs', name: 'blog index', audience: 'public' },
   { path: '/jobs', name: 'public job search', audience: 'public' },
-  { path: '/features/auto-apply', name: 'feature: auto-apply', audience: 'public' },
-  { path: '/features/cover-letters', name: 'feature: cover letters', audience: 'public' },
-  { path: '/features/interview-prep', name: 'feature: interview prep', audience: 'public' },
-  { path: '/features/job-matching', name: 'feature: job matching', audience: 'public' },
-  { path: '/features/resume-builder', name: 'feature: resume builder', audience: 'public' },
   { path: '/terms', name: 'terms', audience: 'public' },
   { path: '/privacy', name: 'privacy', audience: 'public' },
-  { path: '/security', name: 'security', audience: 'public' },
   { path: '/cookies', name: 'cookies', audience: 'public' },
   { path: '/gdpr', name: 'gdpr', audience: 'public' },
-  { path: '/sitemap', name: 'sitemap', audience: 'public' },
   { path: '/unauthorized', name: 'unauthorized', audience: 'public' },
 ];
 
@@ -60,7 +57,6 @@ export const PUBLIC_ROUTES: RouteSpec[] = [
 export const AUTH_ROUTES: RouteSpec[] = [
   { path: '/app/login', name: 'login', audience: 'public' },
   { path: '/app/signup', name: 'signup', audience: 'public' },
-  { path: '/forgot-password', name: 'forgot password', audience: 'public' },
   { path: '/app/reset-password', name: 'reset password', audience: 'public' },
   {
     path: '/app/verify-email',

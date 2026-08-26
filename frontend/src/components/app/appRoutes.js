@@ -6,23 +6,9 @@ const MAP = {
   'Jobocate Home.dc.html': '/',
   'Pricing.dc.html': '/pricing',
   'About.dc.html': '/about',
-  'Enterprise.dc.html': '/enterprise',
-  'Job Matching.dc.html': '/features/job-matching',
-  'Auto-Apply.dc.html': '/features/auto-apply',
-  'Cover Letters.dc.html': '/features/cover-letters',
-  'Interview Prep.dc.html': '/features/interview-prep',
-  'Resume Builder.dc.html': '/features/resume-builder',
-  'Blog.dc.html': '/blog',
-  'Blog Post.dc.html': '/blog/post',
-  'Book Demo.dc.html': '/demo',
   'Browse Jobs.dc.html': '/jobs',
-  'Public Job.dc.html': '/jobs/role',
-  'Customer Stories.dc.html': '/customers',
-  'Customer Story.dc.html': '/customers/story',
   'For Employers.dc.html': '/employers',
   'Employer Pricing.dc.html': '/employers/pricing',
-  'Security.dc.html': '/security',
-  'Legal.dc.html': '/legal/terms',
 
   // ---- Candidate app (/app/*) ----
   'App Login.dc.html': '/app/login',
@@ -103,4 +89,18 @@ const MAP = {
   'Employer Analytics.dc.html': '/employer/dashboard',
 };
 
-export const appRoute = (dc) => MAP[dc] || '/app';
+export const appRoute = (dc) => {
+  const route = MAP[dc];
+  if (route) return route;
+  // There is no pages/app/index.jsx, so the previous silent '/app' fallback
+  // turned a typo'd or retired key into an invisible 404. Fail loudly in
+  // development; degrade to the dashboard in production rather than 404.
+  if (process.env.NODE_ENV !== 'production') {
+    throw new Error(
+      'appRoute: unknown screen key "' +
+        dc +
+        '". Add it to MAP in appRoutes.js, or use a literal path.',
+    );
+  }
+  return '/app/dashboard';
+};

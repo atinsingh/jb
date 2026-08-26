@@ -38,7 +38,7 @@ export default function Cookies() {
         <meta name="description" content="Learn about how Jobocate uses cookies and how you can manage your preferences." />
       </Head>
 
-      <PublicLayout>
+      <PublicLayout surface="v3">
         {/* Hero Section */}
         <section className="relative pt-16 pb-16 overflow-hidden bg-gradient-to-b from-primary-50/50 via-white to-white">
           <div className="absolute inset-0 pointer-events-none">

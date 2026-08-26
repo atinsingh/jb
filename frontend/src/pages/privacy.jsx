@@ -46,7 +46,7 @@ export default function Privacy() {
         <meta name="description" content="Learn how Jobocate protects your privacy and handles your personal data." />
       </Head>
 
-      <PublicLayout>
+      <PublicLayout surface="v3">
         {/* Hero Section */}
         <section className="relative pt-16 pb-16 overflow-hidden bg-gradient-to-b from-primary-50/50 via-white to-white">
           <div className="absolute inset-0 pointer-events-none">

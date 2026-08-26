@@ -82,7 +82,7 @@ export default function JobDetail() {
         )}
       </Head>
 
-      <PublicLayout>
+      <PublicLayout surface="v3">
         <div className="jd">
           {state === 'loading' && (
             <div className="jd__state" aria-busy="true">Loading role…</div>

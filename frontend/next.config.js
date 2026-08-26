@@ -77,10 +77,7 @@ const legacyRedirects = [
  */
 const retiredMarketingRedirects = [
   { source: '/promo', destination: '/' },
-  { source: '/post-job', destination: '/employers' },
-  { source: '/customers', destination: '/employers' },
-  { source: '/customers/:slug', destination: '/employers' },
-];
+  { source: '/post-job', destination: '/employers' },];
 
 const nextConfig = {
   images: {

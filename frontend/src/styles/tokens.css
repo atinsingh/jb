@@ -499,7 +499,8 @@ html[data-jb-theme='light'] {
    The light values below are v3's own [data-theme="light"] pair, re-scoped to
    this repo's existing html[data-jb-theme='light'] attribute.
    ============================================================================ */
-.jbv3 {
+.jbv3,
+.jbv3-chrome {
   --jb-v3-bg: #0b0b0c;
   --jb-v3-panel: #111113;
   --jb-v3-sunk: #08080a;
@@ -530,7 +531,8 @@ html[data-jb-theme='light'] {
   --jb-v3-font-mono: var(--jb-face-v3-mono), ui-monospace, SFMono-Regular, monospace;
 }
 
-html[data-jb-theme='light'] .jbv3 {
+html[data-jb-theme='light'] .jbv3,
+html[data-jb-theme='light'] .jbv3-chrome {
   --jb-v3-bg: #e8e4da;
   --jb-v3-panel: #f7f5ef;
   --jb-v3-sunk: #ded9cd;
@@ -607,6 +609,12 @@ html[data-jb-theme='light'] .jbv3 {
 
   /* Nav wash is defined at :root as a literal green, not derived from
      --jb-d-bg, so it has to be re-stated here or the header stays green. */
+  /* Public chrome runs the v3 type stack. Scoped to .jbv3-chrome, so /app/*
+     keeps Instrument Serif + IBM Plex Mono. */
+  --jb-font-display: var(--jb-v3-font-display);
+  --jb-font-sans: var(--jb-v3-font-display);
+  --jb-font-mono: var(--jb-v3-font-mono);
+
   --jb-nav-wash: rgba(11, 11, 12, 0.72);
   --jb-nav-wash-solid: rgba(11, 11, 12, 0.92);
 }

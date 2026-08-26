@@ -1,17 +1,36 @@
 'use client';
 
 /**
- * Jobocate logo — the single source of truth for the brand mark.
+ * The Jobocate mark.
  *
- * The design system's mark: a bracketed "[J]" (the J-hook is the accent) next to
- * a lowercase `jobocate` JetBrains Mono wordmark. Use this everywhere instead of
- * hand-coding a wordmark, so the logo can never drift between pages again.
+ * Two forms, because the design bundle supplies one and the app needs two:
  *
- *   theme="light"  → marketing / cream surfaces (dark wordmark)
- *   theme="dark"   → app rail / dark surfaces (light wordmark)
- *   accent         → override the J-hook color (defaults to the brand green)
- *   mark           → render only the bracket mark (no wordmark)
+ *   default   the WORDMARK from the Candidate v3 bundle
+ *             (assets/jobocate_logo.svg). A single path, inlined here with
+ *             fill: currentColor so it takes the surrounding ink rather than
+ *             the orange the source file happens to ship with. The design uses
+ *             the same file as a CSS mask over var(--fg), which is the same
+ *             result by another route; inlining avoids a second request and a
+ *             mask-support fallback.
+ *
+ *   mark      the bracketed "[J]" glyph. NOT in the design bundle. Kept
+ *             because four collapsed sidebars (admin, agent, app, employer)
+ *             need a square icon and a wordmark cannot serve as one. Its
+ *             J-hook still takes `accent`.
+ *
+ * Props:
+ *   theme="light"  dark ink, for cream / light surfaces
+ *   theme="dark"   light ink, for dark surfaces
+ *   size           height in px; the wordmark keeps its 211:45 ratio
+ *   accent         overrides the J-hook colour, `mark` form only
  */
+
+/** From assets/jobocate_logo.svg in the v3 bundle. viewBox 0 0 211 45. */
+const WORDMARK_PATH =
+  'M4.35394 33C3.56945 33 2.8536 32.8137 2.20639 32.441C1.57879 32.0488 1.06887 31.5389 0.676626 30.9113C0.303991 30.2641 0.117674 29.5482 0.117674 28.7637V26.2043H4.35394V28.5578C4.35394 28.6166 4.36375 28.6657 4.38336 28.7049C4.42258 28.7245 4.47161 28.7343 4.53045 28.7343H16.8274C16.8862 28.7343 16.9254 28.7245 16.9451 28.7049C16.9843 28.6657 17.0039 28.6166 17.0039 28.5578V11.8187H21.299V28.7637C21.299 29.5482 21.1029 30.2641 20.7106 30.9113C20.3184 31.5389 19.7987 32.0488 19.1514 32.441C18.5239 32.8137 17.8276 33 17.0627 33H4.35394ZM31.7586 33C30.9741 33 30.2582 32.8137 29.611 32.441C28.9834 32.0488 28.4735 31.5389 28.0813 30.9113C27.7086 30.2641 27.5223 29.5482 27.5223 28.7637V16.0549C27.5223 15.2704 27.7086 14.5644 28.0813 13.9368C28.4735 13.2896 28.9834 12.7797 29.611 12.407C30.2582 12.0148 30.9741 11.8187 31.7586 11.8187H44.4674C45.2323 11.8187 45.9285 12.0148 46.5561 12.407C47.2033 12.7797 47.723 13.2896 48.1153 13.9368C48.5075 14.5644 48.7037 15.2704 48.7037 16.0549V28.7637C48.7037 29.5482 48.5075 30.2641 48.1153 30.9113C47.723 31.5389 47.2033 32.0488 46.5561 32.441C45.9285 32.8137 45.2323 33 44.4674 33H31.7586ZM31.9351 28.7343H44.232C44.2909 28.7343 44.3301 28.7245 44.3497 28.7049C44.3889 28.6657 44.4086 28.6166 44.4086 28.5578V16.2609C44.4086 16.202 44.3889 16.1628 44.3497 16.1432C44.3301 16.104 44.2909 16.0844 44.232 16.0844H31.9351C31.8763 16.0844 31.8272 16.104 31.788 16.1432C31.7684 16.1628 31.7586 16.202 31.7586 16.2609V28.5578C31.7586 28.6166 31.7684 28.6657 31.788 28.7049C31.8272 28.7245 31.8763 28.7343 31.9351 28.7343ZM55.0109 33V11.8187H71.1322C71.8971 11.8187 72.5933 12.0148 73.2209 12.407C73.8681 12.7797 74.3879 13.2896 74.7801 13.9368C75.1724 14.5644 75.3685 15.2704 75.3685 16.0549V20.1147C75.3685 20.3697 75.3489 20.6148 75.3096 20.8502C75.2704 21.0659 75.2116 21.2816 75.1331 21.4974C75.4469 21.9092 75.7019 22.3603 75.898 22.8506C76.0941 23.3213 76.1922 23.8018 76.1922 24.2921V28.7637C76.1922 29.5482 75.9961 30.2641 75.6038 30.9113C75.2116 31.5389 74.6919 32.0488 74.0446 32.441C73.417 32.8137 72.711 33 71.9265 33H55.0109ZM59.4236 28.7343H71.7206C71.7794 28.7343 71.8186 28.7245 71.8383 28.7049C71.8775 28.6657 71.8971 28.6166 71.8971 28.5578V24.5275C71.8971 24.4882 71.8775 24.449 71.8383 24.4098C71.8186 24.3706 71.7794 24.351 71.7206 24.351H59.4236C59.3648 24.351 59.3158 24.3706 59.2766 24.4098C59.2569 24.449 59.2471 24.4882 59.2471 24.5275V28.5578C59.2471 28.6166 59.2569 28.6657 59.2766 28.7049C59.3158 28.7245 59.3648 28.7343 59.4236 28.7343ZM59.4236 20.0853H70.8969C70.9361 20.0853 70.9753 20.0755 71.0145 20.0559C71.0538 20.0166 71.0734 19.9774 71.0734 19.9382V16.2609C71.0734 16.202 71.0538 16.1628 71.0145 16.1432C70.9753 16.104 70.9361 16.0844 70.8969 16.0844H59.4236C59.3648 16.0844 59.3158 16.104 59.2766 16.1432C59.2569 16.1628 59.2471 16.202 59.2471 16.2609V19.9382C59.2471 19.9774 59.2569 20.0166 59.2766 20.0559C59.3158 20.0755 59.3648 20.0853 59.4236 20.0853ZM86.5564 33C85.7719 33 85.0561 32.8137 84.4089 32.441C83.7813 32.0488 83.2713 31.5389 82.8791 30.9113C82.5065 30.2641 82.3201 29.5482 82.3201 28.7637V16.0549C82.3201 15.2704 82.5065 14.5644 82.8791 13.9368C83.2713 13.2896 83.7813 12.7797 84.4089 12.407C85.0561 12.0148 85.7719 11.8187 86.5564 11.8187H99.2652C100.03 11.8187 100.726 12.0148 101.354 12.407C102.001 12.7797 102.521 13.2896 102.913 13.9368C103.305 14.5644 103.501 15.2704 103.501 16.0549V28.7637C103.501 29.5482 103.305 30.2641 102.913 30.9113C102.521 31.5389 102.001 32.0488 101.354 32.441C100.726 32.8137 100.03 33 99.2652 33H86.5564ZM86.7329 28.7343H99.0298C99.0887 28.7343 99.1279 28.7245 99.1475 28.7049C99.1867 28.6657 99.2064 28.6166 99.2064 28.5578V16.2609C99.2064 16.202 99.1867 16.1628 99.1475 16.1432C99.1279 16.104 99.0887 16.0844 99.0298 16.0844H86.7329C86.6741 16.0844 86.625 16.104 86.5858 16.1432C86.5662 16.1628 86.5564 16.202 86.5564 16.2609V28.5578C86.5564 28.6166 86.5662 28.6657 86.5858 28.7049C86.625 28.7245 86.6741 28.7343 86.7329 28.7343ZM113.957 33C113.172 33 112.456 32.8137 111.809 32.441C111.182 32.0488 110.672 31.5389 110.279 30.9113C109.907 30.2641 109.72 29.5482 109.72 28.7637V16.0549C109.72 15.2704 109.907 14.5644 110.279 13.9368C110.672 13.2896 111.182 12.7797 111.809 12.407C112.456 12.0148 113.172 11.8187 113.957 11.8187H130.843V16.0844H114.957C114.643 16.0844 114.398 16.1726 114.221 16.3491C114.045 16.506 113.957 16.7512 113.957 17.0846V27.7341C113.957 28.0479 114.045 28.293 114.221 28.4695C114.398 28.6461 114.643 28.7343 114.957 28.7343H130.843V33H113.957ZM136.948 33V16.0549C136.948 15.2704 137.135 14.5644 137.507 13.9368C137.9 13.2896 138.409 12.7797 139.037 12.407C139.684 12.0148 140.4 11.8187 141.185 11.8187H153.864C154.648 11.8187 155.355 12.0148 155.982 12.407C156.629 12.7797 157.149 13.2896 157.541 13.9368C157.934 14.5644 158.13 15.2704 158.13 16.0549V33H153.835V26.0278H141.185V33H136.948ZM141.185 21.7915H153.835V16.2609C153.835 16.202 153.815 16.1628 153.776 16.1432C153.756 16.104 153.717 16.0844 153.658 16.0844H141.361C141.302 16.0844 141.253 16.104 141.214 16.1432C141.194 16.1628 141.185 16.202 141.185 16.2609V21.7915ZM171.874 33V16.0844H163.402V11.8187H184.583V16.0844H176.14V33H171.874ZM189.821 33V11.8187H209.355V16.0844H194.116V20.2618H206.384V24.5569H194.116V28.7343H209.355V33H189.821Z';
+
+const WORDMARK_RATIO = 211 / 45;
+
 export default function Logo({
   theme = 'light',
   size = 24,
@@ -21,42 +40,63 @@ export default function Logo({
   style = {},
 }) {
   const dark = theme === 'dark';
-  // On the Flight Plan surface the bracket was #565D52 — a muted grey-green
-  // that all but disappeared against #0d2418, leaving the mark looking like a
-  // floating hook. Cream at 65% reads as a bracket without competing with the
-  // wordmark, and the hook takes the accent green.
-  const bracket = dark ? 'rgba(242, 236, 219, 0.65)' : '#B0A79A';
-  const hook = accent || (dark ? '#8fd6a3' : '#1f7a4d');
-  const word = dark ? '#f2ecdb' : '#221c15';
+  const ink = dark ? '#f2ecdb' : '#221c15';
+
+  if (mark) {
+    // Bracketed [J] for collapsed rails. On the dark surface the original
+    // #565D52 bracket all but vanished, so it is cream at 65% instead.
+    const bracket = dark ? 'rgba(242, 236, 219, 0.65)' : '#B0A79A';
+    const hook = accent || (dark ? '#8fd6a3' : '#1f7a4d');
+
+    return (
+      <span
+        className={className}
+        role="img"
+        aria-label="Jobocate"
+        style={{ display: 'inline-flex', alignItems: 'center', lineHeight: 1, ...style }}
+      >
+        <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <path
+            d="M10.5 5H6.5a1.5 1.5 0 0 0-1.5 1.5v19A1.5 1.5 0 0 0 6.5 27h4"
+            style={{ stroke: bracket }}
+            strokeWidth="2.4"
+            strokeLinecap="round"
+          />
+          <path
+            d="M21.5 5h4A1.5 1.5 0 0 1 27 6.5v19a1.5 1.5 0 0 1-1.5 1.5h-4"
+            style={{ stroke: bracket }}
+            strokeWidth="2.4"
+            strokeLinecap="round"
+          />
+          {/* stroke via style, not the SVG attribute: a presentation attribute
+              does not resolve var(), and callers pass design tokens here. */}
+          <path
+            d="M19 8v9.8a4.6 4.6 0 0 1-9.2 0"
+            style={{ stroke: hook }}
+            strokeWidth="2.8"
+            strokeLinecap="round"
+          />
+        </svg>
+      </span>
+    );
+  }
 
   return (
     <span
       className={className}
       role="img"
       aria-label="Jobocate"
-      style={{ display: 'inline-flex', alignItems: 'center', gap: 9, lineHeight: 1, ...style }}
+      style={{ display: 'inline-flex', alignItems: 'center', lineHeight: 1, color: ink, ...style }}
     >
-      <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
-        <path d="M10.5 5H6.5a1.5 1.5 0 0 0-1.5 1.5v19A1.5 1.5 0 0 0 6.5 27h4" stroke={bracket} strokeWidth="2.4" strokeLinecap="round" />
-        <path d="M21.5 5h4A1.5 1.5 0 0 1 27 6.5v19a1.5 1.5 0 0 1-1.5 1.5h-4" stroke={bracket} strokeWidth="2.4" strokeLinecap="round" />
-        <path d="M19 8v9.8a4.6 4.6 0 0 1-9.2 0" stroke={hook} strokeWidth="2.8" strokeLinecap="round" />
+      <svg
+        height={size}
+        width={Math.round(size * WORDMARK_RATIO)}
+        viewBox="0 0 211 45"
+        fill="none"
+        aria-hidden="true"
+      >
+        <path d={WORDMARK_PATH} fill="currentColor" />
       </svg>
-      {!mark && (
-        <span
-          style={{
-            // Sans, not mono. The mono wordmark read as a terminal string next
-            // to the display serif headings and sat visually smaller than its
-            // point size suggested.
-            fontFamily: 'var(--jb-font-sans)',
-            fontWeight: 600,
-            fontSize: Math.round(size * 0.68),
-            letterSpacing: '-0.02em',
-            color: word,
-          }}
-        >
-          jobocate
-        </span>
-      )}
     </span>
   );
 }
