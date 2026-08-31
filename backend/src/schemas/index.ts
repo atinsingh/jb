@@ -31,5 +31,3 @@ export {
 // Export from usage-record
 export * from './usage-record.schema';
 
-// Export from refresh-token
-export * from './refresh-token.schema';
