@@ -218,9 +218,9 @@ export default function AppOnboarding() {
           display: 'flex',
           flexDirection: 'column',
           minHeight: '100vh',
-          background: 'var(--jb-a-rail)',
-          color: 'var(--jb-a-ink)',
-          fontFamily: 'var(--jb-font-sans)',
+          background: 'var(--jb-v3-rail)',
+          color: 'var(--jb-v3-fg)',
+          fontFamily: 'var(--jb-v3-font-display)',
         }}
       >
         {/* ── HEADER: logo + the three-step tracker ─────────────────────── */}
@@ -233,13 +233,13 @@ export default function AppOnboarding() {
             rowGap: 10,
             minHeight: 64,
             padding: '12px clamp(16px, 4vw, 36px)',
-            background: 'var(--jb-a-card)',
-            borderBottom: '1px solid var(--jb-a-line)',
+            background: 'var(--jb-v3-card)',
+            borderBottom: '1px solid var(--jb-v3-line)',
             flexShrink: 0,
           }}
         >
           <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 9, textDecoration: 'none', color: 'inherit' }}>
-            <Logo size={21} accent="var(--jb-a-accent)" />
+            <Logo size={21} accent="var(--jb-v3-accent)" />
           </Link>
 
           <span style={{ flex: 1 }} />
@@ -274,20 +274,20 @@ export default function AppOnboarding() {
                         width: 20,
                         height: 20,
                         borderRadius: '50%',
-                        border: `1.5px solid ${done || here ? 'var(--jb-a-accent)' : 'var(--jb-a-line-strong)'}`,
-                        background: done ? 'var(--jb-a-accent)' : 'var(--jb-a-card)',
-                        color: done ? 'var(--jb-a-accent-ink)' : here ? 'var(--jb-a-accent)' : 'var(--jb-a-ink-warm)',
+                        border: `1.5px solid ${done || here ? 'var(--jb-v3-accent)' : 'var(--jb-v3-line-2)'}`,
+                        background: done ? 'var(--jb-v3-accent)' : 'var(--jb-v3-card)',
+                        color: done ? 'var(--jb-v3-accent-ink)' : here ? 'var(--jb-v3-accent)' : 'var(--jb-v3-fg-3)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontFamily: 'var(--jb-font-mono)',
+                        fontFamily: 'var(--jb-v3-font-mono)',
                         fontSize: 11,
                         fontWeight: 600,
                       }}
                     >
                       {done ? '✓' : i + 1}
                     </span>
-                    <span style={{ fontSize: 13, fontWeight: here ? 600 : 500, color: here ? 'var(--jb-a-ink)' : 'var(--jb-a-ink-2)' }}>
+                    <span style={{ fontSize: 13, fontWeight: here ? 600 : 500, color: here ? 'var(--jb-v3-fg)' : 'var(--jb-v3-fg-2)' }}>
                       {label}
                     </span>
                   </button>
@@ -304,16 +304,16 @@ export default function AppOnboarding() {
               <h1
                 style={{
                   margin: 0,
-                  fontFamily: 'var(--jb-font-display)',
+                  fontFamily: 'var(--jb-v3-font-display)',
                   fontWeight: 400,
-                  fontSize: 'var(--jb-a-display-sm)',
+                  fontSize: 'var(--jb-v3-display-sm)',
                   lineHeight: 1.05,
                   letterSpacing: '-0.02em',
                 }}
               >
                 {HEADS[step].h}
               </h1>
-              <p style={{ margin: 0, fontSize: 16.5, lineHeight: 1.5, color: 'var(--jb-a-ink-2)', maxWidth: '52ch' }}>
+              <p style={{ margin: 0, fontSize: 16.5, lineHeight: 1.5, color: 'var(--jb-v3-fg-2)', maxWidth: '52ch' }}>
                 {HEADS[step].s}
               </p>
             </div>
@@ -346,18 +346,18 @@ export default function AppOnboarding() {
                       gap: 12,
                       height: 280,
                       width: '100%',
-                      border: '1.5px dashed var(--jb-a-line-dashed)',
-                      borderRadius: 14,
-                      background: 'var(--jb-a-card)',
+                      border: '1.5px dashed var(--jb-v3-line-dashed)',
+                      borderRadius: 2,
+                      background: 'var(--jb-v3-card)',
                       fontFamily: 'inherit',
                       color: 'inherit',
                       cursor: 'pointer',
                     }}
                   >
-                    <span style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 30 }}>
+                    <span style={{ fontFamily: 'var(--jb-v3-font-display)', fontWeight: 600, letterSpacing: '-0.04em', fontSize: 30 }}>
                       Drop your résumé here
                     </span>
-                    <span style={{ fontSize: 14.5, color: 'var(--jb-a-ink-3)' }}>
+                    <span style={{ fontSize: 14.5, color: 'var(--jb-v3-fg-3)' }}>
                       PDF or DOCX, up to 10 MB. We read it once to fill your profile.
                     </span>
                     <span
@@ -366,9 +366,9 @@ export default function AppOnboarding() {
                         alignItems: 'center',
                         height: 42,
                         padding: '0 22px',
-                        borderRadius: 999,
-                        background: 'var(--jb-a-accent)',
-                        color: 'var(--jb-a-accent-ink)',
+                        borderRadius: 2,
+                        background: 'var(--jb-v3-accent)',
+                        color: 'var(--jb-v3-accent-ink)',
                         fontSize: 14.5,
                         fontWeight: 600,
                         marginTop: 6,
@@ -384,16 +384,16 @@ export default function AppOnboarding() {
                       alignItems: 'center',
                       gap: 14,
                       padding: '18px 20px',
-                      background: 'var(--jb-a-card)',
-                      border: '1px solid var(--jb-a-line)',
-                      borderRadius: 14,
+                      background: 'var(--jb-v3-card)',
+                      border: '1px solid var(--jb-v3-line)',
+                      borderRadius: 2,
                     }}
                   >
                     <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
                       <span style={{ fontSize: 15.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {fileName || 'Your résumé'}
                       </span>
-                      <span style={{ fontSize: 13.5, color: 'var(--jb-a-ink-3)' }}>
+                      <span style={{ fontSize: 13.5, color: 'var(--jb-v3-fg-3)' }}>
                         {parsing ? 'Reading it now…' : parseError ? parseError : `${fileSize} · read and ready`}
                       </span>
                     </span>
@@ -403,9 +403,9 @@ export default function AppOnboarding() {
                   </div>
                 )}
 
-                <span style={{ fontSize: 14.5, color: 'var(--jb-a-ink-3)' }}>
+                <span style={{ fontSize: 14.5, color: 'var(--jb-v3-fg-3)' }}>
                   No résumé yet?{' '}
-                  <Link href="/app/resume" style={{ color: 'var(--jb-a-accent)', fontWeight: 600, textDecoration: 'none' }}>
+                  <Link href="/app/resume" style={{ color: 'var(--jb-v3-accent)', fontWeight: 600, textDecoration: 'none' }}>
                     Start from a blank one
                   </Link>{' '}
                   — the builder walks you through it.
@@ -431,12 +431,12 @@ export default function AppOnboarding() {
                       style={{
                         height: 50,
                         padding: '0 14px',
-                        border: '1px solid var(--jb-a-line-strong)',
-                        borderRadius: 9,
-                        background: 'var(--jb-a-card)',
+                        border: '1px solid var(--jb-v3-line-2)',
+                        borderRadius: 2,
+                        background: 'var(--jb-v3-card)',
                         fontFamily: 'inherit',
                         fontSize: 15.5,
-                        color: 'var(--jb-a-ink)',
+                        color: 'var(--jb-v3-fg)',
                       }}
                     />
                   </label>
@@ -454,11 +454,11 @@ export default function AppOnboarding() {
                           gap: 8,
                           height: 34,
                           padding: '0 8px 0 13px',
-                          borderRadius: 999,
+                          borderRadius: 2,
                           fontSize: 14,
-                          background: 'var(--jb-a-tint)',
-                          color: 'var(--jb-a-accent)',
-                          border: '1px solid var(--jb-a-tint-line)',
+                          background: 'var(--jb-v3-accent-soft)',
+                          color: 'var(--jb-v3-accent)',
+                          border: '1px solid var(--jb-v3-accent-line)',
                         }}
                       >
                         {s}
@@ -483,12 +483,12 @@ export default function AppOnboarding() {
                         height: 34,
                         width: 130,
                         padding: '0 13px',
-                        borderRadius: 999,
-                        border: '1px dashed var(--jb-a-line-strong)',
-                        background: 'var(--jb-a-card)',
+                        borderRadius: 2,
+                        border: '1px dashed var(--jb-v3-line-2)',
+                        background: 'var(--jb-v3-card)',
                         fontFamily: 'inherit',
                         fontSize: 14,
-                        color: 'var(--jb-a-ink)',
+                        color: 'var(--jb-v3-fg)',
                       }}
                     />
                   </div>
@@ -529,7 +529,7 @@ export default function AppOnboarding() {
                   <span style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
                     <MonoLabel>Base salary floor</MonoLabel>
                     <span style={{ flex: 1 }} />
-                    <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 20, fontWeight: 600 }}>${salary}k</span>
+                    <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 20, fontWeight: 600 }}>${salary}k</span>
                   </span>
                   <input
                     type="range"
@@ -539,18 +539,18 @@ export default function AppOnboarding() {
                     value={salary}
                     aria-label="Minimum base salary in thousands"
                     onChange={(e) => setSalary(Number(e.target.value))}
-                    style={{ width: '100%', accentColor: 'var(--jb-a-accent)' }}
+                    style={{ width: '100%', accentColor: 'var(--jb-v3-accent)' }}
                   />
                 </div>
 
                 {/* The consent panel. It is the one tinted block on the screen
                     because it is the one place the user is handing over a
                     standing permission — the emphasis is the point. */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '18px 20px', background: 'var(--jb-a-tint)', borderRadius: 11 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '18px 20px', background: 'var(--jb-v3-accent-soft)', borderRadius: 2 }}>
                   <Toggle size="lg" checked={autoApply} label="Draft applications for my best matches" onChange={() => setAutoApply((v) => !v)} />
                   <span style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <span style={{ fontSize: 15, fontWeight: 600 }}>Draft applications for my best matches</span>
-                    <span style={{ fontSize: 14, lineHeight: 1.45, color: 'var(--jb-a-tint-ink)' }}>
+                    <span style={{ fontSize: 14, lineHeight: 1.45, color: 'var(--jb-v3-accent-soft-ink)' }}>
                       Nothing sends until you approve it. You can change the limits or switch this off any time.
                     </span>
                   </span>
@@ -567,16 +567,16 @@ export default function AppOnboarding() {
             alignItems: 'center',
             gap: 12,
             padding: '18px clamp(20px, 4vw, 44px)',
-            background: 'var(--jb-a-card)',
-            borderTop: '1px solid var(--jb-a-line)',
+            background: 'var(--jb-v3-card)',
+            borderTop: '1px solid var(--jb-v3-line)',
             flexShrink: 0,
           }}
         >
-          <Button variant="quiet" onClick={back} disabled={step === 0} style={{ color: step === 0 ? 'var(--jb-a-ink-faint)' : 'var(--jb-a-ink-2)', fontSize: 14.5 }}>
+          <Button variant="quiet" onClick={back} disabled={step === 0} style={{ color: step === 0 ? 'var(--jb-v3-fg-3)' : 'var(--jb-v3-fg-2)', fontSize: 14.5 }}>
             Back
           </Button>
           <span style={{ flex: 1 }} />
-          <span style={{ fontSize: 14, color: 'var(--jb-a-ink-3)' }}>{stepLabel}</span>
+          <span style={{ fontSize: 14, color: 'var(--jb-v3-fg-3)' }}>{stepLabel}</span>
           <Button
             onClick={isPrefs ? finish : next}
             disabled={!canContinue || saving}

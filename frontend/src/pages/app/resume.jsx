@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import Head from 'next/head';
 import { motion } from 'framer-motion';
-import AppSidebar from '@/components/app/AppSidebar';
+import AppTopNav from '@/components/app/AppTopNav';
 import { uploadResume } from '@/services/api';
 import {
   getResumeData,
@@ -305,33 +305,33 @@ export default function AppResume() {
           height: 8px;
         }
         #jbapp ::-webkit-scrollbar-thumb {
-          background: var(--jb-a-line);
-          border-radius: 8px;
+          background: var(--jb-v3-line);
+          border-radius: 2px;
         }
         #jbapp input:focus,
         #jbapp textarea:focus {
           outline: none;
-          border-color: var(--jb-a-accent);
-          box-shadow: 0 0 0 3px var(--jb-a-tint);
+          border-color: var(--jb-v3-accent);
+          box-shadow: 0 0 0 3px var(--jb-v3-accent-soft);
         }
         #jbapp .jb-btn {
           transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease,
             box-shadow 0.16s ease;
         }
         #jbapp .jb-btn:hover {
-          background: var(--jb-a-control);
+          background: var(--jb-v3-control);
         }
         #jbapp .jb-btn:active {
           transform: translateY(1px);
         }
         #jbapp .jb-btn-green {
           transition: background 0.16s ease, transform 0.16s ease, box-shadow 0.2s ease;
-          box-shadow: 0 8px 20px -10px var(--jb-a-tint-line);
+          box-shadow: 0 8px 20px -10px var(--jb-v3-accent-line);
         }
         #jbapp .jb-btn-green:hover {
-          background: var(--jb-a-accent-hover);
+          background: var(--jb-v3-accent-hover);
           transform: translateY(-1px);
-          box-shadow: 0 12px 26px -10px var(--jb-a-tint-line);
+          box-shadow: 0 12px 26px -10px var(--jb-v3-accent-line);
         }
         #jbapp .jb-sec {
           transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease,
@@ -339,31 +339,31 @@ export default function AppResume() {
         }
         #jbapp .jb-sec:hover {
           transform: translateY(-2px);
-          box-shadow: 0 var(--jb-a-shadow-lift);
+          box-shadow: 0 var(--jb-v3-shadow-lift);
         }
         #jbapp .jb-add {
           transition: border-color 0.16s ease, color 0.16s ease, background 0.16s ease;
         }
         #jbapp .jb-add:hover {
-          border-color: var(--jb-a-accent);
-          color: var(--jb-a-accent);
-          background: var(--jb-a-tint);
+          border-color: var(--jb-v3-accent);
+          color: var(--jb-v3-accent);
+          background: var(--jb-v3-accent-soft);
         }
         #jbapp .jb-empty {
           transition: border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
           cursor: pointer;
         }
         #jbapp .jb-empty:hover {
-          border-color: var(--jb-a-accent);
-          background: var(--jb-a-tint);
-          color: var(--jb-a-accent);
+          border-color: var(--jb-v3-accent);
+          background: var(--jb-v3-accent-soft);
+          color: var(--jb-v3-accent);
         }
         #jbapp .jb-page {
           transition: box-shadow 0.3s ease;
         }
         #jbapp .jb-page:hover {
-          box-shadow: 0 var(--jb-a-shadow-paper),
-            0 var(--jb-a-shadow-lift);
+          box-shadow: 0 var(--jb-v3-shadow-paper),
+            0 var(--jb-v3-shadow-lift);
         }
         @keyframes jbskel {
           0% {
@@ -385,7 +385,7 @@ export default function AppResume() {
           }
           #jbapp .rb-editor-panel {
             border-right: none !important;
-            border-bottom: 1px solid var(--jb-a-line) !important;
+            border-bottom: 1px solid var(--jb-v3-line) !important;
           }
         }
       `}</style>
@@ -393,41 +393,40 @@ export default function AppResume() {
       <div
         id="jbapp"
         style={{
-          display: 'flex',
           minHeight: '100vh',
-          background: 'var(--jb-a-stage-deep)',
-          fontFamily: 'var(--jb-font-sans)',
-          color: 'var(--jb-a-ink)',
+          background: 'var(--jb-v3-sunk)',
+          fontFamily: 'var(--jb-v3-font-display)',
+          color: 'var(--jb-v3-fg)',
         }}
       >
-        <AppSidebar active="resume" />
+        <AppTopNav />
 
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           {/* HEADER */}
           <header
             style={{
-              position: 'sticky',
-              top: 0,
-              zIndex: 20,
+              position: 'relative',
+              
+              
               display: 'flex',
               alignItems: 'center',
               flexWrap: 'wrap',
               rowGap: 10,
               gap: 16,
               padding: '15px 32px',
-              background: 'var(--jb-a-card)',
+              background: 'var(--jb-v3-card)',
               backdropFilter: 'blur(10px)',
-              borderBottom: '1px solid var(--jb-a-line)',
+              borderBottom: '1px solid var(--jb-v3-line)',
             }}
           >
             <a
               href="/app/resume-library"
               style={{
-                fontFamily: 'var(--jb-font-mono)',
+                fontFamily: 'var(--jb-v3-font-mono)',
                 fontSize: 11.5,
                 letterSpacing: '0.1em',
                 textTransform: 'uppercase',
-                color: 'var(--jb-a-ink-soft)',
+                color: 'var(--jb-v3-fg-2)',
                 textDecoration: 'none',
               }}
               title="Back to My Resumes"
@@ -436,8 +435,8 @@ export default function AppResume() {
             </a>
             {(id.name || id.title) && (
               <>
-                <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: 'var(--jb-a-ink-faint)' }}>·</span>
-                <span style={{ fontSize: 13.5, color: 'var(--jb-a-ink-2)' }}>
+                <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, color: 'var(--jb-v3-fg-3)' }}>·</span>
+                <span style={{ fontSize: 13.5, color: 'var(--jb-v3-fg-2)' }}>
                   {[id.name, id.title].filter(Boolean).join(' — ')}
                 </span>
               </>
@@ -448,9 +447,9 @@ export default function AppResume() {
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 6,
-                fontFamily: 'var(--jb-font-mono)',
+                fontFamily: 'var(--jb-v3-font-mono)',
                 fontSize: 12,
-                color: 'var(--jb-a-ink-warm)',
+                color: 'var(--jb-v3-fg-3)',
               }}
             >
               {/* `idle` used to fall through to "Saved · just now", so a résumé
@@ -465,14 +464,14 @@ export default function AppResume() {
                   borderRadius: '50%',
                   background:
                     saveState === 'error'
-                      ? 'var(--jb-a-offer-ink)'
+                      ? 'var(--jb-v3-warn)'
                       : saveState === 'saving'
-                        ? 'var(--jb-a-status-offer)'
+                        ? 'var(--jb-v3-warn)'
                         : saveState === 'saved'
-                          ? 'var(--jb-a-accent)'
-                          : 'var(--jb-a-ink-faint)',
+                          ? 'var(--jb-v3-accent)'
+                          : 'var(--jb-v3-fg-3)',
                   boxShadow:
-                    saveState === 'saved' ? '0 0 0 3px var(--jb-a-tint)' : 'none',
+                    saveState === 'saved' ? '0 0 0 3px var(--jb-v3-accent-soft)' : 'none',
                 }}
               />
               {saveState === 'saving'
@@ -491,10 +490,10 @@ export default function AppResume() {
                 fontFamily: 'inherit',
                 fontSize: 13.5,
                 fontWeight: 600,
-                color: 'var(--jb-a-ink)',
-                background: 'var(--jb-a-card)',
-                border: '1px solid var(--jb-a-line-strong)',
-                borderRadius: 999,
+                color: 'var(--jb-v3-fg)',
+                background: 'var(--jb-v3-card)',
+                border: '1px solid var(--jb-v3-line-2)',
+                borderRadius: 2,
                 padding: '9px 16px',
                 cursor: 'pointer',
               }}
@@ -517,10 +516,10 @@ export default function AppResume() {
                 fontFamily: 'inherit',
                 fontSize: 13.5,
                 fontWeight: 600,
-                color: 'var(--jb-a-ink)',
-                background: 'var(--jb-a-card)',
-                border: '1px solid var(--jb-a-line-strong)',
-                borderRadius: 999,
+                color: 'var(--jb-v3-fg)',
+                background: 'var(--jb-v3-card)',
+                border: '1px solid var(--jb-v3-line-2)',
+                borderRadius: 2,
                 padding: '9px 16px',
                 cursor: exporting ? 'default' : 'pointer',
                 opacity: exporting ? 0.65 : 1,
@@ -543,10 +542,10 @@ export default function AppResume() {
                 fontFamily: 'inherit',
                 fontSize: 13.5,
                 fontWeight: 700,
-                color: 'var(--jb-a-accent)',
-                background: 'var(--jb-a-accent)',
+                color: 'var(--jb-v3-accent-ink)',
+                background: 'var(--jb-v3-accent)',
                 border: 'none',
-                borderRadius: 999,
+                borderRadius: 2,
                 padding: '9px 16px',
                 cursor: 'pointer',
                 textDecoration: 'none',
@@ -564,12 +563,12 @@ export default function AppResume() {
               style={{
                 margin: '14px 32px 0',
                 padding: '11px 16px',
-                borderRadius: 12,
+                borderRadius: 2,
                 fontSize: 13,
                 fontWeight: 600,
-                background: notice.kind === 'ok' ? 'var(--jb-a-tint)' : 'var(--jb-a-offer-bg)',
-                border: `1px solid ${notice.kind === 'ok' ? 'var(--jb-a-tint-line)' : 'var(--jb-a-warn-line)'}`,
-                color: notice.kind === 'ok' ? 'var(--jb-a-accent)' : 'var(--jb-a-offer-ink)',
+                background: notice.kind === 'ok' ? 'var(--jb-v3-accent-soft)' : 'var(--jb-v3-warn-soft)',
+                border: `1px solid ${notice.kind === 'ok' ? 'var(--jb-v3-accent-line)' : 'var(--jb-v3-warn-line)'}`,
+                color: notice.kind === 'ok' ? 'var(--jb-v3-accent)' : 'var(--jb-v3-warn)',
               }}
             >
               {notice.text}
@@ -602,7 +601,7 @@ export default function AppResume() {
                 initial={{ opacity: 0, x: -14 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-                style={{ borderRight: '1px solid var(--jb-a-line)', padding: '22px 24px', height: '100%' }}
+                style={{ borderRight: '1px solid var(--jb-v3-line)', padding: '22px 24px', height: '100%' }}
               >
                 <RailTabs view={view} setView={setView} />
 
@@ -631,9 +630,9 @@ export default function AppResume() {
                   <div
                     style={{
                       background:
-                        'linear-gradient(180deg,var(--jb-a-card) 0%,var(--jb-a-card) 100%)',
-                      border: '1px solid var(--jb-a-line)',
-                      borderRadius: 16,
+                        'linear-gradient(180deg,var(--jb-v3-card) 0%,var(--jb-v3-card) 100%)',
+                      border: '1px solid var(--jb-v3-line)',
+                      borderRadius: 2,
                       padding: 20,
                       marginBottom: 18,
                     }}
@@ -644,7 +643,7 @@ export default function AppResume() {
                         <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 3 }}>
                           {completeness === 100 ? 'Résumé complete' : 'Résumé strength'}
                         </div>
-                        <div style={{ fontSize: 13, color: 'var(--jb-a-ink-2)' }}>
+                        <div style={{ fontSize: 13, color: 'var(--jb-v3-fg-2)' }}>
                           {completeness === 100
                             ? 'Every core section is filled in.'
                             : `${doneCount} of ${checklist.length} core sections done.`}
@@ -665,9 +664,9 @@ export default function AppResume() {
                               justifyContent: 'center',
                               fontSize: 11,
                               fontWeight: 700,
-                              color: c.done ? 'var(--jb-a-card)' : 'var(--jb-a-ink-faint)',
-                              background: c.done ? 'var(--jb-a-accent)' : 'transparent',
-                              border: c.done ? 'none' : '1.5px solid var(--jb-a-line)',
+                              color: c.done ? 'var(--jb-v3-card)' : 'var(--jb-v3-fg-3)',
+                              background: c.done ? 'var(--jb-v3-accent)' : 'transparent',
+                              border: c.done ? 'none' : '1.5px solid var(--jb-v3-line)',
                             }}
                           >
                             {c.done ? '✓' : ''}
@@ -676,7 +675,7 @@ export default function AppResume() {
                             style={{
                               fontSize: 13,
                               fontWeight: 500,
-                              color: c.done ? 'var(--jb-a-ink-2)' : 'var(--jb-a-ink-soft)',
+                              color: c.done ? 'var(--jb-v3-fg-2)' : 'var(--jb-v3-fg-2)',
                               textDecoration: 'none',
                             }}
                           >
@@ -692,21 +691,21 @@ export default function AppResume() {
                 {data.suggestions.length > 0 && (
                   <div
                     style={{
-                      background: 'var(--jb-a-ink)',
-                      borderRadius: 16,
+                      background: 'var(--jb-v3-fg)',
+                      borderRadius: 2,
                       padding: '18px 20px',
                       marginBottom: 22,
-                      color: 'var(--jb-a-control)',
+                      color: 'var(--jb-v3-control)',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
                       <span
                         style={{
-                          fontFamily: 'var(--jb-font-mono)',
+                          fontFamily: 'var(--jb-v3-font-mono)',
                           fontSize: 11,
                           letterSpacing: '0.1em',
                           textTransform: 'uppercase',
-                          color: 'var(--jb-a-accent)',
+                          color: 'var(--jb-v3-accent)',
                         }}
                       >
                         ✦ AI suggestions
@@ -715,16 +714,16 @@ export default function AppResume() {
                     {data.suggestions.map((s, i) => (
                       <div
                         key={i}
-                        style={{ display: 'flex', gap: 11, padding: '11px 0', borderBottom: '1px solid var(--jb-a-line-strong)' }}
+                        style={{ display: 'flex', gap: 11, padding: '11px 0', borderBottom: '1px solid var(--jb-v3-line-2)' }}
                       >
                         <span
                           style={{
                             flexShrink: 0,
                             width: 20,
                             height: 20,
-                            borderRadius: 6,
-                            background: 'var(--jb-a-tint)',
-                            color: 'var(--jb-a-accent)',
+                            borderRadius: 2,
+                            background: 'var(--jb-v3-accent-soft)',
+                            color: 'var(--jb-v3-accent)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -734,14 +733,14 @@ export default function AppResume() {
                           {s.icon}
                         </span>
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, color: 'var(--jb-a-line)', lineHeight: 1.45 }}>{s.text}</div>
+                          <div style={{ fontSize: 13, color: 'var(--jb-v3-line)', lineHeight: 1.45 }}>{s.text}</div>
                           <button
                             type="button"
                             style={{
                               fontFamily: 'inherit',
                               fontSize: 12,
                               fontWeight: 600,
-                              color: 'var(--jb-a-accent)',
+                              color: 'var(--jb-v3-accent)',
                               background: 'none',
                               border: 'none',
                               padding: '6px 0 0',
@@ -769,7 +768,7 @@ export default function AppResume() {
                   display: 'flex',
                   justifyContent: 'center',
                   background:
-                    'radial-gradient(130% 90% at 50% -10%, var(--jb-a-card) 0%, var(--jb-a-control) 55%, var(--jb-a-line-strong) 100%)',
+                    'radial-gradient(130% 90% at 50% -10%, var(--jb-v3-card) 0%, var(--jb-v3-control) 55%, var(--jb-v3-line-2) 100%)',
                   minHeight: '100%',
                 }}
               >
@@ -782,11 +781,11 @@ export default function AppResume() {
                   style={{
                     width: '100%',
                     maxWidth: 720,
-                    background: 'var(--jb-a-card)',
-                    border: '1px solid var(--jb-a-line)',
-                    borderRadius: 12,
+                    background: 'var(--jb-v3-card)',
+                    border: '1px solid var(--jb-v3-line)',
+                    borderRadius: 2,
                     boxShadow:
-                      '0 var(--jb-a-shadow-paper), 0 var(--jb-a-shadow-lift)',
+                      '0 var(--jb-v3-shadow-paper), 0 var(--jb-v3-shadow-lift)',
                     overflow: 'hidden',
                   }}
                 >
@@ -802,7 +801,7 @@ export default function AppResume() {
 }
 
 /* ------------------------------------------------------- ui helpers --- */
-const MONO = 'var(--jb-font-mono)';
+const MONO = 'var(--jb-v3-font-mono)';
 
 function RailTabs({ view, setView }) {
   const tab = (key, label) => (
@@ -817,18 +816,18 @@ function RailTabs({ view, setView }) {
         fontWeight: 700,
         border: 'none',
         cursor: 'pointer',
-        borderRadius: 8,
+        borderRadius: 2,
         transition: 'background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease',
-        background: view === key ? 'var(--jb-a-card)' : 'transparent',
-        color: view === key ? 'var(--jb-a-ink)' : 'var(--jb-a-ink-warm)',
-        boxShadow: view === key ? '0 var(--jb-a-shadow-lift)' : 'none',
+        background: view === key ? 'var(--jb-v3-card)' : 'transparent',
+        color: view === key ? 'var(--jb-v3-fg)' : 'var(--jb-v3-fg-3)',
+        boxShadow: view === key ? '0 var(--jb-v3-shadow-lift)' : 'none',
       }}
     >
       {label}
     </button>
   );
   return (
-    <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--jb-a-control)', borderRadius: 11, marginBottom: 18 }}>
+    <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--jb-v3-control)', borderRadius: 2, marginBottom: 18 }}>
       {tab('edit', '✎  Edit')}
       {tab('design', '◈  Design')}
     </div>
@@ -843,7 +842,7 @@ function GroupLabel({ children }) {
         fontSize: 11,
         letterSpacing: '0.1em',
         textTransform: 'uppercase',
-        color: 'var(--jb-a-ink-soft)',
+        color: 'var(--jb-v3-fg-2)',
         margin: '4px 0 11px',
       }}
     >
@@ -871,11 +870,11 @@ function DesignPanel({ design, onChange }) {
             >
               <div
                 style={{
-                  borderRadius: 10,
+                  borderRadius: 2,
                   overflow: 'hidden',
-                  background: 'var(--jb-a-card)',
-                  border: `2px solid ${sel ? t.accent : 'var(--jb-a-line)'}`,
-                  boxShadow: sel ? `0 0 0 3px ${t.accentSoft}, 0 var(--jb-a-shadow-lift)` : '0 var(--jb-a-shadow-lift)',
+                  background: 'var(--jb-v3-card)',
+                  border: `2px solid ${sel ? t.accent : 'var(--jb-v3-line)'}`,
+                  boxShadow: sel ? `0 0 0 3px ${t.accentSoft}, 0 var(--jb-v3-shadow-lift)` : '0 var(--jb-v3-shadow-lift)',
                   transition: 'border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease',
                   transform: sel ? 'translateY(-1px)' : 'none',
                 }}
@@ -883,10 +882,10 @@ function DesignPanel({ design, onChange }) {
                 <Thumb theme={t} />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 7 }}>
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: sel ? 'var(--jb-a-ink)' : 'var(--jb-a-ink-2)' }}>{tpl.name}</span>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: sel ? 'var(--jb-v3-fg)' : 'var(--jb-v3-fg-2)' }}>{tpl.name}</span>
                 {sel && <span style={{ color: t.accent, fontSize: 12 }}>✓</span>}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--jb-a-ink-soft)', lineHeight: 1.3 }}>{tpl.blurb}</div>
+              <div style={{ fontSize: 11, color: 'var(--jb-v3-fg-2)', lineHeight: 1.3 }}>{tpl.blurb}</div>
             </button>
           );
         })}
@@ -909,8 +908,8 @@ function DesignPanel({ design, onChange }) {
                 borderRadius: '50%',
                 background: a.color,
                 cursor: 'pointer',
-                border: '2px solid var(--jb-a-card)',
-                boxShadow: sel ? `0 0 0 2px ${a.color}` : '0 0 0 1px var(--jb-a-line)',
+                border: '2px solid var(--jb-v3-card)',
+                boxShadow: sel ? `0 0 0 2px ${a.color}` : '0 0 0 1px var(--jb-v3-line)',
                 transition: 'transform 0.14s ease, box-shadow 0.14s ease',
                 transform: sel ? 'scale(1.12)' : 'none',
               }}
@@ -936,16 +935,16 @@ function DesignPanel({ design, onChange }) {
                 width: '100%',
                 padding: '10px 13px',
                 marginBottom: 7,
-                borderRadius: 10,
+                borderRadius: 2,
                 cursor: 'pointer',
-                background: sel ? 'var(--jb-a-card)' : 'transparent',
-                border: `1px solid ${sel ? t.accent : 'var(--jb-a-line)'}`,
+                background: sel ? 'var(--jb-v3-card)' : 'transparent',
+                border: `1px solid ${sel ? t.accent : 'var(--jb-v3-line)'}`,
                 boxShadow: sel ? `0 0 0 2px ${t.accentSoft}` : 'none',
                 transition: 'border-color 0.16s ease, box-shadow 0.16s ease',
               }}
             >
-              <span style={{ fontFamily: f.heading, fontSize: 17, fontWeight: 500, color: 'var(--jb-a-ink)' }}>{f.name}</span>
-              <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '0.04em', color: 'var(--jb-a-ink-soft)' }}>{f.tag}</span>
+              <span style={{ fontFamily: f.heading, fontSize: 17, fontWeight: 500, color: 'var(--jb-v3-fg)' }}>{f.name}</span>
+              <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '0.04em', color: 'var(--jb-v3-fg-2)' }}>{f.tag}</span>
             </button>
           );
         })}
@@ -953,7 +952,7 @@ function DesignPanel({ design, onChange }) {
 
       {/* DENSITY */}
       <GroupLabel>Density</GroupLabel>
-      <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--jb-a-control)', borderRadius: 10 }}>
+      <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--jb-v3-control)', borderRadius: 2 }}>
         {DENSITIES.map((d) => {
           const sel = design.densityId === d.id;
           return (
@@ -968,11 +967,11 @@ function DesignPanel({ design, onChange }) {
                 fontSize: 12,
                 fontWeight: 600,
                 border: 'none',
-                borderRadius: 7,
+                borderRadius: 2,
                 cursor: 'pointer',
-                background: sel ? 'var(--jb-a-card)' : 'transparent',
-                color: sel ? 'var(--jb-a-ink)' : 'var(--jb-a-ink-warm)',
-                boxShadow: sel ? '0 var(--jb-a-shadow-lift)' : 'none',
+                background: sel ? 'var(--jb-v3-card)' : 'transparent',
+                color: sel ? 'var(--jb-v3-fg)' : 'var(--jb-v3-fg-3)',
+                boxShadow: sel ? '0 var(--jb-v3-shadow-lift)' : 'none',
                 transition: 'background 0.16s ease, color 0.16s ease',
               }}
             >
@@ -996,16 +995,16 @@ function ScoreRing({ value, label }) {
       <span style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
         <span
           style={{
-            fontFamily: 'var(--jb-font-display)',
+            fontFamily: 'var(--jb-v3-font-display)',
             fontWeight: 400,
             fontSize: 38,
             lineHeight: 1,
-            color: 'var(--jb-a-accent)',
+            color: 'var(--jb-v3-accent)',
           }}
         >
           {v}
         </span>
-        <span style={{ fontSize: 14, color: 'var(--jb-a-ink-2)' }}>{label || 'ATS score'}</span>
+        <span style={{ fontSize: 14, color: 'var(--jb-v3-fg-2)' }}>{label || 'ATS score'}</span>
       </span>
       <span
         role="progressbar"
@@ -1013,7 +1012,7 @@ function ScoreRing({ value, label }) {
         aria-valuemin={0}
         aria-valuemax={100}
         aria-label={label || 'ATS score'}
-        style={{ display: 'block', height: 4, borderRadius: 2, background: 'var(--jb-a-line-soft)' }}
+        style={{ display: 'block', height: 4, borderRadius: 2, background: 'var(--jb-v3-line)' }}
       >
         <span
           style={{
@@ -1021,7 +1020,7 @@ function ScoreRing({ value, label }) {
             width: `${v}%`,
             height: '100%',
             borderRadius: 2,
-            background: 'var(--jb-a-accent)',
+            background: 'var(--jb-v3-accent)',
             transition: 'width 0.4s ease',
           }}
         />
@@ -1087,7 +1086,7 @@ function ContentEditor({ data, onChange }) {
 
       <EditGroup label="Experience" action={<button type="button" onClick={addRole} style={addBtn}>+ Add role</button>}>
         {(data.experience || []).length === 0 && (
-          <div style={{ fontSize: 12.5, color: 'var(--jb-a-ink-faint)' }}>No roles yet — add your work experience.</div>
+          <div style={{ fontSize: 12.5, color: 'var(--jb-v3-fg-3)' }}>No roles yet — add your work experience.</div>
         )}
         {(data.experience || []).map((e, i) => (
           <div key={i} style={expCard}>
@@ -1102,7 +1101,7 @@ function ContentEditor({ data, onChange }) {
             <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
               {(e.bullets || []).map((b, bi) => (
                 <div key={bi} style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
-                  <span style={{ color: 'var(--jb-a-accent)', marginTop: 9 }}>▪</span>
+                  <span style={{ color: 'var(--jb-v3-accent)', marginTop: 9 }}>▪</span>
                   <textarea value={b} onChange={(ev) => setBullet(i, bi, ev.target.value)} rows={1} placeholder="Achievement / impact" style={{ ...eInp, resize: 'vertical', minHeight: 34 }} />
                   <button type="button" onClick={() => removeBullet(i, bi)} style={iconBtn}>×</button>
                 </div>
@@ -1120,7 +1119,7 @@ function EditGroup({ label, action, children }) {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--jb-a-ink-soft)' }}>{label}</span>
+        <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--jb-v3-fg-2)' }}>{label}</span>
         {action}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{children}</div>
@@ -1131,7 +1130,7 @@ function EditGroup({ label, action, children }) {
 function EInput({ label, value, onChange, placeholder }) {
   return (
     <label style={{ display: 'block' }}>
-      {label && <span style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: 'var(--jb-a-ink-warm)', marginBottom: 4 }}>{label}</span>}
+      {label && <span style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: 'var(--jb-v3-fg-3)', marginBottom: 4 }}>{label}</span>}
       <input value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} style={eInp} />
     </label>
   );
@@ -1148,9 +1147,9 @@ function SkillsInput({ skills, onAdd, onRemove }) {
       {skills.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
           {skills.map((s, i) => (
-            <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 500, background: 'var(--jb-a-control)', borderRadius: 6, padding: '4px 8px' }}>
+            <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 500, background: 'var(--jb-v3-control)', borderRadius: 2, padding: '4px 8px' }}>
               {s}
-              <button type="button" onClick={() => onRemove(i)} aria-label={`Remove ${s}`} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--jb-a-ink-warm)', fontSize: 13, lineHeight: 1, padding: 0 }}>×</button>
+              <button type="button" onClick={() => onRemove(i)} aria-label={`Remove ${s}`} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--jb-v3-fg-3)', fontSize: 13, lineHeight: 1, padding: 0 }}>×</button>
             </span>
           ))}
         </div>
@@ -1166,10 +1165,10 @@ function SkillsInput({ skills, onAdd, onRemove }) {
   );
 }
 
-const eInp = { width: '100%', padding: '8px 10px', borderRadius: 9, border: '1px solid var(--jb-a-line)', background: 'var(--jb-a-card)', fontFamily: 'inherit', fontSize: 13, color: 'var(--jb-a-ink)', boxSizing: 'border-box' };
-const addBtn = { fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: 'var(--jb-a-accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 };
-const iconBtn = { border: '1px solid var(--jb-a-line)', background: 'var(--jb-a-card)', borderRadius: 7, cursor: 'pointer', color: 'var(--jb-a-ink-warm)', width: 26, height: 26, flexShrink: 0, fontSize: 15, lineHeight: 1 };
-const expCard = { border: '1px solid var(--jb-a-line)', borderRadius: 12, padding: 12, background: 'var(--jb-a-card)' };
+const eInp = { width: '100%', padding: '8px 10px', borderRadius: 2, border: '1px solid var(--jb-v3-line)', background: 'var(--jb-v3-card)', fontFamily: 'inherit', fontSize: 13, color: 'var(--jb-v3-fg)', boxSizing: 'border-box' };
+const addBtn = { fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: 'var(--jb-v3-accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 };
+const iconBtn = { border: '1px solid var(--jb-v3-line)', background: 'var(--jb-v3-card)', borderRadius: 2, cursor: 'pointer', color: 'var(--jb-v3-fg-3)', width: 26, height: 26, flexShrink: 0, fontSize: 15, lineHeight: 1 };
+const expCard = { border: '1px solid var(--jb-v3-line)', borderRadius: 2, padding: 12, background: 'var(--jb-v3-card)' };
 
 /* ------------------------------------------------------ data mappers --- */
 // Merge a resume-builder document into the view model, keeping sample

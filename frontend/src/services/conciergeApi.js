@@ -1,10 +1,11 @@
 import { API_URL } from '@/config/api';
+import { getAccessToken } from '@/lib/apiClient';
 
 /**
  * Concierge API helpers — CANDIDATE-facing only.
  *
  * Follows the same fetch/auth/error convention as services/api.js:
- *  - reads the JWT from localStorage ('authToken' || 'token')
+ *  - reads the current Supabase access token via lib/apiClient
  *  - attaches Authorization: Bearer <token>
  *  - throws Error(message) on non-2xx responses
  *
@@ -18,15 +19,8 @@ import { API_URL } from '@/config/api';
  * status" endpoint does not yet exist on the backend (backlog).
  */
 
-const getAuthToken = () => {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('authToken') || localStorage.getItem('token');
-  }
-  return null;
-};
-
 const apiCall = async (endpoint, options = {}) => {
-  const token = getAuthToken();
+  const token = await getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,

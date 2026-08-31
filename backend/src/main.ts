@@ -36,17 +36,6 @@ for (const envPath of possibleEnvPaths) {
   if (!result.error && result.parsed) {
     earlyLogger.log(`Loaded .env file from: ${envPath}`);
     earlyLogger.debug(`Environment variables loaded: ${Object.keys(result.parsed).length} variables`);
-    // Log a few key variables to verify (without exposing secrets)
-    if (result.parsed.GOOGLE_CLIENT_ID) {
-      earlyLogger.debug(`GOOGLE_CLIENT_ID: ${result.parsed.GOOGLE_CLIENT_ID.substring(0, 20)}...`);
-    } else {
-      earlyLogger.warn('GOOGLE_CLIENT_ID: not found');
-    }
-    if (result.parsed.GOOGLE_CLIENT_SECRET) {
-      earlyLogger.debug('GOOGLE_CLIENT_SECRET: ***');
-    } else {
-      earlyLogger.warn('GOOGLE_CLIENT_SECRET: not found');
-    }
     envLoaded = true;
     break;
   }

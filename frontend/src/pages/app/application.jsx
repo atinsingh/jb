@@ -4,17 +4,17 @@ import { useEffect, useMemo, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import AppSidebar from '@/components/app/AppSidebar';
+import AppTopNav from '@/components/app/AppTopNav';
 import { appRoute } from '@/components/app/appRoutes';
 import { LoadingState, EmptyState, ErrorState } from '@/components/app/AppStates';
 import { getApplicationById, getApplicationActivity } from '@/services/applicationApi';
 
 /* ---- tone → activity dot styling (ported from dc toneStyle) -------------- */
 function toneStyle(tone) {
-  if (tone === 'green') return { dotBg: '#1FA463', dotBorder: '#1FA463', icon: '✓', iconColor: '#0C2C1C', textColor: '#3A352C' };
-  if (tone === 'mint') return { dotBg: '#1E2D24', dotBorder: '#1E2D24', icon: '✦', iconColor: '#5BD08C', textColor: '#3A352C' };
-  if (tone === 'note') return { dotBg: '#FBEDE4', dotBorder: '#EAD0C4', icon: '✎', iconColor: '#C9622E', textColor: '#1B1A16' };
-  return { dotBg: '#F2ECE0', dotBorder: '#E1D9C9', icon: '•', iconColor: '#A79E8F', textColor: '#5A544A' };
+  if (tone === 'green') return { dotBg: 'var(--jb-v3-accent)', dotBorder: 'var(--jb-v3-accent)', icon: '✓', iconColor: 'var(--jb-v3-accent-ink)', textColor: 'var(--jb-v3-fg-2)' };
+  if (tone === 'mint') return { dotBg: 'var(--jb-v3-ok)', dotBorder: 'var(--jb-v3-ok)', icon: '✦', iconColor: 'var(--jb-v3-ok)', textColor: 'var(--jb-v3-fg-2)' };
+  if (tone === 'note') return { dotBg: 'var(--jb-v3-danger-soft)', dotBorder: 'var(--jb-v3-danger-line)', icon: '✎', iconColor: 'var(--jb-v3-danger)', textColor: 'var(--jb-v3-fg)' };
+  return { dotBg: 'var(--jb-v3-control)', dotBorder: 'var(--jb-v3-line)', icon: '•', iconColor: 'var(--jb-v3-fg-3)', textColor: 'var(--jb-v3-fg-2)' };
 }
 
 /* ---- timeline row → derived visual props (ported from dc map) ------------ */
@@ -28,14 +28,14 @@ function buildTimeline(raw) {
       connector: i < raw.length - 1,
       pad: i < raw.length - 1 ? '24px' : '0',
       mark: done ? '✓' : '',
-      dotBg: done ? '#1FA463' : '#FFFEFB',
-      dotBorder: done ? '#1FA463' : cur ? '#1FA463' : '#D2C9B7',
-      dotRing: cur ? '0 0 0 4px rgba(31,164,99,0.18)' : 'none',
-      markColor: done ? '#0C2C1C' : '#1FA463',
-      lineColor: done ? '#CDE9D6' : '#E6DECF',
+      dotBg: done ? 'var(--jb-v3-accent)' : 'var(--jb-v3-panel)',
+      dotBorder: done ? 'var(--jb-v3-accent)' : cur ? 'var(--jb-v3-accent)' : 'var(--jb-v3-line-2)',
+      dotRing: cur ? '0 0 0 4px color-mix(in srgb, var(--jb-v3-accent) 18%, transparent)' : 'none',
+      markColor: done ? 'var(--jb-v3-accent-ink)' : 'var(--jb-v3-accent)',
+      lineColor: done ? 'var(--jb-v3-accent-line)' : 'var(--jb-v3-line)',
       titleWeight: cur ? 700 : done ? 600 : 500,
-      titleColor: t.state === 'future' ? '#A79E8F' : '#1B1A16',
-      dateColor: cur ? '#157A49' : t.state === 'future' ? '#B5AC9C' : '#8A8378',
+      titleColor: t.state === 'future' ? 'var(--jb-v3-fg-3)' : 'var(--jb-v3-fg)',
+      dateColor: cur ? 'var(--jb-v3-accent)' : t.state === 'future' ? 'var(--jb-v3-fg-3)' : 'var(--jb-v3-fg-3)',
       isCurrent: cur,
       detail: !!t.detail,
       detailText: t.detail || '',
@@ -94,8 +94,8 @@ function mapApplication(app, activityEvents) {
           name: m.name || m.title || 'Document',
           meta: m.meta || m.description || '',
           href: m.href || appRoute(m.type === 'cover_letter' ? 'App Cover Letter.dc.html' : 'App Resume.dc.html'),
-          iconBg: m.type === 'cover_letter' ? '#F4EFE4' : '#EAF6EE',
-          iconColor: m.type === 'cover_letter' ? '#5A544A' : '#157A49',
+          iconBg: m.type === 'cover_letter' ? 'var(--jb-v3-control)' : 'var(--jb-v3-accent-soft)',
+          iconColor: m.type === 'cover_letter' ? 'var(--jb-v3-fg-2)' : 'var(--jb-v3-accent)',
         }))
       : [];
 
@@ -201,14 +201,14 @@ export default function AppApplicationDetail() {
 
   const withdrawLabel = withdrawn ? 'Application withdrawn' : 'Withdraw application';
 
-  const cardLg = { background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18, padding: 26 };
-  const cardSm = { background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 16, padding: 20 };
+  const cardLg = { background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, padding: 26 };
+  const cardSm = { background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, padding: 20 };
   const railLabel = {
-    fontFamily: 'var(--jb-font-mono)',
+    fontFamily: 'var(--jb-v3-font-mono)',
     fontSize: 11,
     letterSpacing: '0.08em',
     textTransform: 'uppercase',
-    color: '#9A9286',
+    color: 'var(--jb-v3-fg-3)',
     marginBottom: 14,
   };
 
@@ -223,14 +223,14 @@ export default function AppApplicationDetail() {
           width: 8px;
         }
         #jbapp ::-webkit-scrollbar-thumb {
-          background: #e1d9c9;
-          border-radius: 8px;
+          background: var(--jb-v3-line);
+          border-radius: 2px;
         }
         #jbapp textarea:focus,
         #jbapp input:focus {
           outline: none;
-          border-color: #1fa463;
-          box-shadow: 0 0 0 3px rgba(31, 164, 99, 0.15);
+          border-color: var(--jb-v3-accent);
+          box-shadow: 0 0 0 3px color-mix(in srgb, var(--jb-v3-accent) 15%, transparent);
         }
         @keyframes rbpop {
           from {
@@ -243,50 +243,49 @@ export default function AppApplicationDetail() {
           }
         }
         #jbapp a.jb-material:hover {
-          border-color: #1fa463 !important;
+          border-color: var(--jb-v3-accent) !important;
         }
         #jbapp button.jb-addnote:hover {
-          background: #1b9159 !important;
+          background: var(--jb-v3-ok) !important;
         }
         #jbapp a.jb-prep:hover {
-          background: #2a2820 !important;
+          background: var(--jb-v3-invert) !important;
         }
         #jbapp button.jb-withdraw:hover {
-          color: #c9622e !important;
+          color: var(--jb-v3-danger) !important;
         }
       `}</style>
 
       <div
         id="jbapp"
         style={{
-          display: 'flex',
           minHeight: '100vh',
-          background: '#F7F3EA',
-          fontFamily: 'var(--jb-font-sans)',
-          color: '#1B1A16',
+          background: 'var(--jb-v3-bg)',
+          fontFamily: 'var(--jb-v3-font-display)',
+          color: 'var(--jb-v3-fg)',
         }}
       >
-        <AppSidebar active="tracker" />
+        <AppTopNav />
 
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           {/* HEADER */}
           <header
             style={{
-              position: 'sticky',
-              top: 0,
-              zIndex: 20,
+              position: 'relative',
+              
+              
               display: 'flex',
               alignItems: 'center',
               gap: 18,
               padding: '15px 32px',
-              background: 'rgba(247,243,234,0.85)',
+              background: 'color-mix(in srgb, var(--jb-v3-bg) 85%, transparent)',
               backdropFilter: 'blur(10px)',
-              borderBottom: '1px solid #E7E0D2',
+              borderBottom: '1px solid var(--jb-v3-line)',
             }}
           >
             <Link
               href={appRoute('App Tracker.dc.html')}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13.5, fontWeight: 600, color: '#5A544A', textDecoration: 'none' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13.5, fontWeight: 600, color: 'var(--jb-v3-fg-2)', textDecoration: 'none' }}
             >
               ← Back to tracker
             </Link>
@@ -294,7 +293,7 @@ export default function AppApplicationDetail() {
             <button
               className="jb-withdraw"
               onClick={() => setWithdrawn(true)}
-              style={{ fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: '#A79E8F', background: 'none', border: 'none', cursor: 'pointer' }}
+              style={{ fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: 'var(--jb-v3-fg-3)', background: 'none', border: 'none', cursor: 'pointer' }}
             >
               {withdrawLabel}
             </button>
@@ -316,9 +315,9 @@ export default function AppApplicationDetail() {
                   width: 62,
                   height: 62,
                   flexShrink: 0,
-                  borderRadius: 15,
-                  background: '#EAF6EE',
-                  color: '#157A49',
+                  borderRadius: 2,
+                  background: 'var(--jb-v3-accent-soft)',
+                  color: 'var(--jb-v3-accent)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -331,31 +330,31 @@ export default function AppApplicationDetail() {
               </Link>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 11, flexWrap: 'wrap', marginBottom: 6 }}>
-                  <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 33, lineHeight: 1, margin: 0 }}>{model.role}</h1>
+                  <h1 style={{ fontFamily: 'var(--jb-v3-font-display)', fontWeight: 600, letterSpacing: '-0.04em', fontSize: 33, lineHeight: 1, margin: 0 }}>{model.role}</h1>
                   <span
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: 6,
-                      fontFamily: 'var(--jb-font-mono)',
+                      fontFamily: 'var(--jb-v3-font-mono)',
                       fontSize: 11,
                       fontWeight: 600,
-                      color: '#157A49',
-                      background: '#EAF6EE',
-                      border: '1px solid #CDE9D6',
+                      color: 'var(--jb-v3-accent)',
+                      background: 'var(--jb-v3-accent-soft)',
+                      border: '1px solid var(--jb-v3-accent-line)',
                       padding: '5px 11px',
-                      borderRadius: 999,
+                      borderRadius: 2,
                     }}
                   >
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#1FA463' }} />
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--jb-v3-accent)' }} />
                     {model.statusLabel}
                   </span>
                 </div>
-                <div style={{ fontSize: 14, color: '#5A544A' }}>
-                  <Link href={appRoute('App Company.dc.html')} style={{ color: '#157A49', fontWeight: 600, textDecoration: 'none' }}>
+                <div style={{ fontSize: 14, color: 'var(--jb-v3-fg-2)' }}>
+                  <Link href={appRoute('App Company.dc.html')} style={{ color: 'var(--jb-v3-accent)', fontWeight: 600, textDecoration: 'none' }}>
                     {model.company}
                   </Link>{' '}
-                  · {model.location} · <span style={{ fontFamily: 'var(--jb-font-mono)', color: '#157A49' }}>{model.salary}</span> · {model.appliedLabel}
+                  · {model.location} · <span style={{ fontFamily: 'var(--jb-v3-font-mono)', color: 'var(--jb-v3-accent)' }}>{model.salary}</span> · {model.appliedLabel}
                 </div>
               </div>
             </div>
@@ -396,14 +395,14 @@ export default function AppApplicationDetail() {
                             {t.isCurrent && (
                               <span
                                 style={{
-                                  fontFamily: 'var(--jb-font-mono)',
+                                  fontFamily: 'var(--jb-v3-font-mono)',
                                   fontSize: 11,
                                   fontWeight: 600,
                                   letterSpacing: '0.04em',
-                                  color: '#0C2C1C',
-                                  background: '#1FA463',
+                                  color: 'var(--jb-v3-accent-ink)',
+                                  background: 'var(--jb-v3-accent)',
                                   padding: '3px 8px',
-                                  borderRadius: 999,
+                                  borderRadius: 2,
                                 }}
                               >
                                 UP NEXT
@@ -411,7 +410,7 @@ export default function AppApplicationDetail() {
                             )}
                           </div>
                           <div style={{ fontSize: 13, color: t.dateColor, marginTop: 3 }}>{t.date}</div>
-                          {t.detail && <div style={{ fontSize: 13, lineHeight: 1.5, color: '#5A544A', marginTop: 6 }}>{t.detailText}</div>}
+                          {t.detail && <div style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--jb-v3-fg-2)', marginTop: 6 }}>{t.detailText}</div>}
                         </div>
                       </div>
                     ))}
@@ -437,10 +436,10 @@ export default function AppApplicationDetail() {
                         flex: 1,
                         fontFamily: 'inherit',
                         fontSize: 14,
-                        color: '#1B1A16',
-                        background: '#FBF8F1',
-                        border: '1px solid #E1D9C9',
-                        borderRadius: 11,
+                        color: 'var(--jb-v3-fg)',
+                        background: 'var(--jb-v3-panel)',
+                        border: '1px solid var(--jb-v3-line)',
+                        borderRadius: 2,
                         padding: '11px 14px',
                       }}
                     />
@@ -452,10 +451,10 @@ export default function AppApplicationDetail() {
                         fontFamily: 'inherit',
                         fontSize: 13.5,
                         fontWeight: 700,
-                        color: '#0C2C1C',
-                        background: '#1FA463',
+                        color: 'var(--jb-v3-accent-ink)',
+                        background: 'var(--jb-v3-accent)',
                         border: 'none',
-                        borderRadius: 11,
+                        borderRadius: 2,
                         padding: '11px 18px',
                         cursor: 'pointer',
                       }}
@@ -484,11 +483,11 @@ export default function AppApplicationDetail() {
                           >
                             {a.icon}
                           </span>
-                          {a.connector && <span style={{ width: 2, flex: 1, minHeight: 18, background: '#EFE8DA' }} />}
+                          {a.connector && <span style={{ width: 2, flex: 1, minHeight: 18, background: 'var(--jb-v3-line)' }} />}
                         </div>
                         <div style={{ paddingBottom: 16, flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 13.5, lineHeight: 1.5, color: a.textColor }}>{a.text}</div>
-                          <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#A79E8F', marginTop: 3 }}>{a.time}</div>
+                          <div style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, color: 'var(--jb-v3-fg-3)', marginTop: 3 }}>{a.time}</div>
                         </div>
                       </div>
                     ))}
@@ -508,21 +507,21 @@ export default function AppApplicationDetail() {
                         alignItems: 'flex-start',
                         gap: 11,
                         padding: 14,
-                        background: '#EAF6EE',
-                        border: '1px solid #CDE9D6',
-                        borderRadius: 13,
+                        background: 'var(--jb-v3-accent-soft)',
+                        border: '1px solid var(--jb-v3-accent-line)',
+                        borderRadius: 2,
                         marginBottom: 16,
                       }}
                     >
-                      <span style={{ color: '#157A49', flexShrink: 0, fontSize: 15 }}>◷</span>
+                      <span style={{ color: 'var(--jb-v3-accent)', flexShrink: 0, fontSize: 15 }}>◷</span>
                       <div>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: '#1F4733' }}>{model.nextStep.title}</div>
-                        <div style={{ fontSize: 13, color: '#1F4733', marginTop: 2 }}>{model.nextStep.when}</div>
-                        <div style={{ fontSize: 12, color: '#5BA46F', marginTop: 2 }}>{model.nextStep.detail}</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--jb-v3-ok)' }}>{model.nextStep.title}</div>
+                        <div style={{ fontSize: 13, color: 'var(--jb-v3-ok)', marginTop: 2 }}>{model.nextStep.when}</div>
+                        <div style={{ fontSize: 12, color: 'var(--jb-v3-ok)', marginTop: 2 }}>{model.nextStep.detail}</div>
                       </div>
                     </div>
                   ) : (
-                    <div style={{ fontSize: 13, color: '#8A8378', marginBottom: 16 }}>No upcoming step scheduled yet.</div>
+                    <div style={{ fontSize: 13, color: 'var(--jb-v3-fg-3)', marginBottom: 16 }}>No upcoming step scheduled yet.</div>
                   )}
                   <Link
                     href={appRoute('App Interview.dc.html')}
@@ -532,12 +531,12 @@ export default function AppApplicationDetail() {
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: 8,
-                      background: '#1B1A16',
-                      color: '#F7F3EA',
+                      background: 'var(--jb-v3-fg)',
+                      color: 'var(--jb-v3-bg)',
                       fontSize: 14,
                       fontWeight: 600,
                       padding: 12,
-                      borderRadius: 11,
+                      borderRadius: 2,
                       textDecoration: 'none',
                       marginBottom: 16,
                     }}
@@ -546,15 +545,15 @@ export default function AppApplicationDetail() {
                   </Link>
 
                   {model.recruiter && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 11, paddingTop: 16, borderTop: '1px solid #F2ECE0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 11, paddingTop: 16, borderTop: '1px solid var(--jb-v3-control)' }}>
                       <span
                         style={{
                           width: 38,
                           height: 38,
                           flexShrink: 0,
                           borderRadius: '50%',
-                          background: '#EAF6EE',
-                          color: '#157A49',
+                          background: 'var(--jb-v3-accent-soft)',
+                          color: 'var(--jb-v3-accent)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -566,22 +565,22 @@ export default function AppApplicationDetail() {
                       </span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13.5, fontWeight: 700 }}>{model.recruiter.name}</div>
-                        <div style={{ fontSize: 12, color: '#8A8378' }}>{model.recruiter.org}</div>
+                        <div style={{ fontSize: 12, color: 'var(--jb-v3-fg-3)' }}>{model.recruiter.org}</div>
                       </div>
                       <Link
                         href={appRoute('App Messages.dc.html')}
                         title="Message"
                         style={{
                           flexShrink: 0,
-                          fontFamily: 'var(--jb-font-mono)',
+                          fontFamily: 'var(--jb-v3-font-mono)',
                           fontSize: 11,
                           fontWeight: 600,
-                          color: '#157A49',
+                          color: 'var(--jb-v3-accent)',
                           textDecoration: 'none',
-                          border: '1px solid #CDE9D6',
-                          background: '#EAF6EE',
+                          border: '1px solid var(--jb-v3-accent-line)',
+                          background: 'var(--jb-v3-accent-soft)',
                           padding: '7px 11px',
-                          borderRadius: 999,
+                          borderRadius: 2,
                         }}
                       >
                         Message
@@ -594,7 +593,7 @@ export default function AppApplicationDetail() {
                 <div style={cardSm}>
                   <div style={railLabel}>Submitted materials</div>
                   {model.materials.length === 0 && (
-                    <div style={{ fontSize: 13, color: '#8A8378' }}>No documents submitted yet.</div>
+                    <div style={{ fontSize: 13, color: 'var(--jb-v3-fg-3)' }}>No documents submitted yet.</div>
                   )}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {model.materials.map((m, i) => (
@@ -607,9 +606,9 @@ export default function AppApplicationDetail() {
                           alignItems: 'center',
                           gap: 12,
                           padding: 13,
-                          background: '#FBF8F1',
-                          border: '1px solid #E6DECF',
-                          borderRadius: 12,
+                          background: 'var(--jb-v3-panel)',
+                          border: '1px solid var(--jb-v3-line)',
+                          borderRadius: 2,
                           textDecoration: 'none',
                         }}
                       >
@@ -618,13 +617,13 @@ export default function AppApplicationDetail() {
                             width: 34,
                             height: 34,
                             flexShrink: 0,
-                            borderRadius: 9,
+                            borderRadius: 2,
                             background: m.iconBg,
                             color: m.iconColor,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontFamily: 'var(--jb-font-mono)',
+                            fontFamily: 'var(--jb-v3-font-mono)',
                             fontSize: 11,
                             fontWeight: 600,
                           }}
@@ -632,10 +631,10 @@ export default function AppApplicationDetail() {
                           {m.tag}
                         </span>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13.5, fontWeight: 600, color: '#1B1A16' }}>{m.name}</div>
-                          <div style={{ fontSize: 12, color: '#8A8378' }}>{m.meta}</div>
+                          <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--jb-v3-fg)' }}>{m.name}</div>
+                          <div style={{ fontSize: 12, color: 'var(--jb-v3-fg-3)' }}>{m.meta}</div>
                         </div>
-                        <span style={{ color: '#A79E8F', fontSize: 13, flexShrink: 0 }}>↗</span>
+                        <span style={{ color: 'var(--jb-v3-fg-3)', fontSize: 13, flexShrink: 0 }}>↗</span>
                       </Link>
                     ))}
                   </div>

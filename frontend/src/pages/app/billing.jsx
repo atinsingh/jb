@@ -1,35 +1,22 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Head from 'next/head';
-import Link from 'next/link';
-import AppSidebar from '@/components/app/AppSidebar';
-import { appRoute } from '@/components/app/appRoutes';
-import { getInvoices } from '@/services/billingApi';
 import { LoadingState, EmptyState, ErrorState } from '@/components/app/AppStates';
+import {
+  Screen,
+  CellGrid,
+  Label,
+  EndRule,
+  MonoButton,
+  MonoSwitch,
+  mono,
+  HAIR,
+} from '@/components/app/v3/kit';
+import { getInvoices } from '@/services/billingApi';
 
-// ---- status pill styling (ported from the design's statusStyle()) -----------
-const statusStyle = (s) =>
-  s === 'paid'
-    ? { label: 'PAID', color: '#157A49', bg: '#EAF6EE', border: '#CDE9D6' }
-    : { label: 'REFUNDED', color: '#8A8378', bg: '#F2ECE0', border: '#E6DECF' };
-
-// Normalize a raw invoice list into render-ready rows (status pill + divider).
-const buildInvoices = (raw) =>
-  raw.map((i, idx, arr) => {
-    const ss = statusStyle(i.status);
-    return {
-      ...i,
-      statusLabel: ss.label,
-      statusColor: ss.color,
-      statusBg: ss.bg,
-      statusBorder: ss.border,
-      divider: idx < arr.length - 1 ? '#F2ECE0' : 'transparent',
-    };
-  });
-
-// Best-effort mapping of an API invoice shape onto the design's row shape.
-const normalizeApiInvoice = (i) => {
+// Best-effort mapping of an API invoice shape onto the v3 row.
+const normalizeInvoice = (i) => {
   const fmtDate = (d) => {
     try {
       return new Date(d).toLocaleDateString('en-US', {
@@ -41,273 +28,231 @@ const normalizeApiInvoice = (i) => {
       return String(d);
     }
   };
-  const fmtAmount = (a) => {
-    if (typeof a === 'number') return `$${a.toFixed(2)}`;
-    return a != null ? String(a) : '$0.00';
-  };
-  const status = String(i.status || 'paid').toLowerCase() === 'refunded' ? 'refunded' : 'paid';
+  const fmtAmount = (a) => (typeof a === 'number' ? `$${a.toFixed(2)}` : a != null ? String(a) : '—');
   return {
+    id: i.id || i._id || `${i.date}-${i.amount}`,
     date: i.date ? fmtDate(i.date) : i.dateLabel || '—',
-    desc: i.description || i.desc || 'Subscription',
-    amount: i.amountLabel || fmtAmount(i.amount),
-    status,
+    label: i.description || i.desc || 'Subscription',
+    amt: i.amountLabel || fmtAmount(i.amount),
+    status: String(i.status || 'paid').toLowerCase() === 'refunded' ? 'refunded' : 'paid',
+    url: i.invoiceUrl || i.url || null,
   };
 };
 
-const headerCell = {
-  fontFamily: 'var(--jb-font-mono)',
-  fontSize: 11,
-  letterSpacing: '0.06em',
-  textTransform: 'uppercase',
-  color: '#9A9286',
-};
+/*
+ * Plans are product content, not user data. Prices are the two published
+ * cycles; the yearly figure is the monthly-equivalent at the annual discount,
+ * which is what the design's toggle switches between.
+ */
+const PLANS = [
+  {
+    name: 'Free',
+    monthly: 0,
+    yearly: 0,
+    tag: '',
+    lines: ['5 matches a day', 'Manual apply', 'One résumé'],
+    cta: 'Current',
+  },
+  {
+    name: 'Pro',
+    monthly: 29,
+    yearly: 23,
+    tag: 'Popular',
+    lines: ['Unlimited matches', 'Auto-apply drafts', 'Résumé tailoring', 'Interview drills'],
+    cta: 'Choose Pro',
+  },
+  {
+    name: 'Premium',
+    monthly: 59,
+    yearly: 47,
+    tag: '',
+    lines: ['Everything in Pro', 'Human concierge', 'Offer negotiation', 'Priority support'],
+    cta: 'Choose Premium',
+  },
+];
+
+const COLS = '110px 1fr 90px 70px';
 
 export default function AppBilling() {
   const [invoices, setInvoices] = useState([]);
+  const [yearly, setYearly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Fetch the user's real invoices. No sample fallback — an authenticated user
-  // with no billing history sees a genuine empty state, not fabricated rows.
   useEffect(() => {
-    let active = true;
+    let alive = true;
     (async () => {
       try {
         const data = await getInvoices();
-        const list = Array.isArray(data) ? data : data?.invoices;
-        const rows = Array.isArray(list) ? list.map(normalizeApiInvoice) : [];
-        if (active) setInvoices(buildInvoices(rows));
+        if (!alive) return;
+        const list = data?.invoices || (Array.isArray(data) ? data : []);
+        setInvoices((Array.isArray(list) ? list : []).map(normalizeInvoice));
       } catch (e) {
-        if (active) setError(e);
+        if (alive) setError(e || new Error('Could not load your invoices'));
       } finally {
-        if (active) setLoading(false);
+        if (alive) setLoading(false);
       }
     })();
     return () => {
-      active = false;
+      alive = false;
     };
   }, []);
 
-  const gridCols = '1fr 1.6fr 0.8fr 0.9fr 0.8fr';
+  const paidTotal = useMemo(
+    () => invoices.filter((i) => i.status === 'paid').length,
+    [invoices],
+  );
 
   return (
     <>
       <Head>
-        <title>Billing · Plan &amp; billing — Jobocate</title>
+        <title>Billing · Jobocate</title>
       </Head>
 
-      <style jsx global>{`
-        #jbapp ::-webkit-scrollbar {
-          width: 8px;
-        }
-        #jbapp ::-webkit-scrollbar-thumb {
-          background: #e1d9c9;
-          border-radius: 8px;
-        }
-        #jbapp input:focus {
-          outline: none;
-          border-color: #1fa463;
-          box-shadow: 0 0 0 3px rgba(31, 164, 99, 0.15);
-        }
-        #jbapp a.jb-pm:hover {
-          border-color: #1fa463 !important;
-        }
-      `}</style>
-
-      <div
-        id="jbapp"
-        style={{
-          display: 'flex',
-          minHeight: '100vh',
-          background: '#F7F3EA',
-          fontFamily: 'var(--jb-font-sans)',
-          color: '#1B1A16',
-        }}
-      >
-        <AppSidebar active="settings" />
-
-        <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          {/* HEADER */}
-          <header
-            style={{
-              position: 'sticky',
-              top: 0,
-              zIndex: 20,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 18,
-              padding: '15px 32px',
-              background: 'rgba(247,243,234,0.85)',
-              backdropFilter: 'blur(10px)',
-              borderBottom: '1px solid #E7E0D2',
-            }}
-          >
-            <Link
-              href={appRoute('App Settings.dc.html')}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 7,
-                fontSize: 13.5,
-                fontWeight: 600,
-                color: '#5A544A',
-                textDecoration: 'none',
-              }}
-            >
-              ← Back to settings
-            </Link>
-            <div style={{ flex: 1 }} />
-            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, color: '#9A9286' }}>
-              Plan &amp; billing
-            </span>
-          </header>
-
-          <div style={{ padding: '30px 32px 64px', maxWidth: 820, width: '100%', margin: '0 auto' }}>
-            <h1
-              style={{
-                fontFamily: 'var(--jb-font-display)',
-                fontWeight: 400,
-                fontSize: 38,
-                lineHeight: 1,
-                margin: '0 0 22px',
-              }}
-            >
-              Billing
-            </h1>
-
-            {/* SUMMARY — real subscription/payment summary is surfaced on the
-                subscription & payment-method pages; no fabricated charge here. */}
-            <div
-              style={{
-                background: '#FFFEFB',
-                border: '1px solid #E6DECF',
-                borderRadius: 18,
-                padding: '8px 26px',
-                marginBottom: 18,
-              }}
-            >
-              <EmptyState
-                icon="💳"
-                title="No active subscription"
-                hint="When you subscribe, your next charge and payment method appear here."
-                action={
-                  <Link
-                    href={appRoute('App Payment Methods.dc.html')}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 7,
-                      marginTop: 6,
-                      fontSize: 13.5,
-                      fontWeight: 700,
-                      color: '#0C2C1C',
-                      background: '#1FA463',
-                      borderRadius: 999,
-                      padding: '10px 18px',
-                      textDecoration: 'none',
-                    }}
-                  >
-                    Manage payment methods →
-                  </Link>
-                }
-              />
-            </div>
-
-            {/* INVOICES */}
-            <div
-              style={{
-                background: '#FFFEFB',
-                border: '1px solid #E6DECF',
-                borderRadius: 18,
-                overflow: 'hidden',
-                marginBottom: 18,
-              }}
-            >
-              <div style={{ padding: '18px 24px', borderBottom: '1px solid #F2ECE0' }}>
-                <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Invoices</h2>
-              </div>
-
-              {loading ? (
-                <LoadingState label="Loading invoices…" />
-              ) : error ? (
-                <ErrorState error={error} onRetry={() => window.location.reload()} />
-              ) : invoices.length === 0 ? (
-                <EmptyState
-                  icon="🧾"
-                  title="No invoices yet"
-                  hint="Your paid invoices and receipts will appear here once you have an active subscription."
-                />
-              ) : (
-                <>
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: gridCols,
-                      padding: '11px 24px',
-                      background: '#FBF9F4',
-                      borderBottom: '1px solid #F2ECE0',
-                    }}
-                  >
-                    <span style={headerCell}>Date</span>
-                    <span style={headerCell}>Description</span>
-                    <span style={headerCell}>Amount</span>
-                    <span style={headerCell}>Status</span>
-                    <span style={{ ...headerCell, textAlign: 'right' }}>Receipt</span>
-                  </div>
-                  {invoices.map((i, idx) => (
-                    <div
-                      key={`${i.date}-${idx}`}
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: gridCols,
-                        alignItems: 'center',
-                        padding: '15px 24px',
-                        borderBottom: `1px solid ${i.divider}`,
-                      }}
-                    >
-                      <span style={{ fontSize: 13.5, color: '#5A544A' }}>{i.date}</span>
-                      <span style={{ fontSize: 13.5, fontWeight: 600, color: '#1B1A16' }}>{i.desc}</span>
-                      <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 13, color: '#1B1A16' }}>
-                        {i.amount}
-                      </span>
-                      <span>
-                        <span
-                          style={{
-                            fontFamily: 'var(--jb-font-mono)',
-                            fontSize: 11,
-                            fontWeight: 600,
-                            letterSpacing: '0.04em',
-                            color: i.statusColor,
-                            background: i.statusBg,
-                            border: `1px solid ${i.statusBorder}`,
-                            padding: '3px 9px',
-                            borderRadius: 999,
-                          }}
-                        >
-                          {i.statusLabel}
-                        </span>
-                      </span>
-                      <a
-                        href="#"
-                        style={{
-                          fontFamily: 'var(--jb-font-mono)',
-                          fontSize: 11.5,
-                          fontWeight: 600,
-                          color: '#157A49',
-                          textDecoration: 'none',
-                          textAlign: 'right',
-                        }}
-                      >
-                        PDF ↓
-                      </a>
-                    </div>
-                  ))}
-                </>
-              )}
+      <Screen width={1060} pad="40px 28px 80px">
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'space-between',
+            gap: 24,
+            marginBottom: 34,
+          }}
+        >
+          <div>
+            <div style={{ ...mono(), marginBottom: 10 }}>Invoices paid</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+              <span
+                style={{ fontSize: 44, fontWeight: 600, letterSpacing: '-0.045em', lineHeight: 1 }}
+              >
+                {paidTotal}
+              </span>
+              <span style={mono(11, '0')}>/ {invoices.length} total</span>
             </div>
           </div>
-        </main>
-      </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={mono(10, '0.12em', yearly ? 'var(--jb-v3-fg-3)' : 'var(--jb-v3-fg)')}>
+              Monthly
+            </span>
+            <MonoSwitch checked={yearly} onChange={() => setYearly(!yearly)} label="Billing cycle" />
+            <span style={mono(10, '0.12em', yearly ? 'var(--jb-v3-fg)' : 'var(--jb-v3-fg-3)')}>
+              Yearly −20%
+            </span>
+          </div>
+        </div>
+
+        <CellGrid cols={3} style={{ marginBottom: 34 }}>
+          {PLANS.map((p) => (
+            <div
+              key={p.name}
+              style={{
+                background: 'var(--jb-v3-panel)',
+                padding: '24px 22px',
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  justifyContent: 'space-between',
+                  marginBottom: 18,
+                }}
+              >
+                <span style={{ fontSize: 15, fontWeight: 600 }}>{p.name}</span>
+                {p.tag && (
+                  <span style={mono(9.5, '0.12em', 'var(--jb-v3-accent)')}>{p.tag}</span>
+                )}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, marginBottom: 22 }}>
+                <span
+                  style={{ fontSize: 34, fontWeight: 600, letterSpacing: '-0.045em', lineHeight: 1 }}
+                >
+                  ${yearly ? p.yearly : p.monthly}
+                </span>
+                <span style={mono(10, '0')}>/mo</span>
+              </div>
+              <div
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 9,
+                  marginBottom: 22,
+                }}
+              >
+                {p.lines.map((l) => (
+                  <div key={l} style={{ display: 'flex', alignItems: 'baseline', gap: 9 }}>
+                    <span
+                      style={{
+                        width: 3,
+                        height: 10,
+                        display: 'block',
+                        flex: 'none',
+                        background: 'var(--jb-v3-accent)',
+                      }}
+                    />
+                    <span style={{ fontSize: 12.5, color: 'var(--jb-v3-fg-2)' }}>{l}</span>
+                  </div>
+                ))}
+              </div>
+              <MonoButton block filled={p.name === 'Pro'} href="/app/upgrade" style={{ padding: '8px 0' }}>
+                {p.cta}
+              </MonoButton>
+            </div>
+          ))}
+        </CellGrid>
+
+        {loading && <LoadingState label="Loading your invoices…" />}
+        {!loading && error && <ErrorState error={error} onRetry={() => window.location.reload()} />}
+
+        {!loading && !error && invoices.length > 0 && (
+          <>
+            <Label>Invoices</Label>
+            {invoices.map((i) => (
+              <div
+                key={i.id}
+                style={{
+                  borderTop: HAIR,
+                  padding: '13px 4px',
+                  display: 'grid',
+                  gridTemplateColumns: COLS,
+                  gap: 20,
+                  alignItems: 'baseline',
+                }}
+              >
+                <span style={mono(10.5, '0')}>{i.date}</span>
+                <span style={{ fontSize: 13, color: 'var(--jb-v3-fg-2)' }}>
+                  {i.label}
+                  {i.status === 'refunded' && (
+                    <span style={{ ...mono(9.5, '0.12em', 'var(--jb-v3-warn)'), marginLeft: 10 }}>
+                      Refunded
+                    </span>
+                  )}
+                </span>
+                <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11 }}>{i.amt}</span>
+                {i.url ? (
+                  <a
+                    href={i.url}
+                    style={{ ...mono(10, '0.1em', 'var(--jb-v3-accent)'), textAlign: 'right' }}
+                  >
+                    PDF
+                  </a>
+                ) : (
+                  <span style={{ ...mono(10, '0.1em'), textAlign: 'right' }}>—</span>
+                )}
+              </div>
+            ))}
+            <EndRule />
+          </>
+        )}
+
+        {!loading && !error && invoices.length === 0 && (
+          <EmptyState title="No invoices yet" hint="Charges appear here once you upgrade." />
+        )}
+      </Screen>
     </>
   );
 }

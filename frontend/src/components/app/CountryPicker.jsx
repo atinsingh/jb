@@ -52,7 +52,7 @@ const chip = {
   color: '#0C2C1C',
   background: '#E3F5EA',
   border: '1px solid #B7E2CA',
-  borderRadius: 999,
+  borderRadius: 2,
   padding: '5px 8px 5px 11px',
 };
 
@@ -139,7 +139,7 @@ export default function CountryPicker({
           color: '#1B1A16',
           background: '#FFFEFB',
           border: '1px solid #D9D0BE',
-          borderRadius: 10,
+          borderRadius: 2,
           padding: '10px 12px',
         }}
       />
@@ -163,7 +163,7 @@ export default function CountryPicker({
               color: '#3D3930',
               background: '#FFFEFB',
               border: '1px solid #D9D0BE',
-              borderRadius: 999,
+              borderRadius: 2,
               padding: '5px 11px',
               cursor: 'pointer',
             }}

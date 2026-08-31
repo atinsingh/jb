@@ -2,20 +2,19 @@
 // replaced most badges with mono labels — so it is reserved for genuine state:
 // an application's stage, a flag on a match row, an offer.
 //
-// Radius is 5px, not 999px: the mockup's badges are rectangular so they read as
-// data cells in a table row, while the round pills are all actions.
+// Radius is 2px, the v3 radius: badges read as data cells in a table row.
 export default function Badge({ tone = 'neutral', children, style, ...rest }) {
   const toneStyle = {
-    neutral: { background: 'var(--jb-a-control)', color: 'var(--jb-a-chip-neutral-ink)' },
-    accent: { background: 'var(--jb-a-tint)', color: 'var(--jb-a-accent)' },
-    offer: { background: 'var(--jb-a-offer-bg)', color: 'var(--jb-a-offer-ink)' },
-    warn: { background: 'var(--jb-a-warn-bg)', color: 'var(--jb-a-offer-ink)' },
-    danger: { background: 'var(--jb-a-danger-bg)', color: 'var(--jb-a-danger-ink)' },
+    neutral: { background: 'var(--jb-v3-control)', color: 'var(--jb-v3-chip-ink)' },
+    accent: { background: 'var(--jb-v3-accent-soft)', color: 'var(--jb-v3-accent)' },
+    offer: { background: 'var(--jb-v3-warn-soft)', color: 'var(--jb-v3-warn)' },
+    warn: { background: 'var(--jb-v3-warn-soft)', color: 'var(--jb-v3-warn)' },
+    danger: { background: 'var(--jb-v3-danger-soft)', color: 'var(--jb-v3-danger)' },
     // The mono uppercase flag ("DRAFT READY") that sits beside a role title.
     flag: {
-      background: 'var(--jb-a-tint)',
-      color: 'var(--jb-a-accent)',
-      fontFamily: 'var(--jb-font-mono)',
+      background: 'var(--jb-v3-accent-soft)',
+      color: 'var(--jb-v3-accent)',
+      fontFamily: 'var(--jb-v3-font-mono)',
       fontSize: 11,
       fontWeight: 400,
       letterSpacing: '0.1em',
@@ -31,7 +30,7 @@ export default function Badge({ tone = 'neutral', children, style, ...rest }) {
         alignItems: 'center',
         height: 24,
         padding: '0 10px',
-        borderRadius: 5,
+        borderRadius: 2,
         fontSize: 12.5,
         fontWeight: 600,
         ...toneStyle,

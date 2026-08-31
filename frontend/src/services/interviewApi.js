@@ -1,4 +1,5 @@
 import { API_URL } from '@/config/api';
+import { getAccessToken } from '@/lib/apiClient';
 
 // ---------------------------------------------------------------------------
 // Interview Buddy / Live Interview API helpers
@@ -13,15 +14,8 @@ import { API_URL } from '@/config/api';
 // stubs on top of these helpers.
 // ---------------------------------------------------------------------------
 
-const getAuthToken = () => {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('authToken') || localStorage.getItem('token');
-  }
-  return null;
-};
-
 const apiCall = async (endpoint, options = {}) => {
-  const token = getAuthToken();
+  const token = await getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,

@@ -11,16 +11,16 @@ export default function PageHeader({ title, subtitle, action, level = 'h2', styl
         gap: 16,
         height: 64,
         padding: '0 44px',
-        borderBottom: '1px solid var(--jb-a-line)',
+        borderBottom: '1px solid var(--jb-v3-line)',
         flexShrink: 0,
-        background: 'var(--jb-a-header)',
+        background: 'var(--jb-v3-panel)',
         ...style,
       }}
     >
-      <Tag style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--jb-a-ink)' }}>
+      <Tag style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--jb-v3-fg)' }}>
         {title}
       </Tag>
-      {subtitle && <span style={{ fontSize: 14, color: 'var(--jb-a-ink-3)' }}>{subtitle}</span>}
+      {subtitle && <span style={{ fontSize: 14, color: 'var(--jb-v3-fg-3)' }}>{subtitle}</span>}
       <span style={{ flex: 1 }} />
       {action}
     </div>

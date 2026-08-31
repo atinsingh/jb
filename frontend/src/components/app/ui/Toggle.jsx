@@ -15,7 +15,7 @@ export default function Toggle({ checked = false, onChange, label, size = 'sm', 
         flexShrink: 0,
         border: 0,
         borderRadius: 999,
-        background: checked ? 'var(--jb-a-accent)' : 'var(--jb-a-line-btn)',
+        background: checked ? 'var(--jb-v3-accent)' : 'var(--jb-v3-line-btn)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: checked ? 'flex-end' : 'flex-start',
@@ -30,7 +30,7 @@ export default function Toggle({ checked = false, onChange, label, size = 'sm', 
           width: track.knob,
           height: track.knob,
           borderRadius: '50%',
-          background: 'var(--jb-a-card)',
+          background: 'var(--jb-v3-card)',
         }}
       />
     </button>

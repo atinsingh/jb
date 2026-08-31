@@ -300,7 +300,7 @@ export default function AdminSidebar({ active = 'dashboard' }) {
         >
           {wide && (
             <Link href="/admin/dashboard" style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 9 }}>
-              <Logo theme="dark" size={24} accent={ACCENT} />
+              <Logo size={24} accent={ACCENT} style={{ color: "#f2ecdb" }} />
               <span
                 style={{
                   fontFamily: 'var(--jb-font-mono)',
@@ -320,7 +320,7 @@ export default function AdminSidebar({ active = 'dashboard' }) {
           )}
           {narrow && (
             <Link href="/admin/dashboard" aria-label="Admin home" style={{ display: 'flex' }}>
-              <Logo theme="dark" size={26} mark accent={ACCENT} />
+              <Logo size={26} mark accent={ACCENT} style={{ color: "#f2ecdb" }} />
             </Link>
           )}
           <div style={{ display: 'flex', gap: 6 }}>

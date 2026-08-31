@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/context/AuthContext';
 import Logo from '@/components/brand/Logo';
-import useMarketingTheme from './useMarketingTheme';
+import useJbTheme from '@/components/theme/useJbTheme';
 
 /**
  * Marketing header - the single public nav for every logged-out page.
@@ -59,7 +59,7 @@ export default function SiteNav({ variant = 'candidate' }) {
   const router = useRouter();
   const auth = useAuth();
   const user = auth?.user;
-  const { theme, toggle } = useMarketingTheme();
+  const { theme, toggle } = useJbTheme();
 
   const isEmployer = variant === 'employer';
   const home = ROLE_HOME[user?.role] || ROLE_HOME.ROLE_CANDIDATE;
@@ -85,7 +85,7 @@ export default function SiteNav({ variant = 'candidate' }) {
 
       <div className="jbnav__bar">
         <Link href="/" className="jbnav__logo" aria-label="Jobocate home">
-          <Logo theme={theme === 'light' ? 'light' : 'dark'} size={22} style={{ color: 'var(--jb-ink)' }} />
+          <Logo size={22} style={{ color: 'var(--jb-ink)' }} />
         </Link>
 
         <nav className="jbnav__links" aria-label="Primary">

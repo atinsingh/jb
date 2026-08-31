@@ -1,18 +1,11 @@
 import { API_URL } from '@/config/api';
+import { getAccessToken } from '@/lib/apiClient';
 
 // ---------------------------------------------------------------- auth helper
-// Mirrors api.js's getAuthToken so we never modify api.js.
-const getAuthToken = () => {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('authToken') || localStorage.getItem('token');
-  }
-  return null;
-};
-
 // Shared fetch wrapper following the api.js convention (token auto-attached,
 // JSON body, throw on !ok). Kept local so we never modify api.js.
 const apiCall = async (endpoint, options = {}) => {
-  const token = getAuthToken();
+  const token = await getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,

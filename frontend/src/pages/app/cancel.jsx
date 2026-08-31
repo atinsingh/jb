@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import AppSidebar from '@/components/app/AppSidebar';
+import AppTopNav from '@/components/app/AppTopNav';
 import { appRoute } from '@/components/app/appRoutes';
 import { getSubscription, submitCancellation, acceptRetentionOffer } from '@/services/cancelApi';
 
@@ -140,8 +140,8 @@ export default function AppCancel() {
   if (sType === 'stay') {
     sc = {
       icon: '✓',
-      iconBg: '#1FA463',
-      iconColor: '#0C2C1C',
+      iconBg: 'var(--jb-v3-accent)',
+      iconColor: 'var(--jb-v3-accent-ink)',
       title: 'You’re staying on Premium.',
       body: offer.successNote,
       cta: 'Back to settings',
@@ -151,8 +151,8 @@ export default function AppCancel() {
   } else if (sType === 'kept') {
     sc = {
       icon: '✓',
-      iconBg: '#1FA463',
-      iconColor: '#0C2C1C',
+      iconBg: 'var(--jb-v3-accent)',
+      iconColor: 'var(--jb-v3-accent-ink)',
       title: 'Glad you’re staying.',
       body: 'Your Premium membership is unchanged — we’ll keep working your search in the background.',
       cta: 'Back to dashboard',
@@ -162,8 +162,8 @@ export default function AppCancel() {
   } else {
     sc = {
       icon: '◷',
-      iconBg: '#F2ECE0',
-      iconColor: '#8A8378',
+      iconBg: 'var(--jb-v3-control)',
+      iconColor: 'var(--jb-v3-fg-3)',
       title: 'Membership cancelled.',
       body: `Your Premium access stays active until ${renewal || 'the end of your billing period'}, then you’ll move to the Free plan. Your data is never deleted.`,
       cta: 'Back to settings',
@@ -172,8 +172,8 @@ export default function AppCancel() {
     };
   }
 
-  const contColor = canCont ? '#0C2C1C' : '#8FB7A1';
-  const contBg = canCont ? '#1FA463' : '#CFE6D8';
+  const contColor = canCont ? 'var(--jb-v3-accent-ink)' : 'var(--jb-v3-fg-3)';
+  const contBg = canCont ? 'var(--jb-v3-accent)' : 'var(--jb-v3-ok-line)';
   const contCursor = canCont ? 'pointer' : 'default';
 
   return (
@@ -187,13 +187,13 @@ export default function AppCancel() {
           width: 8px;
         }
         #jbapp ::-webkit-scrollbar-thumb {
-          background: #e1d9c9;
-          border-radius: 8px;
+          background: var(--jb-v3-line);
+          border-radius: 2px;
         }
         #jbapp textarea:focus {
           outline: none;
-          border-color: #1fa463;
-          box-shadow: 0 0 0 3px rgba(31, 164, 99, 0.15);
+          border-color: var(--jb-v3-accent);
+          box-shadow: 0 0 0 3px color-mix(in srgb, var(--jb-v3-accent) 15%, transparent);
         }
         @keyframes rbpop {
           from {
@@ -210,29 +210,28 @@ export default function AppCancel() {
       <div
         id="jbapp"
         style={{
-          display: 'flex',
           minHeight: '100vh',
-          background: '#F7F3EA',
-          fontFamily: 'var(--jb-font-sans)',
-          color: '#1B1A16',
+          background: 'var(--jb-v3-bg)',
+          fontFamily: 'var(--jb-v3-font-display)',
+          color: 'var(--jb-v3-fg)',
         }}
       >
-        <AppSidebar active="settings" />
+        <AppTopNav />
 
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           {/* HEADER */}
           <header
             style={{
-              position: 'sticky',
-              top: 0,
-              zIndex: 20,
+              position: 'relative',
+              
+              
               display: 'flex',
               alignItems: 'center',
               gap: 18,
               padding: '15px 32px',
-              background: 'rgba(247,243,234,0.85)',
+              background: 'color-mix(in srgb, var(--jb-v3-bg) 85%, transparent)',
               backdropFilter: 'blur(10px)',
-              borderBottom: '1px solid #E7E0D2',
+              borderBottom: '1px solid var(--jb-v3-line)',
             }}
           >
             <Link
@@ -243,7 +242,7 @@ export default function AppCancel() {
                 gap: 7,
                 fontSize: 13.5,
                 fontWeight: 600,
-                color: '#5A544A',
+                color: 'var(--jb-v3-fg-2)',
                 textDecoration: 'none',
               }}
             >
@@ -253,9 +252,9 @@ export default function AppCancel() {
             {inFlow && (
               <span
                 style={{
-                  fontFamily: 'var(--jb-font-mono)',
+                  fontFamily: 'var(--jb-v3-font-mono)',
                   fontSize: 11.5,
-                  color: '#9A9286',
+                  color: 'var(--jb-v3-fg-3)',
                 }}
               >
                 {stepLabel}
@@ -269,7 +268,7 @@ export default function AppCancel() {
               <div style={{ animation: 'rbpop 0.25s ease' }}>
                 <h1
                   style={{
-                    fontFamily: 'var(--jb-font-display)',
+                    fontFamily: 'var(--jb-v3-font-display)',
                     fontWeight: 400,
                     fontSize: 34,
                     lineHeight: 1.06,
@@ -278,7 +277,7 @@ export default function AppCancel() {
                 >
                   Before you go…
                 </h1>
-                <p style={{ fontSize: 15, color: '#5A544A', margin: '0 0 24px' }}>
+                <p style={{ fontSize: 15, color: 'var(--jb-v3-fg-2)', margin: '0 0 24px' }}>
                   What’s prompting the cancellation? This helps us improve — and might surface a
                   better option.
                 </p>
@@ -294,9 +293,9 @@ export default function AppCancel() {
                           display: 'flex',
                           alignItems: 'center',
                           gap: 13,
-                          background: on ? '#EAF6EE' : '#FFFEFB',
-                          border: `1.5px solid ${on ? '#1FA463' : '#E6DECF'}`,
-                          borderRadius: 13,
+                          background: on ? 'var(--jb-v3-accent-soft)' : 'var(--jb-v3-panel)',
+                          border: `1.5px solid ${on ? 'var(--jb-v3-accent)' : 'var(--jb-v3-line)'}`,
+                          borderRadius: 2,
                           padding: '15px 17px',
                           cursor: 'pointer',
                           fontFamily: 'inherit',
@@ -308,8 +307,8 @@ export default function AppCancel() {
                             height: 20,
                             flexShrink: 0,
                             borderRadius: '50%',
-                            border: `1.5px solid ${on ? '#1FA463' : '#C9BFAC'}`,
-                            background: on ? '#1FA463' : 'transparent',
+                            border: `1.5px solid ${on ? 'var(--jb-v3-accent)' : 'var(--jb-v3-line-2)'}`,
+                            background: on ? 'var(--jb-v3-accent)' : 'transparent',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -320,11 +319,11 @@ export default function AppCancel() {
                               width: 8,
                               height: 8,
                               borderRadius: '50%',
-                              background: on ? '#FFFFFF' : 'transparent',
+                              background: on ? 'var(--jb-v3-panel)' : 'transparent',
                             }}
                           />
                         </span>
-                        <span style={{ flex: 1, fontSize: 15, fontWeight: 600, color: '#1B1A16' }}>
+                        <span style={{ flex: 1, fontSize: 15, fontWeight: 600, color: 'var(--jb-v3-fg)' }}>
                           {r.label}
                         </span>
                       </button>
@@ -341,10 +340,10 @@ export default function AppCancel() {
                     fontFamily: 'inherit',
                     fontSize: 14,
                     lineHeight: 1.6,
-                    color: '#1B1A16',
-                    background: '#FFFEFB',
-                    border: '1px solid #E1D9C9',
-                    borderRadius: 13,
+                    color: 'var(--jb-v3-fg)',
+                    background: 'var(--jb-v3-panel)',
+                    border: '1px solid var(--jb-v3-line)',
+                    borderRadius: 2,
                     padding: 14,
                     resize: 'vertical',
                     marginBottom: 22,
@@ -356,7 +355,7 @@ export default function AppCancel() {
                     style={{
                       fontSize: 14.5,
                       fontWeight: 600,
-                      color: '#5A544A',
+                      color: 'var(--jb-v3-fg-2)',
                       textDecoration: 'none',
                     }}
                   >
@@ -375,7 +374,7 @@ export default function AppCancel() {
                       color: contColor,
                       background: contBg,
                       border: 'none',
-                      borderRadius: 999,
+                      borderRadius: 2,
                       padding: '14px 26px',
                       cursor: contCursor,
                     }}
@@ -391,9 +390,9 @@ export default function AppCancel() {
               <div style={{ animation: 'rbpop 0.25s ease' }}>
                 <div
                   style={{
-                    background: '#15140F',
-                    border: '1px solid #2C2A22',
-                    borderRadius: 20,
+                    background: 'var(--jb-v3-invert)',
+                    border: '1px solid var(--jb-v3-fg)',
+                    borderRadius: 2,
                     padding: 32,
                     position: 'relative',
                     overflow: 'hidden',
@@ -405,7 +404,7 @@ export default function AppCancel() {
                       position: 'absolute',
                       inset: 0,
                       background:
-                        'radial-gradient(circle at 88% 10%, rgba(31,164,99,0.3), transparent 55%)',
+                        'radial-gradient(circle at 88% 10%, color-mix(in srgb, var(--jb-v3-accent) 30%, transparent), transparent 55%)',
                       pointerEvents: 'none',
                     }}
                   />
@@ -413,14 +412,14 @@ export default function AppCancel() {
                     <span
                       style={{
                         display: 'inline-block',
-                        fontFamily: 'var(--jb-font-mono)',
+                        fontFamily: 'var(--jb-v3-font-mono)',
                         fontSize: 11,
                         fontWeight: 600,
                         letterSpacing: '0.08em',
-                        color: '#0C2C1C',
-                        background: '#5BD08C',
+                        color: 'var(--jb-v3-accent-ink)',
+                        background: 'var(--jb-v3-ok)',
                         padding: '4px 11px',
-                        borderRadius: 999,
+                        borderRadius: 2,
                         marginBottom: 16,
                       }}
                     >
@@ -428,17 +427,17 @@ export default function AppCancel() {
                     </span>
                     <h1
                       style={{
-                        fontFamily: 'var(--jb-font-display)',
+                        fontFamily: 'var(--jb-v3-font-display)',
                         fontWeight: 400,
                         fontSize: 32,
                         lineHeight: 1.08,
-                        color: '#FBF8F1',
+                        color: 'var(--jb-v3-panel)',
                         margin: '0 0 12px',
                       }}
                     >
                       {offer.headline}
                     </h1>
-                    <p style={{ fontSize: 15, lineHeight: 1.6, color: '#B8B1A4', margin: 0 }}>
+                    <p style={{ fontSize: 15, lineHeight: 1.6, color: 'var(--jb-v3-fg-3)', margin: 0 }}>
                       {offer.body}
                     </p>
                   </div>
@@ -449,7 +448,7 @@ export default function AppCancel() {
                     style={{
                       fontSize: 14,
                       fontWeight: 600,
-                      color: '#A79E8F',
+                      color: 'var(--jb-v3-fg-3)',
                       background: 'none',
                       border: 'none',
                       cursor: 'pointer',
@@ -466,10 +465,10 @@ export default function AppCancel() {
                       fontFamily: 'inherit',
                       fontSize: 15,
                       fontWeight: 700,
-                      color: '#0C2C1C',
-                      background: '#1FA463',
+                      color: 'var(--jb-v3-accent-ink)',
+                      background: 'var(--jb-v3-accent)',
                       border: 'none',
-                      borderRadius: 999,
+                      borderRadius: 2,
                       padding: '14px 26px',
                       cursor: 'pointer',
                     }}
@@ -485,7 +484,7 @@ export default function AppCancel() {
               <div style={{ animation: 'rbpop 0.25s ease' }}>
                 <h1
                   style={{
-                    fontFamily: 'var(--jb-font-display)',
+                    fontFamily: 'var(--jb-v3-font-display)',
                     fontWeight: 400,
                     fontSize: 34,
                     lineHeight: 1.06,
@@ -494,14 +493,14 @@ export default function AppCancel() {
                 >
                   You’ll lose access to…
                 </h1>
-                <p style={{ fontSize: 15, color: '#5A544A', margin: '0 0 22px' }}>
+                <p style={{ fontSize: 15, color: 'var(--jb-v3-fg-2)', margin: '0 0 22px' }}>
                   Cancelling drops you to the Free plan. Here’s what goes away when your access ends.
                 </p>
                 <div
                   style={{
-                    background: '#FFFEFB',
-                    border: '1px solid #EAD0C4',
-                    borderRadius: 16,
+                    background: 'var(--jb-v3-panel)',
+                    border: '1px solid var(--jb-v3-danger-line)',
+                    borderRadius: 2,
                     padding: 22,
                     marginBottom: 18,
                   }}
@@ -511,7 +510,7 @@ export default function AppCancel() {
                       <div key={l} style={{ display: 'flex', alignItems: 'flex-start', gap: 11 }}>
                         <span
                           style={{
-                            color: '#C9622E',
+                            color: 'var(--jb-v3-danger)',
                             fontSize: 14,
                             flexShrink: 0,
                             marginTop: 1,
@@ -523,9 +522,9 @@ export default function AppCancel() {
                           style={{
                             fontSize: 14.5,
                             lineHeight: 1.45,
-                            color: '#7A4326',
+                            color: 'var(--jb-v3-danger)',
                             textDecoration: 'line-through',
-                            textDecorationColor: '#E0B7A4',
+                            textDecorationColor: 'var(--jb-v3-danger-line)',
                           }}
                         >
                           {l}
@@ -540,16 +539,16 @@ export default function AppCancel() {
                     alignItems: 'center',
                     gap: 10,
                     padding: '14px 16px',
-                    background: '#FBF9F2',
-                    border: '1px solid #E6DECF',
-                    borderRadius: 13,
+                    background: 'var(--jb-v3-panel)',
+                    border: '1px solid var(--jb-v3-line)',
+                    borderRadius: 2,
                     marginBottom: 24,
                   }}
                 >
-                  <span style={{ color: '#9A9286', flexShrink: 0 }}>◷</span>
-                  <span style={{ fontSize: 13.5, color: '#5A544A' }}>
+                  <span style={{ color: 'var(--jb-v3-fg-3)', flexShrink: 0 }}>◷</span>
+                  <span style={{ fontSize: 13.5, color: 'var(--jb-v3-fg-2)' }}>
                     Your Premium access stays active until{' '}
-                    <b style={{ color: '#1B1A16' }}>{renewal || 'the end of your billing period'}</b>. Your data is
+                    <b style={{ color: 'var(--jb-v3-fg)' }}>{renewal || 'the end of your billing period'}</b>. Your data is
                     never deleted.
                   </span>
                 </div>
@@ -560,10 +559,10 @@ export default function AppCancel() {
                       fontFamily: 'inherit',
                       fontSize: 14,
                       fontWeight: 600,
-                      color: '#C9622E',
-                      background: '#FFFEFB',
-                      border: '1px solid #EAD0C4',
-                      borderRadius: 999,
+                      color: 'var(--jb-v3-danger)',
+                      background: 'var(--jb-v3-panel)',
+                      border: '1px solid var(--jb-v3-danger-line)',
+                      borderRadius: 2,
                       padding: '13px 20px',
                       cursor: 'pointer',
                     }}
@@ -577,10 +576,10 @@ export default function AppCancel() {
                       fontFamily: 'inherit',
                       fontSize: 15,
                       fontWeight: 700,
-                      color: '#0C2C1C',
-                      background: '#1FA463',
+                      color: 'var(--jb-v3-accent-ink)',
+                      background: 'var(--jb-v3-accent)',
                       border: 'none',
-                      borderRadius: 999,
+                      borderRadius: 2,
                       padding: '14px 24px',
                       cursor: 'pointer',
                     }}
@@ -595,9 +594,9 @@ export default function AppCancel() {
             {isSuccess && (
               <div
                 style={{
-                  background: '#FFFEFB',
-                  border: '1px solid #E6DECF',
-                  borderRadius: 20,
+                  background: 'var(--jb-v3-panel)',
+                  border: '1px solid var(--jb-v3-line)',
+                  borderRadius: 2,
                   padding: '48px 36px',
                   textAlign: 'center',
                   animation: 'rbpop 0.35s ease',
@@ -621,7 +620,7 @@ export default function AppCancel() {
                 </div>
                 <h1
                   style={{
-                    fontFamily: 'var(--jb-font-display)',
+                    fontFamily: 'var(--jb-v3-font-display)',
                     fontWeight: 400,
                     fontSize: 34,
                     lineHeight: 1.06,
@@ -634,7 +633,7 @@ export default function AppCancel() {
                   style={{
                     fontSize: 15,
                     lineHeight: 1.6,
-                    color: '#5A544A',
+                    color: 'var(--jb-v3-fg-2)',
                     margin: '0 auto 28px',
                     maxWidth: 400,
                   }}
@@ -648,12 +647,12 @@ export default function AppCancel() {
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: 8,
-                      background: '#1B1A16',
-                      color: '#F7F3EA',
+                      background: 'var(--jb-v3-fg)',
+                      color: 'var(--jb-v3-bg)',
                       fontSize: 15,
                       fontWeight: 600,
                       padding: '14px 24px',
-                      borderRadius: 999,
+                      borderRadius: 2,
                       textDecoration: 'none',
                     }}
                   >
@@ -665,14 +664,14 @@ export default function AppCancel() {
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
-                        background: '#FFFEFB',
-                        color: '#1B1A16',
+                        background: 'var(--jb-v3-panel)',
+                        color: 'var(--jb-v3-fg)',
                         fontSize: 15,
                         fontWeight: 600,
                         padding: '14px 24px',
-                        borderRadius: 999,
+                        borderRadius: 2,
                         textDecoration: 'none',
-                        border: '1px solid #D9D0BE',
+                        border: '1px solid var(--jb-v3-line-2)',
                       }}
                     >
                       Resubscribe

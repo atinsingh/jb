@@ -4,11 +4,6 @@ import { InjectConnection } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
 
-// The dev-only fallback used across the app when JWT_SECRET is unset. A live
-// PAID environment MUST NOT run with this value, so readiness treats it as
-// "not configured".
-const DEV_JWT_FALLBACK = 'dev-insecure-secret-change-me';
-
 @ApiTags('health')
 @Controller()
 export class HealthController {
@@ -82,15 +77,14 @@ export class HealthController {
   private buildReadiness() {
     const mongoOk = this.connection.readyState === 1;
 
-    // JWT_SECRET must be set AND must not be the insecure dev fallback.
-    const jwtRaw = this.config.get<string>('JWT_SECRET');
-    const jwtSecret =
-      typeof jwtRaw === 'string' &&
-      jwtRaw.trim().length > 0 &&
-      jwtRaw !== DEV_JWT_FALLBACK;
+    // Supabase issues and signs the tokens now; what this backend needs is the
+    // project URL (to verify against its JWKS) and the service-role key (for
+    // the user-sync webhook). JWT_SECRET is gone — nothing here signs a token.
+    const supabaseAuth =
+      this.isSet('SUPABASE_URL') && this.isSet('SUPABASE_SERVICE_ROLE_KEY');
 
     const env = {
-      jwtSecret,
+      supabaseAuth,
       mongoUri: this.isSet('MONGODB_URI'),
       frontendUrl: this.isSet('FRONTEND_URL'),
       // Any one AI provider key is acceptable.
@@ -103,11 +97,6 @@ export class HealthController {
       smtp: this.isSet('SMTP_USER') && this.isSet('SMTP_PASSWORD'),
       stripe:
         this.isSet('STRIPE_SECRET_KEY') && this.isSet('STRIPE_WEBHOOK_SECRET'),
-      googleOAuth:
-        this.isSet('GOOGLE_CLIENT_ID') && this.isSet('GOOGLE_CLIENT_SECRET'),
-      linkedinOAuth:
-        this.isSet('LINKEDIN_CLIENT_ID') &&
-        this.isSet('LINKEDIN_CLIENT_SECRET'),
       // Without any board configured the scraper produces an empty job pool.
       scraperBoards:
         this.isSet('GREENHOUSE_BOARDS') || this.isSet('LEVER_BOARDS'),
@@ -120,12 +109,11 @@ export class HealthController {
       quotaEnforced: this.equals('LLM_ENFORCE_QUOTA', 'true'),
     };
 
-    // Alpha (paid) MUST-HAVES. NOTE: googleOAuth, linkedinOAuth and
-    // scraperBoards are reported for ops visibility but are NICE-TO-HAVE — they
-    // deliberately do NOT gate `ready`.
+    // Alpha (paid) MUST-HAVES. NOTE: scraperBoards is reported for ops
+    // visibility but is NICE-TO-HAVE — it deliberately does NOT gate `ready`.
     const mustHaves: Record<string, boolean> = {
       mongo: mongoOk,
-      jwtSecret: env.jwtSecret,
+      supabaseAuth: env.supabaseAuth,
       mongoUri: env.mongoUri,
       frontendUrl: env.frontendUrl,
       aiKey: env.aiKey,

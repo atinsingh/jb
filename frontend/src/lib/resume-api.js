@@ -1,10 +1,11 @@
 import { API_URL } from '@/config/api';
+import { getAccessToken } from '@/lib/apiClient';
 
-const getHeaders = () => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : '';
+const getHeaders = async () => {
+    const token = await getAccessToken();
     return {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
     };
 };
 
@@ -13,7 +14,7 @@ export const resumeApi = {
     getAll: async () => {
         const res = await fetch(`${API_URL}/api/resume-builder`, {
             method: 'GET',
-            headers: getHeaders(),
+            headers: await getHeaders(),
         });
         if (!res.ok) throw new Error('Failed to fetch resumes');
         return res.json();
@@ -23,7 +24,7 @@ export const resumeApi = {
     getOne: async (id) => {
         const res = await fetch(`${API_URL}/api/resume-builder/${id}`, {
             method: 'GET',
-            headers: getHeaders(),
+            headers: await getHeaders(),
         });
         if (!res.ok) throw new Error('Failed to fetch resume');
         return res.json();
@@ -33,7 +34,7 @@ export const resumeApi = {
     create: async (data) => {
         const res = await fetch(`${API_URL}/api/resume-builder`, {
             method: 'POST',
-            headers: getHeaders(),
+            headers: await getHeaders(),
             body: JSON.stringify(data),
         });
         if (!res.ok) throw new Error('Failed to create resume');
@@ -42,7 +43,7 @@ export const resumeApi = {
 
     // Create from upload
     upload: async (file, template) => {
-        const token = localStorage.getItem('authToken');
+        const token = await getAccessToken();
         const formData = new FormData();
         formData.append('resume', file);
         formData.append('template', template);
@@ -63,7 +64,7 @@ export const resumeApi = {
     update: async (id, data) => {
         const res = await fetch(`${API_URL}/api/resume-builder/${id}/autosave`, {
             method: 'PATCH',
-            headers: getHeaders(),
+            headers: await getHeaders(),
             body: JSON.stringify(data),
         });
         if (res.status === 409) throw new Error('Conflict: Resume modified elsewhere');
@@ -75,7 +76,7 @@ export const resumeApi = {
     saveVersion: async (id, description) => {
         const res = await fetch(`${API_URL}/api/resume-builder/${id}/versions`, {
             method: 'POST',
-            headers: getHeaders(),
+            headers: await getHeaders(),
             body: JSON.stringify({ description }),
         });
         if (!res.ok) throw new Error('Failed to save version');
@@ -86,7 +87,7 @@ export const resumeApi = {
     generatePDF: async (id) => {
         const res = await fetch(`${API_URL}/api/resume-builder/${id}/generate-pdf`, {
             method: 'POST',
-            headers: getHeaders(),
+            headers: await getHeaders(),
         });
         if (!res.ok) throw new Error('Failed to generate PDF');
         return res.json();
@@ -96,7 +97,7 @@ export const resumeApi = {
     share: async (id, data) => {
         const res = await fetch(`${API_URL}/api/resume-builder/${id}/share`, {
             method: 'POST',
-            headers: getHeaders(),
+            headers: await getHeaders(),
             body: JSON.stringify(data),
         });
         if (!res.ok) throw new Error('Failed to update share settings');
@@ -123,7 +124,7 @@ export const resumeApi = {
     getVersions: async (id) => {
         const res = await fetch(`${API_URL}/api/resume-builder/${id}/versions`, {
             method: 'GET',
-            headers: getHeaders(),
+            headers: await getHeaders(),
         });
         if (!res.ok) throw new Error('Failed to fetch versions');
         return res.json();
@@ -133,7 +134,7 @@ export const resumeApi = {
     regenerateSection: async (id, data) => {
         const res = await fetch(`${API_URL}/api/resume-builder/${id}/regenerate-section`, {
             method: 'POST',
-            headers: getHeaders(),
+            headers: await getHeaders(),
             body: JSON.stringify(data),
         });
         if (!res.ok) throw new Error('Failed to regenerate section');
@@ -144,7 +145,7 @@ export const resumeApi = {
     delete: async (id) => {
         const res = await fetch(`${API_URL}/api/resume-builder/${id}`, {
             method: 'DELETE',
-            headers: getHeaders(),
+            headers: await getHeaders(),
         });
         if (!res.ok) throw new Error('Failed to delete resume');
         return res.json();

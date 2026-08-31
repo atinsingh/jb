@@ -147,6 +147,16 @@ export class User {
   @Prop()
   lastLogin?: Date;
 
+  // The Supabase Auth user UUID (the JWT `sub` claim), and the join key between
+  // the two stores. Supabase owns identity; this document keeps owning role,
+  // plan, Stripe state and every relationship other collections point at.
+  //
+  // Sparse because it is null until a user is migrated or first signs in through
+  // Supabase, and unique so a duplicated webhook delivery cannot fan one Supabase
+  // identity out across two local users.
+  @Prop()
+  supabaseUserId?: string;
+
   // Session generation embedded in every issued JWT. Incremented on logout so a
   // leaked or shared-device token stops working immediately instead of living
   // out its multi-day expiry.
@@ -215,6 +225,7 @@ export class User {
 export const UserSchema = SchemaFactory.createForClass(User);
 
 // Indexes
+UserSchema.index({ supabaseUserId: 1 }, { unique: true, sparse: true });
 UserSchema.index({ googleId: 1 }, { sparse: true });
 UserSchema.index({ linkedinId: 1 }, { sparse: true });
 UserSchema.index({ role: 1 });

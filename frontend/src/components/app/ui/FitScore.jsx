@@ -15,7 +15,7 @@ export const fitValue = (fit) => {
 
 export const fitInk = (fit) => {
   const n = fitValue(fit);
-  return n !== null && n >= STRONG_FIT ? 'var(--jb-a-accent)' : 'var(--jb-a-ink-2)';
+  return n !== null && n >= STRONG_FIT ? 'var(--jb-v3-accent)' : 'var(--jb-v3-fg-2)';
 };
 
 export default function FitScore({ fit, size = 22, caption, suffix = '', style, ...rest }) {
@@ -24,7 +24,7 @@ export default function FitScore({ fit, size = 22, caption, suffix = '', style, 
     <span style={{ display: 'flex', flexDirection: 'column', ...style }} {...rest}>
       <span
         style={{
-          fontFamily: 'var(--jb-font-mono)',
+          fontFamily: 'var(--jb-v3-font-mono)',
           fontSize: size,
           fontWeight: 600,
           lineHeight: 1.1,
@@ -34,7 +34,7 @@ export default function FitScore({ fit, size = 22, caption, suffix = '', style, 
         {n === null ? '—' : `${n}${suffix}`}
       </span>
       {caption && (
-        <span style={{ fontSize: 11.5, color: 'var(--jb-a-ink-warm)' }}>{caption}</span>
+        <span style={{ fontSize: 11.5, color: 'var(--jb-v3-fg-3)' }}>{caption}</span>
       )}
     </span>
   );

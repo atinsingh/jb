@@ -7,6 +7,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { toast } from 'react-toastify';
 import { API_URL } from '@/config/api';
+import { getAccessToken } from '@/lib/apiClient';
 
 export default function AnswersPackGenerator({ applicationId, jobId, existingAnswersPack, onUpdate }) {
   const [loading, setLoading] = useState(false);
@@ -16,7 +17,7 @@ export default function AnswersPackGenerator({ applicationId, jobId, existingAns
   const handleGenerate = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+      const token = await getAccessToken();
       const response = await fetch(`${API_URL}/api/job-tracker/applications/${applicationId}/answers-pack/generate`, {
         method: 'POST',
         headers: {
@@ -44,7 +45,7 @@ export default function AnswersPackGenerator({ applicationId, jobId, existingAns
 
   const handleSave = async () => {
     try {
-      const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+      const token = await getAccessToken();
       const response = await fetch(`${API_URL}/api/job-tracker/applications/${applicationId}/answers-pack`, {
         method: 'PUT',
         headers: {

@@ -1,33 +1,26 @@
 'use client';
 
-/**
- * Job Profiles — /app/job-profiles
- *
- * A job profile is one targeted search: a role, the countries it targets, its
- * own match threshold, its own résumé, and its own auto-apply switch. Running
- * several at once is the point — "Backend — Canada" and "Staff SWE — remote,
- * global" are different searches for the same person.
- *
- * The `job-profiles` backend has existed with full CRUD and no frontend caller
- * at all; this page is that caller. `targetCountries` set here drives the
- * Stage-1a geo pre-filter and gates auto-apply.
- */
-
 import { useCallback, useEffect, useState } from 'react';
 import Head from 'next/head';
-import Link from 'next/link';
-import AppSidebar from '@/components/app/AppSidebar';
-import { appRoute } from '@/components/app/appRoutes';
-import { LoadingState, EmptyState, ErrorState } from '@/components/app/AppStates';
-import CountryPicker, { countryLabel } from '@/components/app/CountryPicker';
+import { LoadingState, EmptyState, ErrorState, InlineError } from '@/components/app/AppStates';
+import CountryPicker from '@/components/app/CountryPicker';
+import {
+  Screen,
+  BigCount,
+  EndRule,
+  MonoButton,
+  MonoChip,
+  MonoSwitch,
+  Ticks,
+  mono,
+  HAIR,
+} from '@/components/app/v3/kit';
 import {
   listJobProfiles,
   createJobProfile,
   updateJobProfile,
   setJobProfileActive,
   deleteJobProfile,
-  uploadJobProfileResume,
-  getMatchPreviewForProfile,
 } from '@/services/jobProfileApi';
 
 const JOB_TYPES = [
@@ -48,61 +41,8 @@ const blank = () => ({
   autoApply: false,
 });
 
-/* ------------------------------------------------------------ styles --- */
-const card = {
-  background: '#FFFEFB',
-  border: '1px solid #E6DECF',
-  borderRadius: 18,
-  padding: 22,
-};
-const labelStyle = {
-  display: 'block',
-  fontSize: 13,
-  fontWeight: 700,
-  color: '#1B1A16',
-  marginBottom: 5,
-};
-const inputStyle = {
-  width: '100%',
-  fontFamily: 'inherit',
-  fontSize: 14,
-  color: '#1B1A16',
-  background: '#FFFEFB',
-  border: '1px solid #D9D0BE',
-  borderRadius: 10,
-  padding: '10px 12px',
-};
-const primaryBtn = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 8,
-  fontFamily: 'inherit',
-  fontSize: 14,
-  fontWeight: 700,
-  color: '#0C2C1C',
-  background: '#1FA463',
-  border: 'none',
-  borderRadius: 999,
-  padding: '11px 20px',
-  cursor: 'pointer',
-};
-const ghostBtn = {
-  fontFamily: 'inherit',
-  fontSize: 13,
-  fontWeight: 600,
-  color: '#6B655A',
-  background: 'transparent',
-  border: '1px solid #D9D0BE',
-  borderRadius: 999,
-  padding: '9px 16px',
-  cursor: 'pointer',
-};
-
-/* ---------------------------------------------------------- normalize --- */
 function normalizeProfiles(payload) {
-  const list = Array.isArray(payload)
-    ? payload
-    : payload?.profiles || payload?.data || [];
+  const list = Array.isArray(payload) ? payload : payload?.profiles || payload?.data || [];
   return list.map((p) => ({
     ...p,
     id: String(p._id || p.id),
@@ -111,23 +51,45 @@ function normalizeProfiles(payload) {
   }));
 }
 
+/* v3 form parts — 2px fields, mono labels, no cards. */
+const field = {
+  width: '100%',
+  background: 'var(--jb-v3-panel)',
+  border: '1px solid var(--jb-v3-line-2)',
+  borderRadius: 2,
+  padding: '9px 11px',
+  fontFamily: 'inherit',
+  fontSize: 13.5,
+  color: 'var(--jb-v3-fg)',
+};
+
+function Field({ label, children }) {
+  return (
+    <label style={{ display: 'block' }}>
+      <span style={{ ...mono(10, '0.12em'), display: 'block', marginBottom: 7 }}>{label}</span>
+      {children}
+    </label>
+  );
+}
+
+const COLS = '1fr 200px 190px 90px 80px';
+
 export default function JobProfilesPage() {
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(null);
   const [editing, setEditing] = useState(null); // null | 'new' | profileId
   const [draft, setDraft] = useState(blank());
   const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState('');
-  const [preview, setPreview] = useState(null);
+  const [formError, setFormError] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError('');
+    setError(null);
     try {
       setProfiles(normalizeProfiles(await listJobProfiles()));
     } catch (e) {
-      setError(e.message || 'Could not load your job profiles.');
+      setError(e || new Error('Could not load your job profiles.'));
     } finally {
       setLoading(false);
     }
@@ -139,8 +101,7 @@ export default function JobProfilesPage() {
 
   const startNew = () => {
     setDraft(blank());
-    setFormError('');
-    setPreview(null);
+    setFormError(null);
     setEditing('new');
   };
 
@@ -156,12 +117,15 @@ export default function JobProfilesPage() {
       minMatchScore: p.minMatchScore ?? 75,
       autoApply: !!p.autoApply,
     });
-    setFormError('');
-    setPreview(null);
+    setFormError(null);
     setEditing(p.id);
   };
 
-  const payloadFromDraft = () => {
+  const save = async () => {
+    if (!draft.profileName.trim()) {
+      setFormError(new Error('Give this profile a name.'));
+      return;
+    }
     const body = {
       profileName: draft.profileName.trim(),
       role: draft.role.trim(),
@@ -175,23 +139,16 @@ export default function JobProfilesPage() {
     if (draft.salaryMin !== '' && !Number.isNaN(Number(draft.salaryMin))) {
       body.salaryMin = Number(draft.salaryMin);
     }
-    return body;
-  };
 
-  const save = async () => {
-    if (!draft.profileName.trim()) {
-      setFormError('Give this profile a name so you can tell your searches apart.');
-      return;
-    }
     setSaving(true);
-    setFormError('');
+    setFormError(null);
     try {
-      if (editing === 'new') await createJobProfile(payloadFromDraft());
-      else await updateJobProfile(editing, payloadFromDraft());
+      if (editing === 'new') await createJobProfile(body);
+      else await updateJobProfile(editing, body);
       setEditing(null);
       await load();
     } catch (e) {
-      setFormError(e.message || 'Could not save this profile.');
+      setFormError(e || new Error('Could not save this profile.'));
     } finally {
       setSaving(false);
     }
@@ -199,38 +156,20 @@ export default function JobProfilesPage() {
 
   const toggleActive = async (p) => {
     try {
-      await setJobProfileActive(p.id, !p.active);
+      await setJobProfileActive(p.id, !p.isActive);
       await load();
     } catch (e) {
-      setError(e.message || 'Could not change this profile.');
+      setError(e);
     }
   };
 
   const remove = async (p) => {
     try {
       await deleteJobProfile(p.id);
+      setEditing(null);
       await load();
     } catch (e) {
-      setError(e.message || 'Could not delete this profile.');
-    }
-  };
-
-  const attachResume = async (p, file) => {
-    if (!file) return;
-    try {
-      await uploadJobProfileResume(p.id, file);
-      await load();
-    } catch (e) {
-      setError(e.message || 'Could not attach that résumé.');
-    }
-  };
-
-  // Real counts explaining what this profile does to the pool.
-  const checkImpact = async (profileId) => {
-    try {
-      setPreview(await getMatchPreviewForProfile(profileId));
-    } catch {
-      setPreview(null);
+      setError(e);
     }
   };
 
@@ -240,367 +179,198 @@ export default function JobProfilesPage() {
         <title>Job profiles · Jobocate</title>
       </Head>
 
-      <div style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA' }}>
-        <AppSidebar active="job-profiles" />
+      <Screen>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'baseline',
+            justifyContent: 'space-between',
+            marginBottom: 24,
+          }}
+        >
+          <BigCount value={profiles.length} caption="Target profiles" />
+          <MonoButton onClick={startNew} style={{ padding: '7px 14px' }}>
+            New
+          </MonoButton>
+        </div>
 
-        <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          <header
-            style={{
-              position: 'sticky',
-              top: 0,
-              zIndex: 20,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 20,
-              padding: '15px 32px',
-              background: 'rgba(247,243,234,0.85)',
-              backdropFilter: 'blur(10px)',
-              borderBottom: '1px solid #E7E0D2',
-            }}
-          >
-            <h1 style={{ fontSize: 17, fontWeight: 700, color: '#1B1A16', margin: 0 }}>
-              Job profiles
-            </h1>
-            {editing === null && (
-              <button type="button" onClick={startNew} style={primaryBtn}>
-                + New profile
-              </button>
-            )}
-          </header>
+        {editing && (
+          <div style={{ borderTop: HAIR, padding: '24px 4px 28px' }}>
+            <div style={{ ...mono(), marginBottom: 18 }}>
+              {editing === 'new' ? 'New profile' : 'Edit profile'}
+            </div>
+            {formError && <InlineError error={formError} />}
 
-          <div style={{ padding: '30px 32px 56px', width: '100%', maxWidth: 880 }}>
-            <p style={{ fontSize: 14, color: '#6B655A', margin: '0 0 22px', lineHeight: 1.55 }}>
-              Each profile is a separate search. The countries you target here decide which jobs
-              you see — and auto-apply never runs outside them.
-            </p>
+            <div style={{ display: 'grid', gap: 18, maxWidth: 720 }}>
+              <Field label="Profile name">
+                <input
+                  style={field}
+                  value={draft.profileName}
+                  onChange={(e) => setDraft({ ...draft, profileName: e.target.value })}
+                />
+              </Field>
 
-            {error && <ErrorState error={error} onRetry={load} />}
-
-            {editing !== null && (
-              <section style={{ ...card, marginBottom: 22 }}>
-                <h2 style={{ fontSize: 15.5, fontWeight: 700, color: '#1B1A16', margin: '0 0 16px' }}>
-                  {editing === 'new' ? 'New profile' : 'Edit profile'}
-                </h2>
-
-                <div style={{ display: 'grid', gap: 16 }}>
-                  <div>
-                    <label htmlFor="jp-name" style={labelStyle}>
-                      Profile name
-                    </label>
-                    <input
-                      id="jp-name"
-                      style={inputStyle}
-                      value={draft.profileName}
-                      onChange={(e) => setDraft({ ...draft, profileName: e.target.value })}
-                      placeholder="Backend — Canada"
-                    />
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                    <div>
-                      <label htmlFor="jp-role" style={labelStyle}>
-                        Role
-                      </label>
-                      <input
-                        id="jp-role"
-                        style={inputStyle}
-                        value={draft.role}
-                        onChange={(e) => setDraft({ ...draft, role: e.target.value })}
-                        placeholder="Senior Backend Engineer"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="jp-level" style={labelStyle}>
-                        Level
-                      </label>
-                      <input
-                        id="jp-level"
-                        style={inputStyle}
-                        value={draft.level}
-                        onChange={(e) => setDraft({ ...draft, level: e.target.value })}
-                        placeholder="senior"
-                      />
-                    </div>
-                  </div>
-
-                  <CountryPicker
-                    id="jp-countries"
-                    value={draft.targetCountries}
-                    onChange={(targetCountries) => setDraft({ ...draft, targetCountries })}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
+                <Field label="Role">
+                  <input
+                    style={field}
+                    value={draft.role}
+                    onChange={(e) => setDraft({ ...draft, role: e.target.value })}
                   />
+                </Field>
+                <Field label="Level">
+                  <input
+                    style={field}
+                    value={draft.level}
+                    onChange={(e) => setDraft({ ...draft, level: e.target.value })}
+                  />
+                </Field>
+              </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                    <div>
-                      <label htmlFor="jp-type" style={labelStyle}>
-                        Workplace
-                      </label>
-                      <select
-                        id="jp-type"
-                        style={inputStyle}
-                        value={draft.jobType}
-                        onChange={(e) => setDraft({ ...draft, jobType: e.target.value })}
+              <Field label="Target countries">
+                <CountryPicker
+                  value={draft.targetCountries}
+                  onChange={(targetCountries) => setDraft({ ...draft, targetCountries })}
+                />
+              </Field>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
+                <Field label="Work type">
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {JOB_TYPES.map((t) => (
+                      <MonoChip
+                        key={t.value}
+                        on={draft.jobType === t.value}
+                        onClick={() => setDraft({ ...draft, jobType: t.value })}
                       >
-                        {JOB_TYPES.map((t) => (
-                          <option key={t.value} value={t.value}>
-                            {t.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label htmlFor="jp-salary" style={labelStyle}>
-                        Minimum salary
-                      </label>
-                      <input
-                        id="jp-salary"
-                        type="number"
-                        min="0"
-                        style={inputStyle}
-                        value={draft.salaryMin}
-                        onChange={(e) => setDraft({ ...draft, salaryMin: e.target.value })}
-                        placeholder="120000"
-                      />
-                    </div>
+                        {t.label}
+                      </MonoChip>
+                    ))}
                   </div>
+                </Field>
+                <Field label="Salary floor">
+                  <input
+                    style={field}
+                    inputMode="numeric"
+                    value={draft.salaryMin}
+                    onChange={(e) => setDraft({ ...draft, salaryMin: e.target.value })}
+                  />
+                </Field>
+              </div>
 
-                  <div>
-                    <label htmlFor="jp-skills" style={labelStyle}>
-                      Skills
-                    </label>
-                    <input
-                      id="jp-skills"
-                      style={inputStyle}
-                      value={draft.skills.join(', ')}
-                      onChange={(e) =>
-                        setDraft({
-                          ...draft,
-                          skills: e.target.value
-                            .split(',')
-                            .map((s) => s.trim())
-                            .filter(Boolean),
-                        })
-                      }
-                      placeholder="typescript, postgres, kubernetes"
-                    />
-                    <p style={{ fontSize: 12, color: '#8A8375', margin: '5px 0 0' }}>
-                      Comma-separated.
-                    </p>
-                  </div>
+              <Field label="Skills — comma separated">
+                <input
+                  style={field}
+                  value={draft.skills.join(', ')}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      skills: e.target.value
+                        .split(',')
+                        .map((s) => s.trim())
+                        .filter(Boolean),
+                    })
+                  }
+                />
+              </Field>
 
-                  <div>
-                    <label htmlFor="jp-threshold" style={labelStyle}>
-                      Minimum match score — {draft.minMatchScore}%
-                    </label>
-                    <input
-                      id="jp-threshold"
-                      type="range"
-                      min="50"
-                      max="99"
-                      value={draft.minMatchScore}
-                      onChange={(e) => setDraft({ ...draft, minMatchScore: e.target.value })}
-                      style={{ width: '100%' }}
-                    />
-                  </div>
+              <Field label={`Minimum coverage — ${draft.minMatchScore}`}>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  style={{ width: '100%', accentColor: 'var(--jb-v3-accent)' }}
+                  value={draft.minMatchScore}
+                  onChange={(e) => setDraft({ ...draft, minMatchScore: e.target.value })}
+                />
+              </Field>
 
-                  <label
-                    htmlFor="jp-autoapply"
-                    style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <MonoSwitch
+                  checked={draft.autoApply}
+                  onChange={() => setDraft({ ...draft, autoApply: !draft.autoApply })}
+                  label="Auto-apply for this profile"
+                />
+                <span style={{ fontSize: 13.5 }}>Auto-apply for this profile</span>
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <MonoButton filled onClick={save} disabled={saving}>
+                  {saving ? 'Saving…' : 'Save'}
+                </MonoButton>
+                <MonoButton onClick={() => setEditing(null)}>Cancel</MonoButton>
+                <span style={{ flex: 1 }} />
+                {/* Delete lives here rather than in the row: v3's profile row
+                    has no destructive action, and a one-click delete sitting
+                    beside "Edit" in a list is how profiles get lost. */}
+                {editing !== 'new' && (
+                  <MonoButton
+                    onClick={() => remove({ id: editing })}
+                    style={{ borderColor: 'var(--jb-v3-danger-line)', color: 'var(--jb-v3-danger)' }}
                   >
-                    <input
-                      id="jp-autoapply"
-                      type="checkbox"
-                      checked={draft.autoApply}
-                      onChange={(e) => setDraft({ ...draft, autoApply: e.target.checked })}
-                      style={{ marginTop: 3 }}
-                    />
-                    <span>
-                      <span style={{ fontSize: 13.5, fontWeight: 700, color: '#1B1A16' }}>
-                        Prepare applications automatically
-                      </span>
-                      <span style={{ display: 'block', fontSize: 12.5, color: '#6B655A', marginTop: 2 }}>
-                        Jobocate fills applications for matches above your threshold and holds them
-                        for your approval. Nothing is ever submitted without you.
-                      </span>
-                    </span>
-                  </label>
+                    Delete profile
+                  </MonoButton>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
-                  {formError && (
-                    <p style={{ fontSize: 13, color: '#B23A22', margin: 0 }} role="alert">
-                      {formError}
-                    </p>
-                  )}
+        {loading && <LoadingState label="Loading your profiles…" />}
+        {!loading && error && <ErrorState error={error} onRetry={load} />}
 
-                  <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                    <button type="button" onClick={save} disabled={saving} style={primaryBtn}>
-                      {saving ? 'Saving…' : 'Save profile'}
-                    </button>
-                    <button type="button" onClick={() => setEditing(null)} style={ghostBtn}>
-                      Cancel
-                    </button>
+        {!loading && !error && profiles.length > 0 && (
+          <>
+            {profiles.map((p) => (
+              <div
+                key={p.id}
+                style={{
+                  borderTop: HAIR,
+                  padding: '20px 4px',
+                  display: 'grid',
+                  gridTemplateColumns: COLS,
+                  gap: 24,
+                  alignItems: 'center',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 4 }}>
+                    {p.profileName || p.role || 'Untitled profile'}
+                  </div>
+                  <div style={mono(10, '0')}>
+                    {[p.role, p.level, p.jobType].filter(Boolean).join(' · ') || '—'}
                   </div>
                 </div>
-              </section>
-            )}
-
-            {loading ? (
-              <LoadingState label="Loading your profiles…" />
-            ) : profiles.length === 0 && editing === null ? (
-              <EmptyState
-                icon="◎"
-                title="No job profiles yet"
-                hint="Create one to tell Jobocate what you're looking for and which countries you're targeting."
-                action={
-                  <button type="button" onClick={startNew} style={primaryBtn}>
-                    Create your first profile
-                  </button>
-                }
-              />
-            ) : (
-              <div style={{ display: 'grid', gap: 14 }}>
-                {profiles.map((p) => (
-                  <article key={p.id} style={card}>
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'flex-start',
-                        gap: 16,
-                      }}
-                    >
-                      <div style={{ minWidth: 0 }}>
-                        <h3 style={{ fontSize: 15.5, fontWeight: 700, color: '#1B1A16', margin: 0 }}>
-                          {p.profileName}
-                          {/* An inactive profile does nothing at all, so it says
-                              so plainly. Previously only ACTIVE was rendered —
-                              an idle profile looked identical to a running one
-                              apart from a button label, while still showing a
-                              confident AUTO-PREPARE badge. */}
-                          <span
-                            style={{
-                              marginLeft: 9,
-                              fontSize: 11,
-                              fontWeight: 700,
-                              color: p.active ? '#157A49' : '#6B655A',
-                              background: p.active ? '#EAF6EE' : '#F0EDE4',
-                              border: `1px solid ${p.active ? '#CDE9D6' : '#DED8C9'}`,
-                              borderRadius: 999,
-                              padding: '2px 8px',
-                            }}
-                          >
-                            {p.active ? 'ACTIVE' : 'PAUSED'}
-                          </span>
-                          {p.autoApply && (
-                            <span
-                              title={
-                                p.active
-                                  ? 'Applications are prepared for your approval'
-                                  : 'Switched on, but nothing runs while this profile is paused'
-                              }
-                              style={{
-                                marginLeft: 6,
-                                fontSize: 11,
-                                fontWeight: 700,
-                                // Muted while paused: the setting is on, but it
-                                // is not doing anything, and the badge must not
-                                // imply otherwise.
-                                color: p.active ? '#8A6100' : '#8A8375',
-                                background: p.active ? '#FFF3D9' : '#F0EDE4',
-                                border: `1px solid ${p.active ? '#F0DDAE' : '#DED8C9'}`,
-                                borderRadius: 999,
-                                padding: '2px 8px',
-                              }}
-                            >
-                              AUTO-PREPARE{p.active ? '' : ' (IDLE)'}
-                            </span>
-                          )}
-                        </h3>
-                        <p style={{ fontSize: 13, color: '#6B655A', margin: '5px 0 0' }}>
-                          {[p.role, p.level, p.jobType].filter(Boolean).join(' · ') || 'No role set'}
-                          {' · '}
-                          match ≥ {p.minMatchScore ?? 75}%
-                        </p>
-                        <p style={{ fontSize: 13, color: '#3D3930', margin: '7px 0 0' }}>
-                          {p.targetCountries.length ? (
-                            <>
-                              Targeting{' '}
-                              <strong>{p.targetCountries.map(countryLabel).join(', ')}</strong>
-                            </>
-                          ) : (
-                            <span style={{ color: '#8A8375' }}>
-                              No target countries — falls back to your preferences
-                            </span>
-                          )}
-                        </p>
-                      </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 7, flexShrink: 0 }}>
-                        <button type="button" onClick={() => startEdit(p)} style={ghostBtn}>
-                          Edit
-                        </button>
-                        <button type="button" onClick={() => toggleActive(p)} style={ghostBtn}>
-                          {p.active ? 'Pause' : 'Activate'}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div
-                      style={{
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: 10,
-                        alignItems: 'center',
-                        marginTop: 15,
-                        paddingTop: 13,
-                        borderTop: '1px dashed #E6DECF',
-                      }}
-                    >
-                      <label style={{ ...ghostBtn, display: 'inline-flex', alignItems: 'center' }}>
-                        {p.resumePath ? 'Replace résumé' : 'Attach résumé'}
-                        <input
-                          type="file"
-                          accept=".pdf,.doc,.docx"
-                          onChange={(e) => attachResume(p, e.target.files?.[0])}
-                          style={{ display: 'none' }}
-                        />
-                      </label>
-                      <button type="button" onClick={() => checkImpact(p.id)} style={ghostBtn}>
-                        Check impact
-                      </button>
-                      {/* "View matches" is why this card exists, so it carries the
-                          filled treatment. Delete is separated by the spacer and
-                          drops its border — destructive actions should be reachable
-                          without competing for the eye with the primary one. */}
-                      <Link
-                        href={`${appRoute('App Matches.dc.html')}?profileId=${p.id}`}
-                        style={{ ...primaryBtn, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
-                      >
-                        View matches →
-                      </Link>
-                      <span style={{ flex: 1 }} />
-                      <button
-                        type="button"
-                        onClick={() => remove(p)}
-                        style={{ ...ghostBtn, color: '#96796F', background: 'transparent', border: 'none', padding: '9px 4px' }}
-                      >
-                        Delete
-                      </button>
-                    </div>
-
-                    {preview && (
-                      <p style={{ fontSize: 12.5, color: '#6B655A', margin: '12px 0 0' }}>
-                        {preview.poolSize} jobs in the pool · {preview.eligible} eligible ·{' '}
-                        {preview.excludedByGeography} excluded by geography ·{' '}
-                        {preview.recommended} recommended
-                      </p>
-                    )}
-                  </article>
-                ))}
+                {/* The bar shows this profile's coverage floor — the one number
+                    that decides how much it will surface. */}
+                <Ticks pct={(p.minMatchScore ?? 0) / 100} n={16} height={12} grow />
+                <div style={mono(10.5, '0', 'var(--jb-v3-fg-2)')}>
+                  {p.isActive ? 'Active' : 'Paused'}
+                </div>
+                <MonoButton block onClick={() => startEdit(p)}>
+                  Edit
+                </MonoButton>
+                <MonoButton block onClick={() => toggleActive(p)}>
+                  {p.isActive ? 'Pause' : 'Resume'}
+                </MonoButton>
               </div>
-            )}
-          </div>
-        </main>
-      </div>
+            ))}
+            <EndRule />
+          </>
+        )}
+
+        {!loading && !error && profiles.length === 0 && !editing && (
+          <EmptyState
+            title="No profiles yet"
+            hint="A profile is a target: role, level, where you can work, and the coverage floor you care about."
+            action={
+              <MonoButton onClick={startNew} style={{ marginTop: 8 }}>
+                Create one
+              </MonoButton>
+            }
+          />
+        )}
+      </Screen>
     </>
   );
 }

@@ -138,10 +138,15 @@ test.describe('Autopilot: proposal -> approval -> real applicant change', () => 
       await page.goto('/app/login', { waitUntil: 'domcontentloaded' });
       await page.fill('input[name="email"]', employer.email);
       await page.fill('input[name="password"]', employer.password);
-      await page.getByRole('button', { name: /log ?in|sign ?in/i }).first().click();
-      await page.waitForFunction(() => !!window.localStorage.getItem('authToken'), null, {
-        timeout: 30_000,
-      });
+      await page.locator('form').getByRole('button', { name: /^log in$/i }).click();
+      // Sign-in is done when Supabase has persisted its session COOKIE. It used
+      // to be a localStorage token; moving it to cookies is what lets
+      // src/middleware.js gate protected routes server-side.
+      await page.waitForFunction(
+        () => document.cookie.split(/;s*/).some((c) => /^sb-.*-auth-token/.test(c)),
+        null,
+        { timeout: 30_000 },
+      );
 
       await page.goto('/employer/autopilot', { waitUntil: 'domcontentloaded' });
       await page.waitForLoadState('networkidle').catch(() => {});

@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import Logo from '@/components/brand/Logo';
-import useMarketingTheme from './useMarketingTheme';
 
 /**
  * Marketing footer - one hairline row.
@@ -25,8 +24,9 @@ import useMarketingTheme from './useMarketingTheme';
  *      nav sent the same label to public /employers. One destination now.
  *
  * The footer also used to hardcode a dark ground and pass Logo theme="dark"
- * unconditionally, so it stayed dark while the nav flipped to light. It now
- * reads the marketing theme like the nav does.
+ * unconditionally, so it stayed dark while the nav flipped to light. The Logo
+ * now inherits its ink from the surrounding text colour, so neither this file
+ * nor the nav has to tell it which theme is active.
  */
 
 /** Every destination is public. Do not add a /app/* or /employer/* link here. */
@@ -43,7 +43,6 @@ const LINKS = [
 ];
 
 export default function SiteFooter() {
-  const { theme } = useMarketingTheme();
 
   return (
     <footer className="jbfoot" aria-labelledby="jbfoot-heading">
@@ -54,7 +53,7 @@ export default function SiteFooter() {
       <div className="jbfoot__inner">
         <div className="jbfoot__row">
           <Link href="/" className="jbfoot__logo" aria-label="Jobocate home">
-            <Logo theme={theme === 'light' ? 'light' : 'dark'} size={20} style={{ color: 'var(--jb-ink-muted)' }} />
+            <Logo size={20} style={{ color: 'var(--jb-ink-muted)' }} />
           </Link>
 
           <nav className="jbfoot__links" aria-label="Footer">

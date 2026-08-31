@@ -2,6 +2,8 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getConnectionToken } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
+import { randomUUID } from 'crypto';
+import { signTestAccessToken } from './supabase-test-auth';
 import * as request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { HttpExceptionFilter } from '../../src/common/filters/http-exception.filter';
@@ -57,8 +59,17 @@ export interface TestUser {
 }
 
 /**
- * Register a user and return its bearer token. Registration returns a token
- * directly, so this is one call rather than register-then-login.
+ * Create a user and return a bearer token for it.
+ *
+ * There is no registration endpoint any more — Supabase owns sign-up. So this
+ * does what the migration does: writes the local User document (which owns
+ * `role`, plan and Stripe state) and mints a matching access token.
+ *
+ * The token is signed with the per-run keypair from setup-e2e.ts and verified by
+ * the real guard, so this exercises the production auth path rather than
+ * bypassing it. The user is inserted explicitly rather than left to the guard's
+ * lazy upsert because that path always creates ROLE_CANDIDATE, and the RBAC and
+ * employer suites need ROLE_EMPLOYER.
  */
 export async function registerUser(
   app: INestApplication,
@@ -66,17 +77,29 @@ export async function registerUser(
   namePrefix = 'e2e',
 ): Promise<TestUser> {
   const email = uniqueEmail(namePrefix);
-  const res = await api(app)
-    .post('/api/auth/register')
-    .send({
-      name: `${namePrefix} tester`,
-      email,
-      password: 'E2ePassw0rd!',
-      role,
-    })
-    .expect(201);
+  const supabaseUserId = randomUUID();
 
-  return { token: res.body.token, email, id: res.body.user?.id };
+  const connection = app.get<Connection>(getConnectionToken());
+  const inserted = await connection.collection('users').insertOne({
+    supabaseUserId,
+    email,
+    name: `${namePrefix} tester`,
+    role,
+    provider: 'local',
+    emailVerified: true,
+    isActive: true,
+    currentPlanType: 'FREE',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+
+  const token = await signTestAccessToken({
+    sub: supabaseUserId,
+    email,
+    name: `${namePrefix} tester`,
+  });
+
+  return { token, email, id: inserted.insertedId.toString() };
 }
 
 export const auth = (token: string) => ({ Authorization: `Bearer ${token}` });

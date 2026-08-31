@@ -105,7 +105,10 @@ export function useLiveInterview(sessionId) {
         // ---- socket first: if the server refuses, never open a microphone ----
         const socket = io(`${API_URL}/interview-sessions`, {
           transports: ['websocket'],
-          auth: { token: getAuthTokenForSocket() },
+          // Callback form so the token is fetched at connect AND at every
+          // reconnect — a long-lived socket outlives an access token, and a
+          // value captured once here would fail to re-authenticate.
+          auth: (cb) => { getAuthTokenForSocket().then((token) => cb({ token })); },
           query: { sessionId },
         });
         socketRef.current = socket;

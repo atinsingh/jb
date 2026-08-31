@@ -1,0 +1,630 @@
+/*
+ * Pre-auth screens, Candidate v3.
+ *
+ * Shared by /app/login and /app/signup so the two cannot drift, which is how
+ * they ended up on two different design systems before this (login on the
+ * cobalt app palette, signup on the retired cream/green Tailwind mirror).
+ *
+ * The rules of the system, all of which the old screens broke:
+ *   - Radius is 2px. Everywhere. No pills, no rounded-2xl.
+ *   - No box-shadow at all. Separation is a 1px hairline, and specifically
+ *     `display:grid; gap:1px` over a line-coloured ground: THE GAP IS THE RULE.
+ *     Never add per-cell borders on top of it; they double up.
+ *   - No literal hex. Every colour is a var(--jb-v3-*), or the light theme
+ *     (html[data-jb-theme='light']) breaks silently.
+ *   - Sora for display AND body, DM Mono for labels. There is no serif in v3.
+ *   - Motion is 0.18s-0.22s ease on transform/opacity only.
+ */
+
+.page {
+  min-height: 100dvh; /* not 100vh: the iOS address bar makes vh jump */
+  display: flex;
+  flex-direction: column;
+  background: var(--jb-v3-bg);
+  color: var(--jb-v3-fg);
+  font-family: var(--jb-v3-font-display);
+  font-size: 14px;
+  line-height: 1.45;
+  font-feature-settings: 'tnum' 1;
+}
+
+/* The dot field from the homepage, so the seam from / to /app/login is
+   invisible. Fixed and inert. */
+.dots {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: radial-gradient(var(--jb-v3-dot) 0.8px, transparent 0.8px);
+  background-size: 26px 26px;
+  background-position: 13px 13px;
+  mask-image: radial-gradient(ellipse 130% 90% at 50% 0%, #000 8%, rgba(0, 0, 0, 0.35) 55%, transparent 92%);
+  -webkit-mask-image: radial-gradient(ellipse 130% 90% at 50% 0%, #000 8%, rgba(0, 0, 0, 0.35) 55%, transparent 92%);
+}
+
+/* ---------------------------------------------------------------- chrome */
+
+.bar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  height: 56px; /* matches SiteNav */
+  max-width: 1360px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 28px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  color: var(--jb-v3-fg);
+  text-decoration: none;
+}
+
+.barLink {
+  font-family: var(--jb-v3-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--jb-v3-fg-3);
+  text-decoration: none;
+  transition: color 0.18s ease;
+}
+
+.barLink:hover {
+  color: var(--jb-v3-fg);
+}
+
+/* ----------------------------------------------------------------- shell */
+
+/* The grid ground above needs the page padding OUTSIDE it, so the hairline
+   frame does not run to the viewport edge. */
+.shellOuter {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  width: 100%;
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 32px 28px 72px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 1px;
+  background: var(--jb-v3-line);
+  border: 1px solid var(--jb-v3-line);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.formCell {
+  background: var(--jb-v3-bg);
+  padding: 48px clamp(24px, 4vw, 56px) 44px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.asideCell {
+  background: var(--jb-v3-panel);
+  padding: 48px clamp(24px, 3vw, 40px) 44px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.form {
+  width: 100%;
+  max-width: 460px;
+}
+
+/* ------------------------------------------------------------------ type */
+
+.h1 {
+  margin: 0;
+  font-family: var(--jb-v3-font-display);
+  font-size: 44px;
+  font-weight: 600;
+  letter-spacing: -0.05em;
+  line-height: 1.02;
+  text-wrap: pretty;
+}
+
+.lede {
+  margin: 18px 0 34px;
+  font-size: 16.5px;
+  color: var(--jb-v3-fg-2);
+  max-width: 42ch;
+  text-wrap: pretty;
+}
+
+.monoLabel {
+  margin: 0 0 4px;
+  font-family: var(--jb-v3-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--jb-v3-fg-3);
+}
+
+/* --------------------------------------------------------------- buttons */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 2px;
+  padding: 11px 22px;
+  font-family: var(--jb-v3-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: none;
+  white-space: nowrap; /* a CTA that wraps is a broken CTA */
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.btnPrimary {
+  width: 100%;
+  padding: 14px 22px;
+  background: var(--jb-v3-accent);
+  color: var(--jb-v3-accent-ink);
+  border: 1px solid var(--jb-v3-accent);
+}
+
+.btnPrimary:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.btnPrimary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btnGhost {
+  width: 100%;
+  background: none;
+  border: 1px solid var(--jb-v3-line-2);
+  color: var(--jb-v3-fg-2);
+}
+
+.btnGhost:hover {
+  border-color: var(--jb-v3-accent);
+  color: var(--jb-v3-fg);
+}
+
+.btn:focus-visible,
+.field:focus-visible {
+  outline: 2px solid var(--jb-v3-accent);
+  outline-offset: 2px;
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.oauthRow {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 26px;
+}
+
+/* The provider marks are the only non-token colour on the page, because a
+   Google or LinkedIn mark in our accent would not read as Google or LinkedIn. */
+.mark {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+
+/* -------------------------------------------------------------- divider */
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 26px;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--jb-v3-line);
+}
+
+.dividerLabel {
+  font-family: var(--jb-v3-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--jb-v3-fg-3);
+}
+
+/* --------------------------------------------------------------- fields */
+
+.fieldBlock {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.labelRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* Label ABOVE the input, always. Never placeholder-as-label. */
+.label {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--jb-v3-fg-2);
+}
+
+.field {
+  width: 100%;
+  background: var(--jb-v3-panel);
+  border: 1px solid var(--jb-v3-line);
+  border-radius: 2px;
+  padding: 11px 12px;
+  font-family: var(--jb-v3-font-display);
+  font-size: 13.5px;
+  color: var(--jb-v3-fg);
+  transition: border-color 0.18s ease;
+}
+
+.field::placeholder {
+  color: var(--jb-v3-fg-3);
+}
+
+.field:focus {
+  outline: none;
+  border-color: var(--jb-v3-accent-line);
+}
+
+.field[aria-invalid='true'] {
+  border-color: var(--jb-v3-danger-line);
+}
+
+.inlineLink {
+  font-family: var(--jb-v3-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--jb-v3-fg-3);
+  text-decoration: none;
+  transition: color 0.18s ease;
+}
+
+.inlineLink:hover {
+  color: var(--jb-v3-accent-faint);
+}
+
+/* A neutral/positive counterpart to .error, same hairline construction. */
+.notice {
+  margin: 0 0 18px;
+  padding: 11px 12px;
+  border: 1px solid var(--jb-v3-accent-line);
+  border-radius: 2px;
+  background: var(--jb-v3-accent-soft);
+  color: var(--jb-v3-fg);
+  font-size: 13px;
+}
+
+.notice strong {
+  font-weight: 600;
+}
+
+/* Error sits BELOW the thing it describes. */
+.error {
+  display: flex;
+  gap: 10px;
+  margin: 0 0 18px;
+  padding: 11px 12px;
+  border: 1px solid var(--jb-v3-danger-line);
+  border-radius: 2px;
+  background: var(--jb-v3-danger-soft);
+  color: var(--jb-v3-danger);
+  font-size: 13px;
+}
+
+.footNote {
+  margin: 22px 0 0;
+  font-size: 13px;
+  color: var(--jb-v3-fg-3);
+}
+
+.footNote a {
+  color: var(--jb-v3-fg);
+  text-decoration: none;
+  border-bottom: 1px solid var(--jb-v3-accent-line);
+  padding-bottom: 1px;
+}
+
+.footNote a:hover {
+  color: var(--jb-v3-accent-faint);
+}
+
+.terms {
+  margin: 16px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--jb-v3-fg-3);
+}
+
+.terms a {
+  color: var(--jb-v3-fg-2);
+}
+
+/* ------------------------------------------------------- aside data cell */
+
+/*
+ * The right column is a data cell, not decoration: it carries the same
+ * histogram motif as the homepage hero so the two surfaces read as one system.
+ */
+.asideHead {
+  margin: 0 0 auto;
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+  max-width: 15ch;
+}
+
+.statStrip {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--jb-v3-line);
+  border: 1px solid var(--jb-v3-line);
+  border-radius: 2px;
+  margin-top: 36px;
+}
+
+.statCell {
+  background: var(--jb-v3-panel);
+  padding: 18px 20px;
+}
+
+.statValue {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.045em;
+}
+
+.statLabel {
+  margin: 4px 0 0;
+  font-family: var(--jb-v3-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--jb-v3-fg-3);
+}
+
+/* Coverage histogram, same construction as the homepage hero. */
+.hist {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 66px;
+  margin-top: 28px;
+}
+
+.tick {
+  flex: 1;
+  border-radius: 1px;
+  background: var(--jb-v3-tick-off);
+}
+
+.tickOn {
+  background: var(--jb-v3-tick-on);
+}
+
+.asideNote {
+  margin: 16px 0 0;
+  font-size: 13px;
+  color: var(--jb-v3-fg-2);
+  max-width: 34ch;
+}
+
+/* ------------------------------------------------------- signup: role step */
+
+.roleGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--jb-v3-line);
+  border: 1px solid var(--jb-v3-line);
+  border-radius: 2px;
+  margin-bottom: 26px;
+}
+
+.roleCell {
+  position: relative;
+  background: var(--jb-v3-bg);
+  padding: 22px 20px 20px;
+  text-align: left;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--jb-v3-fg);
+  transition: background 0.18s ease;
+}
+
+.roleCell:hover {
+  background: var(--jb-v3-panel);
+}
+
+.roleCellOn {
+  background: var(--jb-v3-accent-soft);
+}
+
+.roleCellOn:hover {
+  background: var(--jb-v3-accent-soft);
+}
+
+.roleCell:focus-visible {
+  outline: 2px solid var(--jb-v3-accent);
+  outline-offset: -2px;
+}
+
+/* The v3 selection mark is a 3x10 solid rectangle, not a circular radio. */
+.roleTick {
+  width: 3px;
+  height: 10px;
+  background: var(--jb-v3-line-2);
+  margin-bottom: 14px;
+  transition: background 0.18s ease;
+}
+
+.roleTickOn {
+  background: var(--jb-v3-accent);
+}
+
+.roleName {
+  display: block;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.roleDesc {
+  display: block;
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--jb-v3-fg-2);
+}
+
+/* Password strength: the histogram tick motif again, not a rounded meter. */
+.strength {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.strengthTicks {
+  display: flex;
+  gap: 2px;
+  flex: 1;
+}
+
+.strengthTick {
+  flex: 1;
+  height: 2px;
+  background: var(--jb-v3-tick-off);
+}
+
+.strengthTickOn {
+  background: var(--jb-v3-tick-on);
+}
+
+.strengthLabel {
+  font-family: var(--jb-v3-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--jb-v3-fg-3);
+}
+
+.backBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 22px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--jb-v3-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--jb-v3-fg-3);
+  transition: color 0.18s ease;
+}
+
+.backBtn:hover {
+  color: var(--jb-v3-fg);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ------------------------------------------------------------ responsive */
+
+@media (max-width: 1000px) {
+  /* The aside is supporting context, not the task. Below the split it would
+     push the form under the fold, so it goes rather than stacks. */
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .asideCell {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .shellOuter {
+    padding: 20px 16px 48px;
+  }
+
+  .bar {
+    padding: 0 16px;
+  }
+
+  .formCell {
+    padding: 32px 20px 30px;
+  }
+
+  .h1 {
+    font-size: 34px;
+  }
+
+  .lede {
+    font-size: 15px;
+    margin-bottom: 28px;
+  }
+
+  .roleGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .field,
+  .roleCell,
+  .roleTick,
+  .barLink,
+  .inlineLink {
+    transition: none;
+  }
+
+  .btnPrimary:hover:not(:disabled) {
+    transform: none;
+  }
+}

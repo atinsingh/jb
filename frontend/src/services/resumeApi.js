@@ -1,16 +1,9 @@
 import { API_URL } from '@/config/api';
-
-// ---------------------------------------------------------------- auth ---
-const getAuthToken = () => {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('authToken') || localStorage.getItem('token');
-  }
-  return null;
-};
+import { getAccessToken } from '@/lib/apiClient';
 
 // Generic JSON API call, mirrors the convention in services/api.js
 const apiCall = async (endpoint, options = {}) => {
-  const token = getAuthToken();
+  const token = await getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,
@@ -82,7 +75,7 @@ export const createResumeVersion = async (id, description) =>
 
 // POST /api/resume-builder/upload  (multipart: resume + template)
 export const uploadResumeToBuilder = async (file, template) => {
-  const token = getAuthToken();
+  const token = await getAccessToken();
   const formData = new FormData();
   formData.append('resume', file);
   if (template) formData.append('template', template);
@@ -102,7 +95,7 @@ export const uploadResumeToBuilder = async (file, template) => {
 
 // GET /api/resume-builder/:id/pdf  ->  PDF binary (blob)
 export const downloadResumePdf = async (id) => {
-  const token = getAuthToken();
+  const token = await getAccessToken();
   const response = await fetch(`${API_URL}/api/resume-builder/${id}/pdf`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });

@@ -2,11 +2,8 @@ import { HealthController } from './health.controller';
 import { Connection } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
 
-const DEV_JWT_FALLBACK = 'dev-insecure-secret-change-me';
-
 // A full set of env values that satisfies every alpha MUST-HAVE.
 const FULL_ENV: Record<string, string> = {
-  JWT_SECRET: 'a-real-long-production-secret',
   MONGODB_URI: 'mongodb://db/jobocate',
   FRONTEND_URL: 'https://app.jobocate.com',
   ANTHROPIC_API_KEY: 'sk-ant-xxx',
@@ -15,10 +12,8 @@ const FULL_ENV: Record<string, string> = {
   SMTP_PASSWORD: 'smtp-pass',
   STRIPE_SECRET_KEY: 'sk_live_xxx',
   STRIPE_WEBHOOK_SECRET: 'whsec_xxx',
-  GOOGLE_CLIENT_ID: 'g-id',
-  GOOGLE_CLIENT_SECRET: 'g-secret',
-  LINKEDIN_CLIENT_ID: 'li-id',
-  LINKEDIN_CLIENT_SECRET: 'li-secret',
+  SUPABASE_URL: 'https://proj.supabase.co',
+  SUPABASE_SERVICE_ROLE_KEY: 'service-role-key-xxx',
   GREENHOUSE_BOARDS: 'acme',
   LEVER_BOARDS: 'beta',
   AUTO_APPLICATION_ENABLED: 'true',
@@ -29,15 +24,13 @@ const FULL_ENV: Record<string, string> = {
 
 // All the secret VALUES that must never appear in the response payload.
 const SECRET_VALUES = [
-  'a-real-long-production-secret',
+  'service-role-key-xxx',
   'mongodb://db/jobocate',
   'sk-ant-xxx',
   'sk-openai-xxx',
   'smtp-pass',
   'sk_live_xxx',
   'whsec_xxx',
-  'g-secret',
-  'li-secret',
 ];
 
 function makeConfig(env: Record<string, string>): ConfigService {
@@ -65,14 +58,12 @@ describe('HealthController — GET /health/readiness', () => {
     expect(res.missing).toEqual([]);
     expect(res.checks.mongo).toEqual({ ok: true, state: 'connected' });
     expect(res.checks.env).toEqual({
-      jwtSecret: true,
+      supabaseAuth: true,
       mongoUri: true,
       frontendUrl: true,
       aiKey: true,
       smtp: true,
       stripe: true,
-      googleOAuth: true,
-      linkedinOAuth: true,
       scraperBoards: true,
     });
     expect(typeof res.timestamp).toBe('string');
@@ -109,14 +100,15 @@ describe('HealthController — GET /health/readiness', () => {
     expect(res.missing).toEqual(['smtp']);
   });
 
-  it('JWT_SECRET === dev fallback => jwtSecret:false (treated as unconfigured)', async () => {
-    const env = { ...FULL_ENV, JWT_SECRET: DEV_JWT_FALLBACK };
+  it('missing SUPABASE_URL => supabaseAuth:false and gates ready', async () => {
+    const env = { ...FULL_ENV };
+    delete env.SUPABASE_URL;
 
     const res = await makeController(env, 1).readiness();
 
-    expect(res.checks.env.jwtSecret).toBe(false);
+    expect(res.checks.env.supabaseAuth).toBe(false);
     expect(res.ready).toBe(false);
-    expect(res.missing).toEqual(['jwtSecret']);
+    expect(res.missing).toEqual(['supabaseAuth']);
   });
 
   it('stripe partial (secret set, webhook missing) => stripe:false', async () => {
@@ -147,19 +139,13 @@ describe('HealthController — GET /health/readiness', () => {
     expect(res.missing).toEqual(['aiKey']);
   });
 
-  it('nice-to-haves (google/linkedin OAuth, scraperBoards) do NOT gate ready', async () => {
+  it('nice-to-haves (scraperBoards) do NOT gate ready', async () => {
     const env = { ...FULL_ENV };
-    delete env.GOOGLE_CLIENT_ID;
-    delete env.GOOGLE_CLIENT_SECRET;
-    delete env.LINKEDIN_CLIENT_ID;
-    delete env.LINKEDIN_CLIENT_SECRET;
     delete env.GREENHOUSE_BOARDS;
     delete env.LEVER_BOARDS;
 
     const res = await makeController(env, 1).readiness();
 
-    expect(res.checks.env.googleOAuth).toBe(false);
-    expect(res.checks.env.linkedinOAuth).toBe(false);
     expect(res.checks.env.scraperBoards).toBe(false);
     // still ready because all MUST-HAVES are present
     expect(res.ready).toBe(true);

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import AppSidebar from '@/components/app/AppSidebar';
+import AppTopNav from '@/components/app/AppTopNav';
 import { appRoute } from '@/components/app/appRoutes';
 import { getEntitlement } from '@/services/subscriptionApi';
 import { LoadingState, EmptyState, ErrorState } from '@/components/app/AppStates';
@@ -23,7 +23,7 @@ const PLAN_INCLUDES = [
   'Priority application routing & support',
 ];
 
-const cardStyle = { background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 16 };
+const cardStyle = { background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2 };
 
 const fmtDate = (d) => {
   try {
@@ -89,14 +89,14 @@ export default function AppSubscription() {
           width: 8px;
         }
         #jbapp ::-webkit-scrollbar-thumb {
-          background: #e1d9c9;
-          border-radius: 8px;
+          background: var(--jb-v3-line);
+          border-radius: 2px;
         }
         #jbapp .jb-cta:hover {
-          background: #1b9159;
+          background: var(--jb-v3-ok);
         }
         #jbapp .jb-cancel:hover {
-          color: #c9622e;
+          color: var(--jb-v3-danger);
         }
         @media (max-width: 720px) {
           #jbapp .jb-usage-grid {
@@ -111,29 +111,28 @@ export default function AppSubscription() {
       <div
         id="jbapp"
         style={{
-          display: 'flex',
           minHeight: '100vh',
-          background: '#F7F3EA',
-          fontFamily: 'var(--jb-font-sans)',
-          color: '#1B1A16',
+          background: 'var(--jb-v3-bg)',
+          fontFamily: 'var(--jb-v3-font-display)',
+          color: 'var(--jb-v3-fg)',
         }}
       >
-        <AppSidebar active="settings" />
+        <AppTopNav />
 
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           {/* HEADER */}
           <header
             style={{
-              position: 'sticky',
-              top: 0,
-              zIndex: 20,
+              position: 'relative',
+              
+              
               display: 'flex',
               alignItems: 'center',
               gap: 18,
               padding: '15px 32px',
-              background: 'rgba(247,243,234,0.85)',
+              background: 'color-mix(in srgb, var(--jb-v3-bg) 85%, transparent)',
               backdropFilter: 'blur(10px)',
-              borderBottom: '1px solid #E7E0D2',
+              borderBottom: '1px solid var(--jb-v3-line)',
             }}
           >
             <Link
@@ -144,14 +143,14 @@ export default function AppSubscription() {
                 gap: 7,
                 fontSize: 13.5,
                 fontWeight: 600,
-                color: '#5A544A',
+                color: 'var(--jb-v3-fg-2)',
                 textDecoration: 'none',
               }}
             >
               ← Back to settings
             </Link>
             <div style={{ flex: 1 }} />
-            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, color: '#9A9286' }}>
+            <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11.5, color: 'var(--jb-v3-fg-3)' }}>
               Plan &amp; billing
             </span>
           </header>
@@ -159,7 +158,7 @@ export default function AppSubscription() {
           <div style={{ padding: '30px 32px 64px', maxWidth: 820, width: '100%', margin: '0 auto' }}>
             <h1
               style={{
-                fontFamily: 'var(--jb-font-display)',
+                fontFamily: 'var(--jb-v3-font-display)',
                 fontWeight: 400,
                 fontSize: 38,
                 lineHeight: 1,
@@ -193,9 +192,9 @@ export default function AppSubscription() {
                         marginTop: 6,
                         fontSize: 14,
                         fontWeight: 700,
-                        color: '#0C2C1C',
-                        background: '#1FA463',
-                        borderRadius: 999,
+                        color: 'var(--jb-v3-accent-ink)',
+                        background: 'var(--jb-v3-accent)',
+                        borderRadius: 2,
                         padding: '11px 20px',
                         textDecoration: 'none',
                       }}
@@ -214,9 +213,9 @@ export default function AppSubscription() {
                       display: 'flex',
                       alignItems: 'center',
                       gap: 12,
-                      background: '#FBF1E2',
-                      border: '1px solid #EAD9BE',
-                      borderRadius: 14,
+                      background: 'var(--jb-v3-warn-soft)',
+                      border: '1px solid var(--jb-v3-warn-line)',
+                      borderRadius: 2,
                       padding: '14px 18px',
                       marginBottom: 18,
                     }}
@@ -227,7 +226,7 @@ export default function AppSubscription() {
                         height: 24,
                         flexShrink: 0,
                         borderRadius: '50%',
-                        background: '#C9622E',
+                        background: 'var(--jb-v3-danger)',
                         color: '#fff',
                         display: 'flex',
                         alignItems: 'center',
@@ -237,7 +236,7 @@ export default function AppSubscription() {
                     >
                       ❙❙
                     </span>
-                    <span style={{ flex: 1, fontSize: 13.5, color: '#7A4326' }}>
+                    <span style={{ flex: 1, fontSize: 13.5, color: 'var(--jb-v3-danger)' }}>
                       <b>Membership paused.</b> Your benefits stay available, then resume billing automatically.
                     </span>
                   </div>
@@ -248,9 +247,9 @@ export default function AppSubscription() {
                   style={{
                     position: 'relative',
                     overflow: 'hidden',
-                    background: '#15140F',
-                    border: '1px solid #2C2A22',
-                    borderRadius: 20,
+                    background: 'var(--jb-v3-invert)',
+                    border: '1px solid var(--jb-v3-fg)',
+                    borderRadius: 2,
                     padding: '28px 30px',
                     marginBottom: 18,
                   }}
@@ -259,7 +258,7 @@ export default function AppSubscription() {
                     style={{
                       position: 'absolute',
                       inset: 0,
-                      background: 'radial-gradient(circle at 92% 12%, rgba(31,164,99,0.28), transparent 55%)',
+                      background: 'radial-gradient(circle at 92% 12%, color-mix(in srgb, var(--jb-v3-accent) 28%, transparent), transparent 55%)',
                       pointerEvents: 'none',
                     }}
                   />
@@ -274,7 +273,7 @@ export default function AppSubscription() {
                   >
                     <div style={{ flex: 1, minWidth: 220 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 10 }}>
-                        <span style={{ fontFamily: 'var(--jb-font-display)', fontSize: 30, lineHeight: 1, color: '#FBF8F1' }}>
+                        <span style={{ fontFamily: 'var(--jb-v3-font-display)', fontSize: 30, lineHeight: 1, color: 'var(--jb-v3-panel)' }}>
                           {planName}
                         </span>
                         <span
@@ -282,14 +281,14 @@ export default function AppSubscription() {
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: 6,
-                            fontFamily: 'var(--jb-font-mono)',
+                            fontFamily: 'var(--jb-v3-font-mono)',
                             fontSize: 11,
                             fontWeight: 600,
                             letterSpacing: '0.04em',
-                            color: '#0C2C1C',
-                            background: '#5BD08C',
+                            color: 'var(--jb-v3-accent-ink)',
+                            background: 'var(--jb-v3-ok)',
                             padding: '4px 10px',
-                            borderRadius: 999,
+                            borderRadius: 2,
                           }}
                         >
                           {statusLabel}
@@ -297,13 +296,13 @@ export default function AppSubscription() {
                       </div>
                       {priceLabel && (
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, marginBottom: 6 }}>
-                          <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 30, fontWeight: 600, color: '#FBF8F1' }}>
+                          <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 30, fontWeight: 600, color: 'var(--jb-v3-panel)' }}>
                             {priceLabel}
                           </span>
-                          {billNote && <span style={{ fontSize: 13, color: '#9A9286' }}>/mo · {billNote}</span>}
+                          {billNote && <span style={{ fontSize: 13, color: 'var(--jb-v3-fg-3)' }}>/mo · {billNote}</span>}
                         </div>
                       )}
-                      {renewNote && <div style={{ fontSize: 13.5, color: '#B8B1A4' }}>{renewNote}</div>}
+                      {renewNote && <div style={{ fontSize: 13.5, color: 'var(--jb-v3-fg-3)' }}>{renewNote}</div>}
                     </div>
                     {cardLast4 && (
                       <div
@@ -315,7 +314,7 @@ export default function AppSubscription() {
                           alignItems: 'flex-end',
                         }}
                       >
-                        <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#8A8378' }}>
+                        <div style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, color: 'var(--jb-v3-fg-3)' }}>
                           Payment method
                         </div>
                         <div
@@ -323,9 +322,9 @@ export default function AppSubscription() {
                             display: 'flex',
                             alignItems: 'center',
                             gap: 9,
-                            background: '#1E1C15',
-                            border: '1px solid #2C2A22',
-                            borderRadius: 10,
+                            background: 'var(--jb-v3-invert)',
+                            border: '1px solid var(--jb-v3-fg)',
+                            borderRadius: 2,
                             padding: '9px 13px',
                           }}
                         >
@@ -333,21 +332,21 @@ export default function AppSubscription() {
                             style={{
                               width: 26,
                               height: 18,
-                              borderRadius: 4,
-                              background: 'linear-gradient(135deg,#1FA463,#157A49)',
+                              borderRadius: 2,
+                              background: 'linear-gradient(135deg,var(--jb-v3-accent),var(--jb-v3-accent))',
                             }}
                           />
-                          <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 12, color: '#E4DECF' }}>
+                          <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 12, color: 'var(--jb-v3-line)' }}>
                             •••• {cardLast4}
                           </span>
                         </div>
                         <Link
                           href={appRoute('App Payment Methods.dc.html')}
                           style={{
-                            fontFamily: 'var(--jb-font-mono)',
+                            fontFamily: 'var(--jb-v3-font-mono)',
                             fontSize: 11,
                             fontWeight: 600,
-                            color: '#5BD08C',
+                            color: 'var(--jb-v3-ok)',
                             textDecoration: 'none',
                           }}
                         >
@@ -363,11 +362,11 @@ export default function AppSubscription() {
                   <div style={{ marginBottom: 18 }}>
                     <div
                       style={{
-                        fontFamily: 'var(--jb-font-mono)',
+                        fontFamily: 'var(--jb-v3-font-mono)',
                         fontSize: 11,
                         letterSpacing: '0.08em',
                         textTransform: 'uppercase',
-                        color: '#9A9286',
+                        color: 'var(--jb-v3-fg-3)',
                         marginBottom: 12,
                       }}
                     >
@@ -387,18 +386,18 @@ export default function AppSubscription() {
                               marginBottom: 10,
                             }}
                           >
-                            <span style={{ fontSize: 13, fontWeight: 600, color: '#5A544A' }}>{u.label}</span>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--jb-v3-fg-2)' }}>{u.label}</span>
                             {u.unlimited && (
                               <span
                                 style={{
-                                  fontFamily: 'var(--jb-font-mono)',
+                                  fontFamily: 'var(--jb-v3-font-mono)',
                                   fontSize: 11,
                                   fontWeight: 600,
-                                  color: '#157A49',
-                                  background: '#EAF6EE',
-                                  border: '1px solid #CDE9D6',
+                                  color: 'var(--jb-v3-accent)',
+                                  background: 'var(--jb-v3-accent-soft)',
+                                  border: '1px solid var(--jb-v3-accent-line)',
                                   padding: '2px 7px',
-                                  borderRadius: 999,
+                                  borderRadius: 2,
                                 }}
                               >
                                 UNLIMITED
@@ -406,17 +405,17 @@ export default function AppSubscription() {
                             )}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 10 }}>
-                            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 24, fontWeight: 600, color: '#1B1A16' }}>
+                            <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 24, fontWeight: 600, color: 'var(--jb-v3-fg)' }}>
                               {u.value}
                             </span>
-                            <span style={{ fontSize: 12, color: '#8A8378' }}>{u.unit}</span>
+                            <span style={{ fontSize: 12, color: 'var(--jb-v3-fg-3)' }}>{u.unit}</span>
                           </div>
                           {u.hasMeter && u.pct && (
-                            <div style={{ height: 6, borderRadius: 999, background: '#EFE8DA', overflow: 'hidden' }}>
-                              <div style={{ width: u.pct, height: '100%', background: '#1FA463' }} />
+                            <div style={{ height: 6, borderRadius: 2, background: 'var(--jb-v3-line)', overflow: 'hidden' }}>
+                              <div style={{ width: u.pct, height: '100%', background: 'var(--jb-v3-accent)' }} />
                             </div>
                           )}
-                          {u.sub && <div style={{ fontSize: 11.5, color: '#A79E8F', marginTop: 8 }}>{u.sub}</div>}
+                          {u.sub && <div style={{ fontSize: 11.5, color: 'var(--jb-v3-fg-3)', marginTop: 8 }}>{u.sub}</div>}
                         </div>
                       ))}
                     </div>
@@ -435,9 +434,9 @@ export default function AppSubscription() {
                         gap: 8,
                         fontSize: 14,
                         fontWeight: 700,
-                        color: '#0C2C1C',
-                        background: '#1FA463',
-                        borderRadius: 999,
+                        color: 'var(--jb-v3-accent-ink)',
+                        background: 'var(--jb-v3-accent)',
+                        borderRadius: 2,
                         padding: '11px 20px',
                         textDecoration: 'none',
                       }}
@@ -448,7 +447,7 @@ export default function AppSubscription() {
                     <Link
                       href={appRoute('App Cancel.dc.html')}
                       className="jb-cancel"
-                      style={{ fontSize: 13, fontWeight: 600, color: '#A79E8F', textDecoration: 'none' }}
+                      style={{ fontSize: 13, fontWeight: 600, color: 'var(--jb-v3-fg-3)', textDecoration: 'none' }}
                     >
                       Cancel membership
                     </Link>
@@ -466,8 +465,8 @@ export default function AppSubscription() {
                   >
                     {includes.map((i, idx) => (
                       <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 11 }}>
-                        <span style={{ color: '#1FA463', fontSize: 14, flexShrink: 0, marginTop: 1 }}>✓</span>
-                        <span style={{ fontSize: 14, lineHeight: 1.45, color: '#46413A' }}>{i}</span>
+                        <span style={{ color: 'var(--jb-v3-accent)', fontSize: 14, flexShrink: 0, marginTop: 1 }}>✓</span>
+                        <span style={{ fontSize: 14, lineHeight: 1.45, color: 'var(--jb-v3-fg-2)' }}>{i}</span>
                       </div>
                     ))}
                   </div>

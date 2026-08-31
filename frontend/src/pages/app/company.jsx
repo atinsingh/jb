@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import AppSidebar from '@/components/app/AppSidebar';
+import AppTopNav from '@/components/app/AppTopNav';
 import { appRoute } from '@/components/app/appRoutes';
 import { LoadingState, EmptyState, ErrorState } from '@/components/app/AppStates';
 import { getCompanyMatches } from '@/services/companyApi';
@@ -99,9 +99,9 @@ export default function AppCompany() {
   const initials = initialsFor(companyName);
 
   const followLabel = following ? 'Following ✓' : '+ Follow';
-  const followColor = following ? '#157A49' : '#0C2C1C';
-  const followBg = following ? '#EAF6EE' : '#1FA463';
-  const followBorder = following ? '#CDE9D6' : '#1FA463';
+  const followColor = following ? 'var(--jb-v3-accent)' : 'var(--jb-v3-accent-ink)';
+  const followBg = following ? 'var(--jb-v3-accent-soft)' : 'var(--jb-v3-accent)';
+  const followBorder = following ? 'var(--jb-v3-accent-line)' : 'var(--jb-v3-accent)';
 
   return (
     <>
@@ -114,53 +114,52 @@ export default function AppCompany() {
           width: 8px;
         }
         #jbapp ::-webkit-scrollbar-thumb {
-          background: #e1d9c9;
-          border-radius: 8px;
+          background: var(--jb-v3-line);
+          border-radius: 2px;
         }
         #jbapp .jb-role:hover {
-          border-color: #1fa463 !important;
+          border-color: var(--jb-v3-accent) !important;
         }
         #jbapp .jb-apply:hover {
-          background: #2a2820 !important;
+          background: var(--jb-v3-invert) !important;
         }
       `}</style>
 
       <div
         id="jbapp"
         style={{
-          display: 'flex',
           minHeight: '100vh',
-          background: '#F7F3EA',
-          fontFamily: 'var(--jb-font-sans)',
-          color: '#1B1A16',
+          background: 'var(--jb-v3-bg)',
+          fontFamily: 'var(--jb-v3-font-display)',
+          color: 'var(--jb-v3-fg)',
         }}
       >
-        <AppSidebar active="matches" />
+        <AppTopNav />
 
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           {/* HEADER */}
           <header
             style={{
-              position: 'sticky',
-              top: 0,
-              zIndex: 20,
+              position: 'relative',
+              
+              
               display: 'flex',
               alignItems: 'center',
               gap: 18,
               padding: '15px 32px',
-              background: 'rgba(247,243,234,0.85)',
+              background: 'color-mix(in srgb, var(--jb-v3-bg) 85%, transparent)',
               backdropFilter: 'blur(10px)',
-              borderBottom: '1px solid #E7E0D2',
+              borderBottom: '1px solid var(--jb-v3-line)',
             }}
           >
             <Link
               href={appRoute('App Matches.dc.html')}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13.5, fontWeight: 600, color: '#5A544A', textDecoration: 'none' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13.5, fontWeight: 600, color: 'var(--jb-v3-fg-2)', textDecoration: 'none' }}
             >
               ← Back to matches
             </Link>
             <div style={{ flex: 1 }} />
-            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, color: '#9A9286' }}>Company profile</span>
+            <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11.5, color: 'var(--jb-v3-fg-3)' }}>Company profile</span>
           </header>
 
           {!companyName ? (
@@ -177,13 +176,13 @@ export default function AppCompany() {
                     width: 78,
                     height: 78,
                     flexShrink: 0,
-                    borderRadius: 20,
-                    background: '#EAF6EE',
-                    color: '#157A49',
+                    borderRadius: 2,
+                    background: 'var(--jb-v3-accent-soft)',
+                    color: 'var(--jb-v3-accent)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontFamily: 'var(--jb-font-display)',
+                    fontFamily: 'var(--jb-v3-font-display)',
                     fontWeight: 800,
                     fontSize: 34,
                   }}
@@ -191,8 +190,8 @@ export default function AppCompany() {
                   {initials}
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 40, lineHeight: 1, letterSpacing: '-0.01em', margin: '0 0 9px' }}>{companyName}</h1>
-                  <div style={{ fontSize: 14, color: '#5A544A' }}>
+                  <h1 style={{ fontFamily: 'var(--jb-v3-font-display)', fontWeight: 600, letterSpacing: '-0.04em', fontSize: 40, lineHeight: 1, letterSpacing: '-0.01em', margin: '0 0 9px' }}>{companyName}</h1>
+                  <div style={{ fontSize: 14, color: 'var(--jb-v3-fg-2)' }}>
                     {roleCount} {roleCount === 1 ? 'role' : 'roles'} matched to you
                   </div>
                 </div>
@@ -209,7 +208,7 @@ export default function AppCompany() {
                     color: followColor,
                     background: followBg,
                     border: `1.5px solid ${followBorder}`,
-                    borderRadius: 999,
+                    borderRadius: 2,
                     padding: '11px 20px',
                     cursor: 'pointer',
                   }}
@@ -222,7 +221,7 @@ export default function AppCompany() {
               <div style={{ marginBottom: 30 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                   <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Open roles</h2>
-                  <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, color: '#8A8378' }}>{roleCount} matched to you</span>
+                  <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11.5, color: 'var(--jb-v3-fg-3)' }}>{roleCount} matched to you</span>
                 </div>
 
                 {loading ? (
@@ -244,25 +243,25 @@ export default function AppCompany() {
                           display: 'flex',
                           alignItems: 'center',
                           gap: 16,
-                          background: '#FFFEFB',
-                          border: '1px solid #E6DECF',
-                          borderRadius: 15,
+                          background: 'var(--jb-v3-panel)',
+                          border: '1px solid var(--jb-v3-line)',
+                          borderRadius: 2,
                           padding: '17px 20px',
                         }}
                       >
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{r.role}</div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#5A544A', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--jb-v3-fg-2)', flexWrap: 'wrap' }}>
                             <span>{r.location}</span>
-                            <span style={{ color: '#C9BFAC' }}>·</span>
+                            <span style={{ color: 'var(--jb-v3-line-2)' }}>·</span>
                             <span>{r.type}</span>
-                            <span style={{ color: '#C9BFAC' }}>·</span>
-                            <span style={{ fontFamily: 'var(--jb-font-mono)', color: '#157A49' }}>{r.salary}</span>
+                            <span style={{ color: 'var(--jb-v3-line-2)' }}>·</span>
+                            <span style={{ fontFamily: 'var(--jb-v3-font-mono)', color: 'var(--jb-v3-accent)' }}>{r.salary}</span>
                           </div>
                         </div>
                         <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                          <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 19, fontWeight: 600, color: '#157A49', lineHeight: 1 }}>{r.match}</div>
-                          <div style={{ fontSize: 11, color: '#8A8378', fontFamily: 'var(--jb-font-mono)' }}>match</div>
+                          <div style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 19, fontWeight: 600, color: 'var(--jb-v3-accent)', lineHeight: 1 }}>{r.match}</div>
+                          <div style={{ fontSize: 11, color: 'var(--jb-v3-fg-3)', fontFamily: 'var(--jb-v3-font-mono)' }}>match</div>
                         </div>
                         <Link
                           href={appRoute('App Apply.dc.html')}
@@ -272,12 +271,12 @@ export default function AppCompany() {
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: 7,
-                            background: '#1B1A16',
-                            color: '#F7F3EA',
+                            background: 'var(--jb-v3-fg)',
+                            color: 'var(--jb-v3-bg)',
                             fontSize: 13.5,
                             fontWeight: 600,
                             padding: '11px 18px',
-                            borderRadius: 11,
+                            borderRadius: 2,
                             textDecoration: 'none',
                           }}
                         >
@@ -290,15 +289,15 @@ export default function AppCompany() {
               </div>
 
               {/* TRUST NOTE */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 11, padding: '15px 18px', background: '#EFF8F1', border: '1px solid #CDE9D6', borderRadius: 13 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 11, padding: '15px 18px', background: 'var(--jb-v3-ok-soft)', border: '1px solid var(--jb-v3-accent-line)', borderRadius: 2 }}>
                 <span
                   style={{
                     width: 22,
                     height: 22,
                     flexShrink: 0,
                     borderRadius: '50%',
-                    background: '#5BD08C',
-                    color: '#0C2C1C',
+                    background: 'var(--jb-v3-ok)',
+                    color: 'var(--jb-v3-accent-ink)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -307,7 +306,7 @@ export default function AppCompany() {
                 >
                   ✓
                 </span>
-                <span style={{ fontSize: 13.5, lineHeight: 1.5, color: '#1F4733' }}>
+                <span style={{ fontSize: 13.5, lineHeight: 1.5, color: 'var(--jb-v3-ok)' }}>
                   <b>Verified careers page.</b> Applications you send through Jobocate go directly to {companyName} — never a third-party board or reseller.
                 </span>
               </div>

@@ -1,16 +1,9 @@
 import { API_URL } from '@/config/api';
-
-// ---------------------------------------------------------------- auth ---
-const getAuthToken = () => {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('authToken') || localStorage.getItem('token');
-  }
-  return null;
-};
+import { getAccessToken } from '@/lib/apiClient';
 
 // Generic JSON API call, mirrors the convention in services/api.js
 const apiCall = async (endpoint, options = {}) => {
-  const token = getAuthToken();
+  const token = await getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,

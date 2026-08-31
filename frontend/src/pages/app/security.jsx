@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import AppSidebar from '@/components/app/AppSidebar';
+import AppTopNav from '@/components/app/AppTopNav';
 import { appRoute } from '@/components/app/appRoutes';
 import { changePassword } from '@/services/securityApi';
 import { EmptyState } from '@/components/app/AppStates';
@@ -12,17 +12,17 @@ const inputStyle = {
   width: '100%',
   fontFamily: 'inherit',
   fontSize: 14,
-  color: '#1B1A16',
-  background: '#FBF8F1',
-  border: '1px solid #E1D9C9',
-  borderRadius: 12,
+  color: 'var(--jb-v3-fg)',
+  background: 'var(--jb-v3-panel)',
+  border: '1px solid var(--jb-v3-line)',
+  borderRadius: 2,
   padding: '12px 14px',
 };
 
 const cardStyle = {
-  background: '#FFFEFB',
-  border: '1px solid #E6DECF',
-  borderRadius: 18,
+  background: 'var(--jb-v3-panel)',
+  border: '1px solid var(--jb-v3-line)',
+  borderRadius: 2,
   padding: 24,
 };
 
@@ -85,12 +85,14 @@ export default function AppSecurity() {
   const twofaSub = twofa
     ? 'On — finish setup by scanning the code below.'
     : 'Add a second step at login using an authenticator app.';
-  const twofaTrack = twofa ? '#1FA463' : '#D2C9B7';
+  const twofaTrack = twofa ? 'var(--jb-v3-accent)' : 'var(--jb-v3-line-2)';
   const twofaKnob = twofa ? 22 : 2;
 
   // ----- Connected accounts derived values (from renderVals) -----
   const providers = [
-    { key: 'google', name: 'Google', glyph: 'G', iconBg: '#F4EFE4', iconColor: '#1B1A16', linked: google, set: setGoogle },
+    { key: 'google', name: 'Google', glyph: 'G', iconBg: 'var(--jb-v3-control)', iconColor: 'var(--jb-v3-fg)', linked: google, set: setGoogle },
+    // LinkedIn's own brand blue, deliberately NOT tokenised: a provider mark
+    // has to stay the provider's colour to be recognisable as one.
     { key: 'linkedin', name: 'LinkedIn', glyph: 'in', iconBg: '#EAF1F8', iconColor: '#0A66C2', linked: linkedin, set: setLinkedin },
   ].map((p) => ({
     name: p.name,
@@ -98,18 +100,18 @@ export default function AppSecurity() {
     iconBg: p.iconBg,
     iconColor: p.iconColor,
     status: p.linked ? 'Connected' : 'Not connected',
-    statusColor: p.linked ? '#157A49' : '#8A8378',
+    statusColor: p.linked ? 'var(--jb-v3-accent)' : 'var(--jb-v3-fg-3)',
     btnLabel: p.linked ? 'Disconnect' : 'Connect',
-    btnColor: p.linked ? '#C9622E' : '#0C2C1C',
-    btnBg: p.linked ? '#FFFEFB' : '#1FA463',
-    btnBorder: p.linked ? '#EAD0C4' : '#1FA463',
+    btnColor: p.linked ? 'var(--jb-v3-danger)' : 'var(--jb-v3-accent-ink)',
+    btnBg: p.linked ? 'var(--jb-v3-panel)' : 'var(--jb-v3-accent)',
+    btnBorder: p.linked ? 'var(--jb-v3-danger-line)' : 'var(--jb-v3-accent)',
     toggle: () => p.set((v) => !v),
   }));
 
   // ----- Sessions derived values (from renderVals) -----
   const sessionRows = sessions.map((s, i, arr) => ({
     ...s,
-    divider: i < arr.length - 1 ? '#F2ECE0' : 'transparent',
+    divider: i < arr.length - 1 ? 'var(--jb-v3-control)' : 'transparent',
     canSignOut: !s.current,
     signOut: () => setSessions((prev) => prev.filter((x) => x.id !== s.id)),
   }));
@@ -119,8 +121,8 @@ export default function AppSecurity() {
   // ----- Data & privacy derived values (from renderVals) -----
   const exportLabel = exported ? '✓ Export emailed to you' : '↧ Export my data';
   const canDelete = deleteText.trim().toUpperCase() === 'DELETE';
-  const delColor = canDelete ? '#fff' : '#C9A38C';
-  const delBg = canDelete ? '#C9622E' : '#F0D9CC';
+  const delColor = canDelete ? '#fff' : 'var(--jb-v3-fg-3)';
+  const delBg = canDelete ? 'var(--jb-v3-danger)' : 'var(--jb-v3-danger-soft)';
   const delCursor = canDelete ? 'pointer' : 'default';
 
   return (
@@ -134,16 +136,16 @@ export default function AppSecurity() {
           width: 8px;
         }
         #jbapp ::-webkit-scrollbar-thumb {
-          background: #e1d9c9;
-          border-radius: 8px;
+          background: var(--jb-v3-line);
+          border-radius: 2px;
         }
         #jbapp input:focus {
           outline: none;
-          border-color: #1fa463;
-          box-shadow: 0 0 0 3px rgba(31, 164, 99, 0.15);
+          border-color: var(--jb-v3-accent);
+          box-shadow: 0 0 0 3px color-mix(in srgb, var(--jb-v3-accent) 15%, transparent);
         }
         #jbapp input::placeholder {
-          color: #a79e8f;
+          color: var(--jb-v3-fg-3);
         }
         @keyframes rbpop {
           from {
@@ -157,25 +159,25 @@ export default function AppSecurity() {
         }
       `}</style>
 
-      <div id="jbapp" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16' }}>
-        <AppSidebar active="settings" />
+      <div style={{ minHeight: '100vh', background: 'var(--jb-v3-bg)', fontFamily: 'var(--jb-v3-font-display)', color: 'var(--jb-v3-fg)' }}>
+        <AppTopNav />
 
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           {/* HEADER */}
-          <header style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: 18, padding: '15px 32px', background: 'rgba(247,243,234,0.85)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #E7E0D2' }}>
-            <Link href={appRoute('App Settings.dc.html')} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13.5, fontWeight: 600, color: '#5A544A', textDecoration: 'none' }}>← Back to settings</Link>
+          <header style={{ position: 'relative',   display: 'flex', alignItems: 'center', gap: 18, padding: '15px 32px', background: 'color-mix(in srgb, var(--jb-v3-bg) 85%, transparent)', backdropFilter: 'blur(10px)', borderBottom: '1px solid var(--jb-v3-line)' }}>
+            <Link href={appRoute('App Settings.dc.html')} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13.5, fontWeight: 600, color: 'var(--jb-v3-fg-2)', textDecoration: 'none' }}>← Back to settings</Link>
             <div style={{ flex: 1 }} />
-            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, color: '#9A9286' }}>Security &amp; data</span>
+            <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11.5, color: 'var(--jb-v3-fg-3)' }}>Security &amp; data</span>
           </header>
 
           <div style={{ padding: '30px 32px 64px', maxWidth: 720, width: '100%', margin: '0 auto' }}>
-            <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 38, lineHeight: 1, margin: '0 0 24px' }}>Security &amp; data</h1>
+            <h1 style={{ fontFamily: 'var(--jb-v3-font-display)', fontWeight: 600, letterSpacing: '-0.04em', fontSize: 38, lineHeight: 1, margin: '0 0 24px' }}>Security &amp; data</h1>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {/* CHANGE PASSWORD */}
               <div style={cardStyle}>
                 <h2 style={h2Style}>Change password</h2>
-                <p style={{ fontSize: 13.5, color: '#8A8378', margin: '0 0 18px' }}>Use at least 8 characters with a number and a symbol.</p>
+                <p style={{ fontSize: 13.5, color: 'var(--jb-v3-fg-3)', margin: '0 0 18px' }}>Use at least 8 characters with a number and a symbol.</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 13, maxWidth: 380 }}>
                   <input
                     type="password"
@@ -199,12 +201,12 @@ export default function AppSecurity() {
                     style={inputStyle}
                   />
                 </div>
-                {pwError && <div style={{ fontSize: 13, color: '#C9622E', marginTop: 12 }}>{pwError}</div>}
-                {pwDone && <div style={{ fontSize: 13, color: '#157A49', marginTop: 12 }}>✓ Password updated.</div>}
+                {pwError && <div style={{ fontSize: 13, color: 'var(--jb-v3-danger)', marginTop: 12 }}>{pwError}</div>}
+                {pwDone && <div style={{ fontSize: 13, color: 'var(--jb-v3-accent)', marginTop: 12 }}>✓ Password updated.</div>}
                 <button
                   onClick={handleUpdatePassword}
                   disabled={pwSaving}
-                  style={{ fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, color: '#0C2C1C', background: '#1FA463', border: 'none', borderRadius: 999, padding: '11px 20px', cursor: pwSaving ? 'default' : 'pointer', marginTop: 16, opacity: pwSaving ? 0.7 : 1 }}
+                  style={{ fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, color: 'var(--jb-v3-accent-ink)', background: 'var(--jb-v3-accent)', border: 'none', borderRadius: 2, padding: '11px 20px', cursor: pwSaving ? 'default' : 'pointer', marginTop: 16, opacity: pwSaving ? 0.7 : 1 }}
                 >
                   {pwSaving ? 'Updating…' : 'Update password'}
                 </button>
@@ -215,24 +217,24 @@ export default function AppSecurity() {
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
                   <div style={{ flex: 1 }}>
                     <h2 style={h2Style}>Two-factor authentication</h2>
-                    <p style={{ fontSize: 13.5, color: '#8A8378', margin: 0 }}>{twofaSub}</p>
+                    <p style={{ fontSize: 13.5, color: 'var(--jb-v3-fg-3)', margin: 0 }}>{twofaSub}</p>
                   </div>
                   <button onClick={() => setTwofa((v) => !v)} style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                    <span style={{ width: 46, height: 26, borderRadius: 999, background: twofaTrack, position: 'relative', display: 'block', transition: 'background 0.2s' }}>
+                    <span style={{ width: 46, height: 26, borderRadius: 2, background: twofaTrack, position: 'relative', display: 'block', transition: 'background 0.2s' }}>
                       <span style={{ position: 'absolute', top: 2, left: twofaKnob, width: 22, height: 22, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left 0.2s' }} />
                     </span>
                   </button>
                 </div>
                 {twofa && (
-                  <div style={{ display: 'flex', gap: 20, marginTop: 20, paddingTop: 20, borderTop: '1px solid #F2ECE0', flexWrap: 'wrap', animation: 'rbpop 0.2s ease' }}>
-                    <div style={{ width: 118, height: 118, flexShrink: 0, borderRadius: 12, border: '1px solid #E1D9C9', background: 'repeating-conic-gradient(#1B1A16 0% 25%, #FFFEFB 0% 50%) 0 0 / 16px 16px', opacity: 0.9 }} />
+                  <div style={{ display: 'flex', gap: 20, marginTop: 20, paddingTop: 20, borderTop: '1px solid var(--jb-v3-control)', flexWrap: 'wrap', animation: 'rbpop 0.2s ease' }}>
+                    <div style={{ width: 118, height: 118, flexShrink: 0, borderRadius: 2, border: '1px solid var(--jb-v3-line)', background: 'repeating-conic-gradient(var(--jb-v3-fg) 0% 25%, var(--jb-v3-panel) 0% 50%) 0 0 / 16px 16px', opacity: 0.9 }} />
                     <div style={{ flex: 1, minWidth: 200 }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 600, color: '#1B1A16', marginBottom: 6 }}>Scan with your authenticator app</div>
-                      <p style={{ fontSize: 12.5, color: '#8A8378', margin: '0 0 12px' }}>Or enter this key manually:</p>
-                      <div style={{ display: 'inline-block', fontFamily: 'var(--jb-font-mono)', fontSize: 13, letterSpacing: '0.08em', color: '#1B1A16', background: '#FBF8F1', border: '1px solid #E1D9C9', borderRadius: 8, padding: '7px 12px', marginBottom: 14 }}>JBSW Y3DP EHPK 3PXP</div>
+                      <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--jb-v3-fg)', marginBottom: 6 }}>Scan with your authenticator app</div>
+                      <p style={{ fontSize: 12.5, color: 'var(--jb-v3-fg-3)', margin: '0 0 12px' }}>Or enter this key manually:</p>
+                      <div style={{ display: 'inline-block', fontFamily: 'var(--jb-v3-font-mono)', fontSize: 13, letterSpacing: '0.08em', color: 'var(--jb-v3-fg)', background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, padding: '7px 12px', marginBottom: 14 }}>JBSW Y3DP EHPK 3PXP</div>
                       <div style={{ display: 'flex', gap: 9 }}>
-                        <input placeholder="6-digit code" inputMode="numeric" style={{ width: 130, fontFamily: 'var(--jb-font-mono)', fontSize: 14, color: '#1B1A16', background: '#FBF8F1', border: '1px solid #E1D9C9', borderRadius: 10, padding: '9px 12px' }} />
-                        <button style={{ fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: '#0C2C1C', background: '#1FA463', border: 'none', borderRadius: 999, padding: '9px 16px', cursor: 'pointer' }}>Verify</button>
+                        <input placeholder="6-digit code" inputMode="numeric" style={{ width: 130, fontFamily: 'var(--jb-v3-font-mono)', fontSize: 14, color: 'var(--jb-v3-fg)', background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, padding: '9px 12px' }} />
+                        <button style={{ fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: 'var(--jb-v3-accent-ink)', background: 'var(--jb-v3-accent)', border: 'none', borderRadius: 2, padding: '9px 16px', cursor: 'pointer' }}>Verify</button>
                       </div>
                     </div>
                   </div>
@@ -245,12 +247,12 @@ export default function AppSecurity() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {providers.map((p) => (
                     <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                      <span style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 10, background: p.iconBg, color: p.iconColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--jb-font-mono)', fontWeight: 600, fontSize: 13 }}>{p.glyph}</span>
+                      <span style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 2, background: p.iconBg, color: p.iconColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--jb-v3-font-mono)', fontWeight: 600, fontSize: 13 }}>{p.glyph}</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14.5, fontWeight: 600, color: '#1B1A16' }}>{p.name}</div>
+                        <div style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--jb-v3-fg)' }}>{p.name}</div>
                         <div style={{ fontSize: 12.5, color: p.statusColor }}>{p.status}</div>
                       </div>
-                      <button onClick={p.toggle} style={{ flexShrink: 0, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: p.btnColor, background: p.btnBg, border: `1px solid ${p.btnBorder}`, borderRadius: 999, padding: '8px 16px', cursor: 'pointer' }}>{p.btnLabel}</button>
+                      <button onClick={p.toggle} style={{ flexShrink: 0, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: p.btnColor, background: p.btnBg, border: `1px solid ${p.btnBorder}`, borderRadius: 2, padding: '8px 16px', cursor: 'pointer' }}>{p.btnLabel}</button>
                     </div>
                   ))}
                 </div>
@@ -261,7 +263,7 @@ export default function AppSecurity() {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                   <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Active sessions</h2>
                   {hasOthers && (
-                    <button onClick={signOutAll} style={{ fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: '#C9622E', background: 'none', border: 'none', cursor: 'pointer' }}>Sign out all others</button>
+                    <button onClick={signOutAll} style={{ fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: 'var(--jb-v3-danger)', background: 'none', border: 'none', cursor: 'pointer' }}>Sign out all others</button>
                   )}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -274,18 +276,18 @@ export default function AppSecurity() {
                   ) : (
                     sessionRows.map((s) => (
                     <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 0', borderBottom: `1px solid ${s.divider}` }}>
-                      <span style={{ width: 36, height: 36, flexShrink: 0, borderRadius: 9, background: '#F4EFE4', color: '#5A544A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15 }}>{s.glyph}</span>
+                      <span style={{ width: 36, height: 36, flexShrink: 0, borderRadius: 2, background: 'var(--jb-v3-control)', color: 'var(--jb-v3-fg-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15 }}>{s.glyph}</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontSize: 14, fontWeight: 600, color: '#1B1A16' }}>{s.device}</span>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--jb-v3-fg)' }}>{s.device}</span>
                           {s.current && (
-                            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, color: '#157A49', background: '#EAF6EE', border: '1px solid #CDE9D6', padding: '2px 7px', borderRadius: 999 }}>THIS DEVICE</span>
+                            <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, fontWeight: 600, color: 'var(--jb-v3-accent)', background: 'var(--jb-v3-accent-soft)', border: '1px solid var(--jb-v3-accent-line)', padding: '2px 7px', borderRadius: 2 }}>THIS DEVICE</span>
                           )}
                         </div>
-                        <div style={{ fontSize: 12.5, color: '#8A8378', marginTop: 2 }}>{s.location} · {s.when}</div>
+                        <div style={{ fontSize: 12.5, color: 'var(--jb-v3-fg-3)', marginTop: 2 }}>{s.location} · {s.when}</div>
                       </div>
                       {s.canSignOut && (
-                        <button onClick={s.signOut} style={{ flexShrink: 0, fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: '#5A544A', background: '#FFFEFB', border: '1px solid #D9D0BE', borderRadius: 999, padding: '7px 14px', cursor: 'pointer' }}>Sign out</button>
+                        <button onClick={s.signOut} style={{ flexShrink: 0, fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: 'var(--jb-v3-fg-2)', background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line-2)', borderRadius: 2, padding: '7px 14px', cursor: 'pointer' }}>Sign out</button>
                       )}
                     </div>
                     ))
@@ -296,29 +298,29 @@ export default function AppSecurity() {
               {/* DATA & PRIVACY */}
               <div style={cardStyle}>
                 <h2 style={h2Style}>Data &amp; privacy</h2>
-                <p style={{ fontSize: 13.5, color: '#8A8378', margin: '0 0 18px' }}>Download everything we hold about you, or remove your account entirely.</p>
+                <p style={{ fontSize: 13.5, color: 'var(--jb-v3-fg-3)', margin: '0 0 18px' }}>Download everything we hold about you, or remove your account entirely.</p>
                 <button
                   onClick={() => setExported(true)}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontFamily: 'inherit', fontSize: 13.5, fontWeight: 600, color: '#1B1A16', background: '#FFFEFB', border: '1px solid #D9D0BE', borderRadius: 999, padding: '11px 18px', cursor: 'pointer' }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontFamily: 'inherit', fontSize: 13.5, fontWeight: 600, color: 'var(--jb-v3-fg)', background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line-2)', borderRadius: 2, padding: '11px 18px', cursor: 'pointer' }}
                 >
                   {exportLabel}
                 </button>
 
-                <div style={{ marginTop: 22, padding: 20, background: '#FBEDE4', border: '1px solid #EAD0C4', borderRadius: 14 }}>
-                  <div style={{ fontSize: 14.5, fontWeight: 700, color: '#7A4326', marginBottom: 5 }}>Delete account</div>
-                  <p style={{ fontSize: 13, lineHeight: 1.55, color: '#8A5A3C', margin: '0 0 14px' }}>
-                    This permanently removes your profile, résumés, applications and history. This can&rsquo;t be undone. Type <b style={{ fontFamily: 'var(--jb-font-mono)' }}>DELETE</b> to confirm.
+                <div style={{ marginTop: 22, padding: 20, background: 'var(--jb-v3-danger-soft)', border: '1px solid var(--jb-v3-danger-line)', borderRadius: 2 }}>
+                  <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--jb-v3-danger)', marginBottom: 5 }}>Delete account</div>
+                  <p style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--jb-v3-warn)', margin: '0 0 14px' }}>
+                    This permanently removes your profile, résumés, applications and history. This can&rsquo;t be undone. Type <b style={{ fontFamily: 'var(--jb-v3-font-mono)' }}>DELETE</b> to confirm.
                   </p>
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                     <input
                       value={deleteText}
                       onChange={(e) => setDeleteText(e.target.value)}
                       placeholder="DELETE"
-                      style={{ width: 160, fontFamily: 'var(--jb-font-mono)', fontSize: 14, color: '#1B1A16', background: '#FFFEFB', border: '1px solid #EAD0C4', borderRadius: 10, padding: '10px 13px' }}
+                      style={{ width: 160, fontFamily: 'var(--jb-v3-font-mono)', fontSize: 14, color: 'var(--jb-v3-fg)', background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-danger-line)', borderRadius: 2, padding: '10px 13px' }}
                     />
                     <button
                       disabled={!canDelete}
-                      style={{ fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, color: delColor, background: delBg, border: 'none', borderRadius: 999, padding: '11px 20px', cursor: delCursor }}
+                      style={{ fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, color: delColor, background: delBg, border: 'none', borderRadius: 2, padding: '11px 20px', cursor: delCursor }}
                     >
                       Delete account
                     </button>

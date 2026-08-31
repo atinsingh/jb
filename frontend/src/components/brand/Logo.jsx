@@ -6,23 +6,38 @@
  * Two forms, because the design bundle supplies one and the app needs two:
  *
  *   default   the WORDMARK from the Candidate v3 bundle
- *             (assets/jobocate_logo.svg). A single path, inlined here with
- *             fill: currentColor so it takes the surrounding ink rather than
- *             the orange the source file happens to ship with. The design uses
- *             the same file as a CSS mask over var(--fg), which is the same
- *             result by another route; inlining avoids a second request and a
- *             mask-support fallback.
+ *             (assets/jobocate_logo.svg), inlined as a single path.
  *
  *   mark      the bracketed "[J]" glyph. NOT in the design bundle. Kept
- *             because four collapsed sidebars (admin, agent, app, employer)
- *             need a square icon and a wordmark cannot serve as one. Its
- *             J-hook still takes `accent`.
+ *             because the admin, agent and employer collapsed rails need a
+ *             square icon and a wordmark cannot serve as one. Its J-hook
+ *             still takes `accent`.
+ *
+ * INK COMES FROM THE SURROUNDING TEXT COLOUR. There is deliberately no
+ * `theme` prop.
+ *
+ * The design renders this file as a CSS mask filled with `var(--fg)`:
+ *
+ *   background: var(--fg);
+ *   mask: url('assets/jobocate_logo.svg') left center / contain no-repeat;
+ *
+ * so the wordmark is whatever the current theme's foreground is, and flips
+ * with the theme for free. Inlining the path with `fill: currentColor` is the
+ * same result by another route, minus a second request and a mask fallback.
+ *
+ * The previous version took `theme="light" | "dark"` and mapped it to a
+ * hardcoded #221c15 / #f2ecdb. It defaulted to "light", and every v3 screen
+ * calls <Logo size={22} /> with no theme — so on the dark v3 background the
+ * wordmark rendered near-black on near-black. Ink is not a property of the
+ * logo; it is a property of the surface, and the surface already states it.
+ *
+ * To override, set `color` on the element (style or a class), the same way
+ * you would tint any other glyph.
  *
  * Props:
- *   theme="light"  dark ink, for cream / light surfaces
- *   theme="dark"   light ink, for dark surfaces
- *   size           height in px; the wordmark keeps its 211:45 ratio
- *   accent         overrides the J-hook colour, `mark` form only
+ *   size     height in px; the wordmark keeps its 211:45 ratio
+ *   mark     render the square [J] instead of the wordmark
+ *   accent   overrides the J-hook colour, `mark` form only
  */
 
 /** From assets/jobocate_logo.svg in the v3 bundle. viewBox 0 0 211 45. */
@@ -31,22 +46,15 @@ const WORDMARK_PATH =
 
 const WORDMARK_RATIO = 211 / 45;
 
-export default function Logo({
-  theme = 'light',
-  size = 24,
-  accent,
-  mark = false,
-  className = '',
-  style = {},
-}) {
-  const dark = theme === 'dark';
-  const ink = dark ? '#f2ecdb' : '#221c15';
-
+export default function Logo({ size = 24, accent, mark = false, className = '', style = {} }) {
   if (mark) {
-    // Bracketed [J] for collapsed rails. On the dark surface the original
-    // #565D52 bracket all but vanished, so it is cream at 65% instead.
-    const bracket = dark ? 'rgba(242, 236, 219, 0.65)' : '#B0A79A';
-    const hook = accent || (dark ? '#8fd6a3' : '#1f7a4d');
+    /*
+     * The bracket is currentColor at 45%, not a fixed grey: on a dark rail the
+     * old #B0A79A was too hot and on a light one the cream was invisible.
+     * Deriving it from the inherited ink makes it correct on both without the
+     * component knowing which surface it is on.
+     */
+    const hook = accent || 'currentColor';
 
     return (
       <span
@@ -58,13 +66,13 @@ export default function Logo({
         <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
           <path
             d="M10.5 5H6.5a1.5 1.5 0 0 0-1.5 1.5v19A1.5 1.5 0 0 0 6.5 27h4"
-            style={{ stroke: bracket }}
+            style={{ stroke: 'currentColor', opacity: 0.45 }}
             strokeWidth="2.4"
             strokeLinecap="round"
           />
           <path
             d="M21.5 5h4A1.5 1.5 0 0 1 27 6.5v19a1.5 1.5 0 0 1-1.5 1.5h-4"
-            style={{ stroke: bracket }}
+            style={{ stroke: 'currentColor', opacity: 0.45 }}
             strokeWidth="2.4"
             strokeLinecap="round"
           />
@@ -86,7 +94,7 @@ export default function Logo({
       className={className}
       role="img"
       aria-label="Jobocate"
-      style={{ display: 'inline-flex', alignItems: 'center', lineHeight: 1, color: ink, ...style }}
+      style={{ display: 'inline-flex', alignItems: 'center', lineHeight: 1, ...style }}
     >
       <svg
         height={size}

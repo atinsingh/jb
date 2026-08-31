@@ -43,8 +43,8 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
-    # Operator supplies production secrets here (JWT_SECRET, MONGODB_URI,
-    # STRIPE_*, SMTP_*, OAuth, AI keys - see backend/.env.example).
+    # Operator supplies production secrets here (SUPABASE_*, MONGODB_URI,
+    # STRIPE_*, SMTP_*, AI keys - see backend/env.example).
     env_file:
       - ./backend/.env
     environment:

@@ -1,19 +1,13 @@
 import { API_URL } from '@/config/api';
+import { getAccessToken } from '@/lib/apiClient';
 
 // Mirrors the apiCall convention in services/api.js (token auto-attached,
 // JSON headers, throws on non-2xx). These helpers point at the CORRECT
 // backend paths (the originals in api.js use stale /api/job-matching and
 // /api/application-agent prefixes). New file — nothing existing is modified.
 
-const getAuthToken = () => {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('authToken') || localStorage.getItem('token');
-  }
-  return null;
-};
-
 const apiCall = async (endpoint, options = {}) => {
-  const token = getAuthToken();
+  const token = await getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,

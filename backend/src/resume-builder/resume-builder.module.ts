@@ -30,13 +30,20 @@ import { AtsModule } from '../ats/ats.module';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => {
-        const secret = configService.get<string>('JWT_SECRET') || 'your-secret-key';
-        const expiresIn = configService.get<string>('JWT_EXPIRES_IN') || '7d';
+        // NOT user auth. This signs the short-lived tokens embedded in PDF-render
+        // and share links (see resume-builder.service.ts). It used to borrow
+        // JWT_SECRET, which meant the Supabase cutover would have deleted the
+        // secret out from under it and broken PDF rendering silently. It now
+        // has its own.
+        const secret = configService.get<string>('RESUME_SHARE_SECRET');
+        if (!secret && process.env.NODE_ENV === 'production') {
+          throw new Error(
+            'RESUME_SHARE_SECRET must be set in production — refusing to sign share links with an insecure default.',
+          );
+        }
         return {
-          secret,
-          signOptions: {
-            expiresIn,
-          },
+          secret: secret || 'dev-insecure-resume-share-secret',
+          signOptions: { expiresIn: '1h' },
         };
       },
       inject: [ConfigService],

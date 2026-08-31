@@ -19,12 +19,12 @@ export default function MonoLabel({
   return (
     <Tag
       style={{
-        fontFamily: 'var(--jb-font-mono)',
+        fontFamily: 'var(--jb-v3-font-mono)',
         fontSize: 11,
         lineHeight: 1.4,
         letterSpacing: TRACKING[tracking] || TRACKING.normal,
         textTransform: 'uppercase',
-        color: tone === 'accent' ? 'var(--jb-a-accent)' : 'var(--jb-a-ink-3)',
+        color: tone === 'accent' ? 'var(--jb-v3-accent)' : 'var(--jb-v3-fg-3)',
         ...style,
       }}
       {...rest}

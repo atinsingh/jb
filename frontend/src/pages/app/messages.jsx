@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import AppSidebar from '@/components/app/AppSidebar';
+import AppTopNav from '@/components/app/AppTopNav';
 import { appRoute } from '@/components/app/appRoutes';
 
 /* ------------------------------------------------------------- sample data ---
@@ -12,7 +12,7 @@ import { appRoute } from '@/components/app/appRoutes';
 const CONVO_DATA = [
   {
     id: 'marcus', name: 'Marcus Bell', sub: 'Your coach', company: 'Concierge',
-    avBg: '#1E2D24', avFg: '#5BD08C', initials: 'MB', pinned: true, headerDot: true,
+    avBg: 'var(--jb-v3-ok)', avFg: 'var(--jb-v3-ok)', initials: 'MB', pinned: true, headerDot: true,
     time: '9:42 AM', unread: 0,
     headerSub: 'Your career coach · Active now',
     profileHref: 'App Concierge.dc.html', profileLabel: 'Concierge',
@@ -31,7 +31,7 @@ const CONVO_DATA = [
   },
   {
     id: 'stripe', name: 'Dana Whitfield', sub: 'Recruiter · Stripe', company: 'Stripe',
-    avBg: '#EAF6EE', avFg: '#157A49', initials: 'DW', pinned: false, headerDot: false,
+    avBg: 'var(--jb-v3-accent-soft)', avFg: 'var(--jb-v3-accent)', initials: 'DW', pinned: false, headerDot: false,
     time: '11:02 AM', unread: 2,
     headerSub: 'Recruiting · Stripe',
     profileHref: 'App Company.dc.html', profileLabel: 'Stripe',
@@ -49,7 +49,7 @@ const CONVO_DATA = [
   },
   {
     id: 'figma', name: 'Theo Marsh', sub: 'Talent · Figma', company: 'Figma',
-    avBg: '#F4EFE4', avFg: '#1B1A16', initials: 'TM', pinned: false, headerDot: false,
+    avBg: 'var(--jb-v3-control)', avFg: 'var(--jb-v3-fg)', initials: 'TM', pinned: false, headerDot: false,
     time: '10:30 AM', unread: 1,
     headerSub: 'Talent partner · Figma',
     profileHref: 'App Company.dc.html', profileLabel: 'Figma',
@@ -65,7 +65,7 @@ const CONVO_DATA = [
   },
   {
     id: 'linear', name: 'Sam Okafor', sub: 'Recruiter · Linear', company: 'Linear',
-    avBg: '#F4EFE4', avFg: '#1B1A16', initials: 'SO', pinned: false, headerDot: false,
+    avBg: 'var(--jb-v3-control)', avFg: 'var(--jb-v3-fg)', initials: 'SO', pinned: false, headerDot: false,
     time: 'Jun 23', unread: 0,
     headerSub: 'Recruiting · Linear',
     profileHref: 'App Company.dc.html', profileLabel: 'Linear',
@@ -126,12 +126,12 @@ export default function AppMessages() {
     const hasUnread = unread > 0;
     return {
       ...c,
-      bg: on ? '#F2ECE0' : 'transparent',
-      bar: on ? '#1FA463' : 'transparent',
+      bg: on ? 'var(--jb-v3-control)' : 'transparent',
+      bar: on ? 'var(--jb-v3-accent)' : 'transparent',
       nameWeight: hasUnread ? 700 : 600,
-      timeColor: hasUnread ? '#157A49' : '#A79E8F',
-      subColor: c.pinned ? '#5BA46F' : '#8A8378',
-      previewColor: hasUnread ? '#3A352C' : '#8A8378',
+      timeColor: hasUnread ? 'var(--jb-v3-accent)' : 'var(--jb-v3-fg-3)',
+      subColor: c.pinned ? 'var(--jb-v3-ok)' : 'var(--jb-v3-fg-3)',
+      previewColor: hasUnread ? 'var(--jb-v3-fg-2)' : 'var(--jb-v3-fg-3)',
       preview, hasUnread, unread,
     };
   });
@@ -144,9 +144,9 @@ export default function AppMessages() {
     msgs: g.msgs.map((m) => ({
       text: m.text, time: m.time,
       align: m.me ? 'flex-end' : 'flex-start',
-      bubbleBg: m.me ? '#EAF6EE' : '#FFFEFB',
-      bubbleBorder: m.me ? '#CDE9D6' : '#E6DECF',
-      color: '#1B1A16',
+      bubbleBg: m.me ? 'var(--jb-v3-accent-soft)' : 'var(--jb-v3-panel)',
+      bubbleBorder: m.me ? 'var(--jb-v3-accent-line)' : 'var(--jb-v3-line)',
+      color: 'var(--jb-v3-fg)',
       radius: m.me ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
     })),
   }));
@@ -154,7 +154,7 @@ export default function AppMessages() {
   const canSend = draft.trim().length > 0;
   const unreadTotal = CONVO_DATA.reduce((n, c) => n + (c.id === sel ? 0 : c.unread), 0);
   const placeholder = 'Message ' + active.name.split(' ')[0] + '…';
-  const sendBg = canSend ? '#1FA463' : '#CFE6D8';
+  const sendBg = canSend ? 'var(--jb-v3-accent)' : 'var(--jb-v3-ok-line)';
   const sendCursor = canSend ? 'pointer' : 'default';
 
   return (
@@ -168,19 +168,19 @@ export default function AppMessages() {
           width: 8px;
         }
         #jbapp ::-webkit-scrollbar-thumb {
-          background: #e1d9c9;
-          border-radius: 8px;
+          background: var(--jb-v3-line);
+          border-radius: 2px;
         }
         #jbapp input:focus,
         #jbapp textarea:focus {
           outline: none;
         }
         #jbapp .jb-convo:hover {
-          background: #f2ece0 !important;
+          background: var(--jb-v3-control) !important;
         }
         #jbapp .jb-icon-btn:hover {
-          background: #f2ece0;
-          color: #5a544a;
+          background: var(--jb-v3-control);
+          color: var(--jb-v3-fg-2);
         }
         @keyframes rbpop {
           from {
@@ -196,25 +196,25 @@ export default function AppMessages() {
 
       <div
         id="jbapp"
-        style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#F7F3EA', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16' }}
+        style={{ height: '100vh', overflow: 'hidden', background: 'var(--jb-v3-bg)', fontFamily: 'var(--jb-v3-font-display)', color: 'var(--jb-v3-fg)' }}
       >
-        <AppSidebar active="messages" />
+        <AppTopNav />
 
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           {/* HEADER */}
-          <header style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 20, padding: '15px 28px', background: 'rgba(247,243,234,0.85)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #E7E0D2' }}>
-            <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9286' }}>Workspace / Messages</div>
+          <header style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 20, padding: '15px 28px', background: 'color-mix(in srgb, var(--jb-v3-bg) 85%, transparent)', backdropFilter: 'blur(10px)', borderBottom: '1px solid var(--jb-v3-line)' }}>
+            <div style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--jb-v3-fg-3)' }}>Workspace / Messages</div>
             <div style={{ flex: 1 }} />
-            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, color: '#157A49' }}>{unreadTotal} unread</span>
+            <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11.5, color: 'var(--jb-v3-accent)' }}>{unreadTotal} unread</span>
           </header>
 
           <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
             {/* ===== LEFT: CONVERSATION LIST ===== */}
-            <div style={{ width: 340, flexShrink: 0, borderRight: '1px solid #E7E0D2', background: '#FBF8F1', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <div style={{ width: 340, flexShrink: 0, borderRight: '1px solid var(--jb-v3-line)', background: 'var(--jb-v3-panel)', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
               <div style={{ flexShrink: 0, padding: '16px 16px 12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: '#FFFEFB', border: '1px solid #E1D9C9', borderRadius: 999, padding: '9px 14px' }}>
-                  <span style={{ color: '#A79E8F', fontSize: 13 }}>⌕</span>
-                  <input placeholder="Search messages…" style={{ flex: 1, border: 'none', background: 'none', fontFamily: 'inherit', fontSize: 13.5, color: '#1B1A16' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, padding: '9px 14px' }}>
+                  <span style={{ color: 'var(--jb-v3-fg-3)', fontSize: 13 }}>⌕</span>
+                  <input placeholder="Search messages…" style={{ flex: 1, border: 'none', background: 'none', fontFamily: 'inherit', fontSize: 13.5, color: 'var(--jb-v3-fg)' }} />
                 </div>
               </div>
               <div style={{ flex: 1, overflowY: 'auto', padding: '0 10px 14px' }}>
@@ -223,29 +223,29 @@ export default function AppMessages() {
                     key={c.id}
                     className="jb-convo"
                     onClick={() => { setSelected(c.id); setDraft(''); }}
-                    style={{ position: 'relative', width: '100%', textAlign: 'left', display: 'flex', alignItems: 'flex-start', gap: 12, padding: '13px 12px', marginBottom: 3, border: 'none', background: c.bg, borderRadius: 13, cursor: 'pointer', fontFamily: 'inherit' }}
+                    style={{ position: 'relative', width: '100%', textAlign: 'left', display: 'flex', alignItems: 'flex-start', gap: 12, padding: '13px 12px', marginBottom: 3, border: 'none', background: c.bg, borderRadius: 2, cursor: 'pointer', fontFamily: 'inherit' }}
                   >
                     <span style={{ position: 'absolute', left: -10, top: 14, bottom: 14, width: 3, borderRadius: '0 3px 3px 0', background: c.bar }} />
                     <span style={{ position: 'relative', width: 42, height: 42, flexShrink: 0, borderRadius: '50%', background: c.avBg, color: c.avFg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14 }}>
                       {c.initials}
                       {c.headerDot && (
-                        <span style={{ position: 'absolute', bottom: 1, right: 1, width: 10, height: 10, borderRadius: '50%', background: '#5BD08C', border: '2px solid #FBF8F1' }} />
+                        <span style={{ position: 'absolute', bottom: 1, right: 1, width: 10, height: 10, borderRadius: '50%', background: 'var(--jb-v3-ok)', border: '2px solid var(--jb-v3-panel)' }} />
                       )}
                     </span>
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                         {c.pinned && (
-                          <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', color: '#157A49', background: '#EAF6EE', border: '1px solid #CDE9D6', padding: '2px 6px', borderRadius: 999, flexShrink: 0 }}>PINNED</span>
+                          <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', color: 'var(--jb-v3-accent)', background: 'var(--jb-v3-accent-soft)', border: '1px solid var(--jb-v3-accent-line)', padding: '2px 6px', borderRadius: 2, flexShrink: 0 }}>PINNED</span>
                         )}
-                        <span style={{ fontSize: 14, fontWeight: c.nameWeight, color: '#1B1A16', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</span>
+                        <span style={{ fontSize: 14, fontWeight: c.nameWeight, color: 'var(--jb-v3-fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</span>
                         <span style={{ flex: 1 }} />
-                        <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: c.timeColor, flexShrink: 0 }}>{c.time}</span>
+                        <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, color: c.timeColor, flexShrink: 0 }}>{c.time}</span>
                       </span>
                       <span style={{ display: 'block', fontSize: 11.5, color: c.subColor, margin: '1px 0 3px' }}>{c.sub}</span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: c.previewColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.preview}</span>
                         {c.hasUnread && (
-                          <span style={{ flexShrink: 0, minWidth: 18, height: 18, padding: '0 5px', borderRadius: 999, background: '#1FA463', color: '#0C2C1C', fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{c.unread}</span>
+                          <span style={{ flexShrink: 0, minWidth: 18, height: 18, padding: '0 5px', borderRadius: 2, background: 'var(--jb-v3-accent)', color: 'var(--jb-v3-accent-ink)', fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{c.unread}</span>
                         )}
                       </span>
                     </span>
@@ -255,48 +255,48 @@ export default function AppMessages() {
             </div>
 
             {/* ===== RIGHT: THREAD ===== */}
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0, background: '#F7F3EA' }}>
-              <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 13, padding: '14px 26px', background: '#FFFEFB', borderBottom: '1px solid #E7E0D2' }}>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--jb-v3-bg)' }}>
+              <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 13, padding: '14px 26px', background: 'var(--jb-v3-panel)', borderBottom: '1px solid var(--jb-v3-line)' }}>
                 <span style={{ position: 'relative', width: 42, height: 42, flexShrink: 0, borderRadius: '50%', background: active.avBg, color: active.avFg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14 }}>
                   {active.initials}
                   {active.headerDot && (
-                    <span style={{ position: 'absolute', bottom: 1, right: 1, width: 10, height: 10, borderRadius: '50%', background: '#5BD08C', border: '2px solid #FFFEFB' }} />
+                    <span style={{ position: 'absolute', bottom: 1, right: 1, width: 10, height: 10, borderRadius: '50%', background: 'var(--jb-v3-ok)', border: '2px solid var(--jb-v3-panel)' }} />
                   )}
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.15 }}>{active.name}</div>
-                  <div style={{ fontSize: 12.5, color: '#8A8378' }}>{active.headerSub}</div>
+                  <div style={{ fontSize: 12.5, color: 'var(--jb-v3-fg-3)' }}>{active.headerSub}</div>
                 </div>
-                <Link href={appRoute(active.profileHref)} style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, color: '#157A49', textDecoration: 'none', border: '1px solid #CDE9D6', background: '#EAF6EE', padding: '7px 13px', borderRadius: 999 }}>{active.profileLabel}</Link>
+                <Link href={appRoute(active.profileHref)} style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, fontWeight: 600, color: 'var(--jb-v3-accent)', textDecoration: 'none', border: '1px solid var(--jb-v3-accent-line)', background: 'var(--jb-v3-accent-soft)', padding: '7px 13px', borderRadius: 2 }}>{active.profileLabel}</Link>
               </div>
 
               <div ref={msgRef} style={{ flex: 1, overflowY: 'auto', padding: '24px 26px 8px', display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {groupsView.map((g, gi) => (
                   <div key={gi} style={{ display: 'contents' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '4px 0' }}>
-                      <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9A9286', background: '#EFE8DA', padding: '4px 12px', borderRadius: 999 }}>{g.date}</span>
+                      <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--jb-v3-fg-3)', background: 'var(--jb-v3-line)', padding: '4px 12px', borderRadius: 2 }}>{g.date}</span>
                     </div>
                     {g.msgs.map((m, mi) => (
                       <div key={mi} style={{ display: 'flex', flexDirection: 'column', alignItems: m.align, animation: 'rbpop 0.2s ease' }}>
                         <div style={{ maxWidth: '74%', fontSize: 14, lineHeight: 1.5, color: m.color, background: m.bubbleBg, border: `1px solid ${m.bubbleBorder}`, borderRadius: m.radius, padding: '11px 15px' }}>{m.text}</div>
-                        <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#A79E8F', margin: '5px 3px 0' }}>{m.time}</span>
+                        <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, color: 'var(--jb-v3-fg-3)', margin: '5px 3px 0' }}>{m.time}</span>
                       </div>
                     ))}
                   </div>
                 ))}
               </div>
 
-              <div style={{ flexShrink: 0, padding: '14px 26px 18px', background: '#F7F3EA' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#FFFEFB', border: '1px solid #E1D9C9', borderRadius: 999, padding: '7px 7px 7px 8px' }}>
-                  <button title="Attach" className="jb-icon-btn" style={{ width: 38, height: 38, flexShrink: 0, border: 'none', background: 'none', borderRadius: '50%', cursor: 'pointer', color: '#A79E8F', fontSize: 22, lineHeight: 1, fontWeight: 300 }}>+</button>
+              <div style={{ flexShrink: 0, padding: '14px 26px 18px', background: 'var(--jb-v3-bg)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, padding: '7px 7px 7px 8px' }}>
+                  <button title="Attach" className="jb-icon-btn" style={{ width: 38, height: 38, flexShrink: 0, border: 'none', background: 'none', borderRadius: '50%', cursor: 'pointer', color: 'var(--jb-v3-fg-3)', fontSize: 22, lineHeight: 1, fontWeight: 300 }}>+</button>
                   <input
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                     onKeyDown={onKey}
                     placeholder={placeholder}
-                    style={{ flex: 1, border: 'none', background: 'none', fontFamily: 'inherit', fontSize: 14, color: '#1B1A16' }}
+                    style={{ flex: 1, border: 'none', background: 'none', fontFamily: 'inherit', fontSize: 14, color: 'var(--jb-v3-fg)' }}
                   />
-                  <button onClick={send} title="Send" style={{ width: 40, height: 40, flexShrink: 0, border: 'none', background: sendBg, color: '#0C2C1C', borderRadius: '50%', cursor: sendCursor, fontSize: 17, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>↑</button>
+                  <button onClick={send} title="Send" style={{ width: 40, height: 40, flexShrink: 0, border: 'none', background: sendBg, color: 'var(--jb-v3-accent-ink)', borderRadius: '50%', cursor: sendCursor, fontSize: 17, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>↑</button>
                 </div>
               </div>
             </div>

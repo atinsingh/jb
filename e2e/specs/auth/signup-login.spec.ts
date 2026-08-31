@@ -10,6 +10,20 @@ import { uniqueEmail, TEST_PASSWORD } from '../../support/api';
  */
 test.use({ storageState: { cookies: [], origins: [] } });
 
+/**
+ * "Signed in" means a Supabase session cookie, not a localStorage token.
+ *
+ * The session moved from `localStorage.authToken` to cookies in the Supabase
+ * migration, and that was the point: cookies are what let `src/middleware.js`
+ * gate protected routes server-side. Supabase names its cookies `sb-<ref>-auth-
+ * token`, sharded with a `.0`/`.1` suffix when the payload is large, so this
+ * matches on the prefix rather than an exact name.
+ */
+async function hasSession(page: import('@playwright/test').Page): Promise<boolean> {
+  const cookies = await page.context().cookies();
+  return cookies.some((c) => /^sb-.*-auth-token/.test(c.name) && !!c.value);
+}
+
 test.describe('signing up and in', () => {
   test('a new candidate can register through the form', async ({ page }) => {
     const email = uniqueEmail('signup-candidate');
@@ -20,24 +34,27 @@ test.describe('signing up and in', () => {
     // email/password form appears. The form fields do not exist in the DOM
     // until both of those happen — picking the card alone does not advance.
     await page
-      .getByRole('button', { name: /looking for a job/i })
+      .getByRole('radio', { name: /looking for a job/i })
       .first()
       .click();
-    await page.getByRole('button', { name: /^continue/i }).click();
+    await page.getByRole('button', { name: /^continue$/i }).click();
 
     await page.fill('input[name="name"]', 'E2E Signup Candidate');
     await page.fill('input[name="email"]', email);
     await page.fill('input[name="password"]', TEST_PASSWORD);
-    await page.getByRole('button', { name: /sign ?up|create|get started|continue/i }).first().click();
+
+    // Scoped to the form: the OAuth buttons above it also read "Continue
+    // with ...", so an unscoped name match would click Google and leave.
+    await page.locator('form').getByRole('button', { name: /create account/i }).click();
 
     // Success is a persisted session, not a URL: the app routes new users to
     // onboarding, dashboard or a verify-email notice depending on config, and
     // asserting one of those would make this test about routing config.
     await expect
-      .poll(
-        () => page.evaluate(() => !!window.localStorage.getItem('authToken')),
-        { message: 'signup did not establish a session', timeout: 30_000 },
-      )
+      .poll(() => hasSession(page), {
+        message: 'signup did not establish a session',
+        timeout: 30_000,
+      })
       .toBe(true);
   });
 
@@ -49,13 +66,13 @@ test.describe('signing up and in', () => {
 
     await page.fill('input[name="email"]', candidateUser.email);
     await page.fill('input[name="password"]', candidateUser.password);
-    await page.getByRole('button', { name: /log ?in|sign ?in/i }).first().click();
+    await page.locator('form').getByRole('button', { name: /^log in$/i }).click();
 
     await expect
-      .poll(
-        () => page.evaluate(() => !!window.localStorage.getItem('authToken')),
-        { message: 'login did not establish a session', timeout: 30_000 },
-      )
+      .poll(() => hasSession(page), {
+        message: 'login did not establish a session',
+        timeout: 30_000,
+      })
       .toBe(true);
 
     await page.goto('/app/dashboard', { waitUntil: 'domcontentloaded' });
@@ -63,38 +80,32 @@ test.describe('signing up and in', () => {
   });
 
   test('a wrong password is refused, and says so', async ({ page, guards }) => {
-    // The 401 here is the point of the test, so it is not a guard failure. The
-    // browser also logs the failed fetch to the console on top of the network
-    // event Playwright reports separately, so both channels need the allowance.
-    guards.allowFailures('/api/auth/login');
+    // The failed sign-in goes straight to Supabase now, not to our backend, so
+    // there is no /api/auth/login request to allow. The browser still logs the
+    // failed fetch to the console, which the guard would otherwise flag.
     guards.allowConsoleErrors();
 
     await page.goto('/app/login', { waitUntil: 'domcontentloaded' });
 
     await page.fill('input[name="email"]', 'nobody-e2e-auto@example.com');
     await page.fill('input[name="password"]', 'definitely-not-the-password');
-    await page.getByRole('button', { name: /log ?in|sign ?in/i }).first().click();
+    await page.locator('form').getByRole('button', { name: /^log in$/i }).click();
 
     // No session, and the user is told — a silent no-op would be the real bug.
-    await expect
-      .poll(() => page.evaluate(() => !!window.localStorage.getItem('authToken')))
-      .toBe(false);
+    await expect.poll(() => hasSession(page)).toBe(false);
 
     await expect(
       page.locator('body'),
       'a failed login gave the user no feedback at all',
-    ).toContainText(/invalid|incorrect|wrong|not found|failed|try again/i, {
+    ).toContainText(/invalid|incorrect|wrong|not found|failed|try again|credentials/i, {
       timeout: 15_000,
     });
   });
 
   test('signed-out visitors are kept out of the product', async ({ page, guards }) => {
-    // The dashboard's own data-fetch effect and AuthContext's redirect guard
-    // both run on mount, independently. The redirect wins and no protected DATA
-    // is ever shown, but the data-fetch effect gets a beat of runway first and
-    // fires five authenticated calls that 401 before the redirect lands. That
-    // is wasted requests, not a security gap, so it is allowed here rather than
-    // silently muted — this is what the assertion below actually verifies.
+    // The middleware now redirects before the page renders, so the dashboard's
+    // data-fetch effect should never run. The allowances below are kept as a
+    // safety net for the brief window where a cached page could still mount.
     guards.allowFailures(
       '/api/matching/matches',
       '/api/matching/recommendations',
@@ -102,22 +113,19 @@ test.describe('signing up and in', () => {
       '/api/users/preferences',
       '/api/resume-builder',
     );
-    // Chrome logs a failed fetch to the console in addition to the network
-    // event above — same expected noise, second channel.
     guards.allowConsoleErrors();
 
     await page.goto('/app/dashboard', { waitUntil: 'domcontentloaded' });
 
-    // Either a redirect to login or an explicit gate is acceptable; silently
-    // rendering the dashboard shell to a stranger is not.
-    await page.waitForLoadState('networkidle').catch(() => {});
-
+    // The middleware redirect is server-side, so this should be settled on
+    // arrival rather than after a client-side bounce.
     const url = page.url();
-    const body = (await page.locator('body').innerText()).toLowerCase();
-    const gated =
-      /\/login|\/signup|\/unauthorized/.test(url) ||
-      /sign in|log in|unauthori/i.test(body);
+    expect(
+      /\/app\/login/.test(url),
+      `an unauthenticated visitor was served ${url} instead of being redirected`,
+    ).toBe(true);
 
-    expect(gated, `an unauthenticated visitor was served ${url}`).toBe(true);
+    // And it must carry the requested route so sign-in can return them to it.
+    expect(url).toContain('redirect=');
   });
 });

@@ -5,6 +5,7 @@ import { AuthProvider } from '@/context/AuthContext';
 import { ThemeProvider } from 'next-themes';
 import ThemeProviderWrapper from '@/components/theme/ThemeProviderWrapper';
 import Head from 'next/head';
+import { useRouter } from 'next/router';
 import { Instrument_Serif, Public_Sans, IBM_Plex_Mono, Sora, DM_Mono } from 'next/font/google';
 
 /*
@@ -72,7 +73,30 @@ const fontV3Mono = DM_Mono({
   fallback: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
 });
 
+/*
+ * The v3 tokens in tokens.css are scoped to `.jbv3`, so a page that does not
+ * carry the class renders every --jb-v3-* reference as an unset value. The
+ * candidate app is 36 pages that each own their root element — there is no
+ * shared layout component to hang the class on — so it is applied here, once,
+ * for the whole /app/* subtree instead of being pasted into 36 files.
+ *
+ * `display: contents` means the wrapper generates no box: it cannot disturb a
+ * page's own flex/grid root or its 100vh sizing, but custom properties still
+ * inherit through it, which is the only thing it is here to do.
+ *
+ * /app/login and the other pre-auth screens already set `jb jbv3` themselves
+ * (JOB-13). Nesting the class is harmless — the inner scope resolves to the
+ * same values — so they are not special-cased.
+ */
+const V3_SUBTREE = '/app';
+
 export default function App({ Component, pageProps }) {
+  const router = useRouter();
+  const isAppSurface =
+    router.pathname === V3_SUBTREE || router.pathname.startsWith(`${V3_SUBTREE}/`);
+
+  const page = <Component {...pageProps} />;
+
   return (
     <ThemeProvider 
       attribute="class" 
@@ -100,7 +124,13 @@ export default function App({ Component, pageProps }) {
             <meta name="viewport" content="width=device-width, initial-scale=1" />
             <meta name="description" content="Jobocate - Find your dream job today" />
           </Head>
-          <Component {...pageProps} />
+          {isAppSurface ? (
+            <div className="jb jbv3" style={{ display: 'contents' }}>
+              {page}
+            </div>
+          ) : (
+            page
+          )}
           <ToastContainer 
             position="top-right"
             autoClose={3000}

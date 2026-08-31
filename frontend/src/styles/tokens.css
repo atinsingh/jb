@@ -520,6 +520,12 @@ html[data-jb-theme='light'] {
 
   --jb-v3-warn: #d9a03f;
 
+  /* Form/auth error state. v3 had no danger token because the marketing pages
+     have no forms; the pre-auth screens do. Checked for AA on --jb-v3-panel. */
+  --jb-v3-danger: #fb7268;
+  --jb-v3-danger-line: rgba(251, 114, 104, 0.42);
+  --jb-v3-danger-soft: rgba(251, 114, 104, 0.10);
+
   /* Histogram: bars at or above the coverage threshold vs below it. */
   --jb-v3-tick-on: #2a5bff;
   --jb-v3-tick-off: #26282d;
@@ -551,10 +557,121 @@ html[data-jb-theme='light'] .jbv3-chrome {
 
   --jb-v3-warn: #8a5a0c;
 
+  --jb-v3-danger: #b42318;
+  --jb-v3-danger-line: rgba(180, 35, 24, 0.38);
+  --jb-v3-danger-soft: rgba(180, 35, 24, 0.08);
+
   --jb-v3-tick-on: #1c3fbf;
   --jb-v3-tick-off: #c9c2b0;
 
   --jb-v3-dot: rgba(26, 24, 19, 0.16);
+}
+
+/* ============================================================================
+   CANDIDATE v3 — APP SURFACE EXTENSION                            (JOB-81)
+   ============================================================================
+   The --jb-v3-* family above was sized for marketing and pre-auth pages: one
+   page ground, one panel, one accent, no persistent navigation. The logged-in
+   surface needs roles those pages never had to express — a sidebar rail, a
+   sheet raised above the page, an input ground, a positive hue for match
+   scores and "applied" states, and a ramp for score rings and funnels.
+
+   These extend the same two blocks and stay scoped to .jbv3, so nothing here
+   reaches the marketing or pre-auth screens.
+
+   Contrast measured on this block's own grounds (target AA 4.5:1 for text):
+     dark   ok #3fbf7f     -> 8.40 on bg, 7.85 on card
+            chip-ink       -> 8.04 on control
+            fg-3           -> 4.75 on rail
+     light  ok #15633e     -> 5.73 on bg, 7.09 on card, 5.17 on sunk
+            chip-ink       -> 6.02 on control
+            fg-3           -> 5.37 on rail
+   The light `ok` is deliberately darker than a mid-green: #1a7f4f measured
+   3.95 on --jb-v3-bg and failed, and match scores do render on page ground.
+   ============================================================================ */
+.jbv3 {
+  /* Grounds. `rail` is the sidebar; `card` is a sheet raised above bg/panel;
+     `control` is the ground for inputs, tracks, and neutral chips. */
+  --jb-v3-rail: #0e0e10;
+  --jb-v3-card: #141417;
+  --jb-v3-control: #1a1b1f;
+
+  /* Heavier edges than --jb-v3-line-2: outlined buttons and drop zones. */
+  --jb-v3-line-btn: #3a3d43;
+  --jb-v3-line-dashed: #33353b;
+
+  --jb-v3-accent-hover: #4a74ff;
+
+  /* Positive. Match scores, "applied", ATS pass — the app's one green. */
+  --jb-v3-ok: #3fbf7f;
+  --jb-v3-ok-soft: rgba(63, 191, 127, 0.13);
+  --jb-v3-ok-line: rgba(63, 191, 127, 0.4);
+
+  /* --jb-v3-warn exists above as a foreground only; the app also fills. */
+  --jb-v3-warn-soft: rgba(217, 160, 63, 0.13);
+  --jb-v3-warn-line: rgba(217, 160, 63, 0.4);
+
+  /* Neutral chip ink — a step brighter than fg-2 so a chip on `control`
+     still reads at small sizes. */
+  --jb-v3-chip-ink: #b0b1b6;
+
+  /* Inverted panel: flips to the opposite end of the current theme. */
+  --jb-v3-invert: #f5f5f4;
+  --jb-v3-invert-ink: #0b0b0c;
+
+  /* `paper` is the résumé sheet lifting off the page; `lift` is the small
+     hover response on an interactive card. */
+  --jb-v3-shadow-paper: 0 24px 48px -28px rgba(0, 0, 0, 0.65);
+  --jb-v3-shadow-lift: 0 10px 22px -14px rgba(0, 0, 0, 0.55);
+
+  --jb-v3-scrim: rgba(0, 0, 0, 0.6);
+
+  /* Categorical ramp for score rings, funnels, and pipeline charts. Ordered
+     by how often a series appears, not by hue. */
+  --jb-v3-viz-1: #2a5bff;
+  --jb-v3-viz-2: #6f8cff;
+  --jb-v3-viz-3: #3fbf7f;
+  --jb-v3-viz-4: #d9a03f;
+
+  /* Display scale, carried over from the --jb-a-* set where it was already
+     tuned per screen. Theme-independent, so it is stated once. */
+  --jb-v3-display-hero: 4rem; /* 64px — dashboard */
+  --jb-v3-display-md: 3.25rem; /* 52px — matches */
+  --jb-v3-display-sm: 2.875rem; /* 46px — applications, onboarding */
+  --jb-v3-display-stat: 2.75rem; /* 44px — bare stat figures */
+}
+
+html[data-jb-theme='light'] .jbv3 {
+  --jb-v3-rail: #efece3;
+  --jb-v3-card: #fdfcf8;
+  --jb-v3-control: #e4e0d4;
+
+  --jb-v3-line-btn: #a49c86;
+  --jb-v3-line-dashed: #bdb6a3;
+
+  --jb-v3-accent-hover: #16309a;
+
+  --jb-v3-ok: #15633e;
+  --jb-v3-ok-soft: rgba(21, 99, 62, 0.1);
+  --jb-v3-ok-line: rgba(21, 99, 62, 0.36);
+
+  --jb-v3-warn-soft: rgba(138, 90, 12, 0.1);
+  --jb-v3-warn-line: rgba(138, 90, 12, 0.34);
+
+  --jb-v3-chip-ink: #56513f;
+
+  --jb-v3-invert: #1a1813;
+  --jb-v3-invert-ink: #f7f5ef;
+
+  --jb-v3-shadow-paper: 0 24px 48px -28px rgba(26, 24, 19, 0.22);
+  --jb-v3-shadow-lift: 0 10px 22px -14px rgba(26, 24, 19, 0.28);
+
+  --jb-v3-scrim: rgba(26, 24, 19, 0.35);
+
+  --jb-v3-viz-1: #1c3fbf;
+  --jb-v3-viz-2: #5a74d8;
+  --jb-v3-viz-3: #15633e;
+  --jb-v3-viz-4: #8a5a0c;
 }
 
 /* ============================================================================

@@ -6,7 +6,7 @@ import { appRoute } from '@/components/app/appRoutes';
 
 /* ---------------------------------------------------------------- skeleton row --- */
 const shimmer = {
-  background: 'linear-gradient(90deg,#EFE8DA 25%,#F7F3EA 50%,#EFE8DA 75%)',
+  background: 'linear-gradient(90deg,var(--jb-v3-line) 25%,var(--jb-v3-bg) 50%,var(--jb-v3-line) 75%)',
   backgroundSize: '200% 100%',
   animation: 'shimmer 1.3s ease-in-out infinite',
 };
@@ -15,22 +15,22 @@ function SkeletonRow({ widths }) {
   return (
     <div
       style={{
-        background: '#FFFEFB',
-        border: '1px solid #E6DECF',
-        borderRadius: 16,
+        background: 'var(--jb-v3-panel)',
+        border: '1px solid var(--jb-v3-line)',
+        borderRadius: 2,
         padding: 20,
         display: 'flex',
         alignItems: 'center',
         gap: 16,
       }}
     >
-      <span style={{ width: 52, height: 52, flexShrink: 0, borderRadius: 13, ...shimmer }} />
+      <span style={{ width: 52, height: 52, flexShrink: 0, borderRadius: 2, ...shimmer }} />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 9 }}>
-        <span style={{ height: 13, width: widths[0], borderRadius: 6, ...shimmer }} />
-        <span style={{ height: 11, width: widths[1], borderRadius: 6, ...shimmer }} />
-        <span style={{ height: 11, width: widths[2], borderRadius: 6, ...shimmer }} />
+        <span style={{ height: 13, width: widths[0], borderRadius: 2, ...shimmer }} />
+        <span style={{ height: 11, width: widths[1], borderRadius: 2, ...shimmer }} />
+        <span style={{ height: 11, width: widths[2], borderRadius: 2, ...shimmer }} />
       </div>
-      <span style={{ width: 80, height: 36, flexShrink: 0, borderRadius: 11, ...shimmer }} />
+      <span style={{ width: 80, height: 36, flexShrink: 0, borderRadius: 2, ...shimmer }} />
     </div>
   );
 }
@@ -40,7 +40,7 @@ function SectionLabel({ tag, tagColor, note }) {
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10 }}>
       <span
         style={{
-          fontFamily: 'var(--jb-font-mono)',
+          fontFamily: 'var(--jb-v3-font-mono)',
           fontSize: 11,
           fontWeight: 600,
           letterSpacing: '0.08em',
@@ -50,7 +50,7 @@ function SectionLabel({ tag, tagColor, note }) {
       >
         {tag}
       </span>
-      <span style={{ fontSize: 12.5, color: '#A79E8F' }}>{note}</span>
+      <span style={{ fontSize: 12.5, color: 'var(--jb-v3-fg-3)' }}>{note}</span>
     </div>
   );
 }
@@ -89,9 +89,9 @@ export default function AppStates() {
         id="jbstates"
         style={{
           minHeight: '100vh',
-          background: '#F7F3EA',
-          fontFamily: 'var(--jb-font-sans)',
-          color: '#1B1A16',
+          background: 'var(--jb-v3-bg)',
+          fontFamily: 'var(--jb-v3-font-display)',
+          color: 'var(--jb-v3-fg)',
           padding: '40px 32px 72px',
         }}
       >
@@ -100,22 +100,22 @@ export default function AppStates() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 8 }}>
             <span
               style={{
-                fontFamily: 'var(--jb-font-display)',
+                fontFamily: 'var(--jb-v3-font-display)',
                 fontWeight: 800,
                 letterSpacing: '-0.02em',
                 fontSize: 23,
-                color: '#1B1A16',
+                color: 'var(--jb-v3-fg)',
               }}
             >
-              Jobocate<span style={{ color: '#1FA463' }}>.</span>
+              Jobocate<span style={{ color: 'var(--jb-v3-accent)' }}>.</span>
             </span>
             <span
               style={{
-                fontFamily: 'var(--jb-font-mono)',
+                fontFamily: 'var(--jb-v3-font-mono)',
                 fontSize: 11,
                 letterSpacing: '0.12em',
                 textTransform: 'uppercase',
-                color: '#9A9286',
+                color: 'var(--jb-v3-fg-3)',
               }}
             >
               / App states
@@ -123,7 +123,7 @@ export default function AppStates() {
           </div>
           <h1
             style={{
-              fontFamily: 'var(--jb-font-display)',
+              fontFamily: 'var(--jb-v3-font-display)',
               fontWeight: 400,
               fontSize: 38,
               lineHeight: 1.02,
@@ -132,29 +132,29 @@ export default function AppStates() {
           >
             Reusable states
           </h1>
-          <p style={{ fontSize: 15, color: '#5A544A', margin: '0 0 32px' }}>
+          <p style={{ fontSize: 15, color: 'var(--jb-v3-fg-2)', margin: '0 0 32px' }}>
             A reference sheet of shared patterns. Lift any block straight into a screen.
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 30 }}>
             {/* 404 */}
             <div>
-              <SectionLabel tag="404" tagColor="#1FA463" note="Page not found" />
+              <SectionLabel tag="404" tagColor="var(--jb-v3-accent)" note="Page not found" />
               <div
                 style={{
-                  background: '#FFFEFB',
-                  border: '1px solid #E6DECF',
-                  borderRadius: 18,
+                  background: 'var(--jb-v3-panel)',
+                  border: '1px solid var(--jb-v3-line)',
+                  borderRadius: 2,
                   padding: '48px 30px',
                   textAlign: 'center',
                 }}
               >
                 <div
                   style={{
-                    fontFamily: 'var(--jb-font-display)',
+                    fontFamily: 'var(--jb-v3-font-display)',
                     fontSize: 88,
                     lineHeight: 1,
-                    color: '#1FA463',
+                    color: 'var(--jb-v3-accent)',
                     marginBottom: 8,
                     animation: 'floaty 4s ease-in-out infinite',
                   }}
@@ -163,7 +163,7 @@ export default function AppStates() {
                 </div>
                 <h2
                   style={{
-                    fontFamily: 'var(--jb-font-display)',
+                    fontFamily: 'var(--jb-v3-font-display)',
                     fontWeight: 400,
                     fontSize: 30,
                     lineHeight: 1.05,
@@ -172,7 +172,7 @@ export default function AppStates() {
                 >
                   This page wandered off.
                 </h2>
-                <p style={{ fontSize: 14.5, color: '#5A544A', margin: '0 auto 24px', maxWidth: 380 }}>
+                <p style={{ fontSize: 14.5, color: 'var(--jb-v3-fg-2)', margin: '0 auto 24px', maxWidth: 380 }}>
                   We couldn&rsquo;t find that page — it may have moved, or never existed. Your search is still right where you
                   left it.
                 </p>
@@ -183,12 +183,12 @@ export default function AppStates() {
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: 8,
-                      background: '#1FA463',
-                      color: '#0C2C1C',
+                      background: 'var(--jb-v3-accent)',
+                      color: 'var(--jb-v3-accent-ink)',
                       fontSize: 14.5,
                       fontWeight: 700,
                       padding: '13px 22px',
-                      borderRadius: 999,
+                      borderRadius: 2,
                       textDecoration: 'none',
                     }}
                   >
@@ -199,14 +199,14 @@ export default function AppStates() {
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
-                      background: '#FFFEFB',
-                      color: '#1B1A16',
+                      background: 'var(--jb-v3-panel)',
+                      color: 'var(--jb-v3-fg)',
                       fontSize: 14.5,
                       fontWeight: 600,
                       padding: '13px 22px',
-                      borderRadius: 999,
+                      borderRadius: 2,
                       textDecoration: 'none',
-                      border: '1px solid #D9D0BE',
+                      border: '1px solid var(--jb-v3-line-2)',
                     }}
                   >
                     Visit help center
@@ -217,12 +217,12 @@ export default function AppStates() {
 
             {/* GENERIC ERROR */}
             <div>
-              <SectionLabel tag="Error" tagColor="#C9622E" note="Unexpected failure · retry" />
+              <SectionLabel tag="Error" tagColor="var(--jb-v3-danger)" note="Unexpected failure · retry" />
               <div
                 style={{
-                  background: '#FFFEFB',
-                  border: '1px solid #E6DECF',
-                  borderRadius: 18,
+                  background: 'var(--jb-v3-panel)',
+                  border: '1px solid var(--jb-v3-line)',
+                  borderRadius: 2,
                   padding: '44px 30px',
                   textAlign: 'center',
                 }}
@@ -233,8 +233,8 @@ export default function AppStates() {
                     height: 60,
                     margin: '0 auto 20px',
                     borderRadius: '50%',
-                    background: '#FBEDE4',
-                    color: '#C9622E',
+                    background: 'var(--jb-v3-danger-soft)',
+                    color: 'var(--jb-v3-danger)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -245,7 +245,7 @@ export default function AppStates() {
                 </div>
                 <h2
                   style={{
-                    fontFamily: 'var(--jb-font-display)',
+                    fontFamily: 'var(--jb-v3-font-display)',
                     fontWeight: 400,
                     fontSize: 28,
                     lineHeight: 1.05,
@@ -254,7 +254,7 @@ export default function AppStates() {
                 >
                   Something broke.
                 </h2>
-                <p style={{ fontSize: 14.5, color: '#5A544A', margin: '0 auto 24px', maxWidth: 380 }}>
+                <p style={{ fontSize: 14.5, color: 'var(--jb-v3-fg-2)', margin: '0 auto 24px', maxWidth: 380 }}>
                   An unexpected error happened on our end — not yours. Your data is safe. Give it another try in a moment.
                 </p>
                 <div style={{ display: 'flex', gap: 11, justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -265,12 +265,12 @@ export default function AppStates() {
                       alignItems: 'center',
                       gap: 8,
                       fontFamily: 'inherit',
-                      background: '#1B1A16',
-                      color: '#F7F3EA',
+                      background: 'var(--jb-v3-fg)',
+                      color: 'var(--jb-v3-bg)',
                       fontSize: 14.5,
                       fontWeight: 600,
                       padding: '13px 22px',
-                      borderRadius: 999,
+                      borderRadius: 2,
                       border: 'none',
                       cursor: 'pointer',
                     }}
@@ -282,14 +282,14 @@ export default function AppStates() {
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
-                      background: '#FFFEFB',
-                      color: '#1B1A16',
+                      background: 'var(--jb-v3-panel)',
+                      color: 'var(--jb-v3-fg)',
                       fontSize: 14.5,
                       fontWeight: 600,
                       padding: '13px 22px',
-                      borderRadius: 999,
+                      borderRadius: 2,
                       textDecoration: 'none',
-                      border: '1px solid #D9D0BE',
+                      border: '1px solid var(--jb-v3-line-2)',
                     }}
                   >
                     Contact support
@@ -297,9 +297,9 @@ export default function AppStates() {
                 </div>
                 <div
                   style={{
-                    fontFamily: 'var(--jb-font-mono)',
+                    fontFamily: 'var(--jb-v3-font-mono)',
                     fontSize: 11,
-                    color: '#B5AC9C',
+                    color: 'var(--jb-v3-fg-3)',
                     marginTop: 18,
                   }}
                 >
@@ -310,12 +310,12 @@ export default function AppStates() {
 
             {/* EMPTY LIST */}
             <div>
-              <SectionLabel tag="Empty" tagColor="#9A9286" note="No items yet · first-run" />
+              <SectionLabel tag="Empty" tagColor="var(--jb-v3-fg-3)" note="No items yet · first-run" />
               <div
                 style={{
-                  background: '#FFFEFB',
-                  border: '1px dashed #D2C9B7',
-                  borderRadius: 18,
+                  background: 'var(--jb-v3-panel)',
+                  border: '1px dashed var(--jb-v3-line-2)',
+                  borderRadius: 2,
                   padding: '44px 30px',
                   textAlign: 'center',
                 }}
@@ -325,10 +325,10 @@ export default function AppStates() {
                     width: 120,
                     height: 84,
                     margin: '0 auto 22px',
-                    borderRadius: 12,
+                    borderRadius: 2,
                     background:
-                      'repeating-linear-gradient(45deg, #F4EFE4, #F4EFE4 9px, #EFE8DA 9px, #EFE8DA 18px)',
-                    border: '1px solid #E6DECF',
+                      'repeating-linear-gradient(45deg, var(--jb-v3-control), var(--jb-v3-control) 9px, var(--jb-v3-line) 9px, var(--jb-v3-line) 18px)',
+                    border: '1px solid var(--jb-v3-line)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -336,11 +336,11 @@ export default function AppStates() {
                 >
                   <span
                     style={{
-                      fontFamily: 'var(--jb-font-mono)',
+                      fontFamily: 'var(--jb-v3-font-mono)',
                       fontSize: 11,
                       letterSpacing: '0.06em',
                       textTransform: 'uppercase',
-                      color: '#A79E8F',
+                      color: 'var(--jb-v3-fg-3)',
                     }}
                   >
                     illustration
@@ -348,7 +348,7 @@ export default function AppStates() {
                 </div>
                 <h2
                   style={{
-                    fontFamily: 'var(--jb-font-display)',
+                    fontFamily: 'var(--jb-v3-font-display)',
                     fontWeight: 400,
                     fontSize: 26,
                     lineHeight: 1.1,
@@ -357,7 +357,7 @@ export default function AppStates() {
                 >
                   Nothing here yet.
                 </h2>
-                <p style={{ fontSize: 14.5, color: '#8A8378', margin: '0 auto 22px', maxWidth: 360 }}>
+                <p style={{ fontSize: 14.5, color: 'var(--jb-v3-fg-3)', margin: '0 auto 22px', maxWidth: 360 }}>
                   Bookmark roles from your matches and they&rsquo;ll collect here for later.
                 </p>
                 <Link
@@ -366,12 +366,12 @@ export default function AppStates() {
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 8,
-                    background: '#1FA463',
-                    color: '#0C2C1C',
+                    background: 'var(--jb-v3-accent)',
+                    color: 'var(--jb-v3-accent-ink)',
                     fontSize: 14.5,
                     fontWeight: 700,
                     padding: '13px 22px',
-                    borderRadius: 999,
+                    borderRadius: 2,
                     textDecoration: 'none',
                   }}
                 >
@@ -382,16 +382,16 @@ export default function AppStates() {
 
             {/* BANNERS */}
             <div>
-              <SectionLabel tag="Banner" tagColor="#C9622E" note="Offline · maintenance" />
+              <SectionLabel tag="Banner" tagColor="var(--jb-v3-danger)" note="Offline · maintenance" />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
                 <div
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: 13,
-                    background: '#FBEDE4',
-                    border: '1px solid #EAD0C4',
-                    borderRadius: 13,
+                    background: 'var(--jb-v3-danger-soft)',
+                    border: '1px solid var(--jb-v3-danger-line)',
+                    borderRadius: 2,
                     padding: '14px 18px',
                   }}
                 >
@@ -401,7 +401,7 @@ export default function AppStates() {
                       height: 26,
                       flexShrink: 0,
                       borderRadius: '50%',
-                      background: '#C9622E',
+                      background: 'var(--jb-v3-danger)',
                       color: '#fff',
                       display: 'flex',
                       alignItems: 'center',
@@ -411,14 +411,14 @@ export default function AppStates() {
                   >
                     ⚠
                   </span>
-                  <span style={{ flex: 1, fontSize: 13.5, color: '#7A4326' }}>
+                  <span style={{ flex: 1, fontSize: 13.5, color: 'var(--jb-v3-danger)' }}>
                     <b>You&rsquo;re offline.</b> Changes are saved locally and will sync the moment you reconnect.
                   </span>
                   <span
                     style={{
-                      fontFamily: 'var(--jb-font-mono)',
+                      fontFamily: 'var(--jb-v3-font-mono)',
                       fontSize: 11,
-                      color: '#9A6A2E',
+                      color: 'var(--jb-v3-warn)',
                       flexShrink: 0,
                     }}
                   >
@@ -430,9 +430,9 @@ export default function AppStates() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: 13,
-                    background: '#15140F',
-                    border: '1px solid #2C2A22',
-                    borderRadius: 13,
+                    background: 'var(--jb-v3-invert)',
+                    border: '1px solid var(--jb-v3-fg)',
+                    borderRadius: 2,
                     padding: '14px 18px',
                   }}
                 >
@@ -442,8 +442,8 @@ export default function AppStates() {
                       height: 26,
                       flexShrink: 0,
                       borderRadius: '50%',
-                      background: '#1E2D24',
-                      color: '#5BD08C',
+                      background: 'var(--jb-v3-ok)',
+                      color: 'var(--jb-v3-accent-ink)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -452,17 +452,17 @@ export default function AppStates() {
                   >
                     ◷
                   </span>
-                  <span style={{ flex: 1, fontSize: 13.5, color: '#E4DECF' }}>
-                    <b style={{ color: '#FBF8F1' }}>Scheduled maintenance.</b> Auto-Apply is paused while we ship an update —
+                  <span style={{ flex: 1, fontSize: 13.5, color: 'var(--jb-v3-line)' }}>
+                    <b style={{ color: 'var(--jb-v3-panel)' }}>Scheduled maintenance.</b> Auto-Apply is paused while we ship an update —
                     back by 2:00 AM PT.
                   </span>
                   <Link
                     href={appRoute('App Help Center.dc.html')}
                     style={{
-                      fontFamily: 'var(--jb-font-mono)',
+                      fontFamily: 'var(--jb-v3-font-mono)',
                       fontSize: 11,
                       fontWeight: 600,
-                      color: '#5BD08C',
+                      color: 'var(--jb-v3-ok)',
                       textDecoration: 'none',
                       flexShrink: 0,
                     }}
@@ -475,7 +475,7 @@ export default function AppStates() {
 
             {/* LOADING SKELETON */}
             <div>
-              <SectionLabel tag="Loading" tagColor="#9A9286" note="Skeleton · match card" />
+              <SectionLabel tag="Loading" tagColor="var(--jb-v3-fg-3)" note="Skeleton · match card" />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
                 <SkeletonRow widths={['58%', '80%', '40%']} />
                 <SkeletonRow widths={['48%', '72%', '34%']} />

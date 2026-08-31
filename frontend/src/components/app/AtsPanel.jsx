@@ -34,7 +34,7 @@ const btn = {
   color: '#1B1A16',
   background: '#FFFEFB',
   border: '1px solid #D9D0BE',
-  borderRadius: 999,
+  borderRadius: 2,
   padding: '9px 16px',
   cursor: 'pointer',
 };
@@ -133,7 +133,7 @@ export default function AtsPanel({ resumeId, initialScore = null, initialReport 
   const hasScore = typeof score === 'number';
 
   return (
-    <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 16, padding: 20, marginBottom: 18 }}>
+    <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 2, padding: 20, marginBottom: 18 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
         {hasScore ? <Ring value={score} /> : null}
         <div style={{ minWidth: 0, flex: 1 }}>
@@ -170,7 +170,7 @@ export default function AtsPanel({ resumeId, initialScore = null, initialReport 
                       fontSize: 10,
                       fontWeight: 700,
                       padding: '2px 7px',
-                      borderRadius: 999,
+                      borderRadius: 2,
                       background: s.bg,
                       color: s.fg,
                       border: `1px solid ${s.bd}`,
@@ -216,7 +216,7 @@ export default function AtsPanel({ resumeId, initialScore = null, initialReport 
                 fontFamily: 'inherit',
                 fontSize: 13,
                 border: '1px solid #D9D0BE',
-                borderRadius: 10,
+                borderRadius: 2,
                 padding: 10,
                 background: '#FFFEFB',
                 resize: 'vertical',

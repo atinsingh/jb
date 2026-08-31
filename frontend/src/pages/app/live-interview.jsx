@@ -19,7 +19,7 @@
 import { useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import AppSidebar from '@/components/app/AppSidebar';
+import AppTopNav from '@/components/app/AppTopNav';
 import { appRoute } from '@/components/app/appRoutes';
 import { useLiveInterview, captureSupportProblem } from '@/hooks/useLiveInterview';
 import {
@@ -32,9 +32,9 @@ import {
 const MONO = 'var(--jb-font-mono, ui-monospace, monospace)';
 
 const card = {
-  background: '#FFFEFB',
-  border: '1px solid #E6DECF',
-  borderRadius: 16,
+  background: 'var(--jb-v3-panel)',
+  border: '1px solid var(--jb-v3-line)',
+  borderRadius: 2,
   padding: 20,
   marginBottom: 14,
 };
@@ -42,10 +42,10 @@ const primaryBtn = {
   fontFamily: 'inherit',
   fontSize: 14,
   fontWeight: 700,
-  color: '#0C2C1C',
-  background: '#1FA463',
+  color: 'var(--jb-v3-accent-ink)',
+  background: 'var(--jb-v3-accent)',
   border: 'none',
-  borderRadius: 999,
+  borderRadius: 2,
   padding: '12px 22px',
   cursor: 'pointer',
 };
@@ -53,10 +53,10 @@ const ghostBtn = {
   fontFamily: 'inherit',
   fontSize: 13,
   fontWeight: 600,
-  color: '#6B655A',
+  color: 'var(--jb-v3-fg-2)',
   background: 'transparent',
-  border: '1px solid #D9D0BE',
-  borderRadius: 999,
+  border: '1px solid var(--jb-v3-line-2)',
+  borderRadius: 2,
   padding: '10px 17px',
   cursor: 'pointer',
 };
@@ -64,10 +64,10 @@ const input = {
   width: '100%',
   fontFamily: 'inherit',
   fontSize: 14,
-  border: '1px solid #D9D0BE',
-  borderRadius: 10,
+  border: '1px solid var(--jb-v3-line-2)',
+  borderRadius: 2,
   padding: '10px 12px',
-  background: '#FFFEFB',
+  background: 'var(--jb-v3-panel)',
 };
 
 /**
@@ -86,10 +86,10 @@ function RecordingIndicator() {
         display: 'inline-flex',
         alignItems: 'center',
         gap: 8,
-        background: '#FDE4E0',
-        border: '1px solid #F0C4BB',
-        color: '#B23A22',
-        borderRadius: 999,
+        background: 'var(--jb-v3-danger-soft)',
+        border: '1px solid var(--jb-v3-danger-line)',
+        color: 'var(--jb-v3-danger)',
+        borderRadius: 2,
         padding: '6px 13px',
         fontSize: 12.5,
         fontWeight: 700,
@@ -100,7 +100,7 @@ function RecordingIndicator() {
           width: 9,
           height: 9,
           borderRadius: '50%',
-          background: '#D3402A',
+          background: 'var(--jb-v3-danger)',
           animation: 'jbPulse 1.4s ease-in-out infinite',
         }}
       />
@@ -124,12 +124,12 @@ function Notice({ notice }) {
       role="status"
       style={{
         padding: '10px 13px',
-        borderRadius: 10,
+        borderRadius: 2,
         fontSize: 13,
         marginBottom: 14,
-        background: isError ? '#FDE4E0' : isWarn ? '#FFF3D9' : '#EAF6EE',
-        border: `1px solid ${isError ? '#F0C4BB' : isWarn ? '#F0DDAE' : '#CDE9D6'}`,
-        color: isError ? '#B23A22' : isWarn ? '#8A6100' : '#157A49',
+        background: isError ? 'var(--jb-v3-danger-soft)' : isWarn ? 'var(--jb-v3-warn-soft)' : 'var(--jb-v3-accent-soft)',
+        border: `1px solid ${isError ? 'var(--jb-v3-danger-line)' : isWarn ? 'var(--jb-v3-warn-line)' : 'var(--jb-v3-accent-line)'}`,
+        color: isError ? 'var(--jb-v3-danger)' : isWarn ? 'var(--jb-v3-warn)' : 'var(--jb-v3-accent)',
       }}
     >
       {notice.message}
@@ -207,26 +207,26 @@ export default function LiveInterviewPage() {
         <title>Live copilot · Jobocate</title>
       </Head>
 
-      <div style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA' }}>
-        <AppSidebar active="live" />
+      <div style={{ minHeight: '100vh', background: 'var(--jb-v3-bg)' }}>
+        <AppTopNav />
 
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           <header
             style={{
-              position: 'sticky',
-              top: 0,
-              zIndex: 20,
+              position: 'relative',
+              
+              
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               gap: 16,
               padding: '15px 32px',
-              background: 'rgba(247,243,234,0.85)',
+              background: 'color-mix(in srgb, var(--jb-v3-bg) 85%, transparent)',
               backdropFilter: 'blur(10px)',
-              borderBottom: '1px solid #E7E0D2',
+              borderBottom: '1px solid var(--jb-v3-line)',
             }}
           >
-            <h1 style={{ fontSize: 17, fontWeight: 700, color: '#1B1A16', margin: 0 }}>
+            <h1 style={{ fontSize: 17, fontWeight: 700, color: 'var(--jb-v3-fg)', margin: 0 }}>
               Live copilot
             </h1>
             {status === 'live' && <RecordingIndicator />}
@@ -239,7 +239,7 @@ export default function LiveInterviewPage() {
             {/* ---------------------------------------------------- setup --- */}
             {phase === 'setup' && (
               <div style={{ maxWidth: 560 }}>
-                <p style={{ fontSize: 14, color: '#6B655A', lineHeight: 1.6, margin: '0 0 18px' }}>
+                <p style={{ fontSize: 14, color: 'var(--jb-v3-fg-2)', lineHeight: 1.6, margin: '0 0 18px' }}>
                   We listen to the interview through a shared browser tab, and put talking points
                   from your own experience on screen as questions are asked. Nothing is scripted for
                   you, and no audio is ever stored.
@@ -260,7 +260,7 @@ export default function LiveInterviewPage() {
                     />
                   </label>
                   <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, margin: '14px 0 0' }}>
-                    Company <span style={{ fontWeight: 500, color: '#8A8375' }}>(optional)</span>
+                    Company <span style={{ fontWeight: 500, color: 'var(--jb-v3-fg-3)' }}>(optional)</span>
                     <input
                       value={company}
                       onChange={(e) => setCompany(e.target.value)}
@@ -288,7 +288,7 @@ export default function LiveInterviewPage() {
                   <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 10px' }}>
                     Before we listen
                   </h2>
-                  <p style={{ fontSize: 13.5, color: '#5A544A', lineHeight: 1.65, margin: '0 0 12px' }}>
+                  <p style={{ fontSize: 13.5, color: 'var(--jb-v3-fg-2)', lineHeight: 1.65, margin: '0 0 12px' }}>
                     This transcribes the <strong>other person&rsquo;s voice</strong> as well as your
                     own. In some places — including California, Illinois, Washington, Pennsylvania
                     and Florida — recording a conversation without everyone&rsquo;s consent is
@@ -297,12 +297,12 @@ export default function LiveInterviewPage() {
 
                   <div
                     style={{
-                      background: '#F7F3EA',
-                      border: '1px solid #E6DECF',
-                      borderRadius: 10,
+                      background: 'var(--jb-v3-bg)',
+                      border: '1px solid var(--jb-v3-line)',
+                      borderRadius: 2,
                       padding: 12,
                       fontSize: 13,
-                      color: '#3D3930',
+                      color: 'var(--jb-v3-fg-2)',
                       marginBottom: 14,
                     }}
                   >
@@ -311,7 +311,7 @@ export default function LiveInterviewPage() {
                     take notes. Is that alright with you?&rdquo;
                   </div>
 
-                  <p style={{ fontSize: 12.5, color: '#6B655A', margin: '0 0 14px' }}>
+                  <p style={{ fontSize: 12.5, color: 'var(--jb-v3-fg-2)', margin: '0 0 14px' }}>
                     Audio is transcribed as it arrives and never stored — there is no recording to
                     keep or leak.
                   </p>
@@ -335,7 +335,7 @@ export default function LiveInterviewPage() {
                     />
                     <span>
                       Keep the transcript afterwards.
-                      <span style={{ color: '#8A8375' }}> Off by default — we delete it when the session ends.</span>
+                      <span style={{ color: 'var(--jb-v3-fg-3)' }}> Off by default — we delete it when the session ends.</span>
                     </span>
                   </label>
                 </div>
@@ -348,7 +348,7 @@ export default function LiveInterviewPage() {
                 >
                   {busy ? 'Starting…' : 'Share tab audio and start'}
                 </button>
-                <p style={{ fontSize: 12, color: '#8A8375', marginTop: 10 }}>
+                <p style={{ fontSize: 12, color: 'var(--jb-v3-fg-3)', marginTop: 10 }}>
                   Pick the meeting tab and tick <strong>&ldquo;Also share tab audio&rdquo;</strong>.
                 </p>
               </div>
@@ -358,12 +358,12 @@ export default function LiveInterviewPage() {
             {phase === 'live' && (
               <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 16 }}>
                 <section>
-                  <h2 style={{ fontSize: 12, fontWeight: 700, color: '#6B655A', letterSpacing: '0.05em', margin: '0 0 9px' }}>
+                  <h2 style={{ fontSize: 12, fontWeight: 700, color: 'var(--jb-v3-fg-2)', letterSpacing: '0.05em', margin: '0 0 9px' }}>
                     TRANSCRIPT
                   </h2>
                   <div style={{ ...card, minHeight: 320, maxHeight: 460, overflowY: 'auto' }}>
                     {transcript.length === 0 ? (
-                      <p style={{ fontSize: 13, color: '#8A8375' }}>Listening…</p>
+                      <p style={{ fontSize: 13, color: 'var(--jb-v3-fg-3)' }}>Listening…</p>
                     ) : (
                       transcript.map((line) => (
                         <p
@@ -372,10 +372,10 @@ export default function LiveInterviewPage() {
                             fontSize: 13.5,
                             lineHeight: 1.6,
                             margin: '0 0 9px',
-                            color: line.isFinal ? '#1B1A16' : '#8A8375',
+                            color: line.isFinal ? 'var(--jb-v3-fg)' : 'var(--jb-v3-fg-3)',
                           }}
                         >
-                          <span style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: line.source === 'CANDIDATE' ? '#157A49' : '#8A6100' }}>
+                          <span style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: line.source === 'CANDIDATE' ? 'var(--jb-v3-accent)' : 'var(--jb-v3-warn)' }}>
                             {line.source === 'CANDIDATE' ? 'YOU' : 'THEM'}{' '}
                           </span>
                           {line.text}
@@ -412,26 +412,26 @@ export default function LiveInterviewPage() {
                 </section>
 
                 <section>
-                  <h2 style={{ fontSize: 12, fontWeight: 700, color: '#6B655A', letterSpacing: '0.05em', margin: '0 0 9px' }}>
+                  <h2 style={{ fontSize: 12, fontWeight: 700, color: 'var(--jb-v3-fg-2)', letterSpacing: '0.05em', margin: '0 0 9px' }}>
                     TALKING POINTS
                   </h2>
                   <div style={{ minHeight: 320, maxHeight: 460, overflowY: 'auto' }}>
                     {coaching.length === 0 ? (
                       <div style={card}>
-                        <p style={{ fontSize: 13, color: '#8A8375', margin: 0 }}>
+                        <p style={{ fontSize: 13, color: 'var(--jb-v3-fg-3)', margin: 0 }}>
                           When a question is asked, evidence from your own experience appears here.
                         </p>
                       </div>
                     ) : (
                       [...coaching].reverse().map((c, i) => (
                         <div key={`${c.question}-${i}`} style={card}>
-                          <p style={{ fontSize: 13, fontWeight: 700, color: '#1B1A16', margin: '0 0 8px' }}>
+                          <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--jb-v3-fg)', margin: '0 0 8px' }}>
                             {c.question}
                           </p>
                           {c.pending ? (
-                            <p style={{ fontSize: 13, color: '#8A8375', margin: 0 }}>Thinking…</p>
+                            <p style={{ fontSize: 13, color: 'var(--jb-v3-fg-3)', margin: 0 }}>Thinking…</p>
                           ) : (
-                            <div style={{ fontSize: 13.5, color: '#3D3930', lineHeight: 1.6 }}>
+                            <div style={{ fontSize: 13.5, color: 'var(--jb-v3-fg-2)', lineHeight: 1.6 }}>
                               {(c.output?.talkingPoints || c.output?.points || []).map((p, j) => (
                                 <p key={j} style={{ margin: '0 0 6px' }}>• {typeof p === 'string' ? p : p?.text}</p>
                               ))}
@@ -457,7 +457,7 @@ export default function LiveInterviewPage() {
               <div style={{ maxWidth: 560 }}>
                 <div style={card}>
                   <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 8px' }}>Session ended</h2>
-                  <p style={{ fontSize: 13.5, color: '#5A544A', margin: 0 }}>
+                  <p style={{ fontSize: 13.5, color: 'var(--jb-v3-fg-2)', margin: 0 }}>
                     {summary?.transcriptRetained
                       ? 'Your transcript has been kept, as you asked.'
                       : `Transcript discarded${

@@ -3,18 +3,18 @@
 import { useState, useMemo, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import AppSidebar from '@/components/app/AppSidebar';
+import AppTopNav from '@/components/app/AppTopNav';
 import { appRoute } from '@/components/app/appRoutes';
 import { getHelpArticles, submitArticleFeedback } from '@/services/helpApi';
 
 // ---- Sample data (the design's own bundled content) ----
 const HELP_CATEGORIES = [
-  { key: 'start', name: 'Getting started', desc: 'Set up your account and learn the basics.', tag: 'GS', tint: '#EAF6EE', ink: '#157A49' },
-  { key: 'matches', name: 'Matches & applications', desc: 'How matching, applying and tracking work.', tag: 'MA', tint: '#F4EFE4', ink: '#5A544A' },
-  { key: 'auto', name: 'Auto-Apply', desc: 'Hands-off applying and your weekly credits.', tag: 'AA', tint: '#E6F6EC', ink: '#157A49' },
-  { key: 'resume', name: 'Résumé & cover letters', desc: 'Building and tailoring your documents.', tag: 'RC', tint: '#F4EFE4', ink: '#5A544A' },
-  { key: 'billing', name: 'Billing & plans', desc: 'Upgrades, invoices, refunds and trials.', tag: 'BP', tint: '#FBEDE4', ink: '#C9622E' },
-  { key: 'account', name: 'Account', desc: 'Login, security and notification settings.', tag: 'AC', tint: '#F4EFE4', ink: '#5A544A' },
+  { key: 'start', name: 'Getting started', desc: 'Set up your account and learn the basics.', tag: 'GS', tint: 'var(--jb-v3-accent-soft)', ink: 'var(--jb-v3-accent)' },
+  { key: 'matches', name: 'Matches & applications', desc: 'How matching, applying and tracking work.', tag: 'MA', tint: 'var(--jb-v3-control)', ink: 'var(--jb-v3-fg-2)' },
+  { key: 'auto', name: 'Auto-Apply', desc: 'Hands-off applying and your weekly credits.', tag: 'AA', tint: 'var(--jb-v3-ok-soft)', ink: 'var(--jb-v3-accent)' },
+  { key: 'resume', name: 'Résumé & cover letters', desc: 'Building and tailoring your documents.', tag: 'RC', tint: 'var(--jb-v3-control)', ink: 'var(--jb-v3-fg-2)' },
+  { key: 'billing', name: 'Billing & plans', desc: 'Upgrades, invoices, refunds and trials.', tag: 'BP', tint: 'var(--jb-v3-danger-soft)', ink: 'var(--jb-v3-danger)' },
+  { key: 'account', name: 'Account', desc: 'Login, security and notification settings.', tag: 'AC', tint: 'var(--jb-v3-control)', ink: 'var(--jb-v3-fg-2)' },
 ];
 
 const HELP_ARTICLES = [
@@ -91,7 +91,7 @@ export default function AppHelp() {
       id: a.id,
       title: a.title,
       open: () => open(a.id),
-      divider: i < arr.length - 1 ? '#F2ECE0' : 'transparent',
+      divider: i < arr.length - 1 ? 'var(--jb-v3-control)' : 'transparent',
       tag: tagFor(a).tag,
       tint: tagFor(a).tint,
       ink: tagFor(a).ink,
@@ -178,16 +178,16 @@ export default function AppHelp() {
           width: 8px;
         }
         #jbapp ::-webkit-scrollbar-thumb {
-          background: #e1d9c9;
-          border-radius: 8px;
+          background: var(--jb-v3-line);
+          border-radius: 2px;
         }
         #jbapp input:focus {
           outline: none;
-          border-color: #1fa463;
-          box-shadow: 0 0 0 3px rgba(31, 164, 99, 0.15);
+          border-color: var(--jb-v3-accent);
+          box-shadow: 0 0 0 3px color-mix(in srgb, var(--jb-v3-accent) 15%, transparent);
         }
         #jbapp input::placeholder {
-          color: #a79e8f;
+          color: var(--jb-v3-fg-3);
         }
         @keyframes rbpop {
           from {
@@ -200,45 +200,45 @@ export default function AppHelp() {
           }
         }
         #jbapp .hc-card:hover {
-          border-color: #1fa463;
+          border-color: var(--jb-v3-accent);
         }
         #jbapp .hc-row:hover {
-          background: #f7f3ea;
+          background: var(--jb-v3-bg);
         }
         #jbapp .hc-yes:hover {
-          background: #dcf0e4;
+          background: var(--jb-v3-ok-soft);
         }
         #jbapp .hc-no:hover {
-          background: #f4efe4;
+          background: var(--jb-v3-control);
         }
       `}</style>
 
       <div
         id="jbapp"
-        style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16' }}
+        style={{ minHeight: '100vh', background: 'var(--jb-v3-bg)', fontFamily: 'var(--jb-v3-font-display)', color: 'var(--jb-v3-fg)' }}
       >
-        <AppSidebar active="" />
+        <AppTopNav />
 
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           <header
             style={{
-              position: 'sticky',
-              top: 0,
-              zIndex: 20,
+              position: 'relative',
+              
+              
               display: 'flex',
               alignItems: 'center',
               gap: 20,
               padding: '15px 32px',
-              background: 'rgba(247,243,234,0.85)',
+              background: 'color-mix(in srgb, var(--jb-v3-bg) 85%, transparent)',
               backdropFilter: 'blur(10px)',
-              borderBottom: '1px solid #E7E0D2',
+              borderBottom: '1px solid var(--jb-v3-line)',
             }}
           >
-            <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9286' }}>
+            <div style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--jb-v3-fg-3)' }}>
               Help center
             </div>
             <div style={{ flex: 1 }} />
-            <Link href={appRoute('App Support.dc.html')} style={{ fontSize: 13, fontWeight: 600, color: '#157A49', textDecoration: 'none' }}>
+            <Link href={appRoute('App Support.dc.html')} style={{ fontSize: 13, fontWeight: 600, color: 'var(--jb-v3-accent)', textDecoration: 'none' }}>
               Contact support →
             </Link>
           </header>
@@ -248,7 +248,7 @@ export default function AppHelp() {
             {showHome && (
               <div>
                 <div style={{ textAlign: 'center', marginBottom: 30 }}>
-                  <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 44, lineHeight: 1.02, margin: '0 0 18px' }}>
+                  <h1 style={{ fontFamily: 'var(--jb-v3-font-display)', fontWeight: 600, letterSpacing: '-0.04em', fontSize: 44, lineHeight: 1.02, margin: '0 0 18px' }}>
                     How can we help?
                   </h1>
                   <div
@@ -258,18 +258,18 @@ export default function AppHelp() {
                       gap: 12,
                       maxWidth: 560,
                       margin: '0 auto',
-                      background: '#FFFEFB',
-                      border: '1px solid #E1D9C9',
-                      borderRadius: 999,
+                      background: 'var(--jb-v3-panel)',
+                      border: '1px solid var(--jb-v3-line)',
+                      borderRadius: 2,
                       padding: '13px 22px',
                     }}
                   >
-                    <span style={{ color: '#1FA463', fontSize: 17 }}>⌕</span>
+                    <span style={{ color: 'var(--jb-v3-accent)', fontSize: 17 }}>⌕</span>
                     <input
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
                       placeholder="Search help…"
-                      style={{ flex: 1, border: 'none', background: 'none', fontFamily: 'inherit', fontSize: 16, color: '#1B1A16' }}
+                      style={{ flex: 1, border: 'none', background: 'none', fontFamily: 'inherit', fontSize: 16, color: 'var(--jb-v3-fg)' }}
                     />
                   </div>
                 </div>
@@ -277,11 +277,11 @@ export default function AppHelp() {
                 {/* SEARCH RESULTS */}
                 {vals.isSearch && (
                   <div style={{ animation: 'rbpop 0.2s ease' }}>
-                    <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#8A8378', marginBottom: 14 }}>
+                    <div style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, color: 'var(--jb-v3-fg-3)', marginBottom: 14 }}>
                       {vals.resultCount} results for “{query}”
                     </div>
                     {vals.hasResults && (
-                      <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 16, overflow: 'hidden' }}>
+                      <div style={{ background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, overflow: 'hidden' }}>
                         {vals.results.map((a) => (
                           <button
                             key={a.id}
@@ -296,7 +296,7 @@ export default function AppHelp() {
                               padding: '16px 18px',
                               border: 'none',
                               borderBottom: `1px solid ${a.divider}`,
-                              background: '#FFFEFB',
+                              background: 'var(--jb-v3-panel)',
                               cursor: 'pointer',
                               fontFamily: 'inherit',
                             }}
@@ -306,13 +306,13 @@ export default function AppHelp() {
                                 width: 36,
                                 height: 36,
                                 flexShrink: 0,
-                                borderRadius: 9,
+                                borderRadius: 2,
                                 background: a.tint,
                                 color: a.ink,
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                fontFamily: 'var(--jb-font-mono)',
+                                fontFamily: 'var(--jb-v3-font-mono)',
                                 fontWeight: 600,
                                 fontSize: 11,
                               }}
@@ -320,19 +320,19 @@ export default function AppHelp() {
                               {a.tag}
                             </span>
                             <span style={{ flex: 1, minWidth: 0 }}>
-                              <span style={{ display: 'block', fontSize: 14.5, fontWeight: 700, color: '#1B1A16' }}>{a.title}</span>
-                              <span style={{ display: 'block', fontSize: 13, color: '#8A8378', marginTop: 2 }}>{a.snippet}</span>
+                              <span style={{ display: 'block', fontSize: 14.5, fontWeight: 700, color: 'var(--jb-v3-fg)' }}>{a.title}</span>
+                              <span style={{ display: 'block', fontSize: 13, color: 'var(--jb-v3-fg-3)', marginTop: 2 }}>{a.snippet}</span>
                             </span>
-                            <span style={{ color: '#C9BFAC', flexShrink: 0 }}>→</span>
+                            <span style={{ color: 'var(--jb-v3-line-2)', flexShrink: 0 }}>→</span>
                           </button>
                         ))}
                       </div>
                     )}
                     {vals.noResults && (
-                      <div style={{ background: '#FFFEFB', border: '1px dashed #D2C9B7', borderRadius: 16, padding: 40, textAlign: 'center' }}>
-                        <p style={{ fontSize: 14.5, color: '#8A8378', margin: 0 }}>
+                      <div style={{ background: 'var(--jb-v3-panel)', border: '1px dashed var(--jb-v3-line-2)', borderRadius: 2, padding: 40, textAlign: 'center' }}>
+                        <p style={{ fontSize: 14.5, color: 'var(--jb-v3-fg-3)', margin: 0 }}>
                           No articles matched. Try different keywords or{' '}
-                          <Link href={appRoute('App Support.dc.html')} style={{ color: '#157A49', fontWeight: 600, textDecoration: 'none' }}>
+                          <Link href={appRoute('App Support.dc.html')} style={{ color: 'var(--jb-v3-accent)', fontWeight: 600, textDecoration: 'none' }}>
                             contact support
                           </Link>
                           .
@@ -353,9 +353,9 @@ export default function AppHelp() {
                           onClick={c.open}
                           style={{
                             textAlign: 'left',
-                            background: '#FFFEFB',
-                            border: '1px solid #E6DECF',
-                            borderRadius: 16,
+                            background: 'var(--jb-v3-panel)',
+                            border: '1px solid var(--jb-v3-line)',
+                            borderRadius: 2,
                             padding: 20,
                             cursor: 'pointer',
                             fontFamily: 'inherit',
@@ -366,12 +366,12 @@ export default function AppHelp() {
                               display: 'inline-flex',
                               width: 38,
                               height: 38,
-                              borderRadius: 10,
+                              borderRadius: 2,
                               background: c.tint,
                               color: c.ink,
                               alignItems: 'center',
                               justifyContent: 'center',
-                              fontFamily: 'var(--jb-font-mono)',
+                              fontFamily: 'var(--jb-v3-font-mono)',
                               fontWeight: 600,
                               fontSize: 12,
                               marginBottom: 14,
@@ -380,14 +380,14 @@ export default function AppHelp() {
                             {c.tag}
                           </span>
                           <div style={{ fontSize: 15.5, fontWeight: 700, marginBottom: 4 }}>{c.name}</div>
-                          <div style={{ fontSize: 12.5, lineHeight: 1.45, color: '#8A8378', marginBottom: 10 }}>{c.desc}</div>
-                          <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#A79E8F' }}>{c.count} articles</div>
+                          <div style={{ fontSize: 12.5, lineHeight: 1.45, color: 'var(--jb-v3-fg-3)', marginBottom: 10 }}>{c.desc}</div>
+                          <div style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, color: 'var(--jb-v3-fg-3)' }}>{c.count} articles</div>
                         </button>
                       ))}
                     </div>
 
                     <h2 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 14px' }}>Popular articles</h2>
-                    <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 16, overflow: 'hidden', marginBottom: 30 }}>
+                    <div style={{ background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, overflow: 'hidden', marginBottom: 30 }}>
                       {vals.popular.map((a) => (
                         <button
                           key={a.id}
@@ -402,15 +402,15 @@ export default function AppHelp() {
                             padding: '15px 18px',
                             border: 'none',
                             borderBottom: `1px solid ${a.divider}`,
-                            background: '#FFFEFB',
+                            background: 'var(--jb-v3-panel)',
                             cursor: 'pointer',
                             fontFamily: 'inherit',
                           }}
                         >
-                          <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#9A9286', flexShrink: 0, width: 18 }}>{a.num}</span>
-                          <span style={{ flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: 600, color: '#1B1A16' }}>{a.title}</span>
-                          <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#A79E8F', flexShrink: 0 }}>{a.catLabel}</span>
-                          <span style={{ color: '#C9BFAC', flexShrink: 0 }}>→</span>
+                          <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, color: 'var(--jb-v3-fg-3)', flexShrink: 0, width: 18 }}>{a.num}</span>
+                          <span style={{ flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: 600, color: 'var(--jb-v3-fg)' }}>{a.title}</span>
+                          <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, color: 'var(--jb-v3-fg-3)', flexShrink: 0 }}>{a.catLabel}</span>
+                          <span style={{ color: 'var(--jb-v3-line-2)', flexShrink: 0 }}>→</span>
                         </button>
                       ))}
                     </div>
@@ -424,9 +424,9 @@ export default function AppHelp() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: 16,
-                    background: '#15140F',
-                    border: '1px solid #2C2A22',
-                    borderRadius: 16,
+                    background: 'var(--jb-v3-invert)',
+                    border: '1px solid var(--jb-v3-fg)',
+                    borderRadius: 2,
                     padding: '22px 24px',
                     textDecoration: 'none',
                   }}
@@ -436,9 +436,9 @@ export default function AppHelp() {
                       width: 44,
                       height: 44,
                       flexShrink: 0,
-                      borderRadius: 11,
-                      background: '#1E2D24',
-                      color: '#5BD08C',
+                      borderRadius: 2,
+                      background: 'var(--jb-v3-ok)',
+                      color: 'var(--jb-v3-accent-ink)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -448,10 +448,10 @@ export default function AppHelp() {
                     ✦
                   </span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: '#FBF8F1' }}>Still stuck?</div>
-                    <div style={{ fontSize: 13, color: '#9A9286' }}>Reach a human on the support team — we usually reply within a few hours.</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--jb-v3-panel)' }}>Still stuck?</div>
+                    <div style={{ fontSize: 13, color: 'var(--jb-v3-fg-3)' }}>Reach a human on the support team — we usually reply within a few hours.</div>
                   </div>
-                  <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 12, fontWeight: 600, color: '#5BD08C', flexShrink: 0 }}>
+                  <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 12, fontWeight: 600, color: 'var(--jb-v3-ok)', flexShrink: 0 }}>
                     Contact support →
                   </span>
                 </Link>
@@ -470,7 +470,7 @@ export default function AppHelp() {
                     fontFamily: 'inherit',
                     fontSize: 13,
                     fontWeight: 600,
-                    color: '#5A544A',
+                    color: 'var(--jb-v3-fg-2)',
                     background: 'none',
                     border: 'none',
                     cursor: 'pointer',
@@ -486,23 +486,23 @@ export default function AppHelp() {
                       width: 46,
                       height: 46,
                       flexShrink: 0,
-                      borderRadius: 12,
+                      borderRadius: 2,
                       background: vals.catTint,
                       color: vals.catInk,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontFamily: 'var(--jb-font-mono)',
+                      fontFamily: 'var(--jb-v3-font-mono)',
                       fontWeight: 600,
                       fontSize: 14,
                     }}
                   >
                     {vals.catTag}
                   </span>
-                  <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 34, lineHeight: 1, margin: 0 }}>{vals.catName}</h1>
+                  <h1 style={{ fontFamily: 'var(--jb-v3-font-display)', fontWeight: 600, letterSpacing: '-0.04em', fontSize: 34, lineHeight: 1, margin: 0 }}>{vals.catName}</h1>
                 </div>
-                <p style={{ fontSize: 14.5, color: '#8A8378', margin: '0 0 22px' }}>{vals.catDesc}</p>
-                <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 16, overflow: 'hidden' }}>
+                <p style={{ fontSize: 14.5, color: 'var(--jb-v3-fg-3)', margin: '0 0 22px' }}>{vals.catDesc}</p>
+                <div style={{ background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, overflow: 'hidden' }}>
                   {vals.catArticles.map((a) => (
                     <button
                       key={a.id}
@@ -517,13 +517,13 @@ export default function AppHelp() {
                         padding: '16px 18px',
                         border: 'none',
                         borderBottom: `1px solid ${a.divider}`,
-                        background: '#FFFEFB',
+                        background: 'var(--jb-v3-panel)',
                         cursor: 'pointer',
                         fontFamily: 'inherit',
                       }}
                     >
-                      <span style={{ flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: 600, color: '#1B1A16' }}>{a.title}</span>
-                      <span style={{ color: '#C9BFAC', flexShrink: 0 }}>→</span>
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: 600, color: 'var(--jb-v3-fg)' }}>{a.title}</span>
+                      <span style={{ color: 'var(--jb-v3-line-2)', flexShrink: 0 }}>→</span>
                     </button>
                   ))}
                 </div>
@@ -542,7 +542,7 @@ export default function AppHelp() {
                     fontFamily: 'inherit',
                     fontSize: 13,
                     fontWeight: 600,
-                    color: '#5A544A',
+                    color: 'var(--jb-v3-fg-2)',
                     background: 'none',
                     border: 'none',
                     cursor: 'pointer',
@@ -553,24 +553,24 @@ export default function AppHelp() {
                   ← Help center
                 </button>
 
-                <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18, padding: 36 }}>
-                  <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#157A49', marginBottom: 12 }}>
+                <div style={{ background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, padding: 36 }}>
+                  <div style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--jb-v3-accent)', marginBottom: 12 }}>
                     {vals.artCatLabel}
                   </div>
-                  <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 34, lineHeight: 1.08, margin: '0 0 22px' }}>{vals.artTitle}</h1>
+                  <h1 style={{ fontFamily: 'var(--jb-v3-font-display)', fontWeight: 600, letterSpacing: '-0.04em', fontSize: 34, lineHeight: 1.08, margin: '0 0 22px' }}>{vals.artTitle}</h1>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                     {vals.artBody.map((p, i) => (
-                      <p key={i} style={{ fontSize: 15.5, lineHeight: 1.7, color: '#46413A', margin: 0 }}>
+                      <p key={i} style={{ fontSize: 15.5, lineHeight: 1.7, color: 'var(--jb-v3-fg-2)', margin: 0 }}>
                         {p}
                       </p>
                     ))}
                   </div>
 
                   {/* HELPFUL */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 30, paddingTop: 22, borderTop: '1px solid #F2ECE0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 30, paddingTop: 22, borderTop: '1px solid var(--jb-v3-control)' }}>
                     {vals.notVoted && (
                       <>
-                        <span style={{ fontSize: 14, fontWeight: 600, color: '#1B1A16' }}>Was this helpful?</span>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--jb-v3-fg)' }}>Was this helpful?</span>
                         <button
                           className="hc-yes"
                           onClick={() => castVote('yes')}
@@ -578,10 +578,10 @@ export default function AppHelp() {
                             fontFamily: 'inherit',
                             fontSize: 13.5,
                             fontWeight: 600,
-                            color: '#157A49',
-                            background: '#EAF6EE',
-                            border: '1px solid #CDE9D6',
-                            borderRadius: 999,
+                            color: 'var(--jb-v3-accent)',
+                            background: 'var(--jb-v3-accent-soft)',
+                            border: '1px solid var(--jb-v3-accent-line)',
+                            borderRadius: 2,
                             padding: '8px 18px',
                             cursor: 'pointer',
                           }}
@@ -595,10 +595,10 @@ export default function AppHelp() {
                             fontFamily: 'inherit',
                             fontSize: 13.5,
                             fontWeight: 600,
-                            color: '#5A544A',
-                            background: '#FFFEFB',
-                            border: '1px solid #D9D0BE',
-                            borderRadius: 999,
+                            color: 'var(--jb-v3-fg-2)',
+                            background: 'var(--jb-v3-panel)',
+                            border: '1px solid var(--jb-v3-line-2)',
+                            borderRadius: 2,
                             padding: '8px 18px',
                             cursor: 'pointer',
                           }}
@@ -608,14 +608,14 @@ export default function AppHelp() {
                       </>
                     )}
                     {vals.voted && (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: '#157A49' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: 'var(--jb-v3-accent)' }}>
                         <span
                           style={{
                             width: 20,
                             height: 20,
                             borderRadius: '50%',
-                            background: '#1FA463',
-                            color: '#0C2C1C',
+                            background: 'var(--jb-v3-accent)',
+                            color: 'var(--jb-v3-accent-ink)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -634,7 +634,7 @@ export default function AppHelp() {
                 {vals.hasRelated && (
                   <div style={{ marginTop: 24 }}>
                     <h2 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 12px' }}>Related articles</h2>
-                    <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 16, overflow: 'hidden' }}>
+                    <div style={{ background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, overflow: 'hidden' }}>
                       {vals.related.map((a) => (
                         <button
                           key={a.id}
@@ -649,13 +649,13 @@ export default function AppHelp() {
                             padding: '14px 18px',
                             border: 'none',
                             borderBottom: `1px solid ${a.divider}`,
-                            background: '#FFFEFB',
+                            background: 'var(--jb-v3-panel)',
                             cursor: 'pointer',
                             fontFamily: 'inherit',
                           }}
                         >
-                          <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, color: '#1B1A16' }}>{a.title}</span>
-                          <span style={{ color: '#C9BFAC', flexShrink: 0 }}>→</span>
+                          <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, color: 'var(--jb-v3-fg)' }}>{a.title}</span>
+                          <span style={{ color: 'var(--jb-v3-line-2)', flexShrink: 0 }}>→</span>
                         </button>
                       ))}
                     </div>

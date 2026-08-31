@@ -40,13 +40,16 @@ async function signInAndSaveState(
     // a type="button" with an onClick handler, so a type-based selector finds
     // nothing. Role + name is what a user (and a screen reader) goes by, and it
     // survives markup changes that a structural selector would not.
-    await page.getByRole('button', { name: /log ?in|sign ?in/i }).first().click();
+    await page.locator('form').getByRole('button', { name: /^log in$/i }).click();
 
-    // Login is done when the app has actually persisted a token — a URL change
-    // alone can happen before AuthContext finishes writing.
-    await page.waitForFunction(() => !!window.localStorage.getItem('authToken'), null, {
-      timeout: 30_000,
-    });
+    // Sign-in is done when Supabase has persisted its session COOKIE. It used
+    // to be a localStorage token; moving it to cookies is what lets
+    // src/middleware.js gate protected routes server-side.
+    await page.waitForFunction(
+      () => document.cookie.split(/;s*/).some((c) => /^sb-.*-auth-token/.test(c)),
+      null,
+      { timeout: 30_000 },
+    );
 
     await context.storageState({ path: storagePath });
   } catch (err) {

@@ -9,16 +9,10 @@
 // caller. Follows the same fetch/auth/error convention as services/savedApi.js.
 
 import { API_URL } from '@/config/api';
-
-const getAuthToken = () => {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('authToken') || localStorage.getItem('token');
-  }
-  return null;
-};
+import { getAccessToken } from '@/lib/apiClient';
 
 const apiCall = async (endpoint, options = {}) => {
-  const token = getAuthToken();
+  const token = await getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,
@@ -84,7 +78,7 @@ export const deleteJobProfile = async (id) =>
 
 // POST /api/job-profiles/:id/resume — multipart, so it bypasses the JSON helper.
 export const uploadJobProfileResume = async (id, file) => {
-  const token = getAuthToken();
+  const token = await getAccessToken();
   const form = new FormData();
   form.append('resume', file);
 

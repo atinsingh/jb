@@ -107,7 +107,7 @@ docs/
 ├── API_DOCUMENTATION.md          # All API endpoints
 ├── AI_SERVICES_GUIDE.md         # AI services setup & usage
 ├── DOCKER_SETUP.md              # Docker Compose guide
-├── OAUTH_SETUP_INSTRUCTIONS.md  # OAuth configuration
+├── SUPABASE_AUTH_SETUP.md       # Supabase auth configuration
 ├── GETTING_STARTED.md           # Quick start checklist
 ├── PHASE1_IMPLEMENTATION.md     # Implementation details
 └── PROJECT_STRUCTURE.md         # This file

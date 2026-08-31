@@ -1,14 +1,17 @@
-// The editorial page opener: mono eyebrow, Instrument Serif headline, deck,
-// action row. Every designed screen starts with one and only one of these.
+// The editorial page opener: mono eyebrow, display headline, deck, action row.
+// Every designed screen starts with one and only one of these.
 //
 // `size` maps to the display steps in tokens.css. They are coarse by design —
 // the headline is meant to be the only thing on the page at its size, so
 // picking a step is a statement about which screen you are on, not a knob.
+//
+// The `lg` step is gone with the --jb-a-* set: it was labelled "employer" and
+// no employer screen imports this component — the whole of components/app/ui
+// is consumed only by /app/*, so `lg` had no caller to carry forward.
 const SIZES = {
-  hero: { fontSize: 'var(--jb-a-display-hero)', maxWidth: '20ch' }, // dashboard
-  lg: { fontSize: 'var(--jb-a-display-lg)', maxWidth: '24ch' }, // employer
-  md: { fontSize: 'var(--jb-a-display-md)', maxWidth: '22ch' }, // matches
-  sm: { fontSize: 'var(--jb-a-display-sm)', maxWidth: 'none' }, // tracker, auth
+  hero: { fontSize: 'var(--jb-v3-display-hero)', maxWidth: '20ch' }, // dashboard
+  md: { fontSize: 'var(--jb-v3-display-md)', maxWidth: '22ch' }, // matches
+  sm: { fontSize: 'var(--jb-v3-display-sm)', maxWidth: 'none' }, // tracker, auth
 };
 
 export default function Hero({
@@ -26,11 +29,11 @@ export default function Hero({
       {eyebrow && (
         <span
           style={{
-            fontFamily: 'var(--jb-font-mono)',
+            fontFamily: 'var(--jb-v3-font-mono)',
             fontSize: 11,
             letterSpacing: '0.22em',
             textTransform: 'uppercase',
-            color: 'var(--jb-a-accent)',
+            color: 'var(--jb-v3-accent)',
           }}
         >
           {eyebrow}
@@ -39,15 +42,17 @@ export default function Hero({
       <Tag
         style={{
           margin: eyebrow ? '16px 0 0' : 0,
-          fontFamily: 'var(--jb-font-display)',
-          // Instrument Serif ships weight 400 only; a heavier value would get a
-          // smeared synthetic bold. Display type earns emphasis from size.
-          fontWeight: 400,
+          fontFamily: 'var(--jb-v3-font-display)',
+          // v3 display is Sora, loaded at 400/500/600 (pages/_app.js). The
+          // shipped v3 headline is 600 with -0.05em tracking and 0.98 leading
+          // (HomeV3.module.css .h1) — matched here so an app headline and a
+          // marketing headline are the same object at different sizes.
+          fontWeight: 600,
           fontSize: step.fontSize,
-          lineHeight: 1.03,
-          letterSpacing: '-0.02em',
+          lineHeight: 0.98,
+          letterSpacing: '-0.05em',
           maxWidth: step.maxWidth,
-          color: 'var(--jb-a-ink)',
+          color: 'var(--jb-v3-fg)',
         }}
       >
         {title}
@@ -58,7 +63,7 @@ export default function Hero({
             margin: '18px 0 0',
             fontSize: 17.5,
             lineHeight: 1.55,
-            color: 'var(--jb-a-ink-2)',
+            color: 'var(--jb-v3-fg-2)',
             maxWidth: '58ch',
           }}
         >

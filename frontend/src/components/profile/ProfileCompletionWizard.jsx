@@ -20,6 +20,8 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { API_URL } from '@/config/api';
 import { toast } from 'react-toastify';
+import { getAccessToken } from '@/lib/apiClient';
+import { LOGIN_ROUTE } from '@/lib/auth/routes';
 
 const STEPS = {
   CHOOSE_METHOD: 0,
@@ -121,7 +123,7 @@ export default function ProfileCompletionWizard({ isOpen, onClose, onComplete })
 
     setUploading(true);
     try {
-      const token = localStorage.getItem('authToken');
+      const token = await getAccessToken();
       const formData = new FormData();
       formData.append('resume', resumeFile);
 
@@ -165,11 +167,11 @@ export default function ProfileCompletionWizard({ isOpen, onClose, onComplete })
   const handleSaveProfile = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('authToken');
+      const token = await getAccessToken();
       
       if (!token) {
         toast.error('Please log in to save your profile');
-        router.push('/login');
+        router.push(LOGIN_ROUTE);
         return;
       }
 

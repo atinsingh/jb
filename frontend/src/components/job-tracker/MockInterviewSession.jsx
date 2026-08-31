@@ -7,6 +7,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { toast } from 'react-toastify';
 import { API_URL } from '@/config/api';
+import { getAccessToken } from '@/lib/apiClient';
 
 export default function MockInterviewSession({ sessionId }) {
   const [session, setSession] = useState(null);
@@ -22,7 +23,7 @@ export default function MockInterviewSession({ sessionId }) {
 
   const fetchSession = async () => {
     try {
-      const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+      const token = await getAccessToken();
       const response = await fetch(`${API_URL}/api/job-tracker/interview-sessions/${sessionId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -39,7 +40,7 @@ export default function MockInterviewSession({ sessionId }) {
   const handleGenerateQuestion = async () => {
     try {
       setGeneratingQuestion(true);
-      const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+      const token = await getAccessToken();
       const response = await fetch(
         `${API_URL}/api/job-tracker/interview-sessions/${sessionId}/generate-question`,
         {
@@ -69,7 +70,7 @@ export default function MockInterviewSession({ sessionId }) {
 
     try {
       setLoading(true);
-      const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+      const token = await getAccessToken();
       const response = await fetch(
         `${API_URL}/api/job-tracker/interview-sessions/${sessionId}/submit-answer`,
         {
@@ -99,7 +100,7 @@ export default function MockInterviewSession({ sessionId }) {
 
   const handleComplete = async () => {
     try {
-      const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+      const token = await getAccessToken();
       const response = await fetch(
         `${API_URL}/api/job-tracker/interview-sessions/${sessionId}/complete`,
         {

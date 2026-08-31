@@ -6,6 +6,7 @@ import { useRouter } from 'next/router';
 import { T, SIDEBAR_W } from './tokens';
 import { KitStyles, Avatar } from './kit';
 import { employerCompanyApi, employerProfileApi } from '@/services/employerApi';
+import { useAuth } from '@/context/AuthContext';
 
 /* ------------------------------------------------------------------ icons --- */
 const I = (p) => ({ width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round', ...p });
@@ -94,6 +95,7 @@ function NavItem({ item, active }) {
 
 export default function Shell({ active, children }) {
   const router = useRouter();
+  const { logout: signOut } = useAuth();
   const [company, setCompany] = useState('');
   const [me, setMe] = useState({ name: '', role: '' });
 
@@ -104,10 +106,10 @@ export default function Shell({ active, children }) {
 
   const isActive = (item) => active ? active === item.key : router.pathname === item.href || router.pathname.startsWith(item.href + '/');
 
-  const logout = () => {
-    if (typeof window !== 'undefined') { localStorage.removeItem('authToken'); localStorage.removeItem('token'); localStorage.removeItem('user'); }
-    router.push('/login');
-  };
+  // Sign-out goes through the context so the Supabase session cookie is
+  // actually cleared. Clearing localStorage did nothing once the session
+  // moved to cookies, and /login was deleted in the redesign.
+  const logout = () => signOut();
 
   const roleLabel = me.role === 'ROLE_EMPLOYER' ? 'Employer' : (me.role ? me.role.replace('ROLE_', '').toLowerCase() : 'Recruiter');
 

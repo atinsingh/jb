@@ -10,6 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { toast } from 'react-hot-toast';
 import { API_URL } from '@/config/api';
+import { getAccessToken } from '@/lib/apiClient';
 
 export default function AIAssistantPanel({ resumeData, onUpdate, isOpen, onClose }) {
   const [activeFeature, setActiveFeature] = useState(null);
@@ -30,7 +31,7 @@ export default function AIAssistantPanel({ resumeData, onUpdate, isOpen, onClose
 
   const fetchQuota = async () => {
     try {
-      const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+      const token = await getAccessToken();
       const response = await fetch(`${API_URL}/api/llm/quota/rewriteBullets`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -45,7 +46,7 @@ export default function AIAssistantPanel({ resumeData, onUpdate, isOpen, onClose
 
   const fetchUsage = async () => {
     try {
-      const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+      const token = await getAccessToken();
       const response = await fetch(`${API_URL}/api/llm/usage`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -60,7 +61,7 @@ export default function AIAssistantPanel({ resumeData, onUpdate, isOpen, onClose
 
   const fetchPendingReviews = async () => {
     try {
-      const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+      const token = await getAccessToken();
       const response = await fetch(`${API_URL}/api/llm/claims-review/pending`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -77,7 +78,7 @@ export default function AIAssistantPanel({ resumeData, onUpdate, isOpen, onClose
     setLoading(true);
     setActiveFeature('rewrite-bullets');
     try {
-      const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+      const token = await getAccessToken();
       const response = await fetch(`${API_URL}/api/llm/rewrite-bullets`, {
         method: 'POST',
         headers: {
@@ -106,7 +107,7 @@ export default function AIAssistantPanel({ resumeData, onUpdate, isOpen, onClose
     setLoading(true);
     setActiveFeature('tailor-resume');
     try {
-      const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+      const token = await getAccessToken();
       const response = await fetch(`${API_URL}/api/llm/tailor-resume`, {
         method: 'POST',
         headers: {
@@ -150,7 +151,7 @@ export default function AIAssistantPanel({ resumeData, onUpdate, isOpen, onClose
 
   const handleReviewClaim = async (reviewId, decision, modifiedContent) => {
     try {
-      const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+      const token = await getAccessToken();
       const response = await fetch(`${API_URL}/api/llm/claims-review/${reviewId}`, {
         method: 'PATCH',
         headers: {

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import AppSidebar from '@/components/app/AppSidebar';
+import AppTopNav from '@/components/app/AppTopNav';
 import { appRoute } from '@/components/app/appRoutes';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -17,9 +17,9 @@ import { LoadingState, EmptyState, ErrorState } from '@/components/app/AppStates
 // Brand → chip gradient mapping for cards returned by the backend.
 const chipForBrand = (brand) => {
   const b = (brand || '').toLowerCase();
-  if (b.includes('master')) return 'linear-gradient(135deg,#C9622E,#9A4A22)';
-  if (b.includes('amex') || b.includes('american')) return 'linear-gradient(135deg,#15140F,#3A372E)';
-  return 'linear-gradient(135deg,#1FA463,#157A49)';
+  if (b.includes('master')) return 'linear-gradient(135deg,var(--jb-v3-danger),var(--jb-v3-warn))';
+  if (b.includes('amex') || b.includes('american')) return 'linear-gradient(135deg,var(--jb-v3-invert),var(--jb-v3-invert))';
+  return 'linear-gradient(135deg,var(--jb-v3-accent),var(--jb-v3-accent))';
 };
 const shortForBrand = (brand) => {
   const b = (brand || '').toLowerCase();
@@ -100,7 +100,7 @@ export default function AppPaymentMethods() {
   const cancelAdd = () => setAdding(false);
   const saveCard = () => {
     const id = 'c' + nextId;
-    const card = { id, brand: 'Visa', brandShort: 'VISA', last4: '0005', exp: '12/29', chipBg: 'linear-gradient(135deg,#1FA463,#157A49)' };
+    const card = { id, brand: 'Visa', brandShort: 'VISA', last4: '0005', exp: '12/29', chipBg: 'linear-gradient(135deg,var(--jb-v3-accent),var(--jb-v3-accent))' };
     setCards((prev) => prev.concat(card));
     setNextId((n) => n + 1);
     setAdding(false);
@@ -118,15 +118,15 @@ export default function AppPaymentMethods() {
 
   const input = {
     width: '100%',
-    fontFamily: 'var(--jb-font-mono)',
+    fontFamily: 'var(--jb-v3-font-mono)',
     fontSize: 14,
-    color: '#1B1A16',
-    background: '#FBF8F1',
-    border: '1px solid #E1D9C9',
-    borderRadius: 12,
+    color: 'var(--jb-v3-fg)',
+    background: 'var(--jb-v3-panel)',
+    border: '1px solid var(--jb-v3-line)',
+    borderRadius: 2,
     padding: '12px 14px',
   };
-  const label = { fontSize: 12, fontWeight: 600, color: '#46413A', marginBottom: 6, display: 'block' };
+  const label = { fontSize: 12, fontWeight: 600, color: 'var(--jb-v3-fg-2)', marginBottom: 6, display: 'block' };
 
   return (
     <>
@@ -139,17 +139,17 @@ export default function AppPaymentMethods() {
           width: 8px;
         }
         #jbapp ::-webkit-scrollbar-thumb {
-          background: #e1d9c9;
-          border-radius: 8px;
+          background: var(--jb-v3-line);
+          border-radius: 2px;
         }
         #jbapp input:focus,
         #jbapp select:focus {
           outline: none;
-          border-color: #1fa463;
-          box-shadow: 0 0 0 3px rgba(31, 164, 99, 0.15);
+          border-color: var(--jb-v3-accent);
+          box-shadow: 0 0 0 3px color-mix(in srgb, var(--jb-v3-accent) 15%, transparent);
         }
         #jbapp input::placeholder {
-          color: #a79e8f;
+          color: var(--jb-v3-fg-3);
         }
         @keyframes rbpop {
           from {
@@ -163,20 +163,20 @@ export default function AppPaymentMethods() {
         }
       `}</style>
 
-      <div id="jbapp" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16' }}>
-        <AppSidebar active="settings" />
+      <div style={{ minHeight: '100vh', background: 'var(--jb-v3-bg)', fontFamily: 'var(--jb-v3-font-display)', color: 'var(--jb-v3-fg)' }}>
+        <AppTopNav />
 
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           {/* HEADER */}
-          <header style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: 18, padding: '15px 32px', background: 'rgba(247,243,234,0.85)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #E7E0D2' }}>
-            <Link href={appRoute('App Settings.dc.html')} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13.5, fontWeight: 600, color: '#5A544A', textDecoration: 'none' }}>← Back to settings</Link>
+          <header style={{ position: 'relative',   display: 'flex', alignItems: 'center', gap: 18, padding: '15px 32px', background: 'color-mix(in srgb, var(--jb-v3-bg) 85%, transparent)', backdropFilter: 'blur(10px)', borderBottom: '1px solid var(--jb-v3-line)' }}>
+            <Link href={appRoute('App Settings.dc.html')} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13.5, fontWeight: 600, color: 'var(--jb-v3-fg-2)', textDecoration: 'none' }}>← Back to settings</Link>
             <div style={{ flex: 1 }} />
-            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, color: '#9A9286' }}>Plan &amp; billing</span>
+            <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11.5, color: 'var(--jb-v3-fg-3)' }}>Plan &amp; billing</span>
           </header>
 
           <div style={{ padding: '30px 32px 64px', maxWidth: 720, width: '100%', margin: '0 auto' }}>
-            <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 38, lineHeight: 1, margin: '0 0 6px' }}>Payment methods</h1>
-            <p style={{ fontSize: 15, color: '#5A544A', margin: '0 0 24px' }}>Cards on file for your subscription. Your default is charged automatically.</p>
+            <h1 style={{ fontFamily: 'var(--jb-v3-font-display)', fontWeight: 600, letterSpacing: '-0.04em', fontSize: 38, lineHeight: 1, margin: '0 0 6px' }}>Payment methods</h1>
+            <p style={{ fontSize: 15, color: 'var(--jb-v3-fg-2)', margin: '0 0 24px' }}>Cards on file for your subscription. Your default is charged automatically.</p>
 
             {/* CARD LIST */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
@@ -190,32 +190,32 @@ export default function AppPaymentMethods() {
                 cards.map((c) => {
                 const isDefault = c.id === defaultId;
                 const confirming = confirmId === c.id;
-                const border = isDefault ? '#CDE9D6' : '#E6DECF';
+                const border = isDefault ? 'var(--jb-v3-accent-line)' : 'var(--jb-v3-line)';
                 return (
-                  <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 16, background: '#FFFEFB', border: `1px solid ${border}`, borderRadius: 16, padding: '18px 20px' }}>
-                    <span style={{ width: 50, height: 34, flexShrink: 0, borderRadius: 7, background: c.chipBg, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--jb-font-mono)', fontWeight: 600, fontSize: 11, letterSpacing: '0.04em' }}>{c.brandShort}</span>
+                  <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 16, background: 'var(--jb-v3-panel)', border: `1px solid ${border}`, borderRadius: 2, padding: '18px 20px' }}>
+                    <span style={{ width: 50, height: 34, flexShrink: 0, borderRadius: 2, background: c.chipBg, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--jb-v3-font-mono)', fontWeight: 600, fontSize: 11, letterSpacing: '0.04em' }}>{c.brandShort}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                        <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 14.5, fontWeight: 600, color: '#1B1A16' }}>•••• {c.last4}</span>
+                        <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 14.5, fontWeight: 600, color: 'var(--jb-v3-fg)' }}>•••• {c.last4}</span>
                         {isDefault && (
-                          <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', color: '#157A49', background: '#EAF6EE', border: '1px solid #CDE9D6', padding: '3px 8px', borderRadius: 999 }}>DEFAULT</span>
+                          <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', color: 'var(--jb-v3-accent)', background: 'var(--jb-v3-accent-soft)', border: '1px solid var(--jb-v3-accent-line)', padding: '3px 8px', borderRadius: 2 }}>DEFAULT</span>
                         )}
                       </div>
-                      <div style={{ fontSize: 12.5, color: '#8A8378', marginTop: 2 }}>{c.brand} · expires {c.exp}</div>
+                      <div style={{ fontSize: 12.5, color: 'var(--jb-v3-fg-3)', marginTop: 2 }}>{c.brand} · expires {c.exp}</div>
                     </div>
 
                     {confirming ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                        <span style={{ fontSize: 13, color: '#7A4326' }}>Remove?</span>
-                        <button onClick={() => doRemove(c.id)} style={{ fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, color: '#fff', background: '#C9622E', border: 'none', borderRadius: 999, padding: '7px 14px', cursor: 'pointer' }}>Remove</button>
-                        <button onClick={cancelRemove} style={{ fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: '#5A544A', background: 'none', border: 'none', cursor: 'pointer' }}>Cancel</button>
+                        <span style={{ fontSize: 13, color: 'var(--jb-v3-danger)' }}>Remove?</span>
+                        <button onClick={() => doRemove(c.id)} style={{ fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, color: '#fff', background: 'var(--jb-v3-danger)', border: 'none', borderRadius: 2, padding: '7px 14px', cursor: 'pointer' }}>Remove</button>
+                        <button onClick={cancelRemove} style={{ fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: 'var(--jb-v3-fg-2)', background: 'none', border: 'none', cursor: 'pointer' }}>Cancel</button>
                       </div>
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         {!isDefault && (
-                          <button onClick={() => makeDefault(c.id)} style={{ fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: '#157A49', background: 'none', border: 'none', cursor: 'pointer', padding: '7px 10px' }}>Set default</button>
+                          <button onClick={() => makeDefault(c.id)} style={{ fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: 'var(--jb-v3-accent)', background: 'none', border: 'none', cursor: 'pointer', padding: '7px 10px' }}>Set default</button>
                         )}
-                        <button onClick={() => askRemove(c.id)} style={{ fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: '#A79E8F', background: 'none', border: 'none', cursor: 'pointer', padding: '7px 10px' }}>Remove</button>
+                        <button onClick={() => askRemove(c.id)} style={{ fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: 'var(--jb-v3-fg-3)', background: 'none', border: 'none', cursor: 'pointer', padding: '7px 10px' }}>Remove</button>
                       </div>
                     )}
                   </div>
@@ -226,12 +226,12 @@ export default function AppPaymentMethods() {
 
             {/* ADD PAYMENT METHOD */}
             {!adding && (
-              <button onClick={startAdd} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, background: '#FBF8F1', border: '1.5px dashed #D2C9B7', borderRadius: 16, padding: 18, cursor: 'pointer', fontFamily: 'inherit', fontSize: 14.5, fontWeight: 600, color: '#157A49' }}>+ Add payment method</button>
+              <button onClick={startAdd} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, background: 'var(--jb-v3-panel)', border: '1.5px dashed var(--jb-v3-line-2)', borderRadius: 2, padding: 18, cursor: 'pointer', fontFamily: 'inherit', fontSize: 14.5, fontWeight: 600, color: 'var(--jb-v3-accent)' }}>+ Add payment method</button>
             )}
 
             {adding && (
-              <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18, padding: 24, animation: 'rbpop 0.25s ease' }}>
-                <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9A9286', marginBottom: 16 }}>New card</div>
+              <div style={{ background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, padding: 24, animation: 'rbpop 0.25s ease' }}>
+                <div style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--jb-v3-fg-3)', marginBottom: 16 }}>New card</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
                   <div>
                     <label style={label}>Card number</label>
@@ -263,8 +263,8 @@ export default function AppPaymentMethods() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-                  <button onClick={saveCard} style={{ fontFamily: 'inherit', fontSize: 14, fontWeight: 700, color: '#0C2C1C', background: '#1FA463', border: 'none', borderRadius: 999, padding: '12px 24px', cursor: 'pointer' }}>Save card</button>
-                  <button onClick={cancelAdd} style={{ fontFamily: 'inherit', fontSize: 14, fontWeight: 600, color: '#5A544A', background: 'none', border: 'none', cursor: 'pointer', padding: '12px 8px' }}>Cancel</button>
+                  <button onClick={saveCard} style={{ fontFamily: 'inherit', fontSize: 14, fontWeight: 700, color: 'var(--jb-v3-accent-ink)', background: 'var(--jb-v3-accent)', border: 'none', borderRadius: 2, padding: '12px 24px', cursor: 'pointer' }}>Save card</button>
+                  <button onClick={cancelAdd} style={{ fontFamily: 'inherit', fontSize: 14, fontWeight: 600, color: 'var(--jb-v3-fg-2)', background: 'none', border: 'none', cursor: 'pointer', padding: '12px 8px' }}>Cancel</button>
                 </div>
               </div>
             )}

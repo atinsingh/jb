@@ -1,45 +1,39 @@
-import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
-import { PassportModule } from '@nestjs/passport';
+import { Global, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { AuthService } from './auth.service';
+import { ConfigModule } from '@nestjs/config';
+
 import { AuthController } from './auth.controller';
-import { JwtStrategy } from './strategies/jwt.strategy';
-import { GoogleStrategy } from './strategies/google.strategy';
+import { SupabaseTokenService } from './supabase-token.service';
+import { SupabaseUserSyncService } from './supabase-user-sync.service';
+import { SupabaseAdminService } from './supabase-admin.service';
+import { SupabaseWebhookController } from './supabase-webhook.controller';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { User, UserSchema } from '../schemas/user.schema';
 import { LoggerModule } from '../common/logger/logger.module';
 
+/**
+ * @Global because `JwtAuthGuard` now has a real dependency.
+ *
+ * The guard is used by ~44 controllers spread across most feature modules, and
+ * Nest resolves a guard's constructor dependencies from the module the guard is
+ * *used* in. Before the Supabase swap the guard had no required dependencies, so
+ * it worked anywhere; now it needs `SupabaseTokenService`. Exporting that
+ * globally is the one-line alternative to adding an `AuthModule` import to every
+ * feature module.
+ *
+ * `JwtModule` is gone from here: nothing in this module signs a token any more.
+ * (`resume-builder` keeps its own JwtModule for short-lived PDF share links —
+ * that is app-internal, not user auth.)
+ */
+@Global()
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
-    PassportModule,
     LoggerModule,
     ConfigModule,
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => {
-        const envSecret = configService.get<string>('JWT_SECRET');
-        if (!envSecret && process.env.NODE_ENV === 'production') {
-          throw new Error(
-            'JWT_SECRET must be set in production — refusing to start with an insecure default secret.',
-          );
-        }
-        const secret = envSecret || 'dev-insecure-secret-change-me';
-        const expiresIn = configService.get<string>('JWT_EXPIRES_IN') || '7d';
-        return {
-          secret,
-          signOptions: {
-            expiresIn,
-          },
-        };
-      },
-      inject: [ConfigService],
-    }),
   ],
-  controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, GoogleStrategy],
-  exports: [AuthService, JwtStrategy],
+  controllers: [AuthController, SupabaseWebhookController],
+  providers: [SupabaseTokenService, SupabaseUserSyncService, SupabaseAdminService, JwtAuthGuard],
+  exports: [SupabaseTokenService, SupabaseUserSyncService, SupabaseAdminService, JwtAuthGuard],
 })
 export class AuthModule {}
-

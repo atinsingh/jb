@@ -1,14 +1,15 @@
 import { API_URL } from '@/config/api';
+import { getAccessToken } from '@/lib/apiClient';
 
 // Real REST engine lives under the job-tracker interview-prep controller.
 // (Historic paths of /api/interview-sessions/* had no backend and 404'd.)
 const BASE = `${API_URL}/api/job-tracker/interview-sessions`;
 
-const getHeaders = () => {
-  const token = localStorage.getItem('authToken');
+const getHeaders = async () => {
+  const token = await getAccessToken();
   return {
     'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` }),
+    ...(token && { Authorization: `Bearer ${token}` }),
   };
 };
 
@@ -25,7 +26,7 @@ export const interviewApi = {
   createSession: async (data) => {
     const res = await fetch(BASE, {
       method: 'POST',
-      headers: getHeaders(),
+      headers: await getHeaders(),
       body: JSON.stringify(data),
     });
     if (!res.ok) {
@@ -39,7 +40,7 @@ export const interviewApi = {
   getSession: async (sessionId) => {
     const res = await fetch(`${BASE}/${sessionId}`, {
       method: 'GET',
-      headers: getHeaders(),
+      headers: await getHeaders(),
     });
     if (!res.ok) throw new Error('Failed to fetch session');
     return res.json();
@@ -49,7 +50,7 @@ export const interviewApi = {
   endSession: async (sessionId) => {
     const res = await fetch(`${BASE}/${sessionId}/complete`, {
       method: 'POST',
-      headers: getHeaders(),
+      headers: await getHeaders(),
     });
     if (!res.ok) throw new Error('Failed to end session');
     return res.json();

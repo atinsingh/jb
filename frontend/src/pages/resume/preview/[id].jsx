@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { API_URL } from '@/config/api';
 import ModernResumePreview from '@/components/resume/ModernResumePreview';
+import { getAccessToken } from '@/lib/apiClient';
 
 export default function ResumePreviewPage() {
   const router = useRouter();
@@ -27,7 +28,7 @@ export default function ResumePreviewPage() {
         };
 
         // Use token from query if provided (for Puppeteer), otherwise use localStorage
-        const authToken = token || localStorage.getItem('authToken') || localStorage.getItem('token');
+        const authToken = token || (await getAccessToken());
         if (authToken) {
           headers['Authorization'] = `Bearer ${authToken}`;
         }

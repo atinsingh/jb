@@ -483,7 +483,7 @@ To deploy AI services separately:
 
 - [API Documentation](./API_DOCUMENTATION.md)
 - [Docker Setup Guide](./DOCKER_SETUP.md)
-- [OAuth Setup Instructions](./OAUTH_SETUP_INSTRUCTIONS.md)
+- [Supabase Auth Setup](./SUPABASE_AUTH_SETUP.md)
 
 ---
 

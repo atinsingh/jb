@@ -1,11 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
-import Link from 'next/link';
-import AppSidebar from '@/components/app/AppSidebar';
-import { appRoute } from '@/components/app/appRoutes';
 import { useAuth } from '@/context/AuthContext';
+import { ErrorState } from '@/components/app/AppStates';
+import { Screen, CellGrid, Cell, MonoButton, mono, HAIR } from '@/components/app/v3/kit';
 import {
   getInterviewApplications,
   createInterviewSession,
@@ -22,92 +21,38 @@ const fmtTime = (elapsed) => {
   return `${mm}:${ss < 10 ? '0' + ss : ss}`;
 };
 
-const scoreColor = (score) => {
-  if (score >= 75) return '#4EE6A8';
-  if (score >= 50) return '#E6C94E';
-  return '#E08A4E';
-};
-
-function ScoreMeter({ label, score }) {
+/*
+ * v3's session screen carries a live waveform. This app records typed answers,
+ * not audio, so there is no amplitude to draw — a fake waveform would be a
+ * picture of data that does not exist. The bar field is driven by the answer
+ * the candidate is actually typing: it fills as the draft grows, which is the
+ * one real signal this screen has about progress through an answer.
+ */
+function DraftMeter({ text }) {
+  const bars = 48;
+  const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+  // ~120 words is a complete STAR answer; past that the meter simply caps.
+  const filled = Math.min(bars, Math.round((words / 120) * bars));
   return (
-    <div>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          fontFamily: 'var(--jb-font-mono)',
-          fontSize: 10,
-          letterSpacing: '0.06em',
-          textTransform: 'uppercase',
-          color: '#4F6B62',
-          marginBottom: 4,
-        }}
-      >
-        <span>{label}</span>
-        <span>{score}</span>
-      </div>
-      <div style={{ height: 5, background: '#1C2B26', borderRadius: 3, overflow: 'hidden' }}>
-        <div
-          style={{
-            width: '100%',
-            height: '100%',
-            background: scoreColor(score),
-            borderRadius: 3,
-            transform: `scaleX(${Math.max(0, Math.min(100, score)) / 100})`,
-            transformOrigin: 'left',
-            transition: 'transform 0.3s ease',
-          }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function LoadingPanel({ label }) {
-  return (
-    <div
-      style={{
-        background: '#0F1614',
-        border: '1px solid #1C2B26',
-        borderRadius: 10,
-        padding: 40,
-        textAlign: 'center',
-        color: '#7A978C',
-        fontSize: 13.5,
-      }}
-    >
-      {label}
-    </div>
-  );
-}
-
-function ErrorPanel({ message, onRetry, retryLabel }) {
-  return (
-    <div
-      style={{
-        background: '#1A0F0F',
-        border: '1px solid #3D2020',
-        borderRadius: 10,
-        padding: 24,
-      }}
-    >
-      <div style={{ fontSize: 13.5, color: '#E0A89E', marginBottom: 14 }}>{message}</div>
-      <button
-        onClick={onRetry}
-        style={{
-          fontFamily: 'inherit',
-          fontSize: 13,
-          fontWeight: 700,
-          color: '#0A0E0D',
-          background: '#4EE6A8',
-          border: 'none',
-          borderRadius: 5,
-          padding: '9px 16px',
-          cursor: 'pointer',
-        }}
-      >
-        {retryLabel}
-      </button>
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 68, marginBottom: 40 }}>
+      {Array.from({ length: bars }, (_, i) => {
+        // A fixed, deterministic profile — no randomness, so it does not
+        // shimmer on every keystroke.
+        const h = 18 + ((i * 37) % 50);
+        return (
+          <span
+            key={i}
+            style={{
+              flex: 1,
+              display: 'block',
+              height: `${h}%`,
+              background: i < filled ? 'var(--jb-v3-accent)' : 'var(--jb-v3-tick-off)',
+              opacity: i < filled ? 0.75 : 1,
+              transition: 'background .3s ease',
+            }}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -116,7 +61,7 @@ export default function AppMockInterview() {
   const { user } = useAuth();
 
   const [role, setRole] = useState({ title: '', company: '', jobId: undefined, applicationId: undefined });
-  const [phase, setPhase] = useState('loading'); // loading | answering | submitting | feedback-ready | loading-question | completing | complete | error | question-error | complete-error
+  const [phase, setPhase] = useState('loading');
   const [errorMessage, setErrorMessage] = useState('');
 
   const [session, setSession] = useState(null);
@@ -154,9 +99,9 @@ export default function AppMockInterview() {
 
     try {
       const newSession = await createInterviewSession({ jobId, applicationId, title });
-      const { question: nextQuestion } = await generateInterviewQuestion(newSession._id);
+      const { question: nextQ } = await generateInterviewQuestion(newSession._id);
       setSession(newSession);
-      setCurrentQuestion(nextQuestion);
+      setCurrentQuestion(nextQ);
       setQuestionNumber(1);
       setPhase('answering');
     } catch (err) {
@@ -176,7 +121,12 @@ export default function AppMockInterview() {
         const apps = data?.applications || [];
         const first = apps[0];
         if (first) {
-          detectedRole = { title: first.jobTitle || '', company: first.companyName || '', jobId: first.jobId, applicationId: first.id };
+          detectedRole = {
+            title: first.jobTitle || '',
+            company: first.companyName || '',
+            jobId: first.jobId,
+            applicationId: first.id,
+          };
           setRole(detectedRole);
         }
       } catch {
@@ -246,309 +196,170 @@ export default function AppMockInterview() {
     startSession(role);
   };
 
-  const timer = fmtTime(elapsed);
-  const progress = `${(questionNumber / QUESTION_CAP) * 100}%`;
-  const answering = phase === 'answering' || phase === 'submitting' || phase === 'feedback-ready' || phase === 'feedback-error';
   const canSubmit = phase === 'answering' && draft.trim().length > 0;
+  const busy = phase === 'submitting' || phase === 'loading-question' || phase === 'completing';
+
+  const sessionStats = useMemo(() => {
+    const score = lastFeedback?.score ?? lastFeedback?.overallScore;
+    return [
+      { k: 'Question', v: `${questionNumber} / ${QUESTION_CAP}` },
+      { k: 'Elapsed', v: fmtTime(elapsed) },
+      { k: 'Last score', v: score == null ? '—' : String(Math.round(score)) },
+    ];
+  }, [questionNumber, elapsed, lastFeedback]);
 
   return (
     <>
       <Head>
         <title>
-          Mock interview{role.title ? ` · ${role.title}` : ''}
-          {role.company ? ` at ${role.company}` : ''} — Jobocate
+          Mock interview{role.title ? ` · ${role.title}` : ''} — Jobocate
         </title>
       </Head>
 
-      <style jsx global>{`
-        #jbapp-mock ::-webkit-scrollbar {
-          width: 8px;
-        }
-        #jbapp-mock ::-webkit-scrollbar-thumb {
-          background: #1c2b26;
-          border-radius: 8px;
-        }
-        #jbapp-mock textarea:focus {
-          outline: none;
-          border-color: #4ee6a8;
-          box-shadow: 0 0 0 3px rgba(78, 230, 168, 0.15);
-        }
-      `}</style>
-
-      <div id="jbapp-mock" style={{ display: 'flex', minHeight: '100vh', background: '#0A0E0D', fontFamily: 'var(--jb-font-sans)', color: '#D8F5E8' }}>
-        <AppSidebar active="interview" />
-
-        <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          <header
-            style={{
-              position: 'sticky',
-              top: 0,
-              zIndex: 20,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 14,
-              padding: '14px 24px',
-              background: 'rgba(10,14,13,0.92)',
-              backdropFilter: 'blur(10px)',
-              borderBottom: '1px solid #16201C',
-            }}
-          >
+      <Screen width={860} pad="56px 28px 80px">
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 40,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span
               style={{
-                fontFamily: 'var(--jb-font-mono)',
-                fontSize: 12,
-                color: '#4F6B62',
+                width: 5,
+                height: 5,
+                borderRadius: '50%',
+                background: phase === 'complete' ? 'var(--jb-v3-ok)' : 'var(--jb-v3-accent)',
+                display: 'block',
               }}
-            >
-              MOCK_INTERVIEW
-              {role.title ? ` · ${role.title}` : ''}
-              {role.company ? ` @ ${role.company}` : ''}
+            />
+            <span style={mono(10, '0.14em')}>
+              {phase === 'complete'
+                ? 'Session complete'
+                : `In session · question ${questionNumber} of ${QUESTION_CAP}`}
             </span>
-            <div style={{ flex: 1 }} />
-            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 12, color: '#4EE6A8' }}>{timer}</span>
-            <button
-              onClick={finishSession}
-              disabled={!session || phase === 'completing' || phase === 'submitting' || phase === 'complete'}
+          </div>
+          <span
+            style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 15, color: 'var(--jb-v3-fg-2)' }}
+          >
+            {fmtTime(elapsed)}
+          </span>
+        </div>
+
+        {(phase === 'error' || phase === 'question-error' || phase === 'complete-error') && (
+          <ErrorState error={new Error(errorMessage)} onRetry={practiceAgain} />
+        )}
+
+        {phase === 'complete' && (
+          <>
+            <h2
               style={{
-                fontFamily: 'var(--jb-font-mono)',
-                fontSize: 11,
-                background: 'transparent',
-                border: '1px solid #2A3D36',
-                color: '#9ECBB9',
-                padding: '6px 12px',
-                borderRadius: 4,
-                cursor: session && phase !== 'submitting' && phase !== 'complete' ? 'pointer' : 'default',
-                opacity: session && phase !== 'submitting' && phase !== 'complete' ? 1 : 0.5,
+                margin: '0 0 44px',
+                fontSize: 30,
+                fontWeight: 600,
+                letterSpacing: '-0.035em',
+                lineHeight: 1.2,
               }}
             >
-              END SESSION
-            </button>
-          </header>
+              {results?.overallScore != null
+                ? `You scored ${Math.round(results.overallScore)}.`
+                : 'Session finished.'}
+            </h2>
+            <MonoButton filled onClick={practiceAgain} style={{ padding: '10px 22px' }}>
+              Practice again
+            </MonoButton>
+          </>
+        )}
 
-          {(phase === 'loading' || answering || phase === 'loading-question' || phase === 'completing') && (
-            <div style={{ padding: '24px 24px 56px', maxWidth: 720, width: '100%', margin: '0 auto' }}>
-              {phase === 'loading' && <LoadingPanel label="Starting your practice session…" />}
+        {phase !== 'complete' && phase !== 'error' && (
+          <>
+            <h2
+              style={{
+                margin: '0 0 44px',
+                fontSize: 30,
+                fontWeight: 600,
+                letterSpacing: '-0.035em',
+                lineHeight: 1.2,
+                textWrap: 'pretty',
+              }}
+            >
+              {currentQuestion || 'Preparing your first question…'}
+            </h2>
 
-              {(answering || phase === 'loading-question' || phase === 'completing') && session && (
-                <>
-                  <div style={{ display: 'flex', gap: 4, marginBottom: 20 }}>
-                    {Array.from({ length: QUESTION_CAP }, (_, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          flex: 1,
-                          height: 3,
-                          borderRadius: 2,
-                          background: i < questionNumber ? '#4EE6A8' : '#1C2B26',
-                        }}
-                      />
-                    ))}
-                  </div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      fontFamily: 'var(--jb-font-mono)',
-                      fontSize: 11,
-                      color: '#4F6B62',
-                      marginBottom: 14,
-                    }}
-                  >
-                    <span>
-                      Q{String(questionNumber).padStart(2, '0')} / {String(QUESTION_CAP).padStart(2, '0')}
-                    </span>
-                  </div>
+            <DraftMeter text={draft} />
 
-                  {phase === 'loading-question' ? (
-                    <LoadingPanel label="Generating your next question…" />
-                  ) : (
-                    <div style={{ fontSize: 19, lineHeight: 1.5, fontWeight: 600, marginBottom: 18 }}>{currentQuestion}</div>
-                  )}
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder="Answer here. Situation, task, action, result."
+              disabled={phase !== 'answering'}
+              style={{
+                width: '100%',
+                minHeight: 160,
+                resize: 'vertical',
+                background: 'var(--jb-v3-panel)',
+                border: '1px solid var(--jb-v3-line-2)',
+                borderRadius: 2,
+                padding: 16,
+                fontFamily: 'inherit',
+                fontSize: 14,
+                lineHeight: 1.6,
+                color: 'var(--jb-v3-fg)',
+                marginBottom: 20,
+              }}
+            />
 
-                  {phase !== 'loading-question' && (
-                    <>
-                      <textarea
-                        value={draft}
-                        onChange={(e) => setDraft(e.target.value)}
-                        disabled={phase === 'submitting' || phase === 'feedback-ready'}
-                        placeholder="Type your answer — aim for Situation → Task → Action → Result…"
-                        style={{
-                          width: '100%',
-                          minHeight: 110,
-                          fontFamily: 'inherit',
-                          fontSize: 13.5,
-                          lineHeight: 1.6,
-                          color: '#D8F5E8',
-                          background: '#0F1614',
-                          border: '1px solid #1C2B26',
-                          borderRadius: 6,
-                          padding: 16,
-                          resize: 'vertical',
-                          marginBottom: 16,
-                        }}
-                      />
+            {lastFeedback && (
+              <div style={{ borderTop: HAIR, padding: '16px 0', marginBottom: 20 }}>
+                <div style={{ ...mono(), marginBottom: 8 }}>Feedback</div>
+                <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6, color: 'var(--jb-v3-fg-2)' }}>
+                  {lastFeedback.feedback || lastFeedback.summary || 'Scored.'}
+                </p>
+              </div>
+            )}
 
-                      {phase !== 'feedback-ready' && phase !== 'feedback-error' && (
-                        <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-                          <button
-                            onClick={submitAnswer}
-                            disabled={!canSubmit}
-                            style={{
-                              flex: 1,
-                              background: canSubmit ? '#4EE6A8' : '#1C2B26',
-                              color: canSubmit ? '#0A0E0D' : '#4F6B62',
-                              border: 'none',
-                              fontWeight: 700,
-                              padding: 10,
-                              borderRadius: 5,
-                              fontSize: 13,
-                              cursor: canSubmit ? 'pointer' : 'default',
-                            }}
-                          >
-                            {phase === 'submitting' ? 'SCORING…' : 'SUBMIT ANSWER'}
-                          </button>
-                          <button
-                            onClick={nextQuestion}
-                            disabled={phase === 'submitting'}
-                            style={{
-                              background: 'transparent',
-                              border: '1px solid #2A3D36',
-                              color: phase === 'submitting' ? '#4F6B62' : '#7A978C',
-                              padding: '10px 16px',
-                              borderRadius: 5,
-                              fontSize: 13,
-                              cursor: phase === 'submitting' ? 'default' : 'pointer',
-                            }}
-                          >
-                            SKIP
-                          </button>
-                        </div>
-                      )}
+            {errorMessage && phase === 'feedback-error' && (
+              <div style={{ ...mono(10, '0.1em', 'var(--jb-v3-danger)'), marginBottom: 20 }}>
+                {errorMessage}
+              </div>
+            )}
 
-                      {phase === 'feedback-error' && (
-                        <ErrorPanel message={errorMessage} onRetry={submitAnswer} retryLabel="Retry scoring" />
-                      )}
-
-                      {phase === 'feedback-ready' && lastFeedback && (
-                        <div style={{ background: '#0F1614', border: '1px solid #1C2B26', borderRadius: 6, padding: 16, marginBottom: 16 }}>
-                          <div style={{ marginBottom: 10 }}>
-                            <ScoreMeter label="Score" score={lastFeedback.score} />
-                          </div>
-                          <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 12, color: '#9ECBB9', marginBottom: 4 }}>
-                            Score: {lastFeedback.score}/100
-                          </div>
-                          <div style={{ fontSize: 12.5, color: '#C3D9CF', lineHeight: 1.5 }}>{lastFeedback.feedback}</div>
-                          <button
-                            onClick={nextQuestion}
-                            style={{
-                              marginTop: 14,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 8,
-                              fontFamily: 'inherit',
-                              fontSize: 13,
-                              fontWeight: 700,
-                              color: '#0A0E0D',
-                              background: '#4EE6A8',
-                              border: 'none',
-                              borderRadius: 999,
-                              padding: '10px 20px',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            {questionNumber >= QUESTION_CAP ? 'Finish session →' : 'Next question →'}
-                          </button>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 40 }}>
+              {phase === 'feedback-ready' || phase === 'feedback-error' ? (
+                <MonoButton filled onClick={nextQuestion} style={{ padding: '10px 22px' }}>
+                  {questionNumber >= QUESTION_CAP ? 'Finish' : 'Next'}
+                </MonoButton>
+              ) : (
+                <MonoButton
+                  filled
+                  onClick={submitAnswer}
+                  disabled={!canSubmit}
+                  style={{ padding: '10px 22px', opacity: canSubmit ? 1 : 0.5 }}
+                >
+                  {busy ? '…' : 'Submit'}
+                </MonoButton>
               )}
-
-              {phase === 'completing' && <LoadingPanel label="Scoring your session…" />}
+              <MonoButton onClick={() => setDraft('')} style={{ padding: '10px 18px' }}>
+                Clear
+              </MonoButton>
+              <MonoButton
+                onClick={finishSession}
+                style={{ padding: '10px 12px', border: 0, color: 'var(--jb-v3-fg-3)' }}
+              >
+                End
+              </MonoButton>
             </div>
-          )}
 
-          {phase === 'error' && (
-            <div style={{ padding: '24px 24px 56px', maxWidth: 720, width: '100%', margin: '0 auto' }}>
-              <ErrorPanel message={errorMessage} onRetry={() => startSession(role)} retryLabel="Try again" />
-            </div>
-          )}
-
-          {phase === 'question-error' && (
-            <div style={{ padding: '24px 24px 56px', maxWidth: 720, width: '100%', margin: '0 auto' }}>
-              <ErrorPanel message={errorMessage} onRetry={nextQuestion} retryLabel="Retry question" />
-            </div>
-          )}
-
-          {(phase === 'complete' || phase === 'complete-error') && (
-            <div style={{ padding: '36px 24px 64px', maxWidth: 680, width: '100%', margin: '0 auto' }}>
-              {phase === 'complete-error' && <ErrorPanel message={errorMessage} onRetry={finishSession} retryLabel="Retry" />}
-
-              {phase === 'complete' && results && (
-                <div style={{ background: '#0F1614', border: '1px solid #1C2B26', borderRadius: 10, padding: 24 }}>
-                  <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#4F6B62', marginBottom: 6 }}>
-                    SESSION COMPLETE · {results.questions?.length ?? 0} QUESTIONS
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 20 }}>
-                    <div style={{ fontSize: 40, fontWeight: 800, color: scoreColor(results.overallScore || 0), fontFamily: 'var(--jb-font-mono)' }}>
-                      {Math.round(results.overallScore || 0)}
-                    </div>
-                    <div style={{ fontSize: 13, color: '#7A978C' }}>overall score</div>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 18 }}>
-                    {(results.rubricScores || []).map((r) => (
-                      <ScoreMeter key={r.category} label={r.category} score={r.score} />
-                    ))}
-                  </div>
-
-                  <div style={{ background: '#0A0E0D', border: '1px solid #1C2B26', borderRadius: 6, padding: 14, marginBottom: 16 }}>
-                    <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 10, color: '#4F6B62', marginBottom: 6 }}>SUMMARY</div>
-                    <div style={{ fontSize: 12.5, color: '#C3D9CF', lineHeight: 1.6 }}>{results.feedbackSummary}</div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <button
-                      onClick={practiceAgain}
-                      style={{
-                        flex: 1,
-                        background: '#4EE6A8',
-                        color: '#0A0E0D',
-                        border: 'none',
-                        fontWeight: 700,
-                        padding: 10,
-                        borderRadius: 5,
-                        fontSize: 13,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      PRACTICE AGAIN
-                    </button>
-                    <Link
-                      href={appRoute('App Interview.dc.html')}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        background: 'transparent',
-                        border: '1px solid #2A3D36',
-                        color: '#9ECBB9',
-                        padding: '10px 16px',
-                        borderRadius: 5,
-                        fontSize: 13,
-                        textDecoration: 'none',
-                      }}
-                    >
-                      BACK TO HUB
-                    </Link>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </main>
-      </div>
+            <CellGrid cols={3}>
+              {sessionStats.map((s) => (
+                <Cell key={s.k} label={s.k} value={s.v} valueSize={22} />
+              ))}
+            </CellGrid>
+          </>
+        )}
+      </Screen>
     </>
   );
 }

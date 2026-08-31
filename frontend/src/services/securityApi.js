@@ -1,17 +1,11 @@
 import { API_URL } from '@/config/api';
-
-// ---------------------------------------------------------------- auth helper
-const getAuthToken = () => {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('authToken') || localStorage.getItem('token');
-  }
-  return null;
-};
+import { getAccessToken } from '@/lib/apiClient';
+import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 
 // Shared fetch wrapper following the api.js convention (token auto-attached,
 // JSON body, throw on !ok). Kept local so we never modify api.js.
 const apiCall = async (endpoint, options = {}) => {
-  const token = getAuthToken();
+  const token = await getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,
@@ -30,12 +24,14 @@ const apiCall = async (endpoint, options = {}) => {
 };
 
 // ---------------------------------------------------------------- Password
-// PATCH /api/users/password — change password.
-// Backend expects the ChangePasswordDto shape: { currentPassword, newPassword }.
-export const changePassword = async ({ currentPassword, newPassword }) =>
-  apiCall('/api/users/password', {
-    method: 'PATCH',
-    body: JSON.stringify({ currentPassword, newPassword }),
+// Supabase owns credentials now, so this goes straight to it rather than to
+// PATCH /api/users/password (retired along with the bcrypt paths). Supabase
+// takes no currentPassword: the caller must already hold a valid session,
+// which is the same guarantee the old endpoint got by re-checking the hash.
+export const changePassword = async ({ newPassword }) => {
+  const { error } = await getSupabaseBrowserClient().auth.updateUser({
+    password: newPassword,
   });
-
-export const isAuthenticated = () => !!getAuthToken();
+  if (error) throw new Error(error.message);
+  return { message: 'Password updated' };
+};

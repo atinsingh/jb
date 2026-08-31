@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import AppSidebar from '@/components/app/AppSidebar';
+import AppTopNav from '@/components/app/AppTopNav';
 import { appRoute } from '@/components/app/appRoutes';
 import { LoadingState, EmptyState, ErrorState } from '@/components/app/AppStates';
 import { getScrapedJobById, calculateJobMatch, markJobAsInterested } from '@/services/jobApi';
@@ -80,8 +80,8 @@ function Bookmark({ saved }) {
       width="15"
       height="15"
       viewBox="0 0 24 24"
-      fill={saved ? '#1FA463' : 'none'}
-      stroke={saved ? '#1FA463' : '#8A8378'}
+      fill={saved ? 'var(--jb-v3-accent)' : 'none'}
+      stroke={saved ? 'var(--jb-v3-accent)' : 'var(--jb-v3-fg-3)'}
       strokeWidth="1.8"
       strokeLinejoin="round"
     >
@@ -148,13 +148,13 @@ export default function AppJob() {
   const d = data;
   const matchDeg = `${((d?.matchScore || 0) / 100) * 360}deg`;
 
-  const saveColor = saved ? '#157A49' : '#46413A';
-  const saveBg = saved ? '#EAF6EE' : '#FFFEFB';
-  const saveBorder = saved ? '#CDE9D6' : '#D9D0BE';
+  const saveColor = saved ? 'var(--jb-v3-accent)' : 'var(--jb-v3-fg-2)';
+  const saveBg = saved ? 'var(--jb-v3-accent-soft)' : 'var(--jb-v3-panel)';
+  const saveBorder = saved ? 'var(--jb-v3-accent-line)' : 'var(--jb-v3-line-2)';
   const saveLabel = saved ? 'Saved' : 'Save';
   const saveTitle = saved ? 'Remove from saved' : 'Save this role';
 
-  const card = { background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18, padding: 28 };
+  const card = { background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, padding: 28 };
 
   return (
     <>
@@ -167,11 +167,11 @@ export default function AppJob() {
           width: 8px;
         }
         #jbapp ::-webkit-scrollbar-thumb {
-          background: #e1d9c9;
-          border-radius: 8px;
+          background: var(--jb-v3-line);
+          border-radius: 2px;
         }
         #jbapp .jb-apply-pill:hover {
-          background: #1b9159 !important;
+          background: var(--jb-v3-ok) !important;
         }
         @keyframes rbpop {
           from {
@@ -188,34 +188,33 @@ export default function AppJob() {
       <div
         id="jbapp"
         style={{
-          display: 'flex',
           minHeight: '100vh',
-          background: '#F7F3EA',
-          fontFamily: 'var(--jb-font-sans)',
-          color: '#1B1A16',
+          background: 'var(--jb-v3-bg)',
+          fontFamily: 'var(--jb-v3-font-display)',
+          color: 'var(--jb-v3-fg)',
         }}
       >
-        <AppSidebar active="matches" />
+        <AppTopNav />
 
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           {/* HEADER */}
           <header
             style={{
-              position: 'sticky',
-              top: 0,
-              zIndex: 20,
+              position: 'relative',
+              
+              
               display: 'flex',
               alignItems: 'center',
               gap: 14,
               padding: '13px 32px',
-              background: 'rgba(247,243,234,0.85)',
+              background: 'color-mix(in srgb, var(--jb-v3-bg) 85%, transparent)',
               backdropFilter: 'blur(10px)',
-              borderBottom: '1px solid #E7E0D2',
+              borderBottom: '1px solid var(--jb-v3-line)',
             }}
           >
             <Link
               href={appRoute('App Matches.dc.html')}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13.5, fontWeight: 600, color: '#5A544A', textDecoration: 'none' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13.5, fontWeight: 600, color: 'var(--jb-v3-fg-2)', textDecoration: 'none' }}
             >
               ← Back to matches
             </Link>
@@ -233,7 +232,7 @@ export default function AppJob() {
                 color: saveColor,
                 background: saveBg,
                 border: `1px solid ${saveBorder}`,
-                borderRadius: 999,
+                borderRadius: 2,
                 padding: '9px 15px',
                 cursor: 'pointer',
               }}
@@ -248,12 +247,12 @@ export default function AppJob() {
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 8,
-                background: '#1FA463',
-                color: '#0C2C1C',
+                background: 'var(--jb-v3-accent)',
+                color: 'var(--jb-v3-accent-ink)',
                 fontSize: 13.5,
                 fontWeight: 700,
                 padding: '10px 18px',
-                borderRadius: 999,
+                borderRadius: 2,
                 textDecoration: 'none',
               }}
             >
@@ -289,9 +288,9 @@ export default function AppJob() {
                     width: 60,
                     height: 60,
                     flexShrink: 0,
-                    borderRadius: 15,
-                    background: '#EAF6EE',
-                    color: '#157A49',
+                    borderRadius: 2,
+                    background: 'var(--jb-v3-accent-soft)',
+                    color: 'var(--jb-v3-accent)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -303,29 +302,29 @@ export default function AppJob() {
                   {d.initials}
                 </Link>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 34, lineHeight: 1.04, margin: '0 0 6px' }}>{d.title}</h1>
-                  <div style={{ fontSize: 14.5, color: '#5A544A' }}>
-                    <Link href={appRoute('App Company.dc.html')} style={{ color: '#157A49', fontWeight: 600, textDecoration: 'none' }}>
+                  <h1 style={{ fontFamily: 'var(--jb-v3-font-display)', fontWeight: 600, letterSpacing: '-0.04em', fontSize: 34, lineHeight: 1.04, margin: '0 0 6px' }}>{d.title}</h1>
+                  <div style={{ fontSize: 14.5, color: 'var(--jb-v3-fg-2)' }}>
+                    <Link href={appRoute('App Company.dc.html')} style={{ color: 'var(--jb-v3-accent)', fontWeight: 600, textDecoration: 'none' }}>
                       {d.company}
                     </Link>{' '}
                     · {d.location} · {d.type} ·{' '}
-                    <span style={{ fontFamily: 'var(--jb-font-mono)', color: '#157A49' }}>{d.salary}</span>
+                    <span style={{ fontFamily: 'var(--jb-v3-font-mono)', color: 'var(--jb-v3-accent)' }}>{d.salary}</span>
                   </div>
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 30, fontWeight: 600, color: '#157A49', lineHeight: 1 }}>{d.matchScore != null ? `${d.matchScore}%` : '—'}</div>
-                  <div style={{ fontSize: 11, color: '#8A8378', fontFamily: 'var(--jb-font-mono)' }}>match</div>
+                  <div style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 30, fontWeight: 600, color: 'var(--jb-v3-accent)', lineHeight: 1 }}>{d.matchScore != null ? `${d.matchScore}%` : '—'}</div>
+                  <div style={{ fontSize: 11, color: 'var(--jb-v3-fg-3)', fontFamily: 'var(--jb-v3-font-mono)' }}>match</div>
                 </div>
               </div>
 
               {/* WHY MATCH */}
-              <div style={{ background: '#EAF6EE', border: '1px solid #CDE9D6', borderRadius: 16, padding: 22 }}>
-                <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#157A49', marginBottom: 10 }}>
+              <div style={{ background: 'var(--jb-v3-accent-soft)', border: '1px solid var(--jb-v3-accent-line)', borderRadius: 2, padding: 22 }}>
+                <div style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--jb-v3-accent)', marginBottom: 10 }}>
                   Why you’re a {d.matchScore != null ? `${d.matchScore}%` : ''} match
                 </div>
-                <p style={{ fontSize: 14.5, lineHeight: 1.6, color: '#1F4733', margin: '0 0 16px' }}>{d.why}</p>
+                <p style={{ fontSize: 14.5, lineHeight: 1.6, color: 'var(--jb-v3-ok)', margin: '0 0 16px' }}>{d.why}</p>
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#1F4733', marginBottom: 8 }}>Matched strengths</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--jb-v3-ok)', marginBottom: 8 }}>Matched strengths</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     {d.matched.map((m, i) => (
                       <span
@@ -336,21 +335,21 @@ export default function AppJob() {
                           gap: 7,
                           fontSize: 13,
                           fontWeight: 600,
-                          color: '#0C2C1C',
-                          background: '#C7EFD5',
-                          border: '1px solid #A6E0BC',
-                          borderRadius: 999,
+                          color: 'var(--jb-v3-accent-ink)',
+                          background: 'var(--jb-v3-ok-soft)',
+                          border: '1px solid var(--jb-v3-ok-line)',
+                          borderRadius: 2,
                           padding: '6px 13px',
                         }}
                       >
-                        <span style={{ color: '#157A49' }}>✓</span>
+                        <span style={{ color: 'var(--jb-v3-accent)' }}>✓</span>
                         {m}
                       </span>
                     ))}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#7A4326', marginBottom: 8 }}>Worth addressing</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--jb-v3-danger)', marginBottom: 8 }}>Worth addressing</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     {d.gaps.map((g, i) => (
                       <span
@@ -361,14 +360,14 @@ export default function AppJob() {
                           gap: 7,
                           fontSize: 13,
                           fontWeight: 600,
-                          color: '#7A4326',
-                          background: '#F7E4D8',
-                          border: '1px solid #EAD0C4',
-                          borderRadius: 999,
+                          color: 'var(--jb-v3-danger)',
+                          background: 'var(--jb-v3-warn-soft)',
+                          border: '1px solid var(--jb-v3-danger-line)',
+                          borderRadius: 2,
                           padding: '6px 13px',
                         }}
                       >
-                        <span style={{ color: '#C9622E' }}>!</span>
+                        <span style={{ color: 'var(--jb-v3-danger)' }}>!</span>
                         {g}
                       </span>
                     ))}
@@ -379,7 +378,7 @@ export default function AppJob() {
               {/* DESCRIPTION */}
               <div style={card}>
                 <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 12px' }}>About the role</h2>
-                <p style={{ fontSize: 15, lineHeight: 1.7, color: '#46413A', margin: '0 0 4px' }}>{d.intro}</p>
+                <p style={{ fontSize: 15, lineHeight: 1.7, color: 'var(--jb-v3-fg-2)', margin: '0 0 4px' }}>{d.intro}</p>
 
                 {expanded && (
                   <div style={{ animation: 'rbpop 0.25s ease' }}>
@@ -389,8 +388,8 @@ export default function AppJob() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                           {sec.items.map((it, ii) => (
                             <div key={ii} style={{ display: 'flex', alignItems: 'flex-start', gap: 11 }}>
-                              <span style={{ width: 6, height: 6, flexShrink: 0, borderRadius: '50%', background: '#1FA463', marginTop: 8 }} />
-                              <span style={{ fontSize: 14.5, lineHeight: 1.6, color: '#46413A' }}>{it}</span>
+                              <span style={{ width: 6, height: 6, flexShrink: 0, borderRadius: '50%', background: 'var(--jb-v3-accent)', marginTop: 8 }} />
+                              <span style={{ fontSize: 14.5, lineHeight: 1.6, color: 'var(--jb-v3-fg-2)' }}>{it}</span>
                             </div>
                           ))}
                         </div>
@@ -408,7 +407,7 @@ export default function AppJob() {
                     fontFamily: 'inherit',
                     fontSize: 13.5,
                     fontWeight: 700,
-                    color: '#157A49',
+                    color: 'var(--jb-v3-accent)',
                     background: 'none',
                     border: 'none',
                     padding: 0,
@@ -424,15 +423,15 @@ export default function AppJob() {
               <div style={card}>
                 <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 14, marginBottom: 18 }}>
                   <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Compensation</h2>
-                  <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#8A8378' }}>est. total / yr</span>
+                  <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, color: 'var(--jb-v3-fg-3)' }}>est. total / yr</span>
                 </div>
-                <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 34, fontWeight: 600, lineHeight: 1, color: '#1B1A16', marginBottom: 4 }}>{d.totalComp}</div>
-                <div style={{ fontSize: 13, color: '#8A8378', marginBottom: 20 }}>{d.compNote}</div>
+                <div style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 34, fontWeight: 600, lineHeight: 1, color: 'var(--jb-v3-fg)', marginBottom: 4 }}>{d.totalComp}</div>
+                <div style={{ fontSize: 13, color: 'var(--jb-v3-fg-3)', marginBottom: 20 }}>{d.compNote}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   {d.comp.map((c, i) => (
-                    <div key={`${c.label}-${i}`} style={{ background: '#FBF8F1', border: '1px solid #E6DECF', borderRadius: 12, padding: '14px 16px' }}>
-                      <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#9A9286', marginBottom: 6 }}>{c.label}</div>
-                      <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 16, fontWeight: 600, color: '#1B1A16' }}>{c.value}</div>
+                    <div key={`${c.label}-${i}`} style={{ background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, padding: '14px 16px' }}>
+                      <div style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--jb-v3-fg-3)', marginBottom: 6 }}>{c.label}</div>
+                      <div style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 16, fontWeight: 600, color: 'var(--jb-v3-fg)' }}>{c.value}</div>
                     </div>
                   ))}
                 </div>
@@ -441,7 +440,7 @@ export default function AppJob() {
 
             {/* ===== RIGHT RAIL ===== */}
             <div style={{ width: 312, flexShrink: 0, position: 'sticky', top: 84, display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 16, padding: 22 }}>
+              <div style={{ background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, padding: 22 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 18 }}>
                   <div
                     style={{
@@ -449,7 +448,7 @@ export default function AppJob() {
                       height: 62,
                       flexShrink: 0,
                       borderRadius: '50%',
-                      background: `conic-gradient(#1FA463 ${matchDeg}, #EFE8DA 0)`,
+                      background: `conic-gradient(var(--jb-v3-accent) ${matchDeg}, var(--jb-v3-line) 0)`,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -460,22 +459,22 @@ export default function AppJob() {
                         width: 50,
                         height: 50,
                         borderRadius: '50%',
-                        background: '#FFFEFB',
+                        background: 'var(--jb-v3-panel)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontFamily: 'var(--jb-font-mono)',
+                        fontFamily: 'var(--jb-v3-font-mono)',
                         fontSize: 17,
                         fontWeight: 600,
-                        color: '#157A49',
+                        color: 'var(--jb-v3-accent)',
                       }}
                     >
                       {d.matchScore != null ? `${d.matchScore}%` : '—'}
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 14.5, fontWeight: 700, color: '#1B1A16' }}>Excellent match</div>
-                    <div style={{ fontSize: 12.5, color: '#8A8378' }}>Top 8% of your matches</div>
+                    <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--jb-v3-fg)' }}>Excellent match</div>
+                    <div style={{ fontSize: 12.5, color: 'var(--jb-v3-fg-3)' }}>Top 8% of your matches</div>
                   </div>
                 </div>
 
@@ -485,22 +484,22 @@ export default function AppJob() {
                     flexDirection: 'column',
                     gap: 11,
                     padding: '16px 0',
-                    borderTop: '1px solid #F2ECE0',
-                    borderBottom: '1px solid #F2ECE0',
+                    borderTop: '1px solid var(--jb-v3-control)',
+                    borderBottom: '1px solid var(--jb-v3-control)',
                     marginBottom: 18,
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 13, color: '#8A8378' }}>Posted</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#1B1A16' }}>{d.posted}</span>
+                    <span style={{ fontSize: 13, color: 'var(--jb-v3-fg-3)' }}>Posted</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--jb-v3-fg)' }}>{d.posted}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 13, color: '#8A8378' }}>Applicants</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#1B1A16' }}>{d.applicants}</span>
+                    <span style={{ fontSize: 13, color: 'var(--jb-v3-fg-3)' }}>Applicants</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--jb-v3-fg)' }}>{d.applicants}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 13, color: '#8A8378' }}>Hiring team</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#1B1A16' }}>{d.hiringTeam}</span>
+                    <span style={{ fontSize: 13, color: 'var(--jb-v3-fg-3)' }}>Hiring team</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--jb-v3-fg)' }}>{d.hiringTeam}</span>
                   </div>
                 </div>
 
@@ -512,12 +511,12 @@ export default function AppJob() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: 9,
-                    background: '#1FA463',
-                    color: '#0C2C1C',
+                    background: 'var(--jb-v3-accent)',
+                    color: 'var(--jb-v3-accent-ink)',
                     fontSize: 15.5,
                     fontWeight: 700,
                     padding: 14,
-                    borderRadius: 999,
+                    borderRadius: 2,
                     textDecoration: 'none',
                     marginBottom: 10,
                   }}
@@ -538,7 +537,7 @@ export default function AppJob() {
                     color: saveColor,
                     background: saveBg,
                     border: `1px solid ${saveBorder}`,
-                    borderRadius: 999,
+                    borderRadius: 2,
                     padding: 12,
                     cursor: 'pointer',
                   }}
@@ -554,9 +553,9 @@ export default function AppJob() {
                   alignItems: 'flex-start',
                   gap: 10,
                   padding: '14px 16px',
-                  background: '#EFF8F1',
-                  border: '1px solid #CDE9D6',
-                  borderRadius: 13,
+                  background: 'var(--jb-v3-ok-soft)',
+                  border: '1px solid var(--jb-v3-accent-line)',
+                  borderRadius: 2,
                 }}
               >
                 <span
@@ -565,8 +564,8 @@ export default function AppJob() {
                     height: 20,
                     flexShrink: 0,
                     borderRadius: '50%',
-                    background: '#5BD08C',
-                    color: '#0C2C1C',
+                    background: 'var(--jb-v3-ok)',
+                    color: 'var(--jb-v3-accent-ink)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -575,7 +574,7 @@ export default function AppJob() {
                 >
                   ✓
                 </span>
-                <span style={{ fontSize: 12.5, lineHeight: 1.5, color: '#1F4733' }}>
+                <span style={{ fontSize: 12.5, lineHeight: 1.5, color: 'var(--jb-v3-ok)' }}>
                   Verified careers page — your application goes straight to {d.company}.
                 </span>
               </div>

@@ -9,16 +9,10 @@
 // until acknowledgeConsent has been called.
 
 import { API_URL } from '@/config/api';
-
-const getAuthToken = () => {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('authToken') || localStorage.getItem('token');
-  }
-  return null;
-};
+import { getAccessToken } from '@/lib/apiClient';
 
 const apiCall = async (endpoint, options = {}) => {
-  const token = getAuthToken();
+  const token = await getAccessToken();
   const headers = { 'Content-Type': 'application/json', ...options.headers };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -32,7 +26,10 @@ const apiCall = async (endpoint, options = {}) => {
   return response.json();
 };
 
-export const getAuthTokenForSocket = getAuthToken;
+// The socket authenticates separately from the REST calls and holds a
+// long-lived connection. It is async now because the token comes from the
+// Supabase session rather than a synchronous localStorage read.
+export const getAuthTokenForSocket = getAccessToken;
 
 // POST /api/interview-buddy/sessions
 export const createLiveSession = async (payload) =>

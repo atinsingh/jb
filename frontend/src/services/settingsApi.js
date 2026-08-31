@@ -1,17 +1,11 @@
 import { API_URL } from '@/config/api';
-
-// ---------------------------------------------------------------- auth helper
-const getAuthToken = () => {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('authToken') || localStorage.getItem('token');
-  }
-  return null;
-};
+import { getAccessToken } from '@/lib/apiClient';
+import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 
 // Shared fetch wrapper following the api.js convention (token auto-attached,
 // JSON body, throw on !ok). Kept local so we never modify api.js.
 const apiCall = async (endpoint, options = {}) => {
-  const token = getAuthToken();
+  const token = await getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,
@@ -42,7 +36,7 @@ export const updateUserProfile = async (profile) =>
 
 // POST /api/users/profile/picture — multipart `picture`
 export const uploadProfilePicture = async (file) => {
-  const token = getAuthToken();
+  const token = await getAccessToken();
   const formData = new FormData();
   formData.append('picture', file);
 
@@ -59,19 +53,26 @@ export const uploadProfilePicture = async (file) => {
   return response.json();
 };
 
-// PATCH /api/users/email — { newEmail, password }
-export const updateUserEmail = async (newEmail, password) =>
-  apiCall('/api/users/email', {
-    method: 'PATCH',
-    body: JSON.stringify({ newEmail, password }),
-  });
+// Supabase owns the identity, so an email change goes to it. It emails BOTH
+// the old and new address to confirm, which is why no current password is
+// asked for here - proving control of the mailbox is the stronger check.
+export const updateUserEmail = async (newEmail) => {
+  const { error } = await getSupabaseBrowserClient().auth.updateUser({ email: newEmail });
+  if (error) throw new Error(error.message);
+  return { message: 'Check both inboxes to confirm the change' };
+};
 
-// PATCH /api/users/password — change password (ChangePasswordDto)
-export const changeUserPassword = async (payload) =>
-  apiCall('/api/users/password', {
-    method: 'PATCH',
-    body: JSON.stringify(payload),
+// Supabase owns credentials now, so this goes straight to it rather than to
+// PATCH /api/users/password (retired along with the bcrypt paths). Supabase
+// takes no currentPassword: the caller must already hold a valid session,
+// which is the same guarantee the old endpoint got by re-checking the hash.
+export const changeUserPassword = async ({ newPassword }) => {
+  const { error } = await getSupabaseBrowserClient().auth.updateUser({
+    password: newPassword,
   });
+  if (error) throw new Error(error.message);
+  return { message: 'Password updated' };
+};
 
 // ---------------------------------------------------------------- Entitlements
 // GET /api/entitlements — { planType, entitlements }

@@ -13,14 +13,14 @@ export default function Chip({ selected = false, children, style, ...rest }) {
         alignItems: 'center',
         height: 28,
         padding: '0 11px',
-        borderRadius: 6,
+        borderRadius: 2,
         fontFamily: 'inherit',
         fontSize: 13,
         cursor: 'pointer',
         fontWeight: selected ? 600 : 500,
-        background: selected ? 'var(--jb-a-tint)' : 'transparent',
-        color: selected ? 'var(--jb-a-accent)' : 'var(--jb-a-ink-2)',
-        border: `1px solid ${selected ? 'var(--jb-a-tint-line)' : 'var(--jb-a-chip-line)'}`,
+        background: selected ? 'var(--jb-v3-accent-soft)' : 'transparent',
+        color: selected ? 'var(--jb-v3-accent)' : 'var(--jb-v3-fg-2)',
+        border: `1px solid ${selected ? 'var(--jb-v3-accent-line)' : 'var(--jb-v3-line-2)'}`,
         ...style,
       }}
       {...rest}

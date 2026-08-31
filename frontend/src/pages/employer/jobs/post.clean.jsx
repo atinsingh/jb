@@ -14,6 +14,7 @@ import {
   PlusIcon
 } from '@heroicons/react/24/outline';
 import EmployerLayout from '@/components/layout/EmployerLayout';
+import { getAccessToken } from '@/lib/apiClient';
 
 // Custom styled input component
 const StyledInput = ({ label, icon: Icon, id, ...props }) => (
@@ -188,7 +189,7 @@ function PostJob() {
     
     try {
       // Get auth token from localStorage
-      const authToken = localStorage.getItem('authToken');
+      const authToken = await getAccessToken();
       if (!authToken) {
         throw new Error('Authentication required. Please log in again.');
       }

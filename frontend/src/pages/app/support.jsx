@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import AppSidebar from '@/components/app/AppSidebar';
+import AppTopNav from '@/components/app/AppTopNav';
 import { appRoute } from '@/components/app/appRoutes';
 import { LoadingState, EmptyState, ErrorState } from '@/components/app/AppStates';
+import { getAccessToken } from '@/lib/apiClient';
 
 /* Static form options (product UI, not user data). */
 const CATEGORIES = [
@@ -25,9 +26,9 @@ const PRIORITIES = [
 
 /* dc statusStyle() */
 function statusStyle(s) {
-  if (s === 'open') return { label: 'OPEN', color: '#157A49', bg: '#EAF6EE', border: '#CDE9D6' };
-  if (s === 'awaiting') return { label: 'AWAITING YOU', color: '#9A6A2E', bg: '#FBF1E2', border: '#EAD9BE' };
-  return { label: 'RESOLVED', color: '#8A8378', bg: '#F2ECE0', border: '#E6DECF' };
+  if (s === 'open') return { label: 'OPEN', color: 'var(--jb-v3-accent)', bg: 'var(--jb-v3-accent-soft)', border: 'var(--jb-v3-accent-line)' };
+  if (s === 'awaiting') return { label: 'AWAITING YOU', color: 'var(--jb-v3-warn)', bg: 'var(--jb-v3-warn-soft)', border: 'var(--jb-v3-warn-line)' };
+  return { label: 'RESOLVED', color: 'var(--jb-v3-fg-3)', bg: 'var(--jb-v3-control)', border: 'var(--jb-v3-line)' };
 }
 
 export default function AppSupport() {
@@ -51,30 +52,32 @@ export default function AppSupport() {
    * empty stays empty and failures surface an error. */
   useEffect(() => {
     let cancelled = false;
-    const token =
-      typeof window !== 'undefined'
-        ? localStorage.getItem('authToken') || localStorage.getItem('token')
-        : null;
-    if (!token) {
-      setLoading(false);
-      return; // unauthenticated → no requests to show
-    }
 
-    setLoading(true);
-    setError(null);
-    import('@/services/supportApi')
-      .then((m) => m.getMyTickets())
-      .then((data) => {
-        if (cancelled) return;
-        const list = Array.isArray(data) ? data : data?.tickets;
-        setTickets(Array.isArray(list) ? list : []);
-      })
-      .catch((e) => {
-        if (!cancelled) setError(e);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    (async () => {
+      const token = await getAccessToken();
+      if (!token) {
+        setLoading(false);
+        return; // unauthenticated -> no requests to show
+      }
+
+
+      setLoading(true);
+      setError(null);
+      import('@/services/supportApi')
+        .then((m) => m.getMyTickets())
+        .then((data) => {
+          if (cancelled) return;
+          const list = Array.isArray(data) ? data : data?.tickets;
+          setTickets(Array.isArray(list) ? list : []);
+        })
+        .catch((e) => {
+          if (!cancelled) setError(e);
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    })();
+
     return () => {
       cancelled = true;
     };
@@ -99,8 +102,8 @@ export default function AppSupport() {
       author: m.author || '',
       showAuthor: !m.me && !!m.author,
       align: m.me ? 'flex-end' : 'flex-start',
-      bubbleBg: m.me ? '#EAF6EE' : '#FFFEFB',
-      bubbleBorder: m.me ? '#CDE9D6' : '#E6DECF',
+      bubbleBg: m.me ? 'var(--jb-v3-accent-soft)' : 'var(--jb-v3-panel)',
+      bubbleBorder: m.me ? 'var(--jb-v3-accent-line)' : 'var(--jb-v3-line)',
       radius: m.me ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
     }));
   }, [active, sent]);
@@ -108,15 +111,12 @@ export default function AppSupport() {
   const canSend = reply.trim().length > 0;
 
   /* ----- actions ----- */
-  const submit = () => {
+  const submit = async () => {
     setSubmitted(true);
     const n = '#JB-' + (4790 + Math.floor(Math.random() * 60)).toString();
     setTicketNum(n || '#JB-4821');
     // Best-effort persistence; failure is non-blocking (UI already advanced).
-    const token =
-      typeof window !== 'undefined'
-        ? localStorage.getItem('authToken') || localStorage.getItem('token')
-        : null;
+    const token = await getAccessToken();
     if (token) {
       import('@/services/supportApi')
         .then((m) => m.createTicket({ category, subject, message, priority }))
@@ -163,15 +163,15 @@ export default function AppSupport() {
   };
 
   /* ----- shared styles ----- */
-  const labelStyle = { fontSize: 12.5, fontWeight: 600, color: '#46413A', marginBottom: 6, display: 'block' };
+  const labelStyle = { fontSize: 12.5, fontWeight: 600, color: 'var(--jb-v3-fg-2)', marginBottom: 6, display: 'block' };
   const fieldStyle = {
     width: '100%',
     fontFamily: 'inherit',
     fontSize: 14,
-    color: '#1B1A16',
-    background: '#FBF8F1',
-    border: '1px solid #E1D9C9',
-    borderRadius: 12,
+    color: 'var(--jb-v3-fg)',
+    background: 'var(--jb-v3-panel)',
+    border: '1px solid var(--jb-v3-line)',
+    borderRadius: 2,
     padding: '12px 14px',
   };
 
@@ -186,19 +186,19 @@ export default function AppSupport() {
           width: 8px;
         }
         #jbapp ::-webkit-scrollbar-thumb {
-          background: #e1d9c9;
-          border-radius: 8px;
+          background: var(--jb-v3-line);
+          border-radius: 2px;
         }
         #jbapp input:focus,
         #jbapp textarea:focus,
         #jbapp select:focus {
           outline: none;
-          border-color: #1fa463;
-          box-shadow: 0 0 0 3px rgba(31, 164, 99, 0.15);
+          border-color: var(--jb-v3-accent);
+          box-shadow: 0 0 0 3px color-mix(in srgb, var(--jb-v3-accent) 15%, transparent);
         }
         #jbapp input::placeholder,
         #jbapp textarea::placeholder {
-          color: #a79e8f;
+          color: var(--jb-v3-fg-3);
         }
         @keyframes rbpop {
           from {
@@ -212,23 +212,23 @@ export default function AppSupport() {
         }
       `}</style>
 
-      <div id="jbapp" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16' }}>
-        <AppSidebar active="support" />
+      <div style={{ minHeight: '100vh', background: 'var(--jb-v3-bg)', fontFamily: 'var(--jb-v3-font-display)', color: 'var(--jb-v3-fg)' }}>
+        <AppTopNav />
 
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           {/* HEADER */}
-          <header style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: 20, padding: '15px 32px', background: 'rgba(247,243,234,0.85)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #E7E0D2' }}>
-            <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9286' }}>Support</div>
+          <header style={{ position: 'relative',   display: 'flex', alignItems: 'center', gap: 20, padding: '15px 32px', background: 'color-mix(in srgb, var(--jb-v3-bg) 85%, transparent)', backdropFilter: 'blur(10px)', borderBottom: '1px solid var(--jb-v3-line)' }}>
+            <div style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--jb-v3-fg-3)' }}>Support</div>
             <div style={{ flex: 1 }} />
-            <Link href={appRoute('App Help Center.dc.html')} style={{ fontSize: 13, fontWeight: 600, color: '#157A49', textDecoration: 'none' }}>Browse help center →</Link>
+            <Link href={appRoute('App Help Center.dc.html')} style={{ fontSize: 13, fontWeight: 600, color: 'var(--jb-v3-accent)', textDecoration: 'none' }}>Browse help center →</Link>
           </header>
 
           <div style={{ padding: '30px 32px 64px', maxWidth: 1080, width: '100%', margin: '0 auto' }}>
             {/* TITLE */}
             <div style={{ marginBottom: 24 }}>
-              <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 40, lineHeight: 1, letterSpacing: '-0.01em', margin: '0 0 8px' }}>Support</h1>
-              <p style={{ fontSize: 15.5, color: '#5A544A', margin: 0 }}>
-                Open a request or pick up a conversation. <span style={{ color: '#157A49', fontWeight: 600 }}>Typical response: under 4 hours</span> on weekdays.
+              <h1 style={{ fontFamily: 'var(--jb-v3-font-display)', fontWeight: 600, letterSpacing: '-0.04em', fontSize: 40, lineHeight: 1, letterSpacing: '-0.01em', margin: '0 0 8px' }}>Support</h1>
+              <p style={{ fontSize: 15.5, color: 'var(--jb-v3-fg-2)', margin: 0 }}>
+                Open a request or pick up a conversation. <span style={{ color: 'var(--jb-v3-accent)', fontWeight: 600 }}>Typical response: under 4 hours</span> on weekdays.
               </p>
             </div>
 
@@ -236,7 +236,7 @@ export default function AppSupport() {
               {/* ===== LEFT: NEW REQUEST ===== */}
               <div style={{ width: 420, flexShrink: 0, maxWidth: '100%' }}>
                 {showForm && (
-                  <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18, padding: 26 }}>
+                  <div style={{ background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, padding: 26 }}>
                     <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 20px' }}>New request</h2>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                       <div>
@@ -271,7 +271,7 @@ export default function AppSupport() {
                       </div>
                       <div>
                         <label style={{ ...labelStyle, marginBottom: 8 }}>Priority</label>
-                        <div style={{ display: 'inline-flex', padding: 3, background: '#F2ECE0', border: '1px solid #E6DECF', borderRadius: 999, gap: 3 }}>
+                        <div style={{ display: 'inline-flex', padding: 3, background: 'var(--jb-v3-control)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, gap: 3 }}>
                           {PRIORITIES.map((p) => {
                             const on = priority === p.key;
                             return (
@@ -281,14 +281,14 @@ export default function AppSupport() {
                                 style={{
                                   fontSize: 12.5,
                                   fontWeight: 600,
-                                  color: on ? '#1B1A16' : '#8A8378',
-                                  background: on ? '#FFFEFB' : 'transparent',
+                                  color: on ? 'var(--jb-v3-fg)' : 'var(--jb-v3-fg-3)',
+                                  background: on ? 'var(--jb-v3-panel)' : 'transparent',
                                   border: 'none',
-                                  borderRadius: 999,
+                                  borderRadius: 2,
                                   padding: '7px 16px',
                                   cursor: 'pointer',
                                   fontFamily: 'inherit',
-                                  boxShadow: on ? '0 1px 3px rgba(27,26,22,0.12)' : 'none',
+                                  boxShadow: on ? '0 1px 3px color-mix(in srgb, var(--jb-v3-invert) 12%, transparent)' : 'none',
                                 }}
                               >
                                 {p.label}
@@ -299,14 +299,14 @@ export default function AppSupport() {
                       </div>
                       <button
                         type="button"
-                        style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 8, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: '#5A544A', background: '#FBF8F1', border: '1px dashed #D2C9B7', borderRadius: 11, padding: '10px 15px', cursor: 'pointer' }}
+                        style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 8, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: 'var(--jb-v3-fg-2)', background: 'var(--jb-v3-panel)', border: '1px dashed var(--jb-v3-line-2)', borderRadius: 2, padding: '10px 15px', cursor: 'pointer' }}
                       >
                         + Attach a file
                       </button>
                     </div>
                     <button
                       onClick={submit}
-                      style={{ width: '100%', fontFamily: 'inherit', fontSize: 15, fontWeight: 700, color: '#0C2C1C', background: '#1FA463', border: 'none', borderRadius: 999, padding: 14, cursor: 'pointer', marginTop: 22 }}
+                      style={{ width: '100%', fontFamily: 'inherit', fontSize: 15, fontWeight: 700, color: 'var(--jb-v3-accent-ink)', background: 'var(--jb-v3-accent)', border: 'none', borderRadius: 2, padding: 14, cursor: 'pointer', marginTop: 22 }}
                     >
                       Submit request
                     </button>
@@ -314,15 +314,15 @@ export default function AppSupport() {
                 )}
 
                 {showSuccess && (
-                  <div style={{ background: '#FFFEFB', border: '1px solid #CDE9D6', borderRadius: 18, padding: '36px 28px', textAlign: 'center', animation: 'rbpop 0.3s ease' }}>
-                    <div style={{ width: 60, height: 60, margin: '0 auto 20px', borderRadius: '50%', background: '#1FA463', color: '#0C2C1C', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>✓</div>
-                    <h2 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 28, lineHeight: 1.1, margin: '0 0 8px' }}>Request received</h2>
-                    <p style={{ fontSize: 14.5, color: '#5A544A', margin: '0 auto 18px', maxWidth: 320 }}>
-                      We’ve opened ticket <b style={{ fontFamily: 'var(--jb-font-mono)', color: '#157A49' }}>{ticketNum}</b> and emailed you a copy. Expect a reply within <b>4 hours</b>.
+                  <div style={{ background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-accent-line)', borderRadius: 2, padding: '36px 28px', textAlign: 'center', animation: 'rbpop 0.3s ease' }}>
+                    <div style={{ width: 60, height: 60, margin: '0 auto 20px', borderRadius: '50%', background: 'var(--jb-v3-accent)', color: 'var(--jb-v3-accent-ink)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>✓</div>
+                    <h2 style={{ fontFamily: 'var(--jb-v3-font-display)', fontWeight: 600, letterSpacing: '-0.04em', fontSize: 28, lineHeight: 1.1, margin: '0 0 8px' }}>Request received</h2>
+                    <p style={{ fontSize: 14.5, color: 'var(--jb-v3-fg-2)', margin: '0 auto 18px', maxWidth: 320 }}>
+                      We’ve opened ticket <b style={{ fontFamily: 'var(--jb-v3-font-mono)', color: 'var(--jb-v3-accent)' }}>{ticketNum}</b> and emailed you a copy. Expect a reply within <b>4 hours</b>.
                     </p>
                     <button
                       onClick={resetForm}
-                      style={{ fontFamily: 'inherit', fontSize: 14, fontWeight: 600, color: '#1B1A16', background: '#FFFEFB', border: '1px solid #D9D0BE', borderRadius: 999, padding: '12px 22px', cursor: 'pointer' }}
+                      style={{ fontFamily: 'inherit', fontSize: 14, fontWeight: 600, color: 'var(--jb-v3-fg)', background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line-2)', borderRadius: 2, padding: '12px 22px', cursor: 'pointer' }}
                     >
                       Submit another
                     </button>
@@ -353,17 +353,17 @@ export default function AppSupport() {
                             <button
                               key={t.id}
                               onClick={() => openTicket(t.id)}
-                              style={{ textAlign: 'left', background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 15, padding: '18px 20px', cursor: 'pointer', fontFamily: 'inherit' }}
+                              style={{ textAlign: 'left', background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, padding: '18px 20px', cursor: 'pointer', fontFamily: 'inherit' }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 7 }}>
-                                <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#9A9286' }}>{t.id}</span>
+                                <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, color: 'var(--jb-v3-fg-3)' }}>{t.id}</span>
                                 <span style={{ flex: 1 }} />
-                                <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', color: ss.color, background: ss.bg, border: `1px solid ${ss.border}`, padding: '3px 9px', borderRadius: 999 }}>{ss.label}</span>
+                                <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', color: ss.color, background: ss.bg, border: `1px solid ${ss.border}`, padding: '3px 9px', borderRadius: 2 }}>{ss.label}</span>
                               </div>
-                              <div style={{ fontSize: 15.5, fontWeight: 700, color: '#1B1A16', marginBottom: 5 }}>{t.subject}</div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: '#8A8378' }}>
+                              <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--jb-v3-fg)', marginBottom: 5 }}>{t.subject}</div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--jb-v3-fg-3)' }}>
                                 <span>{t.category}</span>
-                                <span style={{ color: '#C9BFAC' }}>·</span>
+                                <span style={{ color: 'var(--jb-v3-line-2)' }}>·</span>
                                 <span>Updated {t.updated}</span>
                               </div>
                             </button>
@@ -379,49 +379,49 @@ export default function AppSupport() {
                   <div style={{ animation: 'rbpop 0.2s ease' }}>
                     <button
                       onClick={closeThread}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: '#5A544A', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: 16 }}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: 'var(--jb-v3-fg-2)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: 16 }}
                     >
                       ← All requests
                     </button>
 
-                    <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18, overflow: 'hidden' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '18px 22px', borderBottom: '1px solid #F2ECE0' }}>
+                    <div style={{ background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, overflow: 'hidden' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '18px 22px', borderBottom: '1px solid var(--jb-v3-control)' }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 3 }}>
-                            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#9A9286' }}>{active.id}</span>
+                            <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, color: 'var(--jb-v3-fg-3)' }}>{active.id}</span>
                             {threadStatus && (
-                              <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', color: threadStatus.color, background: threadStatus.bg, border: `1px solid ${threadStatus.border}`, padding: '3px 9px', borderRadius: 999 }}>{threadStatus.label}</span>
+                              <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', color: threadStatus.color, background: threadStatus.bg, border: `1px solid ${threadStatus.border}`, padding: '3px 9px', borderRadius: 2 }}>{threadStatus.label}</span>
                             )}
                           </div>
                           <div style={{ fontSize: 16, fontWeight: 700 }}>{active.subject}</div>
                         </div>
                       </div>
 
-                      <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 14, background: '#F7F3EA' }}>
+                      <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 14, background: 'var(--jb-v3-bg)' }}>
                         {threadMsgs.map((m, i) => (
                           <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: m.align }}>
                             {m.showAuthor && (
-                              <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#9A9286', marginBottom: 5 }}>{m.author}</span>
+                              <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, color: 'var(--jb-v3-fg-3)', marginBottom: 5 }}>{m.author}</span>
                             )}
-                            <div style={{ maxWidth: '78%', fontSize: 14, lineHeight: 1.5, color: '#1B1A16', background: m.bubbleBg, border: `1px solid ${m.bubbleBorder}`, borderRadius: m.radius, padding: '11px 15px' }}>{m.text}</div>
-                            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#A79E8F', margin: '5px 3px 0' }}>{m.time}</span>
+                            <div style={{ maxWidth: '78%', fontSize: 14, lineHeight: 1.5, color: 'var(--jb-v3-fg)', background: m.bubbleBg, border: `1px solid ${m.bubbleBorder}`, borderRadius: m.radius, padding: '11px 15px' }}>{m.text}</div>
+                            <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, color: 'var(--jb-v3-fg-3)', margin: '5px 3px 0' }}>{m.time}</span>
                           </div>
                         ))}
                       </div>
 
-                      <div style={{ padding: '14px 18px', borderTop: '1px solid #F2ECE0' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#FBF8F1', border: '1px solid #E1D9C9', borderRadius: 999, padding: '6px 6px 6px 16px' }}>
+                      <div style={{ padding: '14px 18px', borderTop: '1px solid var(--jb-v3-control)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, padding: '6px 6px 6px 16px' }}>
                           <input
                             value={reply}
                             onChange={(e) => setReply(e.target.value)}
                             onKeyDown={onReplyKey}
                             placeholder="Write a reply…"
-                            style={{ flex: 1, border: 'none', background: 'none', fontFamily: 'inherit', fontSize: 14, color: '#1B1A16' }}
+                            style={{ flex: 1, border: 'none', background: 'none', fontFamily: 'inherit', fontSize: 14, color: 'var(--jb-v3-fg)' }}
                           />
                           <button
                             onClick={sendReply}
                             title="Send"
-                            style={{ width: 38, height: 38, flexShrink: 0, border: 'none', background: canSend ? '#1FA463' : '#CFE6D8', color: '#0C2C1C', borderRadius: '50%', cursor: canSend ? 'pointer' : 'default', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            style={{ width: 38, height: 38, flexShrink: 0, border: 'none', background: canSend ? 'var(--jb-v3-accent)' : 'var(--jb-v3-ok-line)', color: 'var(--jb-v3-accent-ink)', borderRadius: '50%', cursor: canSend ? 'pointer' : 'default', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                           >
                             ↑
                           </button>

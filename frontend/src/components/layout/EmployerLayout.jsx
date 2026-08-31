@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useAuth } from '@/context/AuthContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import logo from '@/assets/advocate_logo.png';
 import {
@@ -22,6 +23,7 @@ import {
 
 function EmployerLayoutContent({ children }) {
   const router = useRouter();
+  const { logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileRef = useRef(null);
@@ -50,9 +52,7 @@ function EmployerLayoutContent({ children }) {
   }, []);
 
   const handleSignOut = async () => {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
-    router.push('/app/login');
+    await logout();
   };
 
   function isActive(href) {

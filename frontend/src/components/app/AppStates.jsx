@@ -7,7 +7,9 @@
  * data and silently keeping it on fetch failure. Every data-backed section
  * should render one of these while there is no real data to show.
  *
- * Mirrors components/employer/EmployerStates.jsx (same cream/green palette).
+ * The employer surface has its own EmployerStates.jsx; it is deliberately NOT
+ * shared, because this one now speaks v3 and that one still speaks the cream
+ * palette. Do not re-unify them until the employer surface moves too.
  */
 
 const wrap = {
@@ -18,7 +20,7 @@ const wrap = {
   textAlign: 'center',
   gap: 8,
   padding: '48px 24px',
-  color: '#6B675E',
+  color: 'var(--jb-v3-fg-2)',
 };
 
 export function LoadingState({ label = 'Loading…' }) {
@@ -30,8 +32,8 @@ export function LoadingState({ label = 'Loading…' }) {
           width: 22,
           height: 22,
           borderRadius: '50%',
-          border: '2px solid #E4DED2',
-          borderTopColor: '#1B1A16',
+          border: '2px solid var(--jb-v3-line-2)',
+          borderTopColor: 'var(--jb-v3-fg)',
           animation: 'app-spin 0.7s linear infinite',
         }}
       />
@@ -48,7 +50,7 @@ export function EmptyState({ icon = '○', title, hint, action = null }) {
         {icon}
       </span>
       {title && (
-        <div style={{ fontSize: 15, fontWeight: 600, color: '#1B1A16' }}>
+        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--jb-v3-fg)' }}>
           {title}
         </div>
       )}
@@ -66,10 +68,10 @@ export function ErrorState({ error, onRetry }) {
       <span aria-hidden style={{ fontSize: 24 }}>
         ⚠️
       </span>
-      <div style={{ fontSize: 15, fontWeight: 600, color: '#1B1A16' }}>
+      <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--jb-v3-fg)' }}>
         Couldn’t load this
       </div>
-      <div style={{ fontSize: 13, maxWidth: 360, color: '#9B4A2F' }}>
+      <div style={{ fontSize: 13, maxWidth: 360, color: 'var(--jb-v3-danger)' }}>
         {message}
       </div>
       {onRetry && (
@@ -79,9 +81,11 @@ export function ErrorState({ error, onRetry }) {
           style={{
             marginTop: 8,
             padding: '8px 16px',
-            borderRadius: 8,
-            border: '1px solid #E4DED2',
-            background: '#fff',
+            borderRadius: 2,
+            border: '1px solid var(--jb-v3-line-2)',
+            // Was a hardcoded #fff, which is a white chip on the dark theme.
+            background: 'transparent',
+            color: 'var(--jb-v3-fg)',
             fontSize: 13,
             fontWeight: 600,
             cursor: 'pointer',
@@ -104,10 +108,10 @@ export function InlineError({ error }) {
       style={{
         margin: '8px 0',
         padding: '10px 14px',
-        borderRadius: 8,
-        background: '#FBEDE4',
-        border: '1px solid #F0C9B0',
-        color: '#9B4A2F',
+        borderRadius: 2,
+        background: 'var(--jb-v3-danger-soft)',
+        border: '1px solid var(--jb-v3-danger-line)',
+        color: 'var(--jb-v3-danger)',
         fontSize: 13,
       }}
     >

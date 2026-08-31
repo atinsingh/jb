@@ -17,45 +17,48 @@ const SIZES = {
 // only ones the design specifies: primary darkens, secondary's border goes ink.
 const VARIANTS = {
   primary: {
-    rest: { background: 'var(--jb-a-accent)', color: 'var(--jb-a-accent-ink)', border: '0' },
-    hover: { background: 'var(--jb-a-accent-hover)' },
+    rest: { background: 'var(--jb-v3-accent)', color: 'var(--jb-v3-accent-ink)', border: '0' },
+    hover: { background: 'var(--jb-v3-accent-hover)' },
     fontWeight: 600,
   },
   secondary: {
     rest: {
-      background: 'var(--jb-a-card)',
-      color: 'var(--jb-a-ink)',
-      border: '1.5px solid var(--jb-a-line-btn)',
+      background: 'var(--jb-v3-card)',
+      color: 'var(--jb-v3-fg)',
+      border: '1.5px solid var(--jb-v3-line-btn)',
     },
-    hover: { borderColor: 'var(--jb-a-ink)' },
+    hover: { borderColor: 'var(--jb-v3-fg)' },
     fontWeight: 600,
   },
   // Bare accent text — "Reset", "All 42 matches →". No box at all.
   quiet: {
-    rest: { background: 'none', border: '0', color: 'var(--jb-a-accent)', padding: 0, height: 'auto' },
-    hover: { color: 'var(--jb-a-accent-hover)' },
+    rest: { background: 'none', border: '0', color: 'var(--jb-v3-accent)', padding: 0, height: 'auto' },
+    hover: { color: 'var(--jb-v3-accent-hover)' },
     fontWeight: 600,
   },
-  // 38x38 circle — the save heart on a match row.
+  // 38x38 square — the save heart on a match row. Square, not a circle, for
+  // the same reason the pill is gone: v3 has no round controls.
   icon: {
     rest: {
-      background: 'var(--jb-a-card)',
-      border: '1px solid var(--jb-a-line-strong)',
-      color: 'var(--jb-a-ink-soft)',
+      background: 'var(--jb-v3-card)',
+      border: '1px solid var(--jb-v3-line-2)',
+      color: 'var(--jb-v3-fg-2)',
       width: 38,
       height: 38,
       padding: 0,
-      borderRadius: 999,
     },
-    hover: { borderColor: 'var(--jb-a-ink)' },
+    hover: { borderColor: 'var(--jb-v3-fg)' },
     fontWeight: 500,
   },
 };
 
+// The `shape` prop is gone with the pill. v3 has no round controls: every
+// button, field and notice on the shipped v3 screens is 2px
+// (AuthV3.module.css), so there is no second shape left to choose between.
+// Nothing passed it — no call site in pages/app or components/app used it.
 export default function Button({
   variant = 'primary',
   size = 'md',
-  shape = 'pill',
   href,
   children,
   style,
@@ -70,7 +73,7 @@ export default function Button({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 9,
-    borderRadius: shape === 'square' ? 8 : 999,
+    borderRadius: 2,
     fontFamily: 'inherit',
     fontWeight: v.fontWeight,
     textDecoration: 'none',

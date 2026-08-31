@@ -1,87 +1,85 @@
-import { Injectable, ExecutionContext, UnauthorizedException, Optional } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
-import { Observable } from 'rxjs';
-import { Reflector } from '@nestjs/core';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  UnauthorizedException,
+  Optional,
+} from '@nestjs/common';
+import { ModuleRef, Reflector } from '@nestjs/core';
+
 import { AppLoggerService } from '../../common/logger/logger.service';
 import { IS_PUBLIC_KEY } from '../../common/decorators/public.decorator';
+import { SupabaseTokenService } from '../supabase-token.service';
 
+/**
+ * The guard every protected controller in the backend already uses.
+ *
+ * The name, the `@Public()` behaviour, the 401 messages and the shape of
+ * `request.user` (a hydrated Mongoose `UserDocument`) are all unchanged from the
+ * self-signed-JWT version — that is the whole point. Only what happens between
+ * "read the header" and "set request.user" moved to Supabase.
+ *
+ * No longer extends `AuthGuard('jwt')`: `passport-jwt` verifies the token itself
+ * before any hook of ours runs, so it cannot be pointed at Supabase's JWKS.
+ * This guard was the strategy's only consumer.
+ */
 @Injectable()
-export class JwtAuthGuard extends AuthGuard('jwt') {
+export class JwtAuthGuard implements CanActivate {
+  /*
+   * SupabaseTokenService is resolved through ModuleRef rather than injected.
+   *
+   * This guard is applied by ~44 controllers across most feature modules, and
+   * dozens of unit specs build a TestingModule containing just their controller
+   * and a few mocks. A required constructor dependency makes every one of those
+   * fail at .compile() with "Nest can't resolve dependencies of the
+   * JwtAuthGuard", even when the spec never exercises the guard.
+   *
+   * Before the Supabase swap every dependency here was @Optional(), so the guard
+   * instantiated anywhere. Resolving lazily restores that property without
+   * making the verifier itself optional, which would risk a guard that quietly
+   * does nothing. strict:false looks it up in the global AuthModule.
+   */
   constructor(
+    private readonly moduleRef: ModuleRef,
     @Optional() private readonly logger?: AppLoggerService,
-    private reflector?: Reflector,
+    @Optional() private readonly reflector?: Reflector,
   ) {
-    super();
-    if (this.logger) {
-      this.logger.setContext('JwtAuthGuard');
-    }
+    this.logger?.setContext('JwtAuthGuard');
   }
 
-  canActivate(context: ExecutionContext): boolean | Promise<boolean> | Observable<boolean> {
+  private get supabaseTokens(): SupabaseTokenService {
+    return this.moduleRef.get(SupabaseTokenService, { strict: false });
+  }
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const isPublic = this.reflector?.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
-
-    if (isPublic) {
-      return true;
-    }
+    if (isPublic) return true;
 
     const request = context.switchToHttp().getRequest();
-    const authHeader = request.headers.authorization;
+    const token = this.bearerFrom(request.headers?.authorization);
 
-    // Log token presence
-    if (this.logger) {
-      if (!authHeader) {
-        this.logger.warn('JWT token missing from Authorization header');
-      } else if (!authHeader.startsWith('Bearer ')) {
-        this.logger.warn('JWT token missing Bearer prefix');
-      } else {
-        this.logger.debug('JWT token found in request');
-      }
-    }
-
-    return super.canActivate(context);
-  }
-
-  handleRequest(err: any, user: any, info: any, context: ExecutionContext) {
-    const request = context.switchToHttp().getRequest();
-    const authHeader = request.headers.authorization;
-
-    if (err) {
-      if (this.logger) {
-        this.logger.error(`JWT validation error: ${err.message}`, err.stack);
-      }
-      throw err;
-    }
-
-    if (info) {
-      if (this.logger) {
-        this.logger.warn(`JWT validation info: ${info.message || JSON.stringify(info)}`);
-      }
-      if (info.name === 'TokenExpiredError') {
-        throw new UnauthorizedException('Token has expired');
-      }
-      if (info.name === 'JsonWebTokenError') {
-        throw new UnauthorizedException('Invalid token');
-      }
-      if (info.name === 'NotBeforeError') {
-        throw new UnauthorizedException('Token not active yet');
-      }
-      throw new UnauthorizedException('Authentication failed');
-    }
-
-    if (!user) {
-      if (this.logger) {
-        this.logger.warn('JWT validation failed - User not found or token invalid');
-      }
+    if (!token) {
+      this.logger?.warn('Access token missing or malformed in Authorization header');
       throw new UnauthorizedException('Authentication required');
     }
 
-    if (this.logger) {
-      this.logger.debug(`JWT validation successful for user: ${user.email || user._id}`);
-    }
-    return user;
+    // Any UnauthorizedException raised in here already carries the right
+    // message ('Token has expired' / 'Invalid token' / 'This account is no
+    // longer active'), so it propagates untouched.
+    request.user = await this.supabaseTokens.authenticate(token);
+
+    this.logger?.debug(
+      `Authenticated ${request.user.email || request.user._id}`,
+    );
+    return true;
+  }
+
+  private bearerFrom(header?: string): string | null {
+    if (!header || !header.startsWith('Bearer ')) return null;
+    const token = header.slice('Bearer '.length).trim();
+    return token.length ? token : null;
   }
 }
-

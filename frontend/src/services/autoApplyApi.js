@@ -1,16 +1,9 @@
 import { API_URL } from '@/config/api';
-
-// Auth token helper (mirrors services/api.js convention)
-const getAuthToken = () => {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('authToken') || localStorage.getItem('token');
-  }
-  return null;
-};
+import { getAccessToken } from '@/lib/apiClient';
 
 // Core fetch wrapper (mirrors services/api.js apiCall convention)
 const apiCall = async (endpoint, options = {}) => {
-  const token = getAuthToken();
+  const token = await getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,

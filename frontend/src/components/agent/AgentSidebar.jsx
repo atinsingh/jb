@@ -199,13 +199,13 @@ export default function AgentSidebar({ active = 'dashboard' }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: narrow ? 'center' : 'space-between', gap: 8, padding: '18px 14px 16px' }}>
           {wide && (
             <Link href="/agent/dashboard" style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 9 }}>
-              <Logo theme="dark" size={24} accent={ACCENT_INK} />
+              <Logo size={24} accent={ACCENT_INK} style={{ color: "#f2ecdb" }} />
               <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.12em', color: ACCENT_INK, background: '#241E3B', border: '1px solid #3A2F63', borderRadius: 5, padding: '3px 6px' }}>CONCIERGE</span>
             </Link>
           )}
           {narrow && (
             <Link href="/agent/dashboard" aria-label="Jobocate home" style={{ display: 'flex' }}>
-              <Logo theme="dark" size={26} mark accent={ACCENT_INK} />
+              <Logo size={26} mark accent={ACCENT_INK} style={{ color: "#f2ecdb" }} />
             </Link>
           )}
           <div style={{ display: 'flex', gap: 6 }}>

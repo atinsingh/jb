@@ -1,4 +1,5 @@
 import { API_URL } from '@/config/api';
+import { getAccessToken } from '@/lib/apiClient';
 
 /**
  * Agent (human career-concierge) API client.
@@ -26,15 +27,8 @@ import { API_URL } from '@/config/api';
  *         -> { message, application }
  */
 
-const getAuthToken = () => {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('authToken') || localStorage.getItem('token');
-  }
-  return null;
-};
-
 const apiCall = async (endpoint, options = {}) => {
-  const token = getAuthToken();
+  const token = await getAccessToken();
   const isForm =
     typeof FormData !== 'undefined' && options.body instanceof FormData;
 

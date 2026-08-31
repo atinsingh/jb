@@ -23,7 +23,28 @@ if (!/e2e/i.test(process.env.MONGODB_URI)) {
 }
 
 process.env.NODE_ENV = 'test';
-process.env.JWT_SECRET = 'e2e-only-secret-not-used-outside-tests';
+
+// Supabase auth, offline.
+//
+// The suite must not touch the network (see the header above), so it cannot
+// fetch a real project's JWKS. Instead it generates a throwaway RSA keypair per
+// run: the public half is handed to the app as SUPABASE_JWKS_LOCAL, and the
+// private half lets test/utils/supabase-test-auth.ts mint access tokens that
+// verify exactly the way a real Supabase token would.
+const { generateKeyPairSync, randomUUID } = require('crypto');
+const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+const kid = randomUUID();
+
+process.env.SUPABASE_URL = 'https://e2e.supabase.test';
+process.env.SUPABASE_JWKS_LOCAL = JSON.stringify({
+  keys: [{ ...publicKey.export({ format: 'jwk' }), kid, alg: 'RS256', use: 'sig' }],
+});
+process.env.E2E_SIGNING_JWK = JSON.stringify(privateKey.export({ format: 'jwk' }));
+process.env.E2E_SIGNING_KID = kid;
+
+// The user-sync webhook is gated by a shared secret, not a signature: Supabase
+// Database Webhooks are pg_net triggers with custom headers and no HMAC.
+process.env.SUPABASE_WEBHOOK_SECRET = 'e2e-webhook-secret-not-used-outside-tests';
 
 // Nothing may reach the network or spawn a browser during E2E.
 process.env.QUEUE_ENABLED = 'false';

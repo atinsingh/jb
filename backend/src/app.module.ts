@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
-import { PassportModule } from '@nestjs/passport';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { join } from 'path';
@@ -114,7 +113,6 @@ function getEnvFilePath(): string {
       ],
       inject: [ConfigService],
     }),
-    PassportModule.register({ defaultStrategy: 'jwt' }),
     AuthModule,
     UsersModule,
     ResumeModule,

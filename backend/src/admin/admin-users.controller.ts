@@ -14,6 +14,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UsersService } from '../users/users.service';
+import { SupabaseAdminService } from '../auth/supabase-admin.service';
 
 @ApiTags('admin-users')
 @ApiBearerAuth()
@@ -21,7 +22,10 @@ import { UsersService } from '../users/users.service';
 @Roles('ROLE_ADMIN')
 @Controller('admin/users')
 export class AdminUsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly supabaseAdmin: SupabaseAdminService,
+  ) {}
 
   @Get()
   async list(
@@ -65,6 +69,6 @@ export class AdminUsersController {
     if (!user) {
       throw new NotFoundException('User not found');
     }
-    return this.usersService.requestPasswordReset({ email: user.email });
+    return this.supabaseAdmin.sendPasswordRecovery(user.email);
   }
 }

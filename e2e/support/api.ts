@@ -105,32 +105,89 @@ export const api = {
   del: <T>(path: string, token?: string) => request<T>('DELETE', path, undefined, token),
 };
 
-/** Register a fresh user and return them with a valid token. */
+/**
+ * Supabase Auth owns identity now, so provisioning a test user is two steps
+ * against Supabase rather than one POST to a registration endpoint we deleted.
+ *
+ * Requires SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and SUPABASE_ANON_KEY in the
+ * environment. The service-role key is admin-level and must only ever come from
+ * a DEV project — never point this suite at production.
+ */
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_ANON_KEY =
+  process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+function requireSupabaseEnv(): void {
+  const missing = [
+    !SUPABASE_URL && 'SUPABASE_URL',
+    !SUPABASE_SERVICE_ROLE_KEY && 'SUPABASE_SERVICE_ROLE_KEY',
+    !SUPABASE_ANON_KEY && 'SUPABASE_ANON_KEY',
+  ].filter(Boolean);
+  if (missing.length) {
+    throw new Error(
+      `E2E needs Supabase credentials to provision users. Missing: ${missing.join(', ')}. ` +
+        'Point these at the Supabase DEV project (see SUPABASE_AUTH_SETUP.md).',
+    );
+  }
+}
+
+/** Create a confirmed Supabase user and return them with a valid access token. */
 export async function createUser(role: Role, prefix: string): Promise<TestUser> {
+  requireSupabaseEnv();
+
   const email = uniqueEmail(prefix);
   const name = role === 'ROLE_EMPLOYER' ? 'E2E Employer' : 'E2E Candidate';
 
-  await api.post('/api/auth/register', {
-    name,
-    email,
-    password: TEST_PASSWORD,
-    role,
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: SUPABASE_SERVICE_ROLE_KEY as string,
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+    },
+    body: JSON.stringify({
+      email,
+      password: TEST_PASSWORD,
+      // Skip the confirmation email: the suite has no inbox.
+      email_confirm: true,
+      // The backend honours role from user_metadata ONLY when first creating
+      // the local user, and only for candidate/employer. That is what makes an
+      // employer fixture possible without a second admin call.
+      user_metadata: { name, role },
+    }),
   });
+
+  if (!res.ok) {
+    throw new Error(
+      `Supabase admin createUser failed (${res.status}): ${await res.text()}`,
+    );
+  }
 
   const token = await login(email, TEST_PASSWORD);
   return { name, email, password: TEST_PASSWORD, role, token };
 }
 
+/** Exchange email + password for a Supabase access token. */
 export async function login(email: string, password: string): Promise<string> {
-  const res = await api.post<{ token?: string; accessToken?: string }>(
-    '/api/auth/login',
-    { email, password },
-  );
-  const token = res.token || res.accessToken;
-  if (!token) {
-    throw new Error(`Login for ${email} returned no token: ${JSON.stringify(res)}`);
+  requireSupabaseEnv();
+
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: SUPABASE_ANON_KEY as string,
+    },
+    body: JSON.stringify({ email, password }),
+  });
+
+  const payload = (await res.json()) as { access_token?: string };
+  if (!res.ok || !payload.access_token) {
+    throw new Error(
+      `Supabase login for ${email} returned no token: ${JSON.stringify(payload)}`,
+    );
   }
-  return token;
+  return payload.access_token;
 }
 
 /** Wait until the backend reports itself up, so setup fails loudly not flakily. */

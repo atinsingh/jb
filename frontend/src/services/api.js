@@ -1,17 +1,9 @@
 import { API_URL } from '@/config/api';
-
-// Helper function to get auth token
-const getAuthToken = () => {
-  if (typeof window !== 'undefined') {
-    // Check both 'authToken' and 'token' for backward compatibility
-    return localStorage.getItem('authToken') || localStorage.getItem('token');
-  }
-  return null;
-};
+import { getAccessToken } from '@/lib/apiClient';
 
 // Helper function for API calls
 const apiCall = async (endpoint, options = {}) => {
-  const token = getAuthToken();
+  const token = await getAccessToken();
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,
@@ -36,7 +28,7 @@ const apiCall = async (endpoint, options = {}) => {
 
 // Resume Parser API
 export const uploadResume = async (file) => {
-  const token = getAuthToken();
+  const token = await getAccessToken();
   const formData = new FormData();
   formData.append('resume', file);
 

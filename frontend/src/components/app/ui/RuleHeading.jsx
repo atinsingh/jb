@@ -7,7 +7,7 @@ export default function RuleHeading({ label, action, tracking = 'wide', style })
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, ...style }}>
       <MonoLabel tracking={tracking}>{label}</MonoLabel>
-      <span style={{ flex: 1, height: 1, background: 'var(--jb-a-line-strong)' }} />
+      <span style={{ flex: 1, height: 1, background: 'var(--jb-v3-line-2)' }} />
       {action}
     </div>
   );

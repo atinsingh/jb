@@ -32,7 +32,7 @@ docker-compose up --build
 ## 📚 Documentation
 
 - **[Docker Setup Guide](DOCKER_SETUP.md)** - Complete Docker Compose documentation
-- **[OAuth Instructions](OAUTH_SETUP_INSTRUCTIONS.md)** - Google & LinkedIn OAuth setup
+- **[Supabase Auth Setup](SUPABASE_AUTH_SETUP.md)** - Supabase projects, providers and keys
 
 ## ✨ Features
 

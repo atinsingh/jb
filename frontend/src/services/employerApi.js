@@ -1,4 +1,6 @@
 import { API_URL } from '@/config/api';
+import { getAccessToken } from '@/lib/apiClient';
+import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 
 /**
  * Employer API client.
@@ -9,15 +11,8 @@ import { API_URL } from '@/config/api';
  * never fall back to fabricated sample data.
  */
 
-const getAuthToken = () => {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('authToken') || localStorage.getItem('token');
-  }
-  return null;
-};
-
 const apiCall = async (endpoint, options = {}) => {
-  const token = getAuthToken();
+  const token = await getAccessToken();
   const headers = { 'Content-Type': 'application/json', ...options.headers };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -394,14 +389,18 @@ export const employerProfileApi = {
       method: 'PATCH',
       body: JSON.stringify(dto),
     }),
-  updateEmail: (email, password) =>
-    apiCall('/api/users/email', {
-      method: 'PATCH',
-      body: JSON.stringify({ email, password }),
-    }),
-  changePassword: (currentPassword, newPassword) =>
-    apiCall('/api/users/password', {
-      method: 'PATCH',
-      body: JSON.stringify({ currentPassword, newPassword }),
-    }),
+  // Supabase owns the identity; see settingsApi.updateUserEmail.
+  updateEmail: async (email) => {
+    const { error } = await getSupabaseBrowserClient().auth.updateUser({ email });
+    if (error) throw new Error(error.message);
+    return { message: 'Check both inboxes to confirm the change' };
+  },
+  // Supabase owns credentials; see securityApi.changePassword.
+  changePassword: async (_currentPassword, newPassword) => {
+    const { error } = await getSupabaseBrowserClient().auth.updateUser({
+      password: newPassword,
+    });
+    if (error) throw new Error(error.message);
+    return { message: 'Password updated' };
+  },
 };
