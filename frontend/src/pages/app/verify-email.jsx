@@ -23,7 +23,7 @@ import styles from '@/components/auth/v3/AuthV3.module.css';
  *   - let someone whose mail never arrived send another
  *
  * Note email confirmation is currently OFF on the project, which makes this a
- * mostly-unreachable screen by design (see SUPABASE_AUTH_SETUP.md). It is built
+ * mostly-unreachable screen by design (see the Auth section of README.md). It is built
  * correctly so that turning confirmation on is a dashboard toggle rather than a
  * frontend project.
  *

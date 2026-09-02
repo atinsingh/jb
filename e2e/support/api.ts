@@ -127,7 +127,7 @@ function requireSupabaseEnv(): void {
   if (missing.length) {
     throw new Error(
       `E2E needs Supabase credentials to provision users. Missing: ${missing.join(', ')}. ` +
-        'Point these at the Supabase DEV project (see SUPABASE_AUTH_SETUP.md).',
+        'Point these at the Supabase DEV project (see the Auth section of README.md).',
     );
   }
 }
