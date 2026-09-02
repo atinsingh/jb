@@ -64,9 +64,9 @@ export const NAV_GROUPS = [
     label: 'Documents',
     leaves: [
       { id: 'resume', label: 'Résumé', href: '/app/resume' },
-      // v3 calls this "Import". /app/resume-builder is only a redirect stub to
-      // the library, so this points at the library directly — one hop fewer,
-      // and the nav highlight resolves to a route that actually renders.
+      // v3 calls this "Import". It points straight at the library: the old
+      // /app/resume-builder redirect stub has been deleted along with the
+      // separate generator screens.
       { id: 'upload', label: 'Import', href: '/app/resume-library' },
       { id: 'letter', label: 'Cover letter', href: '/app/cover-letter' },
       { id: 'profiles', label: 'Job profiles', href: '/app/job-profiles' },

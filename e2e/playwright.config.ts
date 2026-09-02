@@ -1,5 +1,29 @@
 import { defineConfig, devices } from '@playwright/test';
+import * as fs from 'fs';
 import * as path from 'path';
+
+/**
+ * Supabase credentials for `support/api.ts`, read from the repo-wide env file.
+ *
+ * Deliberately NOT an `e2e/.env`: these are real service-role keys, and a copy
+ * is a copy that drifts and a copy that leaks. `.env.local` at the root is the
+ * single source every part of this repo reads. Nothing is written to disk, and
+ * an already-exported variable always wins so CI can pass its own values.
+ */
+function loadEnvFile(file: string): void {
+  if (!fs.existsSync(file)) return;
+  for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+    const match = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line);
+    if (!match) continue;
+    const key = match[1];
+    if (process.env[key] !== undefined) continue;
+    process.env[key] = match[2].trim().replace(/^(['"])(.*)\1$/, '$2');
+  }
+}
+
+// .env.local first — dotenv-style precedence, local overrides shared.
+loadEnvFile(path.join(__dirname, '..', '.env.local'));
+loadEnvFile(path.join(__dirname, '..', '.env'));
 
 /**
  * Browser end-to-end suite for Jobocate.

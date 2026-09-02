@@ -1,7 +1,7 @@
 // MUST be first: populate process.env from .env before AppModule is evaluated,
 // so module-load-time conditionals (e.g. QUEUE_ENABLED in queue.config.ts) see
 // the right values. See src/load-env.ts.
-import './load-env';
+import { REPO_ROOT } from './load-env';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
@@ -12,39 +12,17 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppLoggerService } from './common/logger/logger.service';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import helmet from 'helmet';
-import * as dotenv from 'dotenv';
 import { join } from 'path';
 
 // Initialize logger early (before app creation)
 const earlyLogger = new AppLoggerService();
 earlyLogger.setContext('Bootstrap');
 
-// Load .env file before anything else (as a fallback)
-earlyLogger.debug('Loading .env file...');
-earlyLogger.debug(`process.cwd(): ${process.cwd()}`);
-
-// Try multiple paths
-const possibleEnvPaths = [
-  join(process.cwd(), '.env'),
-  join(process.cwd(), 'backend', '.env'),
-  join(__dirname, '..', '.env'),
-];
-
-let envLoaded = false;
-for (const envPath of possibleEnvPaths) {
-  const result = dotenv.config({ path: envPath });
-  if (!result.error && result.parsed) {
-    earlyLogger.log(`Loaded .env file from: ${envPath}`);
-    earlyLogger.debug(`Environment variables loaded: ${Object.keys(result.parsed).length} variables`);
-    envLoaded = true;
-    break;
-  }
-}
-
-if (!envLoaded) {
-  earlyLogger.warn(`Could not load .env file from any of these paths: ${possibleEnvPaths.join(', ')}`);
-  earlyLogger.warn('Make sure .env file exists in the backend directory');
-}
+// The env is already loaded — `import './load-env'` above is the first import
+// in this file and reads the one repo-wide file at the root. The second copy of
+// path-guessing that used to live here searched `backend/.env`, which no longer
+// exists; it loaded nothing and warned that it had, on every boot.
+earlyLogger.debug(`Env loaded from repo root: ${REPO_ROOT}`);
 
 async function bootstrap() {
   try {

@@ -57,6 +57,33 @@ export class UpdateProfileDto {
     year?: string;
   }>;
 
+  /**
+   * Optional résumé enrichment, added alongside experience and education.
+   *
+   * The résumé generator reads these from the account rather than asking for
+   * them on its own screen, so this DTO is the only way they get set. Absent is
+   * a valid state — a thinner résumé, never a blocked one.
+   */
+  @ApiProperty({ description: 'Certifications array', required: false })
+  @IsArray()
+  @IsOptional()
+  certifications?: Array<{
+    name?: string;
+    issuer?: string;
+    year?: string;
+    credentialId?: string;
+  }>;
+
+  @ApiProperty({
+    description: 'Standalone achievements not tied to one role',
+    required: false,
+    type: [String],
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  achievements?: string[];
+
   @ApiProperty({ description: 'Auto-apply setting', required: false })
   @IsBoolean()
   @IsOptional()

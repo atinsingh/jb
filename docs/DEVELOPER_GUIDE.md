@@ -1,8 +1,6 @@
 # Jobocate — Developer Guide
 
-The single source of truth for understanding, running, and fixing Jobocate. (Older
-scattered docs — `GETTING_STARTED.md`, `PROJECT_STRUCTURE.md`, `API_DOCUMENTATION.md`,
-etc. — predate this and may be stale; trust this file where they conflict.)
+The single source of truth for understanding, running, and fixing Jobocate.
 
 ---
 
@@ -38,7 +36,7 @@ docker compose up -d mongodb            # or your own mongod on :27017
 # 2. Backend
 cd backend
 npm install --legacy-peer-deps
-cp .env.example .env                     # then fill in (see §4); MUST set JWT_SECRET + MONGODB_URI
+# env lives at the REPO ROOT, one file for everything: cp .env.example .env.local
 npm run build && npm run start:prod      # or: npm run dev   (watch mode)
 # health: curl http://localhost:8000/api/health
 
@@ -52,7 +50,7 @@ Build for release: `npm run build` in each (both currently exit 0). Type-check b
 
 ## 4. Environment variables
 
-**Backend (`backend/.env`)** — required in bold:
+**All of these live in the repo-root `.env.local`** (there is no `backend/.env`) — required in bold:
 
 | Var | Purpose |
 |---|---|
@@ -67,7 +65,7 @@ Build for release: `npm run build` in each (both currently exit 0). Type-check b
 | `GREENHOUSE_BOARDS`, `LEVER_BOARDS` | Comma-separated board slugs the scrapers poll |
 | `JOB_SCRAPING_ENABLED`, `AUTO_APPLICATION_ENABLED` | Feature flags for the cron jobs |
 
-**Frontend (`frontend/.env.local`):** `NEXT_PUBLIC_API_URL=http://localhost:8000` (legacy `REACT_APP_BACKEND_URL` also read).
+**Frontend vars** go in that same repo-root `.env.local`: `NEXT_PUBLIC_API_URL=http://localhost:8000` (legacy `REACT_APP_BACKEND_URL` also read). Only `NEXT_PUBLIC_*` reaches the browser.
 
 > If AI features return canned/fallback text, the LLM key is missing or rate-limited (OpenAI/Anthropic 429). Every AI feature degrades gracefully to a deterministic fallback rather than erroring.
 

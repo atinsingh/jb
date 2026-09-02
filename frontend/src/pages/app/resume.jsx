@@ -1,849 +1,1077 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Head from 'next/head';
-import { motion } from 'framer-motion';
-import AppTopNav from '@/components/app/AppTopNav';
-import { uploadResume } from '@/services/api';
-import {
-  getResumeData,
-  listResumes,
-  getResumeById,
-  generateResumePdf,
-  downloadResumePdf,
-  updateResume,
-  createResume,
-} from '@/services/resumeApi';
-import { LoadingState, EmptyState, ErrorState } from '@/components/app/AppStates';
 import Link from 'next/link';
-import AtsPanel from '@/components/app/AtsPanel';
+import AppTopNav from '@/components/app/AppTopNav';
+import { ErrorState } from '@/components/app/AppStates';
 import {
-  TEMPLATES,
-  ACCENTS,
-  FONTS,
-  DENSITIES,
-  resolveTheme,
-  getTemplate,
-  DEFAULT_DESIGN,
-} from '@/components/resume/resumeTemplates';
+  endHarnessSession,
+  getHarnessOptions,
+  startHarnessSession,
+  streamHarnessTurn,
+} from '@/services/resumeHarnessApi';
 
-const DESIGN_KEY = 'jb_resume_design';
+/**
+ * The résumé surface. One screen: set up a session, then talk to it.
+ *
+ * Two halves, and the split is the whole design. Before a session exists the
+ * screen is a short setup form. Once it exists it becomes a conversation with
+ * the document beside it — because iterating on a résumé is a dialogue
+ * ("shorten the summary", "lead with the Stripe work"), not a form resubmission.
+ *
+ * The screen asks for the target role, an optional job posting, and
+ * instructions. Everything biographical — name, location, LinkedIn, work
+ * authorisation, employment history — comes from Settings and Preferences and
+ * is injected server-side. Re-asking here would create a second copy that
+ * drifts from the account.
+ *
+ * Turns stream. A harness run takes tens of seconds, so the transcript shows
+ * the agent's own narration and the phase it is in rather than a spinner that
+ * cannot distinguish thinking from hung.
+ *
+ * Templates are JOB-99; session history is JOB-105.
+ */
 
-/* ------------------------------------------------------- empty model --- */
-const EMPTY = {
-  identity: { name: '', title: '', email: '', location: '', linkedin: '' },
-  atsScore: 0,
-  summary: '',
-  suggestions: [],
-  sections: [],
-  experience: [],
-  skills: [],
+const T = {
+  bg: 'var(--jb-v3-bg)',
+  panel: 'var(--jb-v3-panel)',
+  sunk: 'var(--jb-v3-sunk, var(--jb-v3-panel))',
+  line: 'var(--jb-v3-line)',
+  fg: 'var(--jb-v3-fg)',
+  fg2: 'var(--jb-v3-fg-2)',
+  fg3: 'var(--jb-v3-fg-3)',
+  accent: 'var(--jb-v3-accent)',
+  accentInk: 'var(--jb-v3-accent-ink)',
+  accentLine: 'var(--jb-v3-accent-line)',
+  mono: 'var(--jb-v3-font-mono)',
+  display: 'var(--jb-v3-font-display)',
 };
 
-/* --------------------------------------------------------- component --- */
+const label = {
+  fontFamily: T.mono,
+  fontSize: 10.5,
+  letterSpacing: '0.13em',
+  textTransform: 'uppercase',
+  color: T.fg3,
+};
+
+const primaryBtn = {
+  fontFamily: 'inherit',
+  fontSize: 13,
+  fontWeight: 600,
+  color: T.accentInk,
+  background: T.accent,
+  border: 'none',
+  borderRadius: 3,
+  padding: '11px 20px',
+  cursor: 'pointer',
+  transition: 'opacity .15s ease',
+};
+
+const ghostBtn = {
+  ...primaryBtn,
+  color: T.accent,
+  background: 'transparent',
+  border: `1px solid ${T.accentLine}`,
+  padding: '8px 14px',
+  fontSize: 12.5,
+};
+
+const field = {
+  width: '100%',
+  fontFamily: 'inherit',
+  fontSize: 14,
+  color: T.fg,
+  background: T.panel,
+  border: `1px solid ${T.line}`,
+  borderRadius: 3,
+  padding: '11px 13px',
+  transition: 'border-color .15s ease',
+};
+
+const FIELD_LABELS = {
+  name: 'Full name',
+  email: 'Email',
+  linkedin: 'LinkedIn URL',
+  location: 'Location',
+  experience: 'Work experience',
+  education: 'Education',
+  skills: 'Skills',
+  certifications: 'Certifications',
+  achievements: 'Achievements',
+};
+
+const PHASE_COPY = {
+  writing: 'Writing the résumé…',
+  compiling: 'Compiling LaTeX…',
+  fixing: 'Build failed — fixing it…',
+};
+
 export default function AppResume() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [options, setOptions] = useState(null);
+  const [optionsError, setOptionsError] = useState(null);
+
+  const [harness, setHarness] = useState('opencode');
+  const [alias, setAlias] = useState('');
+  const [targetRole, setTargetRole] = useState('');
+  const [jobDescription, setJobDescription] = useState('');
+  const [jobUrl, setJobUrl] = useState('');
+  const [companyUrl, setCompanyUrl] = useState('');
+
+  const [session, setSession] = useState(null);
+  const [instruction, setInstruction] = useState('');
+  const [phase, setPhase] = useState('idle');
   const [error, setError] = useState(null);
-  const [savedAt, setSavedAt] = useState('just now');
-  const [activeResumeId, setActiveResumeId] = useState(null);
-  // Score from an ATS check run in this session. `data.atsScore` only refreshes
-  // on reload, so without this the completeness ring lingers next to the ATS one.
-  const [liveAtsScore, setLiveAtsScore] = useState(null);
-  const [exporting, setExporting] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [notice, setNotice] = useState(null);
-  const [saveState, setSaveState] = useState('idle'); // idle | saving | saved | error
+  const [pdfBase64, setPdfBase64] = useState('');
 
-  const dataRef = useRef(null);
-  const activeIdRef = useRef(null);
-  const saveTimer = useRef(null);
-  useEffect(() => { dataRef.current = data; }, [data]);
-  useEffect(() => { activeIdRef.current = activeResumeId; }, [activeResumeId]);
+  /** The conversation: what was asked, and what the agent did about it. */
+  const [messages, setMessages] = useState([]);
+  const [liveText, setLiveText] = useState('');
+  const [livePhase, setLivePhase] = useState(null);
+  const transcriptRef = useRef(null);
 
-  // Autosave the edited resume to the backend (debounced).
-  const doSave = useCallback(async () => {
-    const d = dataRef.current;
-    if (!d) return;
-    setSaveState('saving');
+  const loadOptions = useCallback(async () => {
+    setOptionsError(null);
     try {
-      let id = activeIdRef.current;
-      const payload = buildPayload(d);
-      if (!id) {
-        const created = await createResume({ template: 'modern', name: d.identity.name || 'Untitled Resume' });
-        id = created._id || created.id;
-        setActiveResumeId(id);
-        activeIdRef.current = id;
+      const res = await getHarnessOptions();
+      setOptions(res);
+      if (res?.harnesses?.length) {
+        const preferred = res.harnesses.find((h) => h.id === 'opencode');
+        setHarness((preferred || res.harnesses[0]).id);
       }
-      await updateResume(id, payload);
-      setSaveState('saved');
+      if (res?.models?.length) setAlias(res.models[0].alias);
     } catch (e) {
-      setSaveState('error');
+      setOptionsError(e);
     }
   }, []);
 
-  const patchData = useCallback((updater) => {
-    setData((prev) => (typeof updater === 'function' ? updater(prev || EMPTY) : { ...(prev || EMPTY), ...updater }));
-    setSaveState('saving');
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => { doSave(); }, 800);
-  }, [doSave]);
-
-  // Warn before leaving with an in-flight save.
   useEffect(() => {
-    const onBeforeUnload = (e) => {
-      if (saveState === 'saving') { e.preventDefault(); e.returnValue = ''; }
-    };
-    window.addEventListener('beforeunload', onBeforeUnload);
-    return () => window.removeEventListener('beforeunload', onBeforeUnload);
-  }, [saveState]);
+    loadOptions();
+  }, [loadOptions]);
 
-  // Template / style the user picked — persisted locally so it survives reloads.
-  const [design, setDesign] = useState(DEFAULT_DESIGN);
-  const [view, setView] = useState('edit'); // 'edit' | 'design'
-
+  // Keep the newest line in view while the agent narrates.
   useEffect(() => {
+    const el = transcriptRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, liveText, livePhase]);
+
+  const profile = options?.profile;
+  const blocked = Boolean(profile && profile.ready === false);
+  const busy = phase === 'provisioning' || phase === 'working';
+  const platformDown = options && options.sandboxAvailable === false;
+  const sessionOver = session && session.status !== 'active';
+
+  const start = async (carryFromSessionId) => {
+    setError(null);
+    setPhase('provisioning');
     try {
-      const raw = localStorage.getItem(DESIGN_KEY);
-      if (raw) setDesign({ ...DEFAULT_DESIGN, ...JSON.parse(raw) });
+      const next = await startHarnessSession({
+        harness,
+        ...(alias ? { alias } : {}),
+        ...(targetRole.trim() ? { targetRole: targetRole.trim() } : {}),
+        ...(composedJobContext() ? { jobDescription: composedJobContext() } : {}),
+        ...(carryFromSessionId ? { carryFromSessionId } : {}),
+      });
+      setSession(next);
+      setPdfBase64('');
+      setMessages([]);
+      setPhase('ready');
     } catch (e) {
-      /* ignore */
+      setError(e);
+      setPhase('idle');
     }
-  }, []);
+  };
 
-  const updateDesign = useCallback((patch) => {
-    setDesign((prev) => {
-      const next = { ...prev, ...patch };
-      try {
-        localStorage.setItem(DESIGN_KEY, JSON.stringify(next));
-      } catch (e) {
-        /* ignore */
-      }
-      return next;
-    });
-  }, []);
+  /**
+   * The job context sent to the harness.
+   *
+   * The URLs are labelled rather than fetched: nothing in this system reads
+   * them, and pretending otherwise would be worse than saying so. They give the
+   * model the company's name and the posting's identity, which is usually
+   * enough to pitch tone; the pasted text is what actually carries detail.
+   */
+  const composedJobContext = () => {
+    const parts = [];
+    if (jobUrl.trim()) parts.push(`Job posting URL: ${jobUrl.trim()}`);
+    if (companyUrl.trim()) parts.push(`Company website: ${companyUrl.trim()}`);
+    if (jobDescription.trim()) parts.push(jobDescription.trim());
+    return parts.join('\n\n');
+  };
 
-  const theme = useMemo(() => resolveTheme(design), [design]);
-  const Template = getTemplate(design.templateId).Component;
+  const send = async () => {
+    const text = instruction.trim();
+    if (!session || !text || busy) return;
 
-  // Fetch the user's real resume; show empty/error states when there is none.
-  useEffect(() => {
-    let cancelled = false;
+    setError(null);
+    setPhase('working');
+    setInstruction('');
+    setLiveText('');
+    setLivePhase('writing');
+    setMessages((m) => [...m, { role: 'you', text }]);
 
-    const load = async () => {
-      setLoading(true);
-      setError(null);
-      let next = { ...EMPTY };
-
-      try {
-        // 1) Basic resume contact data (name / email / phone). Non-fatal.
-        try {
-          const rd = await getResumeData();
-          if (rd && (rd.name || rd.email || rd.phone)) {
-            next = {
-              ...next,
-              identity: {
-                ...next.identity,
-                name: rd.name || '',
-                email: rd.email || '',
-                location: rd.phone || '',
-              },
-            };
-          }
-        } catch (e) {
-          /* contact enrichment is optional — ignore */
-        }
-
-        // 2) Resume-builder document — prefer an explicit ?id, else the latest.
-        const urlId =
-          typeof window !== 'undefined'
-            ? new URLSearchParams(window.location.search).get('id')
-            : null;
-        let targetId = urlId;
-        if (!targetId) {
-          const list = await listResumes();
-          const first = Array.isArray(list) ? list[0] : list?.resumes?.[0];
-          targetId = first && first.id;
-        }
-        if (targetId) {
-          if (!cancelled) setActiveResumeId(targetId);
-          const full = await getResumeById(targetId);
-          const doc = full?.resume || full;
-          if (doc) next = mergeResumeDoc(next, doc);
-        }
-
-        if (!cancelled) {
-          setData(next);
-          setLoading(false);
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setError(e);
-          setData(next);
-          setLoading(false);
-        }
-      }
-    };
-
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const handleExport = useCallback(async () => {
-    if (exporting) return;
-    setExporting(true);
-    setNotice(null);
     try {
-      if (activeResumeId) {
-        try {
-          const blob = await downloadResumePdf(activeResumeId);
-          const url = URL.createObjectURL(blob);
-          window.open(url, '_blank');
-        } catch (e) {
-          // Fall back to generating a PDF and using the returned URL.
-          const res = await generateResumePdf(activeResumeId);
-          if (res?.pdfUrl) window.open(res.pdfUrl, '_blank');
-          else throw e;
+      await streamHarnessTurn(session.id, { instruction: text }, (event) => {
+        if (event.type === 'phase') setLivePhase(event.phase);
+        else if (event.type === 'token') setLiveText((t) => (t + event.text).slice(-4000));
+        else if (event.type === 'result') {
+          const s = event.session;
+          setSession(s);
+          if (s.pdfBase64) setPdfBase64(s.pdfBase64);
+          setMessages((m) => [
+            ...m,
+            {
+              role: 'agent',
+              text: s.summary || 'Done.',
+              compiled: s.compiled,
+              revision: s.revision,
+            },
+          ]);
+        } else if (event.type === 'error') {
+          const err = new Error(event.message);
+          err.status = event.status;
+          setError(err);
         }
-        setNotice({ kind: 'ok', text: 'PDF ready — opened in a new tab.' });
-      } else {
-        setNotice({ kind: 'warn', text: 'Connect a resume to export a PDF.' });
-      }
+      });
     } catch (e) {
-      setNotice({ kind: 'warn', text: 'Could not export PDF right now.' });
+      setError(e);
     } finally {
-      setExporting(false);
-      setSavedAt('just now');
+      setLiveText('');
+      setLivePhase(null);
+      setPhase('ready');
     }
-  }, [activeResumeId, exporting]);
+  };
 
-  const handleUpload = useCallback(async (file) => {
-    if (!file) return;
-    setUploading(true);
-    setNotice(null);
+  const end = async () => {
+    if (!session) return;
     try {
-      const res = await uploadResume(file);
-      const parsed = res?.parsedData || res?.parsed || res;
-      if (parsed) {
-        setData((prev) => mergeParsed(prev || EMPTY, parsed));
-        setNotice({ kind: 'ok', text: 'Resume parsed and applied.' });
-        setSavedAt('just now');
-      }
+      setSession(await endHarnessSession(session.id));
     } catch (e) {
-      setNotice({ kind: 'warn', text: 'Could not parse that file. Sign in and try a PDF/DOCX.' });
-    } finally {
-      setUploading(false);
+      setError(e);
     }
-  }, []);
+  };
 
-  const id = (data && data.identity) || EMPTY.identity;
-  const exp = (data && data.experience) || [];
-  const skills = (data && data.skills) || [];
-  const summaryText = (data && data.summary) || '';
+  /**
+   * The compiled file lives only inside the session sandbox and dies with it,
+   * so downloading is the only durable copy until JOB-105 persists artifacts.
+   */
+  const downloadPdf = () => {
+    if (!pdfBase64) return;
+    const bytes = Uint8Array.from(atob(pdfBase64), (c) => c.charCodeAt(0));
+    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(targetRole || 'resume').replace(/[^\w-]+/g, '-').toLowerCase()}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
 
-  const hasResume = !!(
-    data &&
-    (data.identity.name || data.summary || exp.length || skills.length)
-  );
+  if (optionsError) {
+    return (
+      <Shell>
+        <ErrorState error={optionsError} onRetry={loadOptions} />
+      </Shell>
+    );
+  }
 
-  // Live completeness — real signal derived from the user's own resume.
-  const checklist = useMemo(
-    () => [
-      { key: 'name', label: 'Name & contact', done: !!id.name },
-      { key: 'summary', label: 'Professional summary', done: !!summaryText },
-      { key: 'experience', label: 'Work experience', done: exp.length > 0 },
-      { key: 'skills', label: 'Skills', done: skills.length > 0 },
-    ],
-    [id.name, summaryText, exp.length, skills.length]
-  );
-  const doneCount = checklist.filter((c) => c.done).length;
-  const completeness = Math.round((doneCount / checklist.length) * 100);
-
-  // Sections rail derived from the real resume (fills what used to be empty).
-  const sections = useMemo(() => {
-    const base = [
-      {
-        key: 'summary',
-        name: 'Summary',
-        filled: !!summaryText,
-        meta: summaryText ? 'Written' : 'Empty',
-      },
-      {
-        key: 'experience',
-        name: 'Experience',
-        filled: exp.length > 0,
-        meta: exp.length ? `${exp.length} role${exp.length > 1 ? 's' : ''}` : 'Empty',
-      },
-      {
-        key: 'skills',
-        name: 'Skills',
-        filled: skills.length > 0,
-        meta: skills.length ? `${skills.length} skill${skills.length > 1 ? 's' : ''}` : 'Empty',
-      },
-    ];
-    const custom = ((data && data.sections) || []).map((s) => ({
-      key: s.key || s.name,
-      name: s.name,
-      filled: true,
-      meta: s.meta || '',
-    }));
-    return [...base, ...custom];
-  }, [summaryText, exp.length, skills.length, data]);
-
-  /* ------------------------------------------------------------- ui --- */
   return (
-    <>
-      <Head>
-        <title>Resume Builder — Jobocate</title>
-      </Head>
-
+    <Shell>
       <style jsx global>{`
-        #jbapp ::-webkit-scrollbar {
-          width: 8px;
-          height: 8px;
+        @keyframes jbPulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.35; }
         }
-        #jbapp ::-webkit-scrollbar-thumb {
-          background: var(--jb-v3-line);
-          border-radius: 2px;
+        @keyframes jbRise {
+          from { opacity: 0; transform: translateY(6px); }
+          to { opacity: 1; transform: none; }
         }
-        #jbapp input:focus,
-        #jbapp textarea:focus {
+        #jbres input:focus,
+        #jbres textarea:focus,
+        #jbres select:focus {
           outline: none;
           border-color: var(--jb-v3-accent);
-          box-shadow: 0 0 0 3px var(--jb-v3-accent-soft);
-        }
-        #jbapp .jb-btn {
-          transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease,
-            box-shadow 0.16s ease;
-        }
-        #jbapp .jb-btn:hover {
-          background: var(--jb-v3-control);
-        }
-        #jbapp .jb-btn:active {
-          transform: translateY(1px);
-        }
-        #jbapp .jb-btn-green {
-          transition: background 0.16s ease, transform 0.16s ease, box-shadow 0.2s ease;
-          box-shadow: 0 8px 20px -10px var(--jb-v3-accent-line);
-        }
-        #jbapp .jb-btn-green:hover {
-          background: var(--jb-v3-accent-hover);
-          transform: translateY(-1px);
-          box-shadow: 0 12px 26px -10px var(--jb-v3-accent-line);
-        }
-        #jbapp .jb-sec {
-          transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease,
-            background 0.16s ease;
-        }
-        #jbapp .jb-sec:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 var(--jb-v3-shadow-lift);
-        }
-        #jbapp .jb-add {
-          transition: border-color 0.16s ease, color 0.16s ease, background 0.16s ease;
-        }
-        #jbapp .jb-add:hover {
-          border-color: var(--jb-v3-accent);
-          color: var(--jb-v3-accent);
-          background: var(--jb-v3-accent-soft);
-        }
-        #jbapp .jb-empty {
-          transition: border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
-          cursor: pointer;
-        }
-        #jbapp .jb-empty:hover {
-          border-color: var(--jb-v3-accent);
-          background: var(--jb-v3-accent-soft);
-          color: var(--jb-v3-accent);
-        }
-        #jbapp .jb-page {
-          transition: box-shadow 0.3s ease;
-        }
-        #jbapp .jb-page:hover {
-          box-shadow: 0 var(--jb-v3-shadow-paper),
-            0 var(--jb-v3-shadow-lift);
-        }
-        @keyframes jbskel {
-          0% {
-            opacity: 0.55;
-          }
-          50% {
-            opacity: 1;
-          }
-          100% {
-            opacity: 0.55;
-          }
-        }
-        @media (max-width: 780px) {
-          /* Editor controls + live preview stack instead of sitting side by
-             side — the controls column has a 320px floor (minmax(320px,
-             380px)) that alone exceeds a phone viewport. */
-          #jbapp .rb-editor-grid {
-            grid-template-columns: 1fr !important;
-          }
-          #jbapp .rb-editor-panel {
-            border-right: none !important;
-            border-bottom: 1px solid var(--jb-v3-line) !important;
-          }
+          box-shadow: 0 0 0 3px color-mix(in srgb, var(--jb-v3-accent) 14%, transparent);
         }
       `}</style>
 
-      <div
-        id="jbapp"
+      <div id="jbres" style={{ padding: '28px 32px 64px', maxWidth: 1240, margin: '0 auto' }}>
+        {!session ? (
+          <Setup
+            {...{
+              options,
+              profile,
+              blocked,
+              platformDown,
+              error,
+              harness,
+              setHarness,
+              alias,
+              setAlias,
+              targetRole,
+              setTargetRole,
+              jobDescription,
+              setJobDescription,
+              jobUrl,
+              setJobUrl,
+              companyUrl,
+              setCompanyUrl,
+              busy,
+              phase,
+              start,
+            }}
+          />
+        ) : (
+          <Workspace
+            {...{
+              session,
+              sessionOver,
+              messages,
+              liveText,
+              livePhase,
+              transcriptRef,
+              instruction,
+              setInstruction,
+              send,
+              busy,
+              phase,
+              error,
+              pdfBase64,
+              downloadPdf,
+              end,
+              start,
+            }}
+          />
+        )}
+      </div>
+    </Shell>
+  );
+}
+
+/* ------------------------------------------------------------------ setup --- */
+
+function Setup(p) {
+  return (
+    <div style={{ maxWidth: 720 }}>
+      <div style={{ ...label, color: T.accent, marginBottom: 10 }}>Résumé</div>
+      <h1
         style={{
-          minHeight: '100vh',
-          background: 'var(--jb-v3-sunk)',
-          fontFamily: 'var(--jb-v3-font-display)',
-          color: 'var(--jb-v3-fg)',
+          fontFamily: T.display,
+          fontWeight: 600,
+          letterSpacing: '-0.04em',
+          fontSize: 38,
+          lineHeight: 1.03,
+          margin: '0 0 10px',
         }}
       >
-        <AppTopNav />
+        Write it with an agent.
+      </h1>
+      <p style={{ fontSize: 15.5, color: T.fg3, margin: '0 0 28px', lineHeight: 1.55 }}>
+        Your details come straight from your account — you never retype them here.
+        Give it a target, then shape the result in conversation.
+      </p>
 
-        <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          {/* HEADER */}
-          <header
+      {p.platformDown && (
+        <Notice
+          data-testid="platform-unavailable"
+          text="The sandbox platform is unreachable, so new sessions cannot start right now."
+        />
+      )}
+      {p.error && (
+        <Notice
+          tone="error"
+          data-testid="harness-error"
+          text={
+            p.error.status === 403
+              ? `${p.error.message} Upgrade your plan to use a stronger model.`
+              : p.error.message
+          }
+        />
+      )}
+
+      {p.blocked ? (
+        <RequiredGate profile={p.profile} />
+      ) : (
+        <>
+          <ProfileFacts profile={p.profile} />
+          <SetupForm {...p} />
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The hard stop when required identity is missing.
+ *
+ * This replaces the setup form rather than greying it out. A disabled form
+ * invites the candidate to fill it in and only reveals the real problem at the
+ * last click; removing it makes the one available action unambiguous. The
+ * fields live in Settings, so that is where the single call to action goes.
+ */
+function RequiredGate({ profile }) {
+  const missing = profile?.missing || [];
+
+  return (
+    <div
+      data-testid="required-gate"
+      style={{
+        border: '1px solid #e6b8ba',
+        background: 'color-mix(in srgb, #b4232a 4%, var(--jb-v3-panel))',
+        borderRadius: 3,
+        padding: '26px 28px',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+        <span
+          aria-hidden="true"
+          style={{
+            width: 22,
+            height: 22,
+            borderRadius: '50%',
+            background: '#b4232a',
+            color: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 14,
+            fontWeight: 700,
+            flexShrink: 0,
+          }}
+        >
+          !
+        </span>
+        <h2
+          style={{
+            fontFamily: T.display,
+            fontSize: 19,
+            fontWeight: 600,
+            letterSpacing: '-0.02em',
+            margin: 0,
+            color: '#b4232a',
+          }}
+        >
+          Finish your profile before generating
+        </h2>
+      </div>
+
+      <p style={{ fontSize: 14, color: T.fg2, margin: '0 0 18px', lineHeight: 1.6, maxWidth: 560 }}>
+        A résumé is written from your account, not from this page — so these
+        details have to exist before an agent can write one. Without them it
+        would have to invent your name or leave an employer no way to reach you.
+      </p>
+
+      <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 22px' }}>
+        {missing.map((f) => (
+          <li
+            key={f}
+            data-testid={`gate-field-${f}`}
             style={{
-              position: 'relative',
-              
-              
               display: 'flex',
               alignItems: 'center',
-              flexWrap: 'wrap',
-              rowGap: 10,
-              gap: 16,
-              padding: '15px 32px',
-              background: 'var(--jb-v3-card)',
-              backdropFilter: 'blur(10px)',
-              borderBottom: '1px solid var(--jb-v3-line)',
+              gap: 10,
+              padding: '9px 0',
+              borderBottom: `1px solid ${T.line}`,
+              fontSize: 14,
+              color: T.fg,
             }}
           >
-            <a
-              href="/app/resume-library"
-              style={{
-                fontFamily: 'var(--jb-v3-font-mono)',
-                fontSize: 11.5,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                color: 'var(--jb-v3-fg-2)',
-                textDecoration: 'none',
-              }}
-              title="Back to My Resumes"
-            >
-              ‹ Toolkit / Resumes
-            </a>
-            {(id.name || id.title) && (
-              <>
-                <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, color: 'var(--jb-v3-fg-3)' }}>·</span>
-                <span style={{ fontSize: 13.5, color: 'var(--jb-v3-fg-2)' }}>
-                  {[id.name, id.title].filter(Boolean).join(' — ')}
-                </span>
-              </>
-            )}
-            <div style={{ flex: 1 }} />
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                fontFamily: 'var(--jb-v3-font-mono)',
-                fontSize: 12,
-                color: 'var(--jb-v3-fg-3)',
-              }}
-            >
-              {/* `idle` used to fall through to "Saved · just now", so a résumé
-                  that had never been written — including a brand-new one with
-                  nothing in the database — displayed as saved. A save indicator
-                  that reports success for a save that never happened is worse
-                  than having none. Idle now says so plainly. */}
-              <span
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: '50%',
-                  background:
-                    saveState === 'error'
-                      ? 'var(--jb-v3-warn)'
-                      : saveState === 'saving'
-                        ? 'var(--jb-v3-warn)'
-                        : saveState === 'saved'
-                          ? 'var(--jb-v3-accent)'
-                          : 'var(--jb-v3-fg-3)',
-                  boxShadow:
-                    saveState === 'saved' ? '0 0 0 3px var(--jb-v3-accent-soft)' : 'none',
-                }}
-              />
-              {saveState === 'saving'
-                ? 'Saving…'
-                : saveState === 'error'
-                  ? 'Save failed — your changes are not stored'
-                  : saveState === 'saved'
-                    ? `Saved · ${savedAt}`
-                    : 'Draft — not saved yet'}
+            <span aria-hidden="true" style={{ color: '#b4232a', fontWeight: 700 }}>
+              *
             </span>
+            {FIELD_LABELS[f] || f}
+            <span style={{ flex: 1 }} />
+            <span style={{ ...label, fontSize: 10, color: '#b4232a' }}>Missing</span>
+          </li>
+        ))}
+      </ul>
 
-            {/* Upload (parse) — hidden file input behind a styled label */}
-            <label
-              className="jb-btn"
-              style={{
-                fontFamily: 'inherit',
-                fontSize: 13.5,
-                fontWeight: 600,
-                color: 'var(--jb-v3-fg)',
-                background: 'var(--jb-v3-card)',
-                border: '1px solid var(--jb-v3-line-2)',
-                borderRadius: 2,
-                padding: '9px 16px',
-                cursor: 'pointer',
-              }}
-            >
-              {uploading ? 'Parsing…' : 'Import file'}
+      <Link
+        data-testid="gate-cta"
+        href="/app/settings"
+        style={{
+          ...primaryBtn,
+          display: 'inline-block',
+          textDecoration: 'none',
+          background: '#b4232a',
+          color: '#fff',
+        }}
+      >
+        Add these in Settings →
+      </Link>
+    </div>
+  );
+}
+
+/**
+ * Model and effort as two controls over one alias list.
+ *
+ * The backend namespaces aliases as provider+model+effort and hands over only
+ * the ones the caller's tier permits, so both dropdowns are derived from that
+ * list rather than from any table in this file — there is no hardcoded model
+ * name or effort ladder here, and a new alias appears without a frontend change.
+ *
+ * Effort is its own control because it is the dial a candidate actually reaches
+ * for: same model, more care, more cost. Folded into a single "Sonnet · thorough"
+ * line it reads as a different model, and the choice disappears.
+ */
+function ModelAndEffort({ models, alias, setAlias, tier }) {
+  if (!models.length) {
+    return (
+      <Field title="Model and effort">
+        <p style={{ fontSize: 13.5, color: T.fg3, margin: 0 }}>
+          No model is enabled on your plan yet.{' '}
+          <Link href="/app/upgrade" style={{ color: T.accent }}>
+            See plans →
+          </Link>
+        </p>
+      </Field>
+    );
+  }
+
+  const selected = models.find((m) => m.alias === alias) || models[0];
+
+  // Distinct models, in the order the backend ranked them.
+  const byModel = [];
+  for (const m of models) {
+    if (!byModel.some((x) => x.model === m.model)) byModel.push(m);
+  }
+
+  // Efforts available for the chosen model — the set differs per model, so
+  // this is recomputed rather than assumed.
+  const efforts = models.filter((m) => m.model === selected.model);
+
+  const pickModel = (model) => {
+    // Keep the current effort if the new model offers it; otherwise take that
+    // model's first, so switching model never lands on an alias that does not
+    // exist.
+    const forModel = models.filter((m) => m.model === model);
+    const sameEffort = forModel.find((m) => m.effort === selected.effort);
+    setAlias((sameEffort || forModel[0]).alias);
+  };
+
+  return (
+    <Field title="Model and effort">
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, maxWidth: 520 }}>
+        <div>
+          <span style={{ ...label, fontSize: 9.5, display: 'block', marginBottom: 6 }}>
+            Model
+          </span>
+          <select
+            data-testid="model-select"
+            value={selected.model}
+            onChange={(e) => pickModel(e.target.value)}
+            style={field}
+          >
+            {byModel.map((m) => (
+              <option key={m.model} value={m.model}>
+                {m.model}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <span style={{ ...label, fontSize: 9.5, display: 'block', marginBottom: 6 }}>
+            Effort
+          </span>
+          <select
+            data-testid="effort-select"
+            value={selected.effort}
+            onChange={(e) => {
+              const next = efforts.find((m) => m.effort === e.target.value);
+              if (next) setAlias(next.alias);
+            }}
+            disabled={efforts.length < 2}
+            style={{ ...field, opacity: efforts.length < 2 ? 0.6 : 1 }}
+          >
+            {efforts.map((m) => (
+              <option key={m.alias} value={m.effort}>
+                {m.effort}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* The resolved alias, so what actually gets billed is never a guess. */}
+      <p data-testid="resolved-alias" style={{ ...label, fontSize: 10, marginTop: 10 }}>
+        {selected.alias}
+      </p>
+
+      <Hint>
+        {efforts.length < 2
+          ? `This model runs at a single effort level. Available on your ${tier || 'current'} plan.`
+          : `Higher effort means more careful work and more cost. Available on your ${tier || 'current'} plan.`}
+      </Hint>
+    </Field>
+  );
+}
+
+function SetupForm(p) {
+  return (
+    <>
+      <Card testId="harness-picker">
+        <Field title="Target role">
+          <input
+            data-testid="target-role"
+            value={p.targetRole}
+            onChange={(e) => p.setTargetRole(e.target.value)}
+            placeholder="e.g. Senior Backend Engineer"
+            style={field}
+          />
+        </Field>
+
+        <Field
+          title="The job you're applying to"
+          hint="All optional. Pasted text carries the most detail — the links mainly tell the agent who you're writing for."
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <input
+              data-testid="job-url"
+              value={p.jobUrl}
+              onChange={(e) => p.setJobUrl(e.target.value)}
+              placeholder="Job posting URL"
+              style={field}
+            />
+            <input
+              data-testid="company-url"
+              value={p.companyUrl}
+              onChange={(e) => p.setCompanyUrl(e.target.value)}
+              placeholder="Company website"
+              style={field}
+            />
+            <textarea
+              data-testid="job-description"
+              value={p.jobDescription}
+              onChange={(e) => p.setJobDescription(e.target.value)}
+              rows={5}
+              placeholder="Paste the job description. It shapes emphasis and wording — it never adds experience you don't have."
+              style={{ ...field, resize: 'vertical', lineHeight: 1.55 }}
+            />
+          </div>
+        </Field>
+
+        <Field title="Agent">
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {(p.options?.harnesses || []).map((h) => {
+              const on = p.harness === h.id;
+              return (
+                <button
+                  key={h.id}
+                  data-testid={`harness-${h.id}`}
+                  aria-pressed={on}
+                  onClick={() => p.setHarness(h.id)}
+                  style={{
+                    ...ghostBtn,
+                    fontSize: 13,
+                    padding: '9px 16px',
+                    color: on ? T.accentInk : T.fg2,
+                    background: on ? T.accent : 'transparent',
+                    borderColor: on ? T.accent : T.line,
+                  }}
+                >
+                  {h.label}
+                </button>
+              );
+            })}
+          </div>
+          <Hint>
+            Fixed for the life of the session. To change it, start a new one —
+            your résumé comes with you.
+          </Hint>
+        </Field>
+
+        <ModelAndEffort
+          models={p.options?.models || []}
+          alias={p.alias}
+          setAlias={p.setAlias}
+          tier={p.options?.tier}
+        />
+
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <button
+            data-testid="start-session"
+            onClick={() => p.start()}
+            disabled={p.busy || p.platformDown || !p.options?.models?.length}
+            style={{
+              ...primaryBtn,
+              opacity: p.busy || p.platformDown ? 0.45 : 1,
+            }}
+          >
+            {p.phase === 'provisioning' ? 'Provisioning sandbox…' : 'Start session'}
+          </button>
+        </div>
+      </Card>
+    </>
+  );
+}
+
+/* -------------------------------------------------------------- workspace --- */
+
+function Workspace(p) {
+  const { session } = p;
+  return (
+    <>
+      <div
+        data-testid="session-bar"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 22,
+          flexWrap: 'wrap',
+          background: T.panel,
+          border: `1px solid ${T.line}`,
+          borderRadius: 3,
+          padding: '12px 18px',
+          marginBottom: 16,
+        }}
+      >
+        <Stat k="Agent" v={session.harnessLabel} testId="session-harness" />
+        <Stat k="Model" v={session.model} testId="session-model" />
+        <Stat k="Effort" v={session.effort} testId="session-effort" />
+        <Stat k="Revision" v={String(session.revision)} testId="session-revision" />
+        <Stat
+          k="Build"
+          v={session.compiled ? 'passing' : session.revision ? 'failing' : '—'}
+          testId="session-build"
+          tone={session.revision && !session.compiled ? 'bad' : 'ok'}
+        />
+        <div style={{ flex: 1 }} />
+        {p.pdfBase64 && (
+          <button data-testid="download-pdf" onClick={p.downloadPdf} style={ghostBtn}>
+            Download PDF
+          </button>
+        )}
+        {!p.sessionOver && (
+          <button data-testid="end-session" onClick={p.end} style={ghostBtn}>
+            End session
+          </button>
+        )}
+        <button
+          data-testid="switch-harness"
+          onClick={() => p.start(session.id)}
+          disabled={p.busy}
+          style={ghostBtn}
+        >
+          New session, other agent
+        </button>
+      </div>
+
+      {p.sessionOver && (
+        <Notice
+          data-testid="session-ended"
+          text="This session has ended and its sandbox is released. Download the PDF before leaving — it is not kept after teardown."
+        />
+      )}
+      {p.error && (
+        <Notice tone="error" data-testid="harness-error" text={p.error.message} />
+      )}
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(360px, 5fr) minmax(0, 7fr)',
+          gap: 18,
+          alignItems: 'start',
+        }}
+      >
+        {/* ---- conversation ---- */}
+        <section
+          style={{
+            background: T.panel,
+            border: `1px solid ${T.line}`,
+            borderRadius: 3,
+            display: 'flex',
+            flexDirection: 'column',
+            height: 640,
+          }}
+        >
+          <div style={{ ...label, padding: '12px 18px', borderBottom: `1px solid ${T.line}` }}>
+            Conversation
+          </div>
+
+          <div
+            ref={p.transcriptRef}
+            data-testid="transcript"
+            style={{ flex: 1, overflowY: 'auto', padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}
+          >
+            {!p.messages.length && !p.livePhase && (
+              <p style={{ fontSize: 13.5, color: T.fg3, margin: 0, lineHeight: 1.6 }}>
+                Describe the résumé you want. Then keep going — “shorten the
+                summary”, “lead with the payments work”, “make it one page”.
+              </p>
+            )}
+
+            {p.messages.map((m, i) => (
+              <Bubble key={i} message={m} />
+            ))}
+
+            {p.livePhase && (
+              <div data-testid="live-status" style={{ animation: 'jbRise .2s ease' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    color: T.accent,
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: '50%',
+                      background: T.accent,
+                      animation: 'jbPulse 1.1s ease-in-out infinite',
+                    }}
+                  />
+                  {PHASE_COPY[p.livePhase] || 'Working…'}
+                </div>
+                {p.liveText && (
+                  <pre
+                    data-testid="live-tokens"
+                    style={{
+                      margin: '8px 0 0',
+                      padding: 12,
+                      background: T.sunk,
+                      border: `1px solid ${T.line}`,
+                      borderRadius: 3,
+                      fontFamily: T.mono,
+                      fontSize: 11.5,
+                      lineHeight: 1.55,
+                      color: T.fg3,
+                      whiteSpace: 'pre-wrap',
+                      maxHeight: 220,
+                      overflow: 'auto',
+                    }}
+                  >
+                    {p.liveText}
+                  </pre>
+                )}
+              </div>
+            )}
+          </div>
+
+          {!p.sessionOver && (
+            <div style={{ borderTop: `1px solid ${T.line}`, padding: 14, display: 'flex', gap: 10 }}>
               <input
-                type="file"
-                accept=".pdf,.docx"
-                style={{ display: 'none' }}
-                onChange={(e) => handleUpload(e.target.files?.[0])}
+                data-testid="instruction"
+                value={p.instruction}
+                onChange={(e) => p.setInstruction(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && p.send()}
+                disabled={p.busy}
+                placeholder={
+                  session.revision
+                    ? 'What should change?'
+                    : 'Build my résumé from my profile'
+                }
+                style={{ ...field, flex: 1 }}
               />
-            </label>
-
-            <button
-              type="button"
-              onClick={handleExport}
-              disabled={exporting}
-              className="jb-btn"
-              style={{
-                fontFamily: 'inherit',
-                fontSize: 13.5,
-                fontWeight: 600,
-                color: 'var(--jb-v3-fg)',
-                background: 'var(--jb-v3-card)',
-                border: '1px solid var(--jb-v3-line-2)',
-                borderRadius: 2,
-                padding: '9px 16px',
-                cursor: exporting ? 'default' : 'pointer',
-                opacity: exporting ? 0.65 : 1,
-              }}
-            >
-              {exporting ? 'Exporting…' : 'Export PDF'}
-            </button>
-            {/* This was a <button> with no onClick — the loudest control on the
-                résumé editor did nothing at all, while the AI generator it
-                should open (/app/resume-generate) was reachable only by typing
-                the URL. Now it goes there, carrying the résumé so the generator
-                grounds itself in this document rather than starting blank. */}
-            <Link
-              href={`/app/resume-generate${activeResumeId ? `?source=${activeResumeId}` : ''}`}
-              className="jb-btn-green"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 7,
-                fontFamily: 'inherit',
-                fontSize: 13.5,
-                fontWeight: 700,
-                color: 'var(--jb-v3-accent-ink)',
-                background: 'var(--jb-v3-accent)',
-                border: 'none',
-                borderRadius: 2,
-                padding: '9px 16px',
-                cursor: 'pointer',
-                textDecoration: 'none',
-              }}
-            >
-              Tailor to a job ✦
-            </Link>
-          </header>
-
-          {/* NOTICE */}
-          {notice && (
-            <motion.div
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              style={{
-                margin: '14px 32px 0',
-                padding: '11px 16px',
-                borderRadius: 2,
-                fontSize: 13,
-                fontWeight: 600,
-                background: notice.kind === 'ok' ? 'var(--jb-v3-accent-soft)' : 'var(--jb-v3-warn-soft)',
-                border: `1px solid ${notice.kind === 'ok' ? 'var(--jb-v3-accent-line)' : 'var(--jb-v3-warn-line)'}`,
-                color: notice.kind === 'ok' ? 'var(--jb-v3-accent)' : 'var(--jb-v3-warn)',
-              }}
-            >
-              {notice.text}
-            </motion.div>
+              <button
+                data-testid="send-instruction"
+                onClick={p.send}
+                disabled={p.busy || !p.instruction.trim()}
+                style={{
+                  ...primaryBtn,
+                  opacity: p.busy || !p.instruction.trim() ? 0.45 : 1,
+                }}
+              >
+                {p.busy ? 'Working…' : session.revision ? 'Update' : 'Generate'}
+              </button>
+            </div>
           )}
+        </section>
 
-          {loading ? (
-            <LoadingState label="Loading your résumé…" />
-          ) : error ? (
-            <ErrorState error={error} />
-          ) : !hasResume ? (
-            <EmptyState
-              title="No résumé yet"
-              hint="Import a PDF or DOCX above, or build one, to see it here."
+        {/* ---- the document ---- */}
+        <section
+          style={{
+            background: T.panel,
+            border: `1px solid ${T.line}`,
+            borderRadius: 3,
+            overflow: 'hidden',
+            height: 640,
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <div
+            style={{
+              ...label,
+              padding: '12px 18px',
+              borderBottom: `1px solid ${T.line}`,
+              display: 'flex',
+              gap: 14,
+            }}
+          >
+            <span>Rendered</span>
+            <div style={{ flex: 1 }} />
+            {p.busy && <span style={{ color: T.accent }}>updating…</span>}
+          </div>
+
+          {p.pdfBase64 ? (
+            <iframe
+              data-testid="pdf-preview"
+              title="Rendered résumé"
+              src={`data:application/pdf;base64,${p.pdfBase64}`}
+              style={{ flex: 1, width: '100%', border: 'none', opacity: p.busy ? 0.55 : 1, transition: 'opacity .2s ease' }}
             />
           ) : (
             <div
-              className="rb-editor-grid"
+              data-testid="pdf-empty"
               style={{
-                display: 'grid',
-                gridTemplateColumns: 'minmax(320px, 380px) 1fr',
-                gap: 0,
                 flex: 1,
-                alignItems: 'start',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 40,
+                textAlign: 'center',
+                fontSize: 13.5,
+                color: T.fg3,
               }}
             >
-              {/* LEFT: EDITOR CONTROLS */}
-              <motion.div
-                className="rb-editor-panel"
-                initial={{ opacity: 0, x: -14 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-                style={{ borderRight: '1px solid var(--jb-v3-line)', padding: '22px 24px', height: '100%' }}
-              >
-                <RailTabs view={view} setView={setView} />
-
-                {view === 'design' ? (
-                  <DesignPanel design={design} onChange={updateDesign} />
-                ) : (
-                  <>
-                {/* ATS COMPATIBILITY — real score, real findings, real fixes.
-                    Replaces a panel that read "Excellent · clears automated
-                    screening for 9 of 10 roles" at every score, including bad
-                    ones, and which nothing ever populated. */}
-                {activeResumeId && (
-                  <AtsPanel
-                    resumeId={activeResumeId}
-                    initialScore={typeof data.atsScore === 'number' ? data.atsScore : null}
-                    initialReport={data.atsReport || null}
-                    onScore={setLiveAtsScore}
-                  />
-                )}
-
-                {/* COMPLETENESS — a section checklist, not a quality score. It
-                    stands down once a real ATS score exists (persisted or from
-                    a check run in this session) so the page never shows two
-                    rings scored on different scales. */}
-                {data.atsScore > 0 || liveAtsScore > 0 ? null : (
-                  <div
-                    style={{
-                      background:
-                        'linear-gradient(180deg,var(--jb-v3-card) 0%,var(--jb-v3-card) 100%)',
-                      border: '1px solid var(--jb-v3-line)',
-                      borderRadius: 2,
-                      padding: 20,
-                      marginBottom: 18,
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14 }}>
-                      <ScoreRing value={completeness} label="done" />
-                      <div>
-                        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 3 }}>
-                          {completeness === 100 ? 'Résumé complete' : 'Résumé strength'}
-                        </div>
-                        <div style={{ fontSize: 13, color: 'var(--jb-v3-fg-2)' }}>
-                          {completeness === 100
-                            ? 'Every core section is filled in.'
-                            : `${doneCount} of ${checklist.length} core sections done.`}
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {checklist.map((c) => (
-                        <div key={c.key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <span
-                            style={{
-                              width: 18,
-                              height: 18,
-                              borderRadius: '50%',
-                              flexShrink: 0,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: 11,
-                              fontWeight: 700,
-                              color: c.done ? 'var(--jb-v3-card)' : 'var(--jb-v3-fg-3)',
-                              background: c.done ? 'var(--jb-v3-accent)' : 'transparent',
-                              border: c.done ? 'none' : '1.5px solid var(--jb-v3-line)',
-                            }}
-                          >
-                            {c.done ? '✓' : ''}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: 13,
-                              fontWeight: 500,
-                              color: c.done ? 'var(--jb-v3-fg-2)' : 'var(--jb-v3-fg-2)',
-                              textDecoration: 'none',
-                            }}
-                          >
-                            {c.label}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* AI SUGGESTIONS */}
-                {data.suggestions.length > 0 && (
-                  <div
-                    style={{
-                      background: 'var(--jb-v3-fg)',
-                      borderRadius: 2,
-                      padding: '18px 20px',
-                      marginBottom: 22,
-                      color: 'var(--jb-v3-control)',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                      <span
-                        style={{
-                          fontFamily: 'var(--jb-v3-font-mono)',
-                          fontSize: 11,
-                          letterSpacing: '0.1em',
-                          textTransform: 'uppercase',
-                          color: 'var(--jb-v3-accent)',
-                        }}
-                      >
-                        ✦ AI suggestions
-                      </span>
-                    </div>
-                    {data.suggestions.map((s, i) => (
-                      <div
-                        key={i}
-                        style={{ display: 'flex', gap: 11, padding: '11px 0', borderBottom: '1px solid var(--jb-v3-line-2)' }}
-                      >
-                        <span
-                          style={{
-                            flexShrink: 0,
-                            width: 20,
-                            height: 20,
-                            borderRadius: 2,
-                            background: 'var(--jb-v3-accent-soft)',
-                            color: 'var(--jb-v3-accent)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: 12,
-                          }}
-                        >
-                          {s.icon}
-                        </span>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, color: 'var(--jb-v3-line)', lineHeight: 1.45 }}>{s.text}</div>
-                          <button
-                            type="button"
-                            style={{
-                              fontFamily: 'inherit',
-                              fontSize: 12,
-                              fontWeight: 600,
-                              color: 'var(--jb-v3-accent)',
-                              background: 'none',
-                              border: 'none',
-                              padding: '6px 0 0',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            {s.action} →
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* EDITABLE CONTENT */}
-                <ContentEditor data={data} onChange={patchData} />
-                  </>
-                )}
-              </motion.div>
-
-              {/* RIGHT: RESUME PREVIEW — sits on a soft "desk" backdrop */}
-              <div
-                style={{
-                  padding: '44px 40px 64px',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  background:
-                    'radial-gradient(130% 90% at 50% -10%, var(--jb-v3-card) 0%, var(--jb-v3-control) 55%, var(--jb-v3-line-2) 100%)',
-                  minHeight: '100%',
-                }}
-              >
-                <motion.div
-                  key={design.templateId}
-                  initial={{ opacity: 0, y: 18 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-                  className="jb-page"
-                  style={{
-                    width: '100%',
-                    maxWidth: 720,
-                    background: 'var(--jb-v3-card)',
-                    border: '1px solid var(--jb-v3-line)',
-                    borderRadius: 2,
-                    boxShadow:
-                      '0 var(--jb-v3-shadow-paper), 0 var(--jb-v3-shadow-lift)',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <Template data={data} theme={theme} />
-                </motion.div>
-              </div>
+              {p.busy
+                ? 'Compiling your résumé…'
+                : 'Your résumé appears here once it compiles.'}
             </div>
           )}
-        </main>
+
+          <details style={{ borderTop: `1px solid ${T.line}` }}>
+            <summary style={{ ...label, padding: '11px 18px', cursor: 'pointer' }}>
+              resume.tex
+            </summary>
+            <pre
+              data-testid="latex-source"
+              style={{
+                margin: 0,
+                padding: 18,
+                fontFamily: T.mono,
+                fontSize: 11.5,
+                lineHeight: 1.6,
+                color: T.fg2,
+                overflow: 'auto',
+                maxHeight: 260,
+                whiteSpace: 'pre-wrap',
+                borderTop: `1px solid ${T.line}`,
+              }}
+            >
+              {session.latex || 'Nothing yet.'}
+            </pre>
+          </details>
+        </section>
       </div>
     </>
   );
 }
 
-/* ------------------------------------------------------- ui helpers --- */
-const MONO = 'var(--jb-v3-font-mono)';
+/* ------------------------------------------------------------ small pieces --- */
 
-function RailTabs({ view, setView }) {
-  const tab = (key, label) => (
-    <button
-      type="button"
-      onClick={() => setView(key)}
-      style={{
-        flex: 1,
-        padding: '8px 0',
-        fontFamily: 'inherit',
-        fontSize: 13,
-        fontWeight: 700,
-        border: 'none',
-        cursor: 'pointer',
-        borderRadius: 2,
-        transition: 'background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease',
-        background: view === key ? 'var(--jb-v3-card)' : 'transparent',
-        color: view === key ? 'var(--jb-v3-fg)' : 'var(--jb-v3-fg-3)',
-        boxShadow: view === key ? '0 var(--jb-v3-shadow-lift)' : 'none',
-      }}
-    >
-      {label}
-    </button>
-  );
+function Bubble({ message }) {
+  const you = message.role === 'you';
   return (
-    <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--jb-v3-control)', borderRadius: 2, marginBottom: 18 }}>
-      {tab('edit', '✎  Edit')}
-      {tab('design', '◈  Design')}
+    <div style={{ display: 'flex', justifyContent: you ? 'flex-end' : 'flex-start' }}>
+      <div
+        style={{
+          maxWidth: '86%',
+          background: you ? T.accent : T.sunk,
+          color: you ? T.accentInk : T.fg2,
+          border: you ? 'none' : `1px solid ${T.line}`,
+          borderRadius: 3,
+          padding: '10px 13px',
+          fontSize: 13.5,
+          lineHeight: 1.55,
+          animation: 'jbRise .2s ease',
+        }}
+      >
+        {message.text}
+        {!you && message.revision != null && (
+          <div style={{ ...label, fontSize: 10, marginTop: 7, color: message.compiled ? T.fg3 : '#b4232a' }}>
+            revision {message.revision} · build {message.compiled ? 'passing' : 'failing'}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-function GroupLabel({ children }) {
+function ProfileFacts({ profile }) {
+  if (!profile) return null;
+  const missing = profile.missing || [];
+  const gaps = profile.optionalGaps || [];
+
   return (
     <div
+      data-testid="profile-facts"
       style={{
-        fontFamily: MONO,
-        fontSize: 11,
-        letterSpacing: '0.1em',
-        textTransform: 'uppercase',
-        color: 'var(--jb-v3-fg-2)',
-        margin: '4px 0 11px',
+        background: T.panel,
+        border: `1px solid ${missing.length ? '#e6b8ba' : T.line}`,
+        borderRadius: 3,
+        padding: '15px 18px',
+        marginBottom: 18,
+      }}
+    >
+      <div style={{ ...label, marginBottom: 9 }}>Written from your account</div>
+      {profile.name && (
+        <p style={{ fontSize: 14, margin: '0 0 2px' }}>
+          <strong>{profile.name}</strong>
+          {profile.headline ? ` · ${profile.headline}` : ''}
+        </p>
+      )}
+      {missing.length > 0 && (
+        <p data-testid="profile-missing" style={{ fontSize: 13, color: '#b4232a', margin: '8px 0 0', lineHeight: 1.5 }}>
+          Required before generating: {missing.map((f) => FIELD_LABELS[f] || f).join(', ')}.{' '}
+          <Link href="/app/settings" style={{ color: T.accent, fontWeight: 600 }}>
+            Add in Settings →
+          </Link>
+        </p>
+      )}
+      {gaps.length > 0 && (
+        <p data-testid="profile-gaps" style={{ fontSize: 12.5, color: T.fg3, margin: '8px 0 0', lineHeight: 1.5 }}>
+          Optional, and your résumé will be stronger with them:{' '}
+          {gaps.map((f) => FIELD_LABELS[f] || f).join(', ')}.{' '}
+          <Link href="/app/settings" style={{ color: T.accent }}>
+            Add in Settings →
+          </Link>
+        </p>
+      )}
+      {!missing.length && !gaps.length && (
+        <p style={{ fontSize: 12.5, color: T.fg3, margin: '8px 0 0' }}>
+          Your profile is complete — nothing else needed here.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Shell({ children }) {
+  return (
+    <>
+      <Head>
+        <title>Résumé · Jobocate</title>
+      </Head>
+      <div style={{ minHeight: '100vh', background: T.bg, fontFamily: T.display, color: T.fg }}>
+        <AppTopNav />
+        <main>{children}</main>
+      </div>
+    </>
+  );
+}
+
+function Card({ children, testId }) {
+  return (
+    <div
+      data-testid={testId}
+      style={{
+        background: T.panel,
+        border: `1px solid ${T.line}`,
+        borderRadius: 3,
+        padding: 26,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 24,
       }}
     >
       {children}
@@ -851,429 +1079,53 @@ function GroupLabel({ children }) {
   );
 }
 
-function DesignPanel({ design, onChange }) {
-  const t = resolveTheme(design);
+function Field({ title, hint, children }) {
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28 }}>
-      {/* TEMPLATES */}
-      <GroupLabel>Template</GroupLabel>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
-        {TEMPLATES.map((tpl) => {
-          const sel = design.templateId === tpl.id;
-          const Thumb = tpl.Thumb;
-          return (
-            <button
-              key={tpl.id}
-              type="button"
-              onClick={() => onChange({ templateId: tpl.id })}
-              style={{ textAlign: 'left', padding: 0, background: 'none', border: 'none', cursor: 'pointer' }}
-            >
-              <div
-                style={{
-                  borderRadius: 2,
-                  overflow: 'hidden',
-                  background: 'var(--jb-v3-card)',
-                  border: `2px solid ${sel ? t.accent : 'var(--jb-v3-line)'}`,
-                  boxShadow: sel ? `0 0 0 3px ${t.accentSoft}, 0 var(--jb-v3-shadow-lift)` : '0 var(--jb-v3-shadow-lift)',
-                  transition: 'border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease',
-                  transform: sel ? 'translateY(-1px)' : 'none',
-                }}
-              >
-                <Thumb theme={t} />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 7 }}>
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: sel ? 'var(--jb-v3-fg)' : 'var(--jb-v3-fg-2)' }}>{tpl.name}</span>
-                {sel && <span style={{ color: t.accent, fontSize: 12 }}>✓</span>}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--jb-v3-fg-2)', lineHeight: 1.3 }}>{tpl.blurb}</div>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ACCENT */}
-      <GroupLabel>Accent colour</GroupLabel>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 9, marginBottom: 24 }}>
-        {ACCENTS.map((a) => {
-          const sel = design.accentId === a.id;
-          return (
-            <button
-              key={a.id}
-              type="button"
-              title={a.name}
-              onClick={() => onChange({ accentId: a.id })}
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: '50%',
-                background: a.color,
-                cursor: 'pointer',
-                border: '2px solid var(--jb-v3-card)',
-                boxShadow: sel ? `0 0 0 2px ${a.color}` : '0 0 0 1px var(--jb-v3-line)',
-                transition: 'transform 0.14s ease, box-shadow 0.14s ease',
-                transform: sel ? 'scale(1.12)' : 'none',
-              }}
-            />
-          );
-        })}
-      </div>
-
-      {/* FONT */}
-      <GroupLabel>Font pairing</GroupLabel>
-      <div style={{ marginBottom: 24 }}>
-        {FONTS.map((f) => {
-          const sel = design.fontId === f.id;
-          return (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => onChange({ fontId: f.id })}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                width: '100%',
-                padding: '10px 13px',
-                marginBottom: 7,
-                borderRadius: 2,
-                cursor: 'pointer',
-                background: sel ? 'var(--jb-v3-card)' : 'transparent',
-                border: `1px solid ${sel ? t.accent : 'var(--jb-v3-line)'}`,
-                boxShadow: sel ? `0 0 0 2px ${t.accentSoft}` : 'none',
-                transition: 'border-color 0.16s ease, box-shadow 0.16s ease',
-              }}
-            >
-              <span style={{ fontFamily: f.heading, fontSize: 17, fontWeight: 500, color: 'var(--jb-v3-fg)' }}>{f.name}</span>
-              <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '0.04em', color: 'var(--jb-v3-fg-2)' }}>{f.tag}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* DENSITY */}
-      <GroupLabel>Density</GroupLabel>
-      <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--jb-v3-control)', borderRadius: 2 }}>
-        {DENSITIES.map((d) => {
-          const sel = design.densityId === d.id;
-          return (
-            <button
-              key={d.id}
-              type="button"
-              onClick={() => onChange({ densityId: d.id })}
-              style={{
-                flex: 1,
-                padding: '7px 0',
-                fontFamily: 'inherit',
-                fontSize: 12,
-                fontWeight: 600,
-                border: 'none',
-                borderRadius: 2,
-                cursor: 'pointer',
-                background: sel ? 'var(--jb-v3-card)' : 'transparent',
-                color: sel ? 'var(--jb-v3-fg)' : 'var(--jb-v3-fg-3)',
-                boxShadow: sel ? '0 var(--jb-v3-shadow-lift)' : 'none',
-                transition: 'background 0.16s ease, color 0.16s ease',
-              }}
-            >
-              {d.name}
-            </button>
-          );
-        })}
-      </div>
-    </motion.div>
+    <div>
+      <div style={{ ...label, marginBottom: hint ? 5 : 10 }}>{title}</div>
+      {hint && <Hint style={{ marginBottom: 11 }}>{hint}</Hint>}
+      {children}
+    </div>
   );
 }
 
-// The ATS score, in the design's language: a large Instrument Serif numeral
-// over a flat progress bar. It replaced a conic-gradient ring for a reason —
-// a ring reads as a gauge you are meant to fill, and an ATS score is not a
-// completion percentage. A bar under a number reads as a measurement.
-function ScoreRing({ value, label }) {
-  const v = Math.max(0, Math.min(100, value || 0));
+function Hint({ children, style }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, minWidth: 0 }}>
-      <span style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-        <span
-          style={{
-            fontFamily: 'var(--jb-v3-font-display)',
-            fontWeight: 400,
-            fontSize: 38,
-            lineHeight: 1,
-            color: 'var(--jb-v3-accent)',
-          }}
-        >
-          {v}
-        </span>
-        <span style={{ fontSize: 14, color: 'var(--jb-v3-fg-2)' }}>{label || 'ATS score'}</span>
-      </span>
+    <p style={{ fontSize: 12.5, color: T.fg3, margin: '9px 0 0', lineHeight: 1.5, ...style }}>
+      {children}
+    </p>
+  );
+}
+
+function Stat({ k, v, testId, tone }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <span style={{ ...label, fontSize: 9.5 }}>{k}</span>
       <span
-        role="progressbar"
-        aria-valuenow={v}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-label={label || 'ATS score'}
-        style={{ display: 'block', height: 4, borderRadius: 2, background: 'var(--jb-v3-line)' }}
+        data-testid={testId}
+        style={{ fontSize: 13.5, fontWeight: 600, color: tone === 'bad' ? '#b4232a' : T.fg }}
       >
-        <span
-          style={{
-            display: 'block',
-            width: `${v}%`,
-            height: '100%',
-            borderRadius: 2,
-            background: 'var(--jb-v3-accent)',
-            transition: 'width 0.4s ease',
-          }}
-        />
+        {v}
       </span>
     </div>
   );
 }
 
-/* --------------------------------------------------- content editor --- */
-// Map the editor view-model back onto the backend Resume schema for autosave.
-function buildPayload(d) {
-  const id = d.identity || {};
-  return {
-    fullName: id.name || '',
-    headline: id.title || '',
-    email: id.email || '',
-    location: id.location || '',
-    linkedin: id.linkedin || '',
-    summary: d.summary || '',
-    skills: d.skills || [],
-    experience: (d.experience || []).map((e) => ({
-      title: e.role || '',
-      company: e.company || '',
-      startDate: e.dates || '',
-      endDate: '',
-      achievements: e.bullets || [],
-    })),
-  };
-}
-
-function ContentEditor({ data, onChange }) {
-  const id = data.identity || {};
-  const setId = (k, v) => onChange((d) => ({ ...d, identity: { ...d.identity, [k]: v } }));
-  const setField = (k, v) => onChange((d) => ({ ...d, [k]: v }));
-  const addSkill = (v) => { const s = v.trim(); if (!s) return; onChange((d) => ({ ...d, skills: [...(d.skills || []), s] })); };
-  const removeSkill = (i) => onChange((d) => ({ ...d, skills: (d.skills || []).filter((_, j) => j !== i) }));
-  const addRole = () => onChange((d) => ({ ...d, experience: [...(d.experience || []), { role: '', company: '', dates: '', bullets: [] }] }));
-  const setExp = (i, k, v) => onChange((d) => ({ ...d, experience: (d.experience || []).map((e, j) => (j === i ? { ...e, [k]: v } : e)) }));
-  const removeExp = (i) => onChange((d) => ({ ...d, experience: (d.experience || []).filter((_, j) => j !== i) }));
-  const addBullet = (i) => onChange((d) => ({ ...d, experience: (d.experience || []).map((e, j) => (j === i ? { ...e, bullets: [...(e.bullets || []), ''] } : e)) }));
-  const setBullet = (i, bi, v) => onChange((d) => ({ ...d, experience: (d.experience || []).map((e, j) => (j === i ? { ...e, bullets: (e.bullets || []).map((b, k) => (k === bi ? v : b)) } : e)) }));
-  const removeBullet = (i, bi) => onChange((d) => ({ ...d, experience: (d.experience || []).map((e, j) => (j === i ? { ...e, bullets: (e.bullets || []).filter((_, k) => k !== bi) } : e)) }));
-
+function Notice({ tone, text, ...rest }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
-      <EditGroup label="Basics">
-        <EInput label="Full name" value={id.name} onChange={(v) => setId('name', v)} />
-        <EInput label="Headline" value={id.title} onChange={(v) => setId('title', v)} placeholder="e.g. Senior Product Engineer" />
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <EInput label="Email" value={id.email} onChange={(v) => setId('email', v)} />
-          <EInput label="Location" value={id.location} onChange={(v) => setId('location', v)} />
-        </div>
-        <EInput label="LinkedIn" value={id.linkedin} onChange={(v) => setId('linkedin', v)} placeholder="linkedin.com/in/…" />
-      </EditGroup>
-
-      <EditGroup label="Summary">
-        <ETextarea value={data.summary} onChange={(v) => setField('summary', v)} placeholder="A 2–3 line professional summary…" />
-      </EditGroup>
-
-      <EditGroup label="Skills">
-        <SkillsInput skills={data.skills || []} onAdd={addSkill} onRemove={removeSkill} />
-      </EditGroup>
-
-      <EditGroup label="Experience" action={<button type="button" onClick={addRole} style={addBtn}>+ Add role</button>}>
-        {(data.experience || []).length === 0 && (
-          <div style={{ fontSize: 12.5, color: 'var(--jb-v3-fg-3)' }}>No roles yet — add your work experience.</div>
-        )}
-        {(data.experience || []).map((e, i) => (
-          <div key={i} style={expCard}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-              <input value={e.role || ''} onChange={(ev) => setExp(i, 'role', ev.target.value)} placeholder="Role / title" style={{ ...eInp, fontWeight: 700 }} />
-              <button type="button" onClick={() => removeExp(i)} title="Remove role" style={iconBtn}>×</button>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
-              <input value={e.company || ''} onChange={(ev) => setExp(i, 'company', ev.target.value)} placeholder="Company" style={eInp} />
-              <input value={e.dates || ''} onChange={(ev) => setExp(i, 'dates', ev.target.value)} placeholder="2022 — Present" style={eInp} />
-            </div>
-            <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {(e.bullets || []).map((b, bi) => (
-                <div key={bi} style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
-                  <span style={{ color: 'var(--jb-v3-accent)', marginTop: 9 }}>▪</span>
-                  <textarea value={b} onChange={(ev) => setBullet(i, bi, ev.target.value)} rows={1} placeholder="Achievement / impact" style={{ ...eInp, resize: 'vertical', minHeight: 34 }} />
-                  <button type="button" onClick={() => removeBullet(i, bi)} style={iconBtn}>×</button>
-                </div>
-              ))}
-              <button type="button" onClick={() => addBullet(i)} style={{ ...addBtn, alignSelf: 'flex-start' }}>+ Add bullet</button>
-            </div>
-          </div>
-        ))}
-      </EditGroup>
+    <div
+      {...rest}
+      style={{
+        border: `1px solid ${tone === 'error' ? '#e6b8ba' : T.line}`,
+        background: T.panel,
+        borderRadius: 3,
+        padding: '12px 16px',
+        fontSize: 13.5,
+        color: tone === 'error' ? '#b4232a' : T.fg2,
+        marginBottom: 16,
+      }}
+    >
+      {text}
     </div>
   );
-}
-
-function EditGroup({ label, action, children }) {
-  return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--jb-v3-fg-2)' }}>{label}</span>
-        {action}
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{children}</div>
-    </div>
-  );
-}
-
-function EInput({ label, value, onChange, placeholder }) {
-  return (
-    <label style={{ display: 'block' }}>
-      {label && <span style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: 'var(--jb-v3-fg-3)', marginBottom: 4 }}>{label}</span>}
-      <input value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} style={eInp} />
-    </label>
-  );
-}
-
-function ETextarea({ value, onChange, placeholder }) {
-  return <textarea value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} rows={4} style={{ ...eInp, resize: 'vertical', minHeight: 82, lineHeight: 1.5 }} />;
-}
-
-function SkillsInput({ skills, onAdd, onRemove }) {
-  const [v, setV] = useState('');
-  return (
-    <div>
-      {skills.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-          {skills.map((s, i) => (
-            <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 500, background: 'var(--jb-v3-control)', borderRadius: 2, padding: '4px 8px' }}>
-              {s}
-              <button type="button" onClick={() => onRemove(i)} aria-label={`Remove ${s}`} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--jb-v3-fg-3)', fontSize: 13, lineHeight: 1, padding: 0 }}>×</button>
-            </span>
-          ))}
-        </div>
-      )}
-      <input
-        value={v}
-        onChange={(e) => setV(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); onAdd(v); setV(''); } }}
-        placeholder="Type a skill, press Enter"
-        style={eInp}
-      />
-    </div>
-  );
-}
-
-const eInp = { width: '100%', padding: '8px 10px', borderRadius: 2, border: '1px solid var(--jb-v3-line)', background: 'var(--jb-v3-card)', fontFamily: 'inherit', fontSize: 13, color: 'var(--jb-v3-fg)', boxSizing: 'border-box' };
-const addBtn = { fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: 'var(--jb-v3-accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 };
-const iconBtn = { border: '1px solid var(--jb-v3-line)', background: 'var(--jb-v3-card)', borderRadius: 2, cursor: 'pointer', color: 'var(--jb-v3-fg-3)', width: 26, height: 26, flexShrink: 0, fontSize: 15, lineHeight: 1 };
-const expCard = { border: '1px solid var(--jb-v3-line)', borderRadius: 2, padding: 12, background: 'var(--jb-v3-card)' };
-
-/* ------------------------------------------------------ data mappers --- */
-// Merge a resume-builder document into the view model, keeping sample
-// fields for anything the backend doesn't provide.
-function mergeResumeDoc(base, doc) {
-  const content = doc.content || doc.data || doc;
-  const next = { ...base };
-
-  // NOTE: `doc.name` is the resume's FILE TITLE (defaults to "Untitled Resume"),
-  // NOT the person's name — the person's name lives in `fullName`. Only trust a
-  // `name` field when it comes from a genuine nested content object.
-  const hasNested = !!(doc.content || doc.data);
-  const name = content.fullName || doc.fullName || (hasNested ? content.name : '');
-  const title = content.title || content.headline || doc.headline;
-  const email = content.email;
-  const location = content.location || content.city;
-  const linkedin = content.linkedin || content.linkedIn;
-
-  next.identity = {
-    name: name || base.identity.name,
-    title: title || base.identity.title,
-    email: email || base.identity.email,
-    location: location || base.identity.location,
-    linkedin: linkedin || base.identity.linkedin,
-  };
-
-  if (typeof doc.atsScore === 'number') next.atsScore = doc.atsScore;
-  else if (typeof content.atsScore === 'number') next.atsScore = content.atsScore;
-
-  // Carry the findings through so the panel can show them without forcing a
-  // re-check on every page load — the score is recomputed server-side on save.
-  if (doc.atsReport) next.atsReport = doc.atsReport;
-  else if (content.atsReport) next.atsReport = content.atsReport;
-
-  if (content.summary || content.profile || content.profileSummary)
-    next.summary = content.summary || content.profile || content.profileSummary;
-
-  const exp = content.experience || content.experiences || content.workExperience;
-  if (Array.isArray(exp) && exp.length) {
-    next.experience = exp.map((e) => ({
-      role: e.role || e.title || e.position || '',
-      company: e.company || e.employer || e.organization || '',
-      dates:
-        e.dates ||
-        [e.startDate || e.start, e.current ? 'Present' : e.endDate || e.end]
-          .filter(Boolean)
-          .join(' — '),
-      bullets: Array.isArray(e.bullets)
-        ? e.bullets
-        : Array.isArray(e.achievements)
-        ? e.achievements
-        : Array.isArray(e.highlights)
-        ? e.highlights
-        : e.description
-        ? [e.description]
-        : [],
-    }));
-  }
-
-  const skills = content.skills;
-  if (Array.isArray(skills) && skills.length) {
-    next.skills = skills.map((s) => (typeof s === 'string' ? s : s.name || s.label)).filter(Boolean);
-  }
-
-  // No dedicated headline field in the schema — fall back to the latest role.
-  if (!next.identity.title && next.experience.length) {
-    next.identity.title = next.experience[0].role || '';
-  }
-
-  return next;
-}
-
-// Merge the resume-parser response (parsedData) into the view model.
-function mergeParsed(base, parsed) {
-  const next = { ...base };
-  next.identity = {
-    ...base.identity,
-    name: parsed.name || parsed.fullName || base.identity.name,
-    title: parsed.title || parsed.headline || base.identity.title,
-    email: parsed.email || base.identity.email,
-    location: parsed.location || parsed.phone || base.identity.location,
-    linkedin: parsed.linkedin || base.identity.linkedin,
-  };
-  if (parsed.summary) next.summary = parsed.summary;
-
-  const exp = parsed.experience || parsed.workExperience;
-  if (Array.isArray(exp) && exp.length) {
-    next.experience = exp.map((e) => ({
-      role: e.role || e.title || e.position || '',
-      company: e.company || e.employer || '',
-      dates: e.dates || [e.startDate, e.endDate].filter(Boolean).join(' — '),
-      bullets: Array.isArray(e.bullets)
-        ? e.bullets
-        : Array.isArray(e.achievements)
-        ? e.achievements
-        : Array.isArray(e.highlights)
-        ? e.highlights
-        : e.description
-        ? [e.description]
-        : [],
-    }));
-  }
-
-  if (Array.isArray(parsed.skills) && parsed.skills.length) {
-    next.skills = parsed.skills.map((s) => (typeof s === 'string' ? s : s.name || s.label)).filter(Boolean);
-  }
-  return next;
 }

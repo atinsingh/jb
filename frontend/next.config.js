@@ -1,3 +1,36 @@
+/*
+ * Repo-wide environment.
+ *
+ * Next only auto-loads `.env*` from its OWN directory, so without this the
+ * frontend would need its own `frontend/.env.local` — the duplication this
+ * repo deliberately removed. Loading here works because `next.config.js` is
+ * evaluated before Next reads `process.env`, and NEXT_PUBLIC_* inlining reads
+ * from `process.env` at build time.
+ *
+ * Only NEXT_PUBLIC_* names reach the browser. The rest — including
+ * SUPABASE_SERVICE_ROLE_KEY — stay in the Node process and are never inlined.
+ * This deliberately does NOT use Next's `env:` config key, which would inline
+ * every variable it is given and publish the server secrets alongside them.
+ *
+ * Written without `dotenv` on purpose: the package is not a frontend
+ * dependency, and adding one to read four lines would be the wrong trade.
+ */
+const { existsSync, readFileSync } = require('fs');
+const { join } = require('path');
+
+for (const file of ['.env.local', '.env']) {
+  const path = join(__dirname, '..', file);
+  if (!existsSync(path)) continue;
+  for (const line of readFileSync(path, 'utf8').split('\n')) {
+    const match = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line);
+    if (!match) continue;
+    // First value wins, and a real exported env var always beats the file —
+    // same precedence the backend loader uses.
+    if (process.env[match[1]] !== undefined) continue;
+    process.env[match[1]] = match[2].trim().replace(/^(['"])(.*)\1$/, '$2');
+  }
+}
+
 /** @type {import('next').NextConfig} */
 
 /*
@@ -99,6 +132,22 @@ const nextConfig = {
       ...r,
       permanent: false,
     }));
+  },
+  /*
+   * Same-origin proxy to the NestJS API.
+   *
+   * Normal dev talks to the backend directly on :8000 via NEXT_PUBLIC_API_URL,
+   * and this rewrite is unused. It exists for `npm run dev:https`: a page served
+   * over TLS may not call an http:// origin — the browser blocks it as mixed
+   * content — and putting a certificate on the backend just to browse locally is
+   * a lot of moving parts for no benefit. Proxying through Next keeps every
+   * request same-origin, so only the frontend needs a cert.
+   *
+   * There are no Next API routes in this app, so /api/* is free to forward.
+   */
+  async rewrites() {
+    const backend = process.env.BACKEND_PROXY_URL || 'http://localhost:8000';
+    return [{ source: '/api/:path*', destination: `${backend}/api/:path*` }];
   },
   /*
    * Security headers applied to every document response.

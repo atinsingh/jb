@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import { LoadingState, ErrorState, InlineError } from '@/components/app/AppStates';
+import ProfileListEditors from '@/components/app/resume/ProfileListEditors';
 import {
   Screen,
   MonoButton,
@@ -24,6 +25,9 @@ import {
  */
 const TABS = [
   { id: 'account', label: 'Account' },
+  // The optional resume data. It lives here, not on the resume screen, so the
+  // generator has exactly one source for it.
+  { id: 'resume', label: 'Résumé details' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'plan', label: 'Plan' },
 ];
@@ -63,7 +67,15 @@ function SwitchRow({ label, checked, onChange }) {
   );
 }
 
-function TextRow({ label, value, onChange, readOnly }) {
+/**
+ * `required` here means "the résumé generator cannot run without this", not
+ * "the form will not submit". Settings stays savable in any state — a
+ * half-filled profile is a normal thing to have — so the marker is a warning
+ * about a downstream consequence, and the empty row says what that consequence
+ * is rather than leaving the asterisk to be decoded.
+ */
+function TextRow({ label, value, onChange, readOnly, required }) {
+  const empty = required && !String(value || '').trim();
   return (
     <div
       style={{
@@ -75,11 +87,46 @@ function TextRow({ label, value, onChange, readOnly }) {
         alignItems: 'center',
       }}
     >
-      <span style={mono(10, '0.12em')}>{label}</span>
+      <span style={mono(10, '0.12em')}>
+        {label}
+        {required && (
+          <abbr
+            title="Required to generate a résumé"
+            aria-label="required"
+            data-testid={`required-${label.toLowerCase().replace(/\s+/g, '-')}`}
+            style={{
+              color: '#b4232a',
+              marginLeft: 4,
+              textDecoration: 'none',
+              cursor: 'help',
+            }}
+          >
+            *
+          </abbr>
+        )}
+      </span>
       {readOnly ? (
         <span style={{ fontSize: 13.5, color: 'var(--jb-v3-fg-2)' }}>{value || '—'}</span>
       ) : (
-        <input style={field} value={value} onChange={(e) => onChange(e.target.value)} />
+        <div>
+          <input
+            style={{
+              ...field,
+              // Only an empty required field is flagged. Colouring every
+              // required field red would make the filled ones look wrong too.
+              borderColor: empty ? '#e6b8ba' : field.borderColor,
+            }}
+            aria-required={required || undefined}
+            aria-invalid={empty || undefined}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+          />
+          {empty && (
+            <p style={{ fontSize: 12, color: '#b4232a', margin: '6px 0 0' }}>
+              Needed before you can generate a résumé.
+            </p>
+          )}
+        </div>
       )}
     </div>
   );
@@ -96,6 +143,9 @@ export default function AppSettings() {
     email: '',
     location: '',
     linkedin: '',
+    experience: [],
+    certifications: [],
+    achievements: [],
   });
   const [billing, setBilling] = useState(null);
   const [notif, setNotif] = useState({
@@ -125,6 +175,9 @@ export default function AppSettings() {
             email: u.email || '',
             location: u.location || '',
             linkedin: u.linkedin || '',
+            experience: u.experience || [],
+            certifications: u.certifications || [],
+            achievements: u.achievements || [],
           });
         }
       } catch (e) {
@@ -202,6 +255,9 @@ export default function AppSettings() {
         headline: profile.headline,
         location: profile.location,
         linkedin: profile.linkedin,
+        experience: profile.experience,
+        certifications: profile.certifications,
+        achievements: profile.achievements,
       });
     } catch (e) {
       failures.push(`profile (${e.message || 'request failed'})`);
@@ -270,6 +326,7 @@ export default function AppSettings() {
               <>
                 <TextRow
                   label="Full name"
+                  required
                   value={profile.fullName}
                   onChange={(v) => onProfileChange('fullName', v)}
                 />
@@ -279,18 +336,33 @@ export default function AppSettings() {
                   onChange={(v) => onProfileChange('headline', v)}
                 />
                 {/* Email is changed through a verified flow, not this form. */}
-                <TextRow label="Email" value={profile.email} readOnly />
+                <TextRow label="Email" value={profile.email} readOnly required />
                 <TextRow
                   label="Location"
+                  required
                   value={profile.location}
                   onChange={(v) => onProfileChange('location', v)}
                 />
                 <TextRow
                   label="LinkedIn"
+                  required
                   value={profile.linkedin}
                   onChange={(v) => onProfileChange('linkedin', v)}
                 />
               </>
+            )}
+
+            {tab === 'resume' && (
+              <ProfileListEditors
+                experience={profile.experience}
+                certifications={profile.certifications}
+                achievements={profile.achievements}
+                onChange={(patch) => {
+                  setProfile((p) => ({ ...p, ...patch }));
+                  setDirty(true);
+                  setSaved(false);
+                }}
+              />
             )}
 
             {tab === 'notifications' &&

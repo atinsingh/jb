@@ -26,9 +26,13 @@ const MAP = {
   'App Application Detail.dc.html': '/app/application',
   'App Offers.dc.html': '/app/offers',
   'App Auto-Apply.dc.html': '/app/auto-apply',
+  // The editor, the builder stub, the section generator and the LaTeX screen
+  // were four routes for one job. They are now the single /app/resume surface,
+  // so every design name that used to point at any of them resolves there.
   'App Resume.dc.html': '/app/resume',
-  'App Resume Builder.dc.html': '/app/resume-builder',
-  'App Resume Generate.dc.html': '/app/resume-generate',
+  'App Resume Builder.dc.html': '/app/resume',
+  'App Resume Generate.dc.html': '/app/resume',
+  'App Resume LaTeX.dc.html': '/app/resume',
   'App Resume Library.dc.html': '/app/resume-library',
   'App Cover Letter.dc.html': '/app/cover-letter',
   'App Interview.dc.html': '/app/interview',

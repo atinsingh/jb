@@ -108,6 +108,23 @@ export class User {
     description?: string;
   }>;
 
+  /**
+   * Optional résumé enrichment. Absent is fine: the résumé generator treats
+   * these as gaps to fill from LinkedIn if it can, and otherwise writes a
+   * thinner document rather than blocking or inventing one.
+   */
+  @Prop([{ name: String, issuer: String, year: String, credentialId: String }])
+  certifications?: Array<{
+    name: string;
+    issuer?: string;
+    year?: string;
+    credentialId?: string;
+  }>;
+
+  /** Free-form accomplishments not tied to a single role. */
+  @Prop({ type: [String], default: undefined })
+  achievements?: string[];
+
   // Subscription info (denormalized for quick access)
   @Prop({ enum: ['FREE', 'PRO', 'ELITE', 'INTERVIEW'], default: 'FREE' })
   currentPlanType?: PlanType;

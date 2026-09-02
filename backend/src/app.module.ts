@@ -4,7 +4,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { join } from 'path';
-import { existsSync } from 'fs';
+import { REPO_ROOT } from './load-env';
 
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -16,6 +16,7 @@ import { ApplicationsModule } from './applications/applications.module';
 import { AgentsModule } from './agents/agents.module';
 import { CoverLettersModule } from './cover-letters/cover-letters.module';
 import { ResumeBuilderModule } from './resume-builder/resume-builder.module';
+import { ResumeHarnessModule } from './resume-harness/resume-harness.module';
 import { BillingModule } from './billing/billing.module';
 import { EntitlementModule } from './entitlement/entitlement.module';
 import { LLMModule } from './llm/llm.module';
@@ -55,25 +56,17 @@ import { bullRootImports } from './queue/queue.config';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
-// Determine the correct .env file path
-function getEnvFilePath(): string {
-  // Try multiple possible locations
-  const possiblePaths = [
-    join(process.cwd(), '.env'),           // From backend directory
-    join(__dirname, '..', '.env'),         // Relative to compiled code (dist/)
-    join(__dirname, '..', '..', '.env'),   // If running from src/
-    join(process.cwd(), 'backend', '.env'), // If running from project root
-    '.env',                                 // Current working directory
-  ];
-
-  for (const path of possiblePaths) {
-    if (existsSync(path)) {
-      return path;
-    }
-  }
-
-  // Return the most likely path anyway - ConfigModule will handle missing file gracefully
-  return join(process.cwd(), '.env');
+/**
+ * The one repo-wide env file, resolved by `load-env.ts` (which has already run
+ * by the time this module is evaluated — it is the first import in main.ts).
+ *
+ * ConfigModule is given the same paths for completeness; it changes nothing in
+ * practice, because dotenv never overwrites a variable that is already set.
+ * This used to be a third copy of "guess where backend/.env might be", which
+ * quietly resolved to a file that no longer exists.
+ */
+function getEnvFilePath(): string[] {
+  return [join(REPO_ROOT, '.env.local'), join(REPO_ROOT, '.env')];
 }
 
 @Module({
@@ -123,6 +116,7 @@ function getEnvFilePath(): string {
     AgentsModule,
     CoverLettersModule,
     ResumeBuilderModule,
+    ResumeHarnessModule,
     BillingModule,
     EntitlementModule,
     LLMModule,

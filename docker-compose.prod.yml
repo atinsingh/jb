@@ -11,7 +11,7 @@
 #   * NODE_ENV=production, no source bind mounts, no hot reload.
 #   * The backend image entrypoint (CMD) is used - no `command:` override.
 #
-# Secrets are read from ./backend/.env (operator-supplied). NEXT_PUBLIC_API_URL
+# Secrets are read from ./.env.local at the repo root (operator-supplied). NEXT_PUBLIC_API_URL
 # is inlined into the frontend bundle at build time, so set it to the PUBLIC
 # backend URL your users hit (not the internal docker hostname).
 # ---------------------------------------------------------------------------
@@ -44,9 +44,10 @@ services:
     ports:
       - "8000:8000"
     # Operator supplies production secrets here (SUPABASE_*, MONGODB_URI,
-    # STRIPE_*, SMTP_*, AI keys - see backend/env.example).
+    # STRIPE_*, SMTP_*, AI keys - see .env.example at the repo root).
     env_file:
-      - ./backend/.env
+      # One env file for the whole repo — see .env.example.
+      - ./.env.local
     environment:
       - NODE_ENV=production
       - PORT=8000

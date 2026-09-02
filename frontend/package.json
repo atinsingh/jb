@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "generate-templates": "node scripts/generate-all-templates.js"
+    "generate-templates": "node scripts/generate-all-templates.js",
+    "dev:https": "next dev --experimental-https --port 3443"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

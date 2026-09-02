@@ -25,7 +25,9 @@
     "db:migrate-objectid": "ts-node src/scripts/migrate-objectid-fields.ts",
     "stripe:sync": "ts-node src/scripts/sync-stripe-catalog.ts",
     "interview:seed-prompts": "ts-node src/interview-buddy/scripts/seed-prompts.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "harness:seed-aliases": "ts-node src/scripts/seed-harness-aliases.ts",
+    "harness:bedrock-check": "ts-node src/scripts/bedrock-check.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.68.0",

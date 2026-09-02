@@ -33,18 +33,24 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      - ./backend/.env.docker
+      # One env file for the whole repo — see .env.example.
+      - ./.env.local
     environment:
-      # Override with your own API keys
+      # ONLY values that differ inside the compose network. Everything else —
+      # keys, secrets, tuning — comes from the env_file above.
+      #
+      # Nothing here may repeat a name from that file with a `${VAR}` default:
+      # compose resolves `${VAR}` from `.env`, not `.env.local`, so such a line
+      # expands to an empty string AND `environment:` outranks `env_file`,
+      # silently blanking the real value. That is what these entries used to do
+      # to SUPABASE_URL.
       - PORT=8000
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - EMERGENT_LLM_KEY=${EMERGENT_LLM_KEY:-}
-      - SUPABASE_URL=${SUPABASE_URL:-}
-      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-}
-      - SUPABASE_WEBHOOK_SECRET=${SUPABASE_WEBHOOK_SECRET:-}
-      # Internal URL for Puppeteer to access frontend within Docker network
+      # Service name, not localhost — and the in-network port, not the host one.
+      # This single line was the whole reason backend/.env.docker existed.
+      - MONGODB_URI=mongodb://mongodb:27017/jobocate
       - INTERNAL_FRONTEND_URL=http://frontend:3000
+      - LITELLM_BASE_URL=http://litellm:4000
+      - AGENT_PLATFORM_URL=http://agent-platform:4100
     volumes:
       - ./backend:/app
       - /app/node_modules
@@ -73,10 +79,12 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    env_file:
+      # Supplies NEXT_PUBLIC_SUPABASE_* and the API URLs — see .env.example.
+      - ./.env.local
     environment:
       - NODE_ENV=development
-      - REACT_APP_BACKEND_URL=http://localhost:8000
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      # Container-specific: file watching needs polling on a bind mount.
       - WATCHPACK_POLLING=true
     volumes:
       - ./frontend:/app
@@ -87,6 +95,62 @@ services:
     networks:
       - jobocate-network
     command: npm run dev
+
+  # LiteLLM proxy — the only route between a harness and a model.
+  # Aliases (provider+model+effort) live in infra/litellm/config.yaml.
+  litellm:
+    image: ghcr.io/berriai/litellm:main-stable
+    container_name: jobocate-litellm
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    # Provider keys come from the repo-wide env file. They are read via env_file
+    # rather than `${VAR}` substitution because compose only auto-reads `.env`
+    # for substitution, never `.env.local` — every key would have resolved to an
+    # empty string, and LiteLLM would have failed at first call, not at boot.
+    #
+    # Metered platform keys only. A Claude Pro/Max or ChatGPT Plus/Pro login is
+    # a Consumer Terms product and must never be configured here.
+    env_file:
+      - ./.env.local
+    volumes:
+      - ./infra/litellm/config.yaml:/app/config.yaml:ro
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    networks:
+      - jobocate-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health/liveliness"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Self-hosted LiteLLM Agent Platform — one sandbox per resume session.
+  # Mounts the docker socket because it provisions sibling containers from
+  # RESUME_SANDBOX_IMAGE; that is the whole reason it is a separate service.
+  agent-platform:
+    image: ghcr.io/berriai/litellm-agent-platform:main-stable
+    container_name: jobocate-agent-platform
+    restart: unless-stopped
+    ports:
+      - "4100:4100"
+    env_file:
+      - ./.env.local
+    environment:
+      # Container-specific overrides only — everything else comes from the file
+      # above. These two differ from their host values on purpose: inside the
+      # compose network the proxy is reachable by service name, not localhost.
+      - PORT=4100
+      - LITELLM_BASE_URL=http://litellm:4000
+      - SANDBOX_NETWORK=jobocate-network
+      # The platform's own name for RESUME_SANDBOX_IMAGE. Kept in sync in
+      # .env.example rather than substituted, for the reason noted above.
+      - DEFAULT_SANDBOX_IMAGE=jobocate/resume-harness:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - litellm
+    networks:
+      - jobocate-network
 
 networks:
   jobocate-network:

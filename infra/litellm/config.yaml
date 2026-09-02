@@ -1,0 +1,227 @@
+# LiteLLM proxy — the only route between a harness and a model.
+#
+# Two rules this file exists to enforce:
+#
+# 1. Aliases are namespaced provider + model + effort. Effort is part of the
+#    alias definition here, never a magic string in application code, so
+#    "sonnet at high effort" is one name the backend hands through opaquely.
+#    Aliases are NOT namespaced per harness: cost is a property of the provider
+#    serving the call, so per-harness aliases would triple this file for
+#    identical prices. Per-harness reporting comes from the `harness` request
+#    tag instead (see `tag_filters` below and LITELLM_TAG_HEADER in the backend).
+#
+# 2. Every credential here is a metered platform key. Anthropic Console and
+#    OpenAI Platform keys only — Claude Pro/Max and ChatGPT Plus/Pro logins are
+#    Consumer Terms products and must never be configured on this proxy.
+#
+# Adding an alias is an entry here plus a row in `harness_model_aliases`
+# (which tiers may select it). Neither is a deploy.
+
+model_list:
+  # ----------------------------------------------------------- anthropic ---
+  - model_name: anthropic/claude-haiku-4-5/low
+    litellm_params:
+      model: anthropic/claude-haiku-4-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+      thinking: { type: disabled }
+
+  - model_name: anthropic/claude-sonnet-4-5/low
+    litellm_params:
+      model: anthropic/claude-sonnet-4-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+      thinking: { type: disabled }
+
+  - model_name: anthropic/claude-sonnet-4-5/high
+    litellm_params:
+      model: anthropic/claude-sonnet-4-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+      thinking: { type: enabled, budget_tokens: 8000 }
+
+  - model_name: anthropic/claude-opus-4-5/high
+    litellm_params:
+      model: anthropic/claude-opus-4-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+      thinking: { type: enabled, budget_tokens: 12000 }
+
+  - model_name: anthropic/claude-opus-4-5/max
+    litellm_params:
+      model: anthropic/claude-opus-4-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+      thinking: { type: enabled, budget_tokens: 32000 }
+
+  # ------------------------------------------------------------- bedrock ---
+  # Amazon Bedrock, authenticated with a Bedrock API key (a bearer token) via
+  # AWS_BEARER_TOKEN_BEDROCK — no IAM keypair, no STS dance. It is a metered
+  # platform credential, so it satisfies the same constraint as the Console and
+  # Platform keys: no subscription login is involved anywhere.
+  #
+  # Two things to know before editing this block:
+  #
+  #  * Model ids are Bedrock's, not Anthropic's. Cross-region inference profiles
+  #    carry a geo prefix (`us.` / `eu.` / `apac.`) and are usually what an
+  #    account is actually entitled to; the bare `anthropic.` id only works if
+  #    that exact model is enabled in that exact region. Run
+  #    `npm run harness:bedrock-check` (backend) to print what THIS key can call
+  #    and reconcile this list against its output rather than guessing.
+  #  * Bedrock serves Anthropic models, not OpenAI ones. That is fine and is the
+  #    design working: aliases are namespaced per provider+model+effort, and the
+  #    harness is independent of the provider. Codex and OpenCode drive a
+  #    Bedrock-backed Claude alias through the OpenAI-compatible route without
+  #    knowing or caring.
+  # Every id below was read off this account's own entitlement listing with
+  # `npm run harness:bedrock-check` — not guessed. Re-run that after any
+  # account or region change and reconcile this block against its output.
+  #
+  # WHY IAM CREDENTIALS AND NOT THE BEDROCK API KEY
+  #
+  # A Bedrock API key (AWS_BEARER_TOKEN_BEDROCK) is the nicer credential, and it
+  # works for plain completions — `npm run harness:bedrock-check` uses it. It
+  # cannot drive an agentic harness on this LiteLLM build, because the two
+  # routes fail in opposite ways and you need both halves at once:
+  #
+  #   * Converse route: the handler dereferences `credentials.access_key`
+  #     before it ever reaches the bearer-token branch, and under bearer auth
+  #     `credentials` is None — so every call dies with
+  #     `'NoneType' object has no attribute 'access_key'`.
+  #   * `bedrock/invoke/` route: bearer auth works, but STREAMING tool-call
+  #     deltas arrive with no `id` —
+  #       {"function":{...},"type":"function","index":61}
+  #     while the non-streaming response carries a correct one. The Vercel AI
+  #     SDK (so OpenCode) rejects that with "Expected id to be a string".
+  #     Verified against nova-micro, nova-lite and nova-pro alike, so it is the
+  #     route, not the model.
+  #
+  # IAM credentials restore the Converse route, whose streaming decoder emits
+  # `"id": start_obj["toolUse"]["toolUseId"]` — the id the SDK needs. Hence the
+  # aws_access_key_id / aws_secret_access_key pair below.
+  #
+  # If a future LiteLLM lets the Converse handler tolerate bearer auth, this can
+  # go back to AWS_BEARER_TOKEN_BEDROCK and drop the IAM pair entirely.
+  - model_name: bedrock/claude-haiku-4-5/low
+    litellm_params:
+      model: bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0
+      aws_region_name: os.environ/AWS_REGION
+      aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
+      aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
+      reasoning_effort: low
+
+  - model_name: bedrock/claude-sonnet-5/low
+    litellm_params:
+      model: bedrock/us.anthropic.claude-sonnet-5
+      aws_region_name: os.environ/AWS_REGION
+      aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
+      aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
+      reasoning_effort: low
+
+  - model_name: bedrock/claude-sonnet-5/high
+    litellm_params:
+      model: bedrock/us.anthropic.claude-sonnet-5
+      aws_region_name: os.environ/AWS_REGION
+      aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
+      aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
+      reasoning_effort: high
+
+  - model_name: bedrock/claude-opus-5/high
+    litellm_params:
+      model: bedrock/us.anthropic.claude-opus-5
+      aws_region_name: os.environ/AWS_REGION
+      aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
+      aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
+      reasoning_effort: high
+
+  # `xhigh` is the sweet spot for agentic coding work on the current Opus/Sonnet
+  # generation, which is exactly what a harness editing LaTeX is doing.
+  - model_name: bedrock/claude-opus-5/xhigh
+    litellm_params:
+      model: bedrock/us.anthropic.claude-opus-5
+      aws_region_name: os.environ/AWS_REGION
+      aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
+      aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
+      reasoning_effort: xhigh
+
+  # Amazon Nova — the cheap end of Bedrock.
+  #
+  # Nova is not a reasoning model, so the `/low` suffix is nominal: there is no
+  # effort dial to set and `drop_params: true` discards `reasoning_effort`
+  # rather than erroring. The suffix stays because the alias *namespace* is
+  # provider+model+effort and application code parses nothing out of it — a
+  # special-case naming scheme for one provider is exactly the kind of
+  # hardcoding this design forbids.
+  #
+  # `nova-micro` is the cheapest thing this proxy can serve, which makes it the
+  # right probe for verifying auth, alias resolution, harness tagging and spend
+  # logging. It is NOT a sensible resume writer — it will not hold an agentic
+  # loop together well enough to produce compiling LaTeX. Keep tier defaults on
+  # Claude; reach for Nova to prove the pipe, not the product.
+  - model_name: bedrock/nova-micro/low
+    litellm_params:
+      model: bedrock/us.amazon.nova-micro-v1:0
+      aws_region_name: os.environ/AWS_REGION
+      aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
+      aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
+
+  - model_name: bedrock/nova-lite/low
+    litellm_params:
+      model: bedrock/us.amazon.nova-lite-v1:0
+      aws_region_name: os.environ/AWS_REGION
+      aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
+      aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
+
+  - model_name: bedrock/nova-pro/low
+    litellm_params:
+      model: bedrock/us.amazon.nova-pro-v1:0
+      aws_region_name: os.environ/AWS_REGION
+      aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
+      aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
+
+  # -------------------------------------------------------------- openai ---
+  - model_name: openai/gpt-5.1-codex/low
+    litellm_params:
+      model: openai/gpt-5.1-codex
+      api_key: os.environ/OPENAI_API_KEY
+      reasoning_effort: low
+
+  - model_name: openai/gpt-5.1-codex/high
+    litellm_params:
+      model: openai/gpt-5.1-codex
+      api_key: os.environ/OPENAI_API_KEY
+      reasoning_effort: high
+
+  - model_name: openai/gpt-5.1-codex-max/high
+    litellm_params:
+      model: openai/gpt-5.1-codex-max
+      api_key: os.environ/OPENAI_API_KEY
+      reasoning_effort: high
+
+litellm_settings:
+  # Per-request tags arrive in the `x-litellm-tags` header and are written to
+  # the spend log, which is what makes `harness=claude-code|codex|opencode`
+  # reportable without a per-harness alias namespace.
+  store_prompts_in_spend_logs: false
+  drop_params: true
+  request_timeout: 900
+  num_retries: 2
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  # `database_url` is deliberately NOT set here.
+  #
+  # LiteLLM requires a PostgreSQL URL for its database features and refuses to
+  # start when the variable resolves to an empty string — which is exactly what
+  # `os.environ/LITELLM_DATABASE_URL` does on a machine that has not configured
+  # one. Point the proxy at Postgres by exporting LITELLM_DATABASE_URL and
+  # adding `database_url: os.environ/LITELLM_DATABASE_URL` back here.
+  #
+  # What you give up without it: virtual keys and the spend log. The proxy
+  # still serves every alias and still receives the `x-litellm-tags` harness
+  # tag, but nothing persists it, so per-harness usage reporting needs the DB.
+  # Sandboxes get short-lived virtual keys, never the master key.
+  allow_user_auth: false
+  # Anthropic-shaped route used by Claude Code (ANTHROPIC_BASE_URL) alongside
+  # the OpenAI-shaped route used by Codex and OpenCode. Same aliases either way.
+  pass_through_endpoints: []
+
+router_settings:
+  routing_strategy: simple-shuffle
+  allowed_fails: 2
+  cooldown_time: 30

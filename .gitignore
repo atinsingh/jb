@@ -145,3 +145,24 @@ e2e/blob-report/
 
 # Local git worktrees used for isolated subagent-driven-development execution
 .worktrees/
+
+# Generated knowledge graph (graphify). Rebuilt locally with `graphify update .`;
+# it is large, machine-written and churns on every code change, so it is not
+# version-controlled. Delete it and re-run the command to regenerate.
+graphify-out/
+
+# ---------------------------------------------------------------------------
+# The repo-wide env template is the ONE env file that is committed. It carries
+# key names and safe defaults only, never a real value; its filled-in
+# counterpart is .env.local, which the rules above keep ignored.
+#
+# This negation lives at the very end on purpose: several `*.env.*` rules above
+# match `.env.example`, and in git the LAST matching pattern wins.
+# ---------------------------------------------------------------------------
+!.env.example
+
+# Per-ticket verification evidence (screenshots, generated resumes, PDFs).
+# Generated during manual browser verification runs and often contains real
+# account data from whichever account was signed in — kept local, attached to
+# the ticket by hand rather than committed.
+docs/job-*-verification/

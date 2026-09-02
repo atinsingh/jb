@@ -10,7 +10,7 @@ Jobocate is a two-sided AI job platform: candidates get eligibility-aware matche
 2. **Tests first, then implementation.** Write or extend a failing test that encodes the goal, watch it fail for the right reason, then implement until that test passes. This is to prevent implementing first and retrofitting tests that rubber-stamp the code.
 3. **Cover the goal, not every line.** One focused test (or a small suite) that proves the behavior is enough. Do not add per-function, per-branch, or snapshot bloat. Do not test framework wiring, getters, or CSS class names unless that *is* the bug.
 4. **No migrations / backfills for older shapes.** The product is not live. Change the current schema, DTOs, and UI to match the task. Do not write `db:migrate-*` scripts, dual-read old+new fields, or compatibility layers for previous implementations unless the user explicitly asks.
-5. **Find code with graphify before grepping the whole tree.** A knowledge graph already exists at `graphify-out/` (`graph.json`, `GRAPH_REPORT.md`, `graph.html`). Use it to locate modules, callers, and paths. Broad search is a fallback after a graph query, or when the graph is clearly stale for the files you just added.
+5. **Find code with graphify before grepping the whole tree.** A knowledge graph lives at `graphify-out/` (`graph.json`, `GRAPH_REPORT.md`). It is generated and **not** version-controlled, so a fresh clone has to build it once with `graphify update .` from the repo root. Use it to locate modules, callers, and paths. Broad search is a fallback after a graph query, or when the graph is clearly stale for the files you just added.
 
 ## Graphify — find things here first
 
@@ -26,7 +26,7 @@ graphify explain "EligibleJobsService"
 
 - Prefer **query** for orientation, **path** when you need the link between two named pieces, **explain** for one node.
 - Quote `source_location` from graph output when citing a fact.
-- After you **add or rename** backend/frontend code in a session, refresh with `graphify --update` (from repo root) so the next lookup is not stale. Do not rebuild the full graph unless `graph.json` is missing.
+- After you **add or rename** backend/frontend code in a session, refresh with `graphify update .` (from repo root) so the next lookup is not stale. Note the CLI takes a path argument — there is no `--update` flag. `graph.html` is skipped above ~5000 nodes, which this repo exceeds; `graph.json` and `GRAPH_REPORT.md` are the ones that matter.
 - If `graphify` is unavailable, read `graphify-out/GRAPH_REPORT.md` community hubs, then open the named files. Last resort: targeted grep in `backend/src` or `frontend/src`.
 
 Communities that usually matter: NestJS module wiring, auth/OAuth, matching, job tracker, employer pipeline, LLM providers, candidate/employer pages, frontend services.
@@ -40,8 +40,9 @@ Communities that usually matter: NestJS module wiring, auth/OAuth, matching, job
 | DB | MongoDB (Docker) | 27017 typical; this machine may use 27018 | `docker-compose.yml` service `mongodb` |
 
 - API prefix is `/api` except `/health` and `/health/readiness`. Swagger: `http://localhost:8000/api/docs`.
-- Backend env: `backend/.env` (Nest loads this, not `.env.local`). Template: `backend/env.example`. Need `MONGODB_URI` + `JWT_SECRET`. CORS: `FRONTEND_URL` (single origin for links) + `CORS_EXTRA_ORIGINS` for extra browsers (e.g. `:3001`).
-- Frontend env: `frontend/.env.local` — `NEXT_PUBLIC_API_URL=http://localhost:8000`.
+- **Env: one file for the whole repo.** `.env.local` at the root, copied from the committed `.env.example`. Backend, frontend, both compose stacks, Playwright and the CLI scripts all read it — there are no per-app env files, and creating `backend/.env` or `frontend/.env.local` is a regression. Precedence: real process env > `.env.local` > `.env`.
+- Need `MONGODB_URI` + Supabase keys. CORS: `FRONTEND_URL` (single origin for links) + `CORS_EXTRA_ORIGINS` for extra browsers (e.g. `:3001`). `NEXT_PUBLIC_*` is the only prefix that reaches the browser — never put a secret behind it.
+- Values that differ inside compose (only `MONGODB_URI`, plus service-name URLs) are `environment:` overrides in `docker-compose.yml`, not a second env file. Never re-declare an env-file name there with `${VAR}`: compose resolves `${VAR}` from `.env`, not `.env.local`, so it expands empty and silently wins over the file.
 - `npm install` in both apps needs `--legacy-peer-deps`.
 - Shared contracts (`packages/contracts`) are consumed by the backend. If Nest fails to compile missing `@jobocate/contracts` exports, `npm run build` in `packages/contracts` first. Do not expand work into that package unless the task requires a new shared type.
 

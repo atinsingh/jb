@@ -194,17 +194,42 @@ export class SupabaseUserSyncService {
       return byEmail;
     }
 
-    const created = await this.userModel.create({
-      supabaseUserId,
-      email,
-      name: metadata.name || metadata.full_name,
-      picture: metadata.avatar_url || metadata.picture,
-      provider: extra.provider,
-      role: this.signupRoleFrom(metadata),
-      emailVerified: extra.emailVerified,
-      isActive: true,
-      lastLogin: new Date(),
-    });
+    let created: UserDocument;
+    try {
+      created = await this.userModel.create({
+        supabaseUserId,
+        email,
+        name: metadata.name || metadata.full_name,
+        picture: metadata.avatar_url || metadata.picture,
+        provider: extra.provider,
+        role: this.signupRoleFrom(metadata),
+        emailVerified: extra.emailVerified,
+        isActive: true,
+        lastLogin: new Date(),
+      });
+    } catch (err: any) {
+      /*
+       * Lost a race, not a failure.
+       *
+       * The SPA fires several authenticated calls as it mounts, so on a brand-
+       * new account two of them can reach this method before either has
+       * inserted: both see `findOne` return null, both insert, and the second
+       * loses to the unique index on `email`. That surfaced as a 500 from
+       * `GET /api/auth/me` on the first page a new user ever loaded.
+       *
+       * The winner's document is exactly what this call wanted, so read it.
+       * Retrying the insert would only lose again.
+       */
+      if (err?.code !== 11000) throw err;
+
+      const winner = await this.userModel.findOne({ email });
+      if (!winner) throw err;
+
+      this.logger.log(
+        `Concurrent first sign-in for ${email}; using the document the other request created`,
+      );
+      return winner;
+    }
 
     this.logger.log(`Created local user for Supabase ${supabaseUserId} (${email})`);
     return created;
