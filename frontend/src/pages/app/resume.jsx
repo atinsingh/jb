@@ -157,7 +157,18 @@ export default function AppResume() {
   }, [messages, liveText, livePhase]);
 
   const profile = options?.profile;
-  const blocked = Boolean(profile && profile.ready === false);
+
+  /**
+   * Fail closed.
+   *
+   * `ready` is the server's verdict on whether a résumé can be written at all,
+   * and only an explicit `true` opens the form. Absent, undefined, still
+   * loading, or a response shape we did not expect all count as "not ready" —
+   * a stale backend that predates the `profile` block once left this screen
+   * fully open on an empty profile, and the candidate would only have found out
+   * as a 403 after committing to a session.
+   */
+  const blocked = profile?.ready !== true;
   const busy = phase === 'provisioning' || phase === 'working';
   const platformDown = options && options.sandboxAvailable === false;
   const sessionOver = session && session.status !== 'active';
@@ -390,7 +401,24 @@ function Setup(p) {
         />
       )}
 
-      {p.blocked ? (
+      {!p.options ? (
+        // Still asking the server whether generation is possible. Showing the
+        // form here would be the fail-open bug in a different costume, and
+        // showing the red gate would accuse a profile we have not read yet.
+        <div
+          data-testid="options-loading"
+          style={{
+            border: `1px solid ${T.line}`,
+            background: T.panel,
+            borderRadius: 3,
+            padding: '22px 24px',
+            fontSize: 13.5,
+            color: T.fg3,
+          }}
+        >
+          Checking your profile…
+        </div>
+      ) : p.blocked ? (
         <RequiredGate profile={p.profile} />
       ) : (
         <>
@@ -412,6 +440,10 @@ function Setup(p) {
  */
 function RequiredGate({ profile }) {
   const missing = profile?.missing || [];
+  // The server said "not ready" but did not say which fields. Naming nothing is
+  // better than naming the wrong thing, so fall back to what is always
+  // required and say plainly that we could not read the profile.
+  const unknown = missing.length === 0;
 
   return (
     <div
@@ -457,13 +489,13 @@ function RequiredGate({ profile }) {
       </div>
 
       <p style={{ fontSize: 14, color: T.fg2, margin: '0 0 18px', lineHeight: 1.6, maxWidth: 560 }}>
-        A résumé is written from your account, not from this page — so these
-        details have to exist before an agent can write one. Without them it
-        would have to invent your name or leave an employer no way to reach you.
+        {unknown
+          ? 'We could not confirm your profile is complete, so generation is held back. Check that these are filled in — a résumé is written from your account, not from this page.'
+          : 'A résumé is written from your account, not from this page — so these details have to exist before an agent can write one. Without them it would have to invent your name or leave an employer no way to reach you.'}
       </p>
 
       <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 22px' }}>
-        {missing.map((f) => (
+        {(unknown ? ['name', 'email', 'linkedin', 'location'] : missing).map((f) => (
           <li
             key={f}
             data-testid={`gate-field-${f}`}
@@ -482,7 +514,9 @@ function RequiredGate({ profile }) {
             </span>
             {FIELD_LABELS[f] || f}
             <span style={{ flex: 1 }} />
-            <span style={{ ...label, fontSize: 10, color: '#b4232a' }}>Missing</span>
+            <span style={{ ...label, fontSize: 10, color: '#b4232a' }}>
+              {unknown ? 'Required' : 'Missing'}
+            </span>
           </li>
         ))}
       </ul>

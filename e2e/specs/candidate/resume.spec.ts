@@ -315,3 +315,59 @@ test.describe('résumé — model and effort selection', () => {
     expect(sent.alias).toBe('anthropic/claude-sonnet-4-5/low');
   });
 });
+
+/**
+ * The gate must fail closed.
+ *
+ * `ready` is the server's verdict on whether a résumé can be written at all.
+ * Treating "absent" or "unknown" as permission is the wrong default: a stale
+ * backend, a trimmed response or a partial failure would silently re-enable
+ * generation for a profile that cannot support it, and the candidate would
+ * discover it as a 403 after committing to a session. Only an explicit
+ * `ready: true` opens the form.
+ *
+ * This is a regression test for exactly that bug — a deployed backend that
+ * predated the `profile` block left Start fully enabled on an empty profile.
+ */
+test.describe('résumé — the required-field gate fails closed', () => {
+  const withOptions = async (page: Page, json: unknown) => {
+    await stubHarnessApi(page);
+    await page.route('**/api/resume-harness/options', (route: Route) =>
+      route.fulfill({ json }),
+    );
+    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
+  };
+
+  test('blocks when the response carries no profile block at all', async ({ page }) => {
+    const { profile, ...noProfile } = OPTIONS;
+    await withOptions(page, noProfile);
+
+    await expect(page.getByTestId('required-gate')).toBeVisible();
+    await expect(page.getByTestId('start-session')).toHaveCount(0);
+  });
+
+  test('blocks when ready is missing from the profile', async ({ page }) => {
+    await withOptions(page, {
+      ...OPTIONS,
+      profile: { name: 'Jordan Reyes', roles: [], missing: [], optionalGaps: [] },
+    });
+
+    await expect(page.getByTestId('required-gate')).toBeVisible();
+    await expect(page.getByTestId('start-session')).toHaveCount(0);
+  });
+
+  test('blocks while options are still loading', async ({ page }) => {
+    await stubHarnessApi(page);
+    // Never resolves: the pre-response state must not be an open form.
+    await page.route('**/api/resume-harness/options', () => {});
+    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
+
+    await expect(page.getByTestId('start-session')).toHaveCount(0);
+  });
+
+  test('opens only on an explicit ready:true', async ({ page }) => {
+    await withOptions(page, OPTIONS);
+    await expect(page.getByTestId('required-gate')).toHaveCount(0);
+    await expect(page.getByTestId('start-session')).toBeEnabled();
+  });
+});
