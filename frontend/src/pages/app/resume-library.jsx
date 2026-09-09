@@ -23,6 +23,11 @@ import {
   downloadResumePdf,
   generateResumePdf,
 } from '@/services/resumeApi';
+import {
+  deleteHarnessSession,
+  listHarnessSessions,
+  renameHarnessSession,
+} from '@/services/resumeHarnessApi';
 
 /* ------------------------------------------------------------ helpers --- */
 const MONO = 'var(--jb-v3-font-mono)';
@@ -128,6 +133,11 @@ export default function ResumeLibrary() {
   const [sort, setSort] = useState('updated');
   const [actionError, setActionError] = useState(null);
   const [busyId, setBusyId] = useState(null);
+  const [agentSessions, setAgentSessions] = useState(null);
+  const [agentSessionsError, setAgentSessionsError] = useState(null);
+  const [agentBusyId, setAgentBusyId] = useState(null);
+  const [agentRenaming, setAgentRenaming] = useState(null);
+  const [agentDelete, setAgentDelete] = useState(null);
 
   const [importOpen, setImportOpen] = useState(false);
   const [versionsFor, setVersionsFor] = useState(null);
@@ -150,6 +160,21 @@ export default function ResumeLibrary() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const loadAgentSessions = useCallback(async () => {
+    setAgentSessionsError(null);
+    try {
+      const data = await listHarnessSessions();
+      setAgentSessions(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setAgentSessionsError(e);
+      setAgentSessions([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAgentSessions();
+  }, [loadAgentSessions]);
 
   /* -------------------------------------------------------- derived --- */
   const summary = useMemo(() => {
@@ -231,6 +256,41 @@ export default function ResumeLibrary() {
     withBusy(r.id, () => createResumeVersion(r.id, `Snapshot · ${new Date().toLocaleString()}`));
   const doDelete = (r) => withBusy(r.id, () => deleteResume(r.id));
   const doRename = (r, name) => withBusy(r.id, () => renameResume(r.id, name));
+  const openAgentSession = (session) =>
+    router.push(`/app/resume?session=${encodeURIComponent(session.id)}`);
+  const renameAgentSession = async (session, name) => {
+    setAgentBusyId(session.id);
+    setAgentSessionsError(null);
+    try {
+      const updated = await renameHarnessSession(session.id, name);
+      setAgentSessions((items) =>
+        items.map((item) =>
+          item.id === session.id ? { ...item, name: updated.name } : item,
+        ),
+      );
+      setAgentRenaming(null);
+    } catch (e) {
+      setAgentSessionsError(e);
+    } finally {
+      setAgentBusyId(null);
+    }
+  };
+  const deleteAgentSession = async (session) => {
+    setAgentBusyId(session.id);
+    setAgentSessionsError(null);
+    try {
+      await deleteHarnessSession(session.id);
+      setAgentSessions((items) =>
+        items.filter((item) => item.id !== session.id),
+      );
+      setAgentDelete(null);
+    } catch (e) {
+      setAgentSessionsError(e);
+      setAgentDelete(null);
+    } finally {
+      setAgentBusyId(null);
+    }
+  };
 
   /* ------------------------------------------------------------- ui --- */
   return (
@@ -249,6 +309,10 @@ export default function ResumeLibrary() {
         #jbapp .jb-btn:active { transform: translateY(1px); }
         #jbapp .jb-menu-item:hover { background: var(--jb-v3-control); }
         #jbapp .jb-row:hover { background: var(--jb-v3-panel); }
+        #jbapp .jb-agent-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: center; }
+        @media (max-width: 760px) {
+          #jbapp .jb-agent-row { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+        }
         @keyframes jbskel { 0%{opacity:.5} 50%{opacity:1} 100%{opacity:.5} }
       `}</style>
 
@@ -316,6 +380,19 @@ export default function ResumeLibrary() {
 
           <div style={{ padding: '22px 32px 60px', flex: 1 }}>
             {actionError && <InlineError error={actionError} />}
+
+            <AgentSessions
+              sessions={agentSessions}
+              error={agentSessionsError}
+              busyId={agentBusyId}
+              renaming={agentRenaming}
+              onStart={() => router.push('/app/resume')}
+              onOpen={openAgentSession}
+              onRename={setAgentRenaming}
+              onCancelRename={() => setAgentRenaming(null)}
+              onSaveRename={renameAgentSession}
+              onDelete={setAgentDelete}
+            />
 
             {/* SUMMARY CARDS */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 22 }}>
@@ -462,12 +539,182 @@ export default function ResumeLibrary() {
             onSave={async (name) => { const r = renaming; setRenaming(null); await doRename(r, name); }}
           />
         )}
+        {agentDelete && (
+          <ConfirmDialog
+            title={`Delete “${agentDelete.name || 'Untitled résumé'}”?`}
+            body="This permanently removes the session, every revision, and its saved PDFs. This cannot be undone."
+            confirmLabel="Delete session"
+            danger
+            onCancel={() => setAgentDelete(null)}
+            onConfirm={() => deleteAgentSession(agentDelete)}
+          />
+        )}
       </AnimatePresence>
     </>
   );
 }
 
 /* ===================================================== sub-components === */
+function AgentSessions({
+  sessions,
+  error,
+  busyId,
+  renaming,
+  onStart,
+  onOpen,
+  onRename,
+  onCancelRename,
+  onSaveRename,
+  onDelete,
+}) {
+  return (
+    <section
+      data-testid="agent-resume-sessions"
+      aria-labelledby="agent-resume-heading"
+      style={{
+        background: 'var(--jb-v3-panel)',
+        border: '1px solid var(--jb-v3-line)',
+        borderRadius: 2,
+        marginBottom: 26,
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        style={{
+          padding: '20px 22px',
+          borderBottom: '1px solid var(--jb-v3-line)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 20,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div>
+          <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--jb-v3-accent)', marginBottom: 6 }}>
+            Agent workspace
+          </div>
+          <h2 id="agent-resume-heading" style={{ margin: '0 0 5px', fontSize: 21, letterSpacing: '-0.025em' }}>
+            Agent-written résumés
+          </h2>
+          <p style={{ margin: 0, color: 'var(--jb-v3-fg-2)', fontSize: 13.5 }}>
+            Reopen a conversation, continue from any saved draft, or clean up work you no longer need.
+          </p>
+        </div>
+        <button type="button" className="jb-btn" onClick={onStart} style={primaryBtn}>
+          + New agent résumé
+        </button>
+      </div>
+
+      {error && (
+        <div role="alert" style={{ padding: '13px 22px', color: 'var(--jb-v3-danger)', background: 'var(--jb-v3-danger-soft)', fontSize: 13 }}>
+          Agent sessions are temporarily unavailable. You can still create a new résumé.
+        </div>
+      )}
+
+      {sessions === null ? (
+        <div style={{ padding: 22, color: 'var(--jb-v3-fg-3)', fontSize: 13 }}>
+          Loading agent sessions…
+        </div>
+      ) : sessions.length === 0 ? (
+        <div data-testid="agent-sessions-empty" style={{ padding: '26px 22px' }}>
+          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 5 }}>No agent sessions yet</div>
+          <div style={{ color: 'var(--jb-v3-fg-2)', fontSize: 13.5 }}>
+            Start with a target role and shape the résumé through conversation. Every revision and PDF will appear here.
+          </div>
+        </div>
+      ) : (
+        <div>
+          {sessions.map((session, index) => {
+            const revisionCount = session.revisionCount ?? session.revision ?? 0;
+            const pending = busyId === session.id;
+            const build = session.compiled
+              ? 'PDF ready'
+              : revisionCount
+                ? 'Build needs attention'
+                : 'Not built yet';
+            return (
+              <article
+                key={session.id}
+                className="jb-agent-row"
+                style={{
+                  padding: '17px 22px',
+                  borderTop: index ? '1px solid var(--jb-v3-line)' : 'none',
+                  opacity: pending ? 0.6 : 1,
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  {renaming?.id === session.id ? (
+                    <AgentSessionRename
+                      session={session}
+                      busy={pending}
+                      onCancel={onCancelRename}
+                      onSave={onSaveRename}
+                    />
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap', marginBottom: 7 }}>
+                        <strong style={{ fontSize: 15.5 }}>{session.name || 'Untitled résumé'}</strong>
+                        <span style={{ fontFamily: MONO, fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.08em', color: session.status === 'active' ? 'var(--jb-v3-accent)' : 'var(--jb-v3-fg-3)' }}>
+                          {session.status === 'active' ? 'In progress' : 'Ended'}
+                        </span>
+                      </div>
+                      <div style={{ color: 'var(--jb-v3-fg-2)', fontSize: 13, lineHeight: 1.55 }}>
+                        {session.targetRole || 'No target role'} · {session.harnessLabel || session.harness || 'Agent'} · {session.modelLabel || session.model || 'Model unavailable'}
+                      </div>
+                      <div style={{ color: 'var(--jb-v3-fg-3)', fontSize: 12.5, lineHeight: 1.55 }}>
+                        {humanizeKey(session.templateKey) || 'Default template'} · {revisionCount} revision{revisionCount === 1 ? '' : 's'} · {build} · Updated {relTime(session.updatedAt)}
+                      </div>
+                    </>
+                  )}
+                </div>
+                {renaming?.id !== session.id && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <button type="button" disabled={pending} onClick={() => onOpen(session)} style={{ ...secondaryBtn, padding: '8px 13px', fontSize: 12.5 }}>
+                      Open session
+                    </button>
+                    <button type="button" disabled={pending} onClick={() => onRename(session)} style={textBtn}>
+                      Rename
+                    </button>
+                    <button type="button" disabled={pending} onClick={() => onDelete(session)} style={{ ...textBtn, color: 'var(--jb-v3-danger)' }}>
+                      Delete
+                    </button>
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function AgentSessionRename({ session, busy, onCancel, onSave }) {
+  const [name, setName] = useState(session.name || '');
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (name.trim()) onSave(session, name.trim());
+      }}
+      style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}
+    >
+      <input aria-label="Session name" autoFocus maxLength={200} disabled={busy} value={name} onChange={(event) => setName(event.target.value)} style={{ ...inp, width: 260 }} />
+      <button type="submit" disabled={busy || !name.trim()} style={{ ...secondaryBtn, padding: '8px 13px', fontSize: 12.5 }}>Save name</button>
+      <button type="button" disabled={busy} onClick={onCancel} style={textBtn}>Cancel</button>
+    </form>
+  );
+}
+
+function humanizeKey(value) {
+  if (!value) return '';
+  return String(value)
+    .split('-')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
 function SummaryCard({ label, value, hint }) {
   return (
     <div style={{ background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, padding: '16px 18px' }}>
@@ -960,5 +1207,6 @@ function Field({ label, children }) {
 const primaryBtn = { display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, color: 'var(--jb-v3-accent-ink)', background: 'var(--jb-v3-accent)', border: 'none', borderRadius: 2, padding: '10px 18px', cursor: 'pointer' };
 const secondaryBtn = { display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'inherit', fontSize: 13.5, fontWeight: 600, color: 'var(--jb-v3-fg)', background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line-2)', borderRadius: 2, padding: '10px 16px', cursor: 'pointer' };
 const dangerBtn = { ...primaryBtn, color: '#fff', background: 'var(--jb-v3-danger)' };
+const textBtn = { fontFamily: 'inherit', fontSize: 12.5, fontWeight: 650, color: 'var(--jb-v3-fg-2)', background: 'transparent', border: 'none', padding: '8px 6px', cursor: 'pointer' };
 const modalCard = { width: 560, maxWidth: '94vw', background: 'var(--jb-v3-bg)', borderRadius: 2, boxShadow: '0 40px 90px -30px color-mix(in srgb, var(--jb-v3-invert) 50%, transparent)', overflow: 'hidden' };
 const inp = { width: '100%', padding: '9px 12px', borderRadius: 2, border: '1px solid var(--jb-v3-line)', background: 'var(--jb-v3-panel)', fontFamily: 'inherit', fontSize: 13.5, color: 'var(--jb-v3-fg)' };

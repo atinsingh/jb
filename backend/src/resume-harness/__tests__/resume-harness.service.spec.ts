@@ -79,6 +79,33 @@ describe('ResumeHarnessService', () => {
             String(d.userId) === String(q.userId),
         ) || null,
     })),
+    updateOne: jest.fn((q: any, update: any) => ({
+      exec: async () => {
+        const found = store.find(
+          (d) =>
+            String(d._id) === String(q._id) &&
+            String(d.userId) === String(q.userId),
+        );
+        if (found) {
+          Object.assign(found, update.$set || {});
+          for (const key of Object.keys(update.$unset || {})) delete found[key];
+        }
+        return { acknowledged: true, modifiedCount: found ? 1 : 0 };
+      },
+    })),
+    deleteOne: jest.fn((q: any) => ({
+      exec: async () => {
+        const before = store.length;
+        store = store.filter(
+          (d) =>
+            !(
+              String(d._id) === String(q._id) &&
+              String(d.userId) === String(q.userId)
+            ),
+        );
+        return { acknowledged: true, deletedCount: before - store.length };
+      },
+    })),
   };
 
   const sandbox: any = {
@@ -92,7 +119,11 @@ describe('ResumeHarnessService', () => {
   const latex: any = {
     compile: jest.fn(async () => ({ ok: true, log: '', pdfBase64: 'JVBER' })),
   };
-  const storage: any = { put: jest.fn(async () => ({})), getBuffer: jest.fn(async () => Buffer.from('%PDF')) };
+  const storage: any = {
+    put: jest.fn(async () => ({})),
+    getBuffer: jest.fn(async () => Buffer.from('%PDF')),
+    delete: jest.fn(async () => undefined),
+  };
 
   const modelAlias: any = {
     resolveForUser: jest.fn(async () => ALIAS),
@@ -580,6 +611,31 @@ describe('ResumeHarnessService', () => {
     await expect(
       service.runTurn('u1', session.id, { instruction: 'again' }),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('permanently deletes an older active session without validating legacy turns', async () => {
+    const session = await start();
+    const stored = store.find((item) => String(item._id) === session.id);
+    stored.turns = [{ revision: 1, instruction: 'Legacy revision' }];
+    stored.save.mockClear();
+    stored.save.mockRejectedValue(
+      new Error('turns.0.kind: Path `kind` is required.'),
+    );
+
+    await expect(service.deleteSession('u1', session.id)).resolves.toEqual({
+      deleted: true,
+    });
+
+    expect(sandbox.destroy).toHaveBeenCalledWith('sbx-1');
+    expect(stored.save).not.toHaveBeenCalled();
+    expect(sessionModel.updateOne).toHaveBeenCalledWith(
+      { _id: session.id, userId: 'u1' },
+      expect.objectContaining({
+        $set: expect.objectContaining({ status: 'ended' }),
+        $unset: { sandboxId: 1 },
+      }),
+    );
+    expect(store).toHaveLength(0);
   });
 
   it('does not leak the session of another user', async () => {

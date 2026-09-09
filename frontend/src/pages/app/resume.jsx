@@ -3,18 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import AppTopNav from '@/components/app/AppTopNav';
 import { ErrorState } from '@/components/app/AppStates';
 import {
-  deleteHarnessSession,
   endHarnessSession,
   endHarnessSessionKeepalive,
   getHarnessPdf,
   getHarnessOptions,
   getHarnessSession,
   getResumeTemplates,
-  listHarnessSessions,
-  renameHarnessSession,
   restoreHarnessRevision,
   revertResumeLook,
   startHarnessSession,
@@ -126,6 +124,7 @@ const PHASE_COPY = {
 const ACTIVE_SESSION_KEY = 'jobocate.resumeHarness.activeSessionId';
 
 export default function AppResume() {
+  const router = useRouter();
   const [options, setOptions] = useState(null);
   const [optionsError, setOptionsError] = useState(null);
 
@@ -142,9 +141,6 @@ export default function AppResume() {
   const [companyUrl, setCompanyUrl] = useState('');
 
   const [session, setSession] = useState(null);
-  const [sessions, setSessions] = useState(null);
-  const [sessionsError, setSessionsError] = useState(false);
-  const [sessionsOpen, setSessionsOpen] = useState(true);
   const lifecycleEnded = useRef(new Set());
   const sessionRef = useRef(null);
   const pdfRequestRef = useRef(0);
@@ -162,27 +158,12 @@ export default function AppResume() {
   const [livePhase, setLivePhase] = useState(null);
   const transcriptRef = useRef(null);
 
-  const loadSessions = useCallback(async () => {
-    try {
-      setSessions(await listHarnessSessions());
-      setSessionsError(false);
-    } catch {
-      setSessionsError(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadSessions();
-  }, [loadSessions, session?.id, session?.revision, session?.status, session?.name]);
-
   useEffect(() => {
     const release = (unmounting = false) => {
       const current = sessionRef.current;
       if (current?.status !== 'active' || lifecycleEnded.current.has(current.id)) return;
       lifecycleEnded.current.add(current.id);
-      void endHarnessSessionKeepalive(current.id).then(() => {
-        if (!unmounting) loadSessions();
-      });
+      void endHarnessSessionKeepalive(current.id);
       if (!unmounting) setSession((value) => value?.id === current.id ? { ...value, status: 'ended' } : value);
     };
     const pagehide = () => release();
@@ -197,7 +178,7 @@ export default function AppResume() {
       pdfRequestRef.current += 1;
       release(true);
     };
-  }, [loadSessions]);
+  }, []);
 
   const acceptSession = useCallback((response) => {
     const current = lifecycleEnded.current.has(response.id)
@@ -224,7 +205,6 @@ export default function AppResume() {
     ]));
     setInstruction('');
     setPdfBase64('');
-    setSessionsOpen(false);
     return current;
   }, [acceptSession]);
 
@@ -288,7 +268,11 @@ export default function AppResume() {
   }, [loadOptions, loadTemplates]);
 
   useEffect(() => {
-    const sessionId = window.sessionStorage.getItem(ACTIVE_SESSION_KEY);
+    if (!router.isReady) return undefined;
+    const requestedSessionId =
+      typeof router.query.session === 'string' ? router.query.session : '';
+    const sessionId =
+      requestedSessionId || window.sessionStorage.getItem(ACTIVE_SESSION_KEY);
     if (!sessionId) {
       setSessionRestoreDone(true);
       return undefined;
@@ -300,16 +284,22 @@ export default function AppResume() {
       try {
         const current = await getHarnessSession(sessionId);
         if (cancelled) return;
-        if (current.status !== 'active') {
+        if (!requestedSessionId && current.status !== 'active') {
           window.sessionStorage.removeItem(ACTIVE_SESSION_KEY);
           return;
         }
 
         selectSession(current);
+        if (current.status === 'active') {
+          window.sessionStorage.setItem(ACTIVE_SESSION_KEY, current.id);
+        }
         // A transient PDF failure must not discard the restored session ID.
         await loadPdf(current, () => cancelled);
-      } catch {
-        if (!cancelled) window.sessionStorage.removeItem(ACTIVE_SESSION_KEY);
+      } catch (e) {
+        if (!cancelled) {
+          window.sessionStorage.removeItem(ACTIVE_SESSION_KEY);
+          if (requestedSessionId) setError(e);
+        }
       } finally {
         if (!cancelled) {
           setSessionRestoreDone(true);
@@ -322,7 +312,7 @@ export default function AppResume() {
     return () => {
       cancelled = true;
     };
-  }, [selectSession, loadPdf]);
+  }, [router.isReady, router.query.session, selectSession, loadPdf]);
 
   // Keep the newest line in view while the agent narrates.
   useEffect(() => {
@@ -366,7 +356,6 @@ export default function AppResume() {
       });
       sessionRef.current = next;
       setSession(next);
-      setSessionsOpen(false);
       setCarryFromSessionId('');
       window.sessionStorage.setItem(ACTIVE_SESSION_KEY, next.id);
       setTemplateKey(next.templateKey || '');
@@ -397,9 +386,7 @@ export default function AppResume() {
       setCarryFromSessionId(session.id);
       window.sessionStorage.removeItem(ACTIVE_SESSION_KEY);
       setSession(null);
-      setSessionsOpen(true);
       setPdfBase64('');
-      await loadSessions();
     } catch (e) {
       lifecycleEnded.current.delete(session.id);
       setError(e);
@@ -593,29 +580,6 @@ export default function AppResume() {
     }
   };
 
-  const reopen = async (id) => {
-    if (busy) return;
-    setError(null);
-    setPhase('working');
-    try {
-      if (session?.status === 'active' && session.id !== id) {
-        const ended = await endHarnessSession(session.id);
-        lifecycleEnded.current.add(session.id);
-        acceptSession(ended);
-        window.sessionStorage.removeItem(ACTIVE_SESSION_KEY);
-      }
-      const current = selectSession(await getHarnessSession(id));
-      if (current.status === 'active') window.sessionStorage.setItem(ACTIVE_SESSION_KEY, id);
-      else window.sessionStorage.removeItem(ACTIVE_SESSION_KEY);
-      await loadPdf(current);
-      await loadSessions();
-    } catch (e) {
-      setError(e);
-    } finally {
-      setPhase('ready');
-    }
-  };
-
   const restoreRevision = async (revision) => {
     if (!session || busy) return;
     setError(null);
@@ -624,33 +588,11 @@ export default function AppResume() {
       await restoreHarnessRevision(session.id, revision);
       const current = selectSession(await getHarnessSession(session.id));
       await loadPdf(current);
-      await loadSessions();
     } catch (e) {
       setError(e);
     } finally {
       setPhase('ready');
     }
-  };
-
-  const rename = async (id, name) => {
-    const current = await renameHarnessSession(id, name);
-    setSession((value) => value?.id === id ? { ...value, name: current.name } : value);
-    await loadSessions();
-  };
-
-  const remove = async (id) => {
-    await deleteHarnessSession(id);
-    lifecycleEnded.current.add(id);
-    if (window.sessionStorage.getItem(ACTIVE_SESSION_KEY) === id) window.sessionStorage.removeItem(ACTIVE_SESSION_KEY);
-    if (session?.id === id) {
-      setSession(null);
-      setPdfBase64('');
-      setMessages([]);
-      setPhase('idle');
-      setSessionsOpen(true);
-    }
-    if (carryFromSessionId === id) setCarryFromSessionId('');
-    await loadSessions();
   };
 
   const downloadPdf = () => {
@@ -751,17 +693,6 @@ export default function AppResume() {
             Give it a target, then shape the result in conversation.
           </p>
         </div>
-        <PastSessions
-          sessions={sessions}
-          unavailable={sessionsError}
-          open={sessionsOpen}
-          setOpen={setSessionsOpen}
-          templates={templates}
-          busy={busy}
-          reopen={reopen}
-          rename={rename}
-          remove={remove}
-        />
         {!session ? (
           <Setup
             {...{
@@ -826,76 +757,12 @@ export default function AppResume() {
 }
 
 function sessionTime(value) {
-  return value ? new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'Time unavailable';
-}
-
-function PastSessions({ sessions, unavailable, open, setOpen, templates, busy, reopen, rename, remove }) {
-  const [editing, setEditing] = useState(null);
-  const [name, setName] = useState('');
-  const [deleting, setDeleting] = useState(null);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState('');
-  const act = async (action) => {
-    setPending(true);
-    setError('');
-    try {
-      await action();
-      setEditing(null);
-      setDeleting(null);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setPending(false);
-    }
-  };
-  const disabled = busy || pending;
-  return (
-    <details data-testid="past-sessions" open={open} onToggle={(event) => setOpen(event.currentTarget.open)} style={{ border: `1px solid ${T.line}`, borderRadius: 3, background: T.panel, marginBottom: 22 }}>
-      <summary style={{ padding: '13px 18px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>Past résumé sessions</summary>
-      <div style={{ padding: '0 18px 14px', fontSize: 13, color: T.fg2 }}>
-        {unavailable ? (
-          <p data-testid="sessions-unavailable" style={{ color: T.fg3, margin: 0 }}>Past sessions are temporarily unavailable. You can still start a new résumé.</p>
-        ) : sessions === null ? (
-          <p style={{ color: T.fg3, margin: 0 }}>Loading past sessions…</p>
-        ) : !sessions.length ? (
-          <p data-testid="sessions-empty" style={{ color: T.fg3, margin: 0 }}>Your first résumé starts below. Its drafts and PDFs will be saved here.</p>
-        ) : sessions.map((item) => (
-          <div key={item.id} style={{ borderTop: `1px solid ${T.line}`, padding: '13px 0', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
-            <div style={{ flex: '1 1 300px', minWidth: 0, overflowWrap: 'anywhere' }}>
-              <div style={{ fontWeight: 600, color: T.fg, marginBottom: 5 }}>{item.name || 'Untitled résumé'}</div>
-              <div style={{ color: T.fg3, lineHeight: 1.7 }}>
-                {item.targetRole && <span>{item.targetRole} · </span>}
-                {item.harnessLabel || item.harness} · {item.modelLabel || item.model} · {templateName(templates, item.templateKey) || 'Default template'}
-              </div>
-              <div style={{ color: T.fg3, lineHeight: 1.7 }}>
-                {item.revisionCount ?? item.revision} revisions · {item.compiled ? 'Build passing' : item.revision ? 'Build failing' : 'Not built'} · {item.status} · Updated {sessionTime(item.updatedAt)}
-              </div>
-            </div>
-            {editing === item.id ? (
-              <form onSubmit={(event) => { event.preventDefault(); if (name.trim()) act(() => rename(item.id, name.trim())); }} style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                <input aria-label="Session name" autoFocus maxLength={200} value={name} onChange={(event) => setName(event.target.value)} disabled={disabled} style={{ ...field, width: 220 }} />
-                <button type="submit" disabled={disabled || !name.trim()} style={ghostBtn}>Save name</button>
-                <button type="button" disabled={pending} onClick={() => setEditing(null)} style={ghostBtn}>Cancel</button>
-              </form>
-            ) : deleting === item.id ? (
-              <div role="group" aria-label="Confirm permanent deletion" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-                <span>This deletes every revision and PDF. It cannot be undone.</span>
-                <button disabled={disabled} onClick={() => act(() => remove(item.id))} style={ghostBtn}>Delete permanently</button>
-                <button disabled={pending} onClick={() => setDeleting(null)} style={ghostBtn}>Cancel</button>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                <button disabled={disabled} onClick={() => reopen(item.id)} style={ghostBtn}>Reopen</button>
-                <button disabled={disabled} onClick={() => { setEditing(item.id); setName(item.name || ''); setDeleting(null); }} style={ghostBtn}>Rename</button>
-                <button disabled={disabled} onClick={() => { setDeleting(item.id); setEditing(null); }} style={ghostBtn}>Delete</button>
-              </div>
-            )}
-          </div>
-        ))}
-        {error && <p role="alert">{error}</p>}
-      </div>
-    </details>
-  );
+  return value
+    ? new Date(value).toLocaleString(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      })
+    : 'Time unavailable';
 }
 
 /* ------------------------------------------------------------------ setup --- */

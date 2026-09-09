@@ -778,10 +778,23 @@ export class ResumeHarnessService {
     const session = await this.mustFind(userId, sessionId);
     if (session.sandboxId) {
       await this.sandbox.destroy(session.sandboxId);
+      const endedAt = new Date();
       session.sandboxId = undefined;
       session.status = 'ended';
-      session.endedAt = new Date();
-      await session.save();
+      session.endedAt = endedAt;
+      // A permanent delete must also work for sessions created before the
+      // current revision schema. Updating only the lifecycle fields avoids
+      // validating legacy turns while still leaving a safely-ended record if
+      // artifact cleanup fails and the delete needs to be retried.
+      await this.sessionModel
+        .updateOne(
+          { _id: sessionId, userId },
+          {
+            $set: { status: 'ended', endedAt },
+            $unset: { sandboxId: 1 },
+          },
+        )
+        .exec();
     }
     const keys = new Set(
       [session.pdfKey, ...session.turns.map((turn) => turn.pdfKey)].filter(

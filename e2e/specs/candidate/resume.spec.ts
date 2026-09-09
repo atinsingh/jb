@@ -313,88 +313,6 @@ async function stubHarnessApi(page: Page) {
 test.describe('résumé session operation integrity', () => {
   test.describe.configure({ mode: 'default' });
 
-  test('a delayed reopen response cannot reactivate a session after pagehide', async ({ page }) => {
-    await stubHarnessApi(page);
-    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
-    await page.getByTestId('start-session').click();
-    await page.getByTestId('instruction').fill('Build my résumé.');
-    await page.getByTestId('send-instruction').click();
-    await expect(page.getByTestId('session-revision')).toHaveText('1');
-    let pending: Route | undefined;
-    await page.route(`**/api/resume-harness/sessions/${SESSION.id}`, (route) => { pending = route; });
-    await page.getByTestId('past-sessions').locator('summary').click();
-    await page.getByRole('button', { name: 'Reopen', exact: true }).click();
-    await expect.poll(() => !!pending).toBe(true);
-    const ended = page.waitForRequest((request) => request.url().endsWith(`/${SESSION.id}/end`));
-    await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
-    await ended;
-    await expect(page.getByTestId('session-ended')).toBeVisible();
-    await pending!.fulfill({ json: { ...SESSION, status: 'active', revision: 1, revisionCount: 1, latex: V1, compiled: true, hasCurrentPdf: true } });
-    await expect(page.getByTestId('pdf-preview')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Continue from here' })).toBeEnabled();
-    await expect(page.getByTestId('session-ended')).toBeVisible();
-    await expect(page.getByTestId('instruction')).toHaveCount(0);
-    expect(await page.evaluate(() => sessionStorage.getItem('jobocate.resumeHarness.activeSessionId'))).toBeNull();
-  });
-
-  test('keeps reopen and restore busy until their delayed PDF matches the selected revision', async ({ page }) => {
-    await stubHarnessApi(page);
-    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
-    await page.getByTestId('start-session').click();
-    await page.getByTestId('instruction').fill('Build my résumé.');
-    await page.getByTestId('send-instruction').click();
-    await expect(page.getByTestId('session-revision')).toHaveText('1');
-    let pendingPdf: Route | undefined;
-    await page.route('**/api/resume-harness/sessions/*/pdf', (route) => { pendingPdf = route; });
-    await page.getByTestId('past-sessions').locator('summary').click();
-    await page.getByRole('button', { name: 'Reopen', exact: true }).click();
-    await expect.poll(() => !!pendingPdf).toBe(true);
-    try {
-      await expect(page.getByTestId('instruction')).toBeDisabled();
-      await expect(page.getByTestId('switch-harness')).toBeDisabled();
-      await page.getByTestId('revision-history').locator('summary').click();
-      await expect(page.getByRole('button', { name: 'Restore revision 1', exact: true })).toBeDisabled();
-    } finally {
-      await pendingPdf!.fulfill({ json: { pdfBase64: PDF } });
-    }
-    await expect(page.getByTestId('instruction')).toBeEnabled();
-    await expect(page.getByTestId('pdf-preview')).toHaveAttribute('src', `data:application/pdf;base64,${PDF}`);
-    pendingPdf = undefined;
-    await page.getByRole('button', { name: 'Restore revision 1', exact: true }).click();
-    await expect.poll(() => !!pendingPdf).toBe(true);
-    const restoredPdf = 'JVBERi0xLjgK';
-    try {
-      await expect(page.getByTestId('session-revision')).toHaveText('2');
-      await expect(page.getByTestId('instruction')).toBeDisabled();
-      await expect(page.getByRole('button', { name: 'Restore revision 1', exact: true })).toBeDisabled();
-    } finally {
-      await pendingPdf!.fulfill({ json: { pdfBase64: restoredPdf } });
-    }
-    await expect(page.getByTestId('instruction')).toBeEnabled();
-    await expect(page.getByTestId('pdf-preview')).toHaveAttribute('src', `data:application/pdf;base64,${restoredPdf}`);
-  });
-
-  test('a failed destination reopen leaves the released source visibly ended', async ({ page, guards }) => {
-    guards.allowFailures(/\/api\/resume-harness\/sessions\/unavailable-session$/);
-    guards.allowConsoleErrors();
-    await stubHarnessApi(page);
-    await page.route('**/api/resume-harness/sessions', (route) => route.request().method() === 'GET'
-      ? route.fulfill({ json: [SESSION, { ...SESSION, id: 'unavailable-session', name: 'Other résumé' }] })
-      : route.fallback());
-    await page.route('**/api/resume-harness/sessions/unavailable-session', (route) =>
-      route.fulfill({ status: 503, json: { message: 'Cannot reopen this session right now.' } }));
-    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
-    await page.getByTestId('start-session').click();
-    await page.getByTestId('past-sessions').locator('summary').click();
-    await page.getByRole('button', { name: 'Reopen', exact: true }).last().click();
-    await expect(page.getByTestId('harness-error')).toContainText('Cannot reopen this session right now.');
-    await expect(page.getByTestId('session-ended')).toBeVisible();
-    await expect(page.getByTestId('instruction')).toHaveCount(0);
-    await expect(page.getByTestId('look-toggle')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Continue from here' })).toBeEnabled();
-    expect(await page.evaluate(() => sessionStorage.getItem('jobocate.resumeHarness.activeSessionId'))).toBeNull();
-  });
-
   test('revision history shows the original instruction alongside its summary', async ({ page }) => {
     await stubHarnessApi(page);
     await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
@@ -410,10 +328,42 @@ test.describe('résumé session operation integrity', () => {
 });
 
 test.describe('résumé session history', () => {
-  test('reopens a persisted PDF after reload, restores in place, renames and deletes', async ({ page }) => {
+  test('manages agent sessions from the résumé library instead of the authoring page', async ({ page }) => {
+    await stubHarnessApi(page);
+    await page.route('**/api/resume-builder', (route: Route) =>
+      route.fulfill({ json: [] }),
+    );
+
+    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('past-sessions')).toHaveCount(0);
+    await page.getByTestId('start-session').click();
+    await page.getByTestId('instruction').fill('Build my résumé.');
+    await page.getByTestId('send-instruction').click();
+    await page.getByTestId('end-session').click();
+
+    await page.goto('/app/resume-library', { waitUntil: 'domcontentloaded' });
+    const library = page.getByTestId('agent-resume-sessions');
+    await expect(library).toContainText('Backend engineer résumé');
+    await expect(library).toContainText('1 revision');
+
+    await library.getByRole('button', { name: 'Rename' }).click();
+    await library.getByRole('textbox', { name: 'Session name' }).fill('Platform résumé');
+    await library.getByRole('button', { name: 'Save name' }).click();
+    await expect(library).toContainText('Platform résumé');
+
+    await library.getByRole('button', { name: 'Open session' }).click();
+    await expect(page).toHaveURL(/\/app\/resume\?session=sess-e2e-1$/);
+    await expect(page.getByTestId('pdf-preview')).toBeVisible();
+
+    await page.goto('/app/resume-library', { waitUntil: 'domcontentloaded' });
+    await page.getByTestId('agent-resume-sessions').getByRole('button', { name: 'Delete' }).click();
+    await page.getByRole('button', { name: 'Delete session' }).click();
+    await expect(page.getByTestId('agent-sessions-empty')).toBeVisible();
+  });
+
+  test('reopens a persisted PDF, restores in place, and continues from it', async ({ page }) => {
     await stubHarnessApi(page);
     await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByTestId('sessions-empty')).toBeVisible();
     await page.getByTestId('start-session').click();
     await page.getByTestId('instruction').fill('Build my résumé.');
     await page.getByTestId('send-instruction').click();
@@ -422,39 +372,23 @@ test.describe('résumé session history', () => {
     await page.getByTestId('send-instruction').click();
     await expect(page.getByTestId('session-revision')).toHaveText('2');
     await page.getByTestId('end-session').click();
-    await page.reload({ waitUntil: 'domcontentloaded' });
-    const past = page.getByTestId('past-sessions');
-    await expect(past).toContainText('Backend engineer résumé');
-    await expect(past).toContainText('2 revisions');
-    await past.getByRole('button', { name: 'Reopen', exact: true }).click();
+    await page.goto(`/app/resume?session=${SESSION.id}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('pdf-preview')).toHaveAttribute('src', `data:application/pdf;base64,${PDF}`);
     await expect(page.getByTestId('instruction')).toHaveCount(0);
     await expect(page.getByTestId('look-toggle')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Continue from here' })).toBeVisible();
     await page.getByTestId('revision-history').locator('summary').click();
     await page.getByRole('button', { name: 'Restore revision 1', exact: true }).click();
-    await expect(page).toHaveURL(/\/app\/resume$/);
+    await expect(page).toHaveURL(/\/app\/resume\?session=sess-e2e-1$/);
     await expect(page.getByTestId('session-revision')).toHaveText('3');
     await expect(page.getByTestId('latex-source')).not.toContainText('Kubernetes');
     await expect(page.getByTestId('pdf-preview')).toBeVisible();
     await expect(page.getByTestId('revision-history')).toContainText('Restored revision 1.');
-    await past.locator('summary').click();
-    await expect(past).toContainText('3 revisions');
-    await past.getByRole('button', { name: 'Rename', exact: true }).click();
-    await past.getByRole('textbox', { name: 'Session name' }).fill('Platform engineer');
-    await past.getByRole('button', { name: 'Save name' }).click();
-    await expect(past).toContainText('Platform engineer');
     const continuing = page.waitForRequest((request) => request.method() === 'POST' && request.url().endsWith('/resume-harness/sessions'));
     await page.getByRole('button', { name: 'Continue from here' }).click();
     expect((await continuing).postDataJSON().carryFromSessionId).toBe(SESSION.id);
     await expect(page.getByTestId('instruction')).toBeVisible();
     await expect(page.getByTestId('pdf-preview')).toBeVisible();
-    await past.locator('summary').click();
-    await past.getByRole('button', { name: 'Delete', exact: true }).click();
-    await expect(past.getByRole('button', { name: 'Delete permanently' })).toBeVisible();
-    await past.getByRole('button', { name: 'Delete permanently' }).click();
-    await expect(page.getByTestId('sessions-empty')).toBeVisible();
-    await expect(page.getByTestId('start-session')).toBeEnabled();
   });
 
   test('list failure leaves generation usable', async ({ page, guards }) => {
@@ -466,8 +400,10 @@ test.describe('résumé session history', () => {
         ? route.fulfill({ status: 503, json: { message: 'History unavailable' } })
         : route.fallback(),
     );
-    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByTestId('sessions-unavailable')).toBeVisible();
+    await page.route('**/api/resume-builder', (route: Route) => route.fulfill({ json: [] }));
+    await page.goto('/app/resume-library', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('agent-resume-sessions')).toContainText('temporarily unavailable');
+    await page.getByRole('button', { name: 'New agent résumé' }).click();
     await page.getByTestId('start-session').click();
     await page.getByTestId('instruction').fill('Build my résumé.');
     await page.getByTestId('send-instruction').click();
@@ -476,6 +412,7 @@ test.describe('résumé session history', () => {
 
   test('hidden and pagehide send one authenticated lifecycle end and never delete', async ({ page }) => {
     await stubHarnessApi(page);
+    await page.route('**/api/resume-builder', (route: Route) => route.fulfill({ json: [] }));
     const ends: any[] = [];
     const deletes: string[] = [];
     page.on('request', (request) => {
@@ -494,8 +431,8 @@ test.describe('résumé session history', () => {
     expect(ends[0].method()).toBe('POST');
     expect(ends[0].headers().authorization).toMatch(/^Bearer /);
     await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
-    await page.reload({ waitUntil: 'domcontentloaded' });
-    await expect(page.getByTestId('past-sessions')).toContainText('ended');
+    await page.goto('/app/resume-library', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('agent-resume-sessions')).toContainText('Ended');
     expect(ends).toHaveLength(1);
     expect(deletes).toHaveLength(0);
   });
