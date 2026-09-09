@@ -2,12 +2,24 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsIn,
   IsMongoId,
+  IsNotEmptyObject,
+  IsObject,
   IsOptional,
   IsString,
   MaxLength,
   MinLength,
 } from 'class-validator';
 import { HARNESS_IDS, HarnessId } from '../harness/harness.types';
+
+/**
+ * Knob choices, as `knobKey -> optionValue`.
+ *
+ * Left as a free-form object here and validated in `ResumeTemplateService`
+ * against the knobs the *selected template* declares — the valid set differs
+ * per template, so it cannot be an enum on a DTO without hardcoding the
+ * catalogue into code the seed is supposed to own.
+ */
+export type VibeDto = Record<string, string>;
 
 export class StartSessionDto {
   @ApiProperty({ enum: HARNESS_IDS })
@@ -57,6 +69,53 @@ export class StartSessionDto {
   @IsString()
   @MaxLength(20000)
   jobDescription?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Template to write to. Omitted means the carried session’s template, ' +
+      'then the catalogue default.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  templateKey?: string;
+
+  @ApiPropertyOptional({
+    description: 'Initial look, as knobKey -> optionValue.',
+    type: 'object',
+    additionalProperties: { type: 'string' },
+  })
+  @IsOptional()
+  @IsObject()
+  vibe?: VibeDto;
+}
+
+export class SelectTemplateDto {
+  @ApiProperty({ description: 'Key of a seeded template.' })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  templateKey: string;
+
+  @ApiPropertyOptional({
+    description: 'Look to apply along with the switch.',
+    type: 'object',
+    additionalProperties: { type: 'string' },
+  })
+  @IsOptional()
+  @IsObject()
+  vibe?: VibeDto;
+}
+
+export class ApplyVibeDto {
+  @ApiProperty({
+    description: 'Knob choices to apply, as knobKey -> optionValue.',
+    type: 'object',
+    additionalProperties: { type: 'string' },
+  })
+  @IsObject()
+  @IsNotEmptyObject()
+  vibe: VibeDto;
 }
 
 export class RunTurnDto {

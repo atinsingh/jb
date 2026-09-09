@@ -7,6 +7,7 @@ import {
 } from './schemas/harness-model-alias.schema';
 import { User, UserDocument } from '../schemas/user.schema';
 import { ResolvedModelAlias } from './harness/harness.types';
+import { isOfferedHarnessAlias } from './offered-alias';
 
 /**
  * Resolves which model+effort alias a signed-in user may run a harness at.
@@ -54,7 +55,7 @@ export class ModelAliasService {
       .lean()
       .exec();
 
-    return (docs as any[]).map((d) => this.toResolved(d, tier));
+    return this.offered(docs).map((d) => this.toResolved(d, tier));
   }
 
   /**
@@ -94,11 +95,15 @@ export class ModelAliasService {
       .lean()
       .exec();
 
-    const preferred = (docs as any[]).find((d) =>
+    const preferred = this.offered(docs).find((d) =>
       (d.defaultForTiers || []).includes(tier),
     );
 
     return preferred ? this.toResolved(preferred, tier) : allowed[0];
+  }
+
+  private offered(docs: any[]): any[] {
+    return docs.filter((d) => isOfferedHarnessAlias(d.alias, d.model));
   }
 
   private toResolved(doc: any, tier?: string): ResolvedModelAlias {

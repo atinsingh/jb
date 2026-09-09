@@ -5,8 +5,10 @@ import { Model } from 'mongoose';
 import { AppModule } from '../src/app.module';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { LoggingInterceptor } from '../src/common/interceptors/logging.interceptor';
-import { AgentPlatformClient } from '../src/resume-harness/sandbox/agent-platform.client';
+import { SANDBOX_DRIVER } from '../src/resume-harness/sandbox/sandbox-driver.interface';
 import { HarnessModelAlias } from '../src/resume-harness/schemas/harness-model-alias.schema';
+import { ResumeTemplate } from '../src/resume-harness/schemas/resume-template.schema';
+import { seedResumeTemplates } from '../src/resume-harness/templates/resume-templates.seed';
 import { HARNESS_IDS } from '../src/resume-harness/harness/harness.types';
 import { api, auth, registerUser, resetDatabase, TestUser } from './utils/e2e-app';
 
@@ -25,13 +27,30 @@ import { api, auth, registerUser, resetDatabase, TestUser } from './utils/e2e-ap
  * if an adapter stopped producing a runnable command, this suite fails.
  */
 
-/** In-memory stand-in for one Agent Platform deployment. */
-class FakeAgentPlatform {
+/**
+ * In-memory stand-in for one sandbox backend.
+ *
+ * Injected over the `SANDBOX_DRIVER` token, which is what the module actually
+ * resolves. Overriding the `AgentPlatformClient` class instead — as this suite
+ * previously did — silently did nothing, because the module builds its driver
+ * in a factory rather than through DI: the suite then ran against the
+ * developer's real Docker daemon, took minutes, leaked containers and failed
+ * every assertion that reads `sandboxes` below.
+ */
+class FakeSandboxDriver {
   readonly sandboxes = new Map<
     string,
     { spec: any; files: Map<string, string>; execs: string[][] }
   >();
   private seq = 0;
+
+  isConfigured() {
+    return true;
+  }
+
+  async ping() {
+    return true;
+  }
 
   isAvailable() {
     return true;
@@ -71,11 +90,19 @@ class FakeAgentPlatform {
     }
 
     // A harness turn: the prompt is the last argv element for all three CLIs.
+    //
+    // The stand-in behaves like a harness that honours its context files: it
+    // starts from TEMPLATE.tex when creating, and appends when updating. That
+    // is what makes the template assertions meaningful — a skeleton that never
+    // reached the sandbox cannot show up in the result.
     const prompt = command[command.length - 1];
     const existing = box.files.get('resume.tex');
+    const skeleton = box.files.get('TEMPLATE.tex');
+    const first = prompt.split('\n')[0];
+
     const body = existing
-      ? `${existing}\n% ${prompt.split('\n').slice(0, 1).join(' ')}`
-      : `\\documentclass{article}\n\\begin{document}\n% ${prompt.split('\n')[0]}\n\\end{document}`;
+      ? `${existing}\n% ${first}`
+      : `${skeleton || '\\documentclass{article}\n\\begin{document}\n\\end{document}'}\n% ${first}`;
     box.files.set('resume.tex', body);
     return { exitCode: 0, stdout: 'edited resume.tex', stderr: '' };
   }
@@ -115,14 +142,14 @@ const ELITE_ONLY_ALIAS = {
 
 describe('Resume harness (e2e)', () => {
   let app: INestApplication;
-  let platform: FakeAgentPlatform;
+  let platform: FakeSandboxDriver;
   let candidate: TestUser;
 
   beforeAll(async () => {
-    platform = new FakeAgentPlatform();
+    platform = new FakeSandboxDriver();
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
-      .overrideProvider(AgentPlatformClient)
+      .overrideProvider(SANDBOX_DRIVER)
       .useValue(platform)
       .compile();
 
@@ -144,6 +171,13 @@ describe('Resume harness (e2e)', () => {
 
     const aliases = app.get<Model<any>>(getModelToken(HarnessModelAlias.name));
     await aliases.create([FREE_TIER_ALIAS, ELITE_ONLY_ALIAS]);
+
+    // The real catalogue, installed the way production installs it. Asserting
+    // against the seeded templates rather than fixtures is what makes this
+    // suite fail if a seeded skeleton stops being usable.
+    await seedResumeTemplates(
+      app.get<Model<any>>(getModelToken(ResumeTemplate.name)),
+    );
   });
 
   afterAll(async () => {
@@ -299,5 +333,244 @@ describe('Resume harness (e2e)', () => {
     // The new sandbox starts with the resume already on disk.
     const box = platform.sandboxes.get(second.body.sandboxId)!;
     expect(box.files.get('resume.tex')).toBe(generated.body.latex);
+  });
+
+  /**
+   * Select a template, generate, change the look, see it re-rendered.
+   *
+   * Run on a Claude Code session and on an AGENTS.md-only session, because the
+   * one thing that differs between harnesses here is which files a look change
+   * has to rewrite — and a condition that reaches only two of the three files
+   * is exactly how a harness ends up working from a stale look.
+   */
+  describe('templates and vibe', () => {
+    it('publishes the seeded catalogue with previews and knobs', async () => {
+      const res = await api(app)
+        .get('/api/resume-harness/templates')
+        .set(auth(candidate.token))
+        .expect(200);
+
+      expect(res.body.length).toBeGreaterThanOrEqual(4);
+      const first = res.body[0];
+      expect(first.key).toBeTruthy();
+      expect(first.previewSvg).toContain('<svg');
+      expect(first.knobs.length).toBeGreaterThan(0);
+      // The skeleton is a sandbox file; the browser has no use for it.
+      expect(first.skeleton).toBeUndefined();
+    });
+
+    it('requires authentication', async () => {
+      await api(app).get('/api/resume-harness/templates').expect(401);
+    });
+
+    describe.each(['claude-code', 'codex'] as const)('on %s', (harness) => {
+      let sessionId: string;
+      let sandboxId: string;
+
+      it('starts on the chosen template, with its skeleton and condition on disk', async () => {
+        const res = await api(app)
+          .post('/api/resume-harness/sessions')
+          .set(auth(candidate.token))
+          .send({ harness, templateKey: 'modern-sans', vibe: { accent: 'navy' } })
+          .expect(201);
+
+        sessionId = res.body.id;
+        sandboxId = res.body.sandboxId;
+        expect(res.body.templateKey).toBe('modern-sans');
+        expect(res.body.vibe.accent).toBe('navy');
+        expect(res.body.canRevert).toBe(false);
+
+        const box = platform.sandboxes.get(sandboxId)!;
+        expect(box.files.get('TEMPLATE.tex')).toContain('Modern Sans');
+
+        const agents = box.files.get('AGENTS.md')!;
+        expect(agents).toContain('Modern Sans');
+        expect(agents).toContain('TEMPLATE.tex');
+        expect(agents).toContain('navy');
+
+        if (harness === 'claude-code') {
+          expect(box.files.get('CLAUDE.md')).toMatch(/^@AGENTS\.md$/m);
+          // The condition is reached through the import, never copied.
+          expect(box.files.get('CLAUDE.md')).not.toContain('Modern Sans');
+        } else {
+          expect(box.files.has('CLAUDE.md')).toBe(false);
+        }
+      });
+
+      it('generates against that template', async () => {
+        const res = await api(app)
+          .post(`/api/resume-harness/sessions/${sessionId}/turns`)
+          .set(auth(candidate.token))
+          .send({ instruction: 'Build a resume for a backend engineer.' })
+          .expect(201);
+
+        expect(res.body.revision).toBe(1);
+        expect(res.body.compiled).toBe(true);
+        // The output is built on the selected skeleton, not a generic preamble.
+        expect(res.body.latex).toContain('Modern Sans');
+      });
+
+      it('applies a vibe change, rewriting the condition and keeping the content', async () => {
+        const before = await api(app)
+          .get(`/api/resume-harness/sessions/${sessionId}`)
+          .set(auth(candidate.token))
+          .expect(200);
+
+        const res = await api(app)
+          .post(`/api/resume-harness/sessions/${sessionId}/vibe`)
+          .set(auth(candidate.token))
+          .send({ vibe: { density: 'compact', accent: 'forest' } })
+          .expect(201);
+
+        expect(res.body.vibe.density).toBe('compact');
+        expect(res.body.vibe.accent).toBe('forest');
+        expect(res.body.revision).toBe(before.body.revision + 1);
+        expect(res.body.canRevert).toBe(true);
+        // Content survives the change — this is a re-apply, not a rewrite.
+        expect(res.body.latex.startsWith(before.body.latex)).toBe(true);
+
+        const agents = platform.sandboxes.get(sandboxId)!.files.get('AGENTS.md')!;
+        expect(agents).toContain('forest');
+        expect(agents).not.toContain('navy');
+      });
+
+      it('switches template mid-session and carries the content over', async () => {
+        const before = await api(app)
+          .get(`/api/resume-harness/sessions/${sessionId}`)
+          .set(auth(candidate.token))
+          .expect(200);
+
+        const res = await api(app)
+          .post(`/api/resume-harness/sessions/${sessionId}/template`)
+          .set(auth(candidate.token))
+          .send({ templateKey: 'executive-serif' })
+          .expect(201);
+
+        expect(res.body.templateKey).toBe('executive-serif');
+        expect(res.body.latex.startsWith(before.body.latex)).toBe(true);
+        // Same session, same sandbox — a template is not a harness.
+        expect(res.body.sandboxId).toBe(before.body.sandboxId);
+
+        const box = platform.sandboxes.get(sandboxId)!;
+        expect(box.files.get('TEMPLATE.tex')).toContain('Executive Serif');
+        expect(box.files.get('AGENTS.md')).toContain('Executive Serif');
+      });
+
+      it('steps back to the previous look, restoring the earlier source', async () => {
+        const current = await api(app)
+          .get(`/api/resume-harness/sessions/${sessionId}`)
+          .set(auth(candidate.token))
+          .expect(200);
+        expect(current.body.canRevert).toBe(true);
+
+        const res = await api(app)
+          .post(`/api/resume-harness/sessions/${sessionId}/revert-look`)
+          .set(auth(candidate.token))
+          .expect(201);
+
+        expect(res.body.templateKey).toBe('modern-sans');
+        expect(res.body.latex.length).toBeLessThan(current.body.latex.length);
+        expect(res.body.canRevert).toBe(false);
+
+        // The rules went back too, or the next turn would run under the
+        // template that was just reverted away from.
+        expect(platform.sandboxes.get(sandboxId)!.files.get('AGENTS.md')).toContain(
+          'Modern Sans',
+        );
+
+        await api(app)
+          .post(`/api/resume-harness/sessions/${sessionId}/revert-look`)
+          .set(auth(candidate.token))
+          .expect(409);
+      });
+
+      it('refuses a knob value the template does not declare', async () => {
+        await api(app)
+          .post(`/api/resume-harness/sessions/${sessionId}/vibe`)
+          .set(auth(candidate.token))
+          .send({ vibe: { density: 'enormous' } })
+          .expect(400);
+
+        await api(app)
+          .post(`/api/resume-harness/sessions/${sessionId}/template`)
+          .set(auth(candidate.token))
+          .send({ templateKey: 'no-such-template' })
+          .expect(404);
+      });
+
+      it('refuses a look change once the session has ended', async () => {
+        await api(app)
+          .delete(`/api/resume-harness/sessions/${sessionId}`)
+          .set(auth(candidate.token))
+          .expect(200);
+
+        await api(app)
+          .post(`/api/resume-harness/sessions/${sessionId}/template`)
+          .set(auth(candidate.token))
+          .send({ templateKey: 'classic-serif' })
+          .expect(409);
+      });
+    });
+
+    it('carries template and look into a new session on a different harness', async () => {
+      const first = await api(app)
+        .post('/api/resume-harness/sessions')
+        .set(auth(candidate.token))
+        .send({
+          harness: 'claude-code',
+          templateKey: 'technical-ledger',
+          vibe: { accent: 'burgundy', tone: 'technical' },
+        })
+        .expect(201);
+
+      await api(app)
+        .post(`/api/resume-harness/sessions/${first.body.id}/turns`)
+        .set(auth(candidate.token))
+        .send({ instruction: 'Build a resume for a platform engineer.' })
+        .expect(201);
+
+      const second = await api(app)
+        .post('/api/resume-harness/sessions')
+        .set(auth(candidate.token))
+        .send({ harness: 'opencode', carryFromSessionId: first.body.id })
+        .expect(201);
+
+      expect(second.body.harness).toBe('opencode');
+      expect(second.body.templateKey).toBe('technical-ledger');
+      expect(second.body.vibe.accent).toBe('burgundy');
+      expect(second.body.vibe.tone).toBe('technical');
+
+      // The new sandbox is correct from its first turn, not after one.
+      const box = platform.sandboxes.get(second.body.sandboxId)!;
+      expect(box.files.get('TEMPLATE.tex')).toContain('Technical Ledger');
+      expect(box.files.get('AGENTS.md')).toContain('burgundy');
+      expect(box.files.has('CLAUDE.md')).toBe(false);
+    });
+
+    it('drops a knob the newly chosen template does not declare', async () => {
+      // technical-ledger has no section-order knob; classic-serif does.
+      const session = await api(app)
+        .post('/api/resume-harness/sessions')
+        .set(auth(candidate.token))
+        .send({
+          harness: 'codex',
+          templateKey: 'classic-serif',
+          vibe: { order: 'skills-first' },
+        })
+        .expect(201);
+
+      expect(session.body.vibe.order).toBe('skills-first');
+
+      const switched = await api(app)
+        .post(`/api/resume-harness/sessions/${session.body.id}/template`)
+        .set(auth(candidate.token))
+        .send({ templateKey: 'technical-ledger' })
+        .expect(201);
+
+      expect(switched.body.templateKey).toBe('technical-ledger');
+      // Carried where it still means something, dropped where it does not.
+      expect(switched.body.vibe.order).toBeUndefined();
+      expect(switched.body.vibe.tone).toBeDefined();
+    });
   });
 });

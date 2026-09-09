@@ -18,7 +18,12 @@ import {
 import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ResumeHarnessService } from './resume-harness.service';
-import { RunTurnDto, StartSessionDto } from './dto/resume-harness.dto';
+import {
+  ApplyVibeDto,
+  RunTurnDto,
+  SelectTemplateDto,
+  StartSessionDto,
+} from './dto/resume-harness.dto';
 
 /**
  * One harness-agnostic contract for LaTeX resume generation.
@@ -40,6 +45,19 @@ export class ResumeHarnessController {
   })
   options(@Request() req) {
     return this.service.options(this.userId(req));
+  }
+
+  /**
+   * The seeded template catalogue.
+   *
+   * Not tier-filtered: a template is a layout, not a capability, and gating one
+   * behind a plan would be a paywall on typography. What a plan buys is the
+   * model that writes the words, which `options` already reports.
+   */
+  @Get('templates')
+  @ApiOperation({ summary: 'Predefined LaTeX templates, with previews and knobs' })
+  templates() {
+    return this.service.listTemplates();
   }
 
   @Post('sessions')
@@ -90,6 +108,95 @@ export class ResumeHarnessController {
     @Body() dto: RunTurnDto,
     @Res() res: Response,
   ) {
+    this.sseHeaders(res);
+    return this.stream(res, (send) =>
+      this.service.runTurnStreaming(this.userId(req), id, dto, send),
+    );
+  }
+
+  // -------------------------------------------------- template and vibe ---
+
+  /**
+   * Switch the résumé to a different template, carrying its content across.
+   *
+   * Unlike the harness, the template is not fixed for the life of a session:
+   * nothing about the sandbox is rebound, so this is one turn against a
+   * rewritten condition. The response is the session after the re-apply.
+   */
+  @Post('sessions/:id/template')
+  @ApiOperation({ summary: 'Select a template and re-apply the résumé to it' })
+  @ApiResponse({ status: 404, description: 'No such template, or no such session' })
+  @ApiResponse({ status: 409, description: 'The session has ended' })
+  selectTemplate(
+    @Request() req,
+    @Param('id') id: string,
+    @Body() dto: SelectTemplateDto,
+  ) {
+    return this.service.selectTemplate(this.userId(req), id, dto);
+  }
+
+  @Post('sessions/:id/template/stream')
+  @ApiOperation({ summary: 'Select a template, streaming the re-render as SSE' })
+  async selectTemplateStream(
+    @Request() req,
+    @Param('id') id: string,
+    @Body() dto: SelectTemplateDto,
+    @Res() res: Response,
+  ) {
+    this.sseHeaders(res);
+    return this.stream(res, (send) =>
+      this.service.selectTemplate(this.userId(req), id, dto, send),
+    );
+  }
+
+  /** Move the look dials on the current template, keeping the content. */
+  @Post('sessions/:id/vibe')
+  @ApiOperation({ summary: 'Apply a vibe change and re-render' })
+  @ApiResponse({ status: 400, description: 'A knob or value this template does not declare' })
+  applyVibe(
+    @Request() req,
+    @Param('id') id: string,
+    @Body() dto: ApplyVibeDto,
+  ) {
+    return this.service.applyVibe(this.userId(req), id, dto);
+  }
+
+  @Post('sessions/:id/vibe/stream')
+  @ApiOperation({ summary: 'Apply a vibe change, streaming the re-render as SSE' })
+  async applyVibeStream(
+    @Request() req,
+    @Param('id') id: string,
+    @Body() dto: ApplyVibeDto,
+    @Res() res: Response,
+  ) {
+    this.sseHeaders(res);
+    return this.stream(res, (send) =>
+      this.service.applyVibe(this.userId(req), id, dto, send),
+    );
+  }
+
+  /**
+   * One step back to the look before the last change.
+   *
+   * Not streamed, because it does not run the model: the previous source is
+   * already known-good and is simply written back and rebuilt.
+   */
+  @Post('sessions/:id/revert-look')
+  @ApiOperation({ summary: 'Restore the résumé as it was before the last look change' })
+  @ApiResponse({ status: 409, description: 'There is no previous look to restore' })
+  revertLook(@Request() req, @Param('id') id: string) {
+    return this.service.revertLook(this.userId(req), id);
+  }
+
+  @Delete('sessions/:id')
+  @ApiOperation({ summary: 'End the session and release its sandbox' })
+  end(@Request() req, @Param('id') id: string) {
+    return this.service.endSession(this.userId(req), id);
+  }
+
+  // ------------------------------------------------------------ internals ---
+
+  private sseHeaders(res: Response): void {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
@@ -97,19 +204,26 @@ export class ResumeHarnessController {
     // defeat the point of streaming.
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders?.();
+  }
 
+  /**
+   * Runs one long operation with its progress on the wire.
+   *
+   * The error path writes an SSE `error` frame rather than setting a status
+   * code: the headers went out when the stream opened, so a thrown exception
+   * would reach the browser as a truncated body and the screen would show a
+   * turn that never ended.
+   */
+  private async stream(
+    res: Response,
+    run: (send: (event: Record<string, unknown>) => void) => Promise<unknown>,
+  ): Promise<void> {
     const send = (event: Record<string, unknown>) => {
       res.write(`data: ${JSON.stringify(event)}\n\n`);
     };
 
     try {
-      const result = await this.service.runTurnStreaming(
-        this.userId(req),
-        id,
-        dto,
-        send,
-      );
-      send({ type: 'result', session: result });
+      send({ type: 'result', session: await run(send) });
     } catch (err: any) {
       send({
         type: 'error',
@@ -119,12 +233,6 @@ export class ResumeHarnessController {
     } finally {
       res.end();
     }
-  }
-
-  @Delete('sessions/:id')
-  @ApiOperation({ summary: 'End the session and release its sandbox' })
-  end(@Request() req, @Param('id') id: string) {
-    return this.service.endSession(this.userId(req), id);
   }
 
   private userId(req: any): string {

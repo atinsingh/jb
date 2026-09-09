@@ -1,4 +1,4 @@
-version: '3.8'
+name: jb
 
 services:
   # MongoDB Database
@@ -6,8 +6,10 @@ services:
     image: mongo:7.0
     container_name: jobocate-mongodb
     restart: unless-stopped
+    # Host 27017 is taken on this machine (another project's mongo).
+    # App code on the host uses MONGODB_URI …:27018; in-network it is still 27017.
     ports:
-      - "27017:27017"
+      - "27018:27017"
     environment:
       - MONGO_INITDB_DATABASE=jobocate
     volumes:

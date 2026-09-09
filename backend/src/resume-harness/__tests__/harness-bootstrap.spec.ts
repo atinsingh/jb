@@ -1,7 +1,11 @@
 import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { HarnessRegistry } from '../harness/harness.registry';
-import { HARNESS_IDS, HarnessId, LITELLM_TAG_HEADER } from '../harness/harness.types';
+import {
+  HARNESS_IDS,
+  HarnessId,
+  LITELLM_TAG_HEADER,
+} from '../harness/harness.types';
 
 const HARNESS_DIR = join(__dirname, '..', 'harness');
 
@@ -28,9 +32,12 @@ describe('harness bootstrap', () => {
   const registry = new HarnessRegistry();
 
   it('exposes exactly the three supported harnesses', () => {
-    expect(registry.list().map((h) => h.id).sort()).toEqual(
-      [...HARNESS_IDS].sort(),
-    );
+    expect(
+      registry
+        .list()
+        .map((h) => h.id)
+        .sort(),
+    ).toEqual([...HARNESS_IDS].sort());
   });
 
   describe.each(HARNESS_IDS)('%s', (id: HarnessId) => {
@@ -72,7 +79,9 @@ describe('harness bootstrap', () => {
 
       // Nothing that smells like a consumer-subscription credential.
       for (const name of Object.keys(env)) {
-        expect(name).not.toMatch(/OAUTH|REFRESH_TOKEN|SESSION_KEY|SUBSCRIPTION/i);
+        expect(name).not.toMatch(
+          /OAUTH|REFRESH_TOKEN|SESSION_KEY|SUBSCRIPTION/i,
+        );
       }
       expect(values).not.toMatch(/sk-ant-oat|oauth|Bearer ya29\./i);
     });
@@ -87,7 +96,10 @@ describe('harness bootstrap', () => {
   it('has no subscription-OAuth auth path anywhere in the harness layer', () => {
     const sources = readdirSync(HARNESS_DIR)
       .filter((f) => f.endsWith('.ts') && !f.endsWith('.spec.ts'))
-      .map((f) => ({ file: f, code: readFileSync(join(HARNESS_DIR, f), 'utf8') }));
+      .map((f) => ({
+        file: f,
+        code: readFileSync(join(HARNESS_DIR, f), 'utf8'),
+      }));
 
     expect(sources.length).toBeGreaterThanOrEqual(HARNESS_IDS.length);
 
@@ -110,12 +122,21 @@ describe('harness bootstrap', () => {
         .replace(/\/\*[\s\S]*?\*\//g, '')
         .replace(/^\s*\/\/.*$/gm, '');
       for (const pattern of forbidden) {
-        expect({ file, match: executable.match(pattern)?.[0] ?? null }).toEqual({
-          file,
-          match: null,
-        });
+        expect({ file, match: executable.match(pattern)?.[0] ?? null }).toEqual(
+          {
+            file,
+            match: null,
+          },
+        );
       }
     }
+  });
+
+  it('keeps OpenCode in one auto-approved, plugin-free session across turns', () => {
+    const boot = registry.get('opencode').bootstrap(bootstrapInput());
+    expect(boot.command).toEqual(
+      expect.arrayContaining(['--continue', '--auto', '--pure']),
+    );
   });
 });
 
@@ -137,7 +158,10 @@ describe('harness bootstrap — output token ceiling', () => {
   const inputWithLimit = (maxOutputTokens?: number) => ({
     sessionId: 'sess-1',
     workdir: '/workspace',
-    proxy: { baseUrl: 'http://litellm:4000', apiKey: 'sk-litellm-virtual-abc123' },
+    proxy: {
+      baseUrl: 'http://litellm:4000',
+      apiKey: 'sk-litellm-virtual-abc123',
+    },
     alias: {
       alias: 'bedrock/nova-micro/low',
       provider: 'bedrock',
@@ -161,7 +185,9 @@ describe('harness bootstrap — output token ceiling', () => {
       const boot = registry.get(id).bootstrap(inputWithLimit(undefined) as any);
       const surface = JSON.stringify({ env: boot.env, files: boot.files });
       // No invented default — an absent limit must stay absent.
-      expect(surface).not.toMatch(/8192|maxOutputTokens|max_output_tokens.*null/);
+      expect(surface).not.toMatch(
+        /8192|maxOutputTokens|max_output_tokens.*null/,
+      );
     });
   });
 });

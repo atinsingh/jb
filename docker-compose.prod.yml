@@ -5,6 +5,9 @@
 #   docker compose -f docker-compose.prod.yml build
 #   docker compose -f docker-compose.prod.yml up -d
 #
+# Project name is `jb` so these services sit with the rest of the stack in
+# Docker Desktop (same group as docker-compose.yml).
+#
 # Differences vs the dev docker-compose.yml:
 #   * Builds the slim `runtime` stages (compiled `node dist/src/main.js` and
 #     `next start`) instead of dev servers.
@@ -15,6 +18,8 @@
 # is inlined into the frontend bundle at build time, so set it to the PUBLIC
 # backend URL your users hit (not the internal docker hostname).
 # ---------------------------------------------------------------------------
+
+name: jb
 
 services:
   mongodb:

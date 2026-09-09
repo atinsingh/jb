@@ -47,6 +47,15 @@ const OPTIONS = {
       effort: 'low',
       label: 'Nova Micro · cheapest',
     },
+    // A different provider+model family. The picker keys off provider+model,
+    // not the short model id, so this cannot collapse into the Anthropic row.
+    {
+      alias: 'bedrock/nova-lite/low',
+      provider: 'bedrock',
+      model: 'nova-lite',
+      effort: 'low',
+      label: 'Nova Lite · cheap',
+    },
   ],
   sandboxAvailable: true,
   // The screen gates on this rather than asking for the same facts again:
@@ -77,42 +86,202 @@ const SESSION = {
   compiled: false,
 };
 
+/**
+ * The seeded catalogue, trimmed to what the screen has to handle: templates
+ * with different knob sets, so switching one has to drop a knob the other does
+ * not declare.
+ */
+const TEMPLATES = [
+  {
+    key: 'classic-serif',
+    name: 'Classic Serif',
+    description: 'Traditional, centred header.',
+    previewSvg: '<svg viewBox="0 0 100 130"><rect width="100" height="130"/></svg>',
+    constraints: ['Keep the centred header.'],
+    knobs: [
+      {
+        key: 'density',
+        label: 'Density',
+        defaultValue: 'balanced',
+        options: [
+          { value: 'compact', label: 'Compact' },
+          { value: 'balanced', label: 'Balanced' },
+        ],
+      },
+      {
+        key: 'order',
+        label: 'Section order',
+        defaultValue: 'experience-first',
+        options: [
+          { value: 'experience-first', label: 'Experience first' },
+          { value: 'skills-first', label: 'Skills first' },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'modern-sans',
+    name: 'Modern Sans',
+    description: 'Left-aligned header with a rule.',
+    previewSvg: '<svg viewBox="0 0 100 130"><rect width="100" height="130"/></svg>',
+    constraints: ['Keep the rule under the name.'],
+    knobs: [
+      {
+        key: 'density',
+        label: 'Density',
+        defaultValue: 'balanced',
+        options: [
+          { value: 'compact', label: 'Compact' },
+          { value: 'balanced', label: 'Balanced' },
+        ],
+      },
+      // No `order` knob: switching here must drop it rather than show a control
+      // this template cannot honour.
+      {
+        key: 'accent',
+        label: 'Accent',
+        defaultValue: 'slate',
+        options: [
+          { value: 'slate', label: 'Slate' },
+          { value: 'navy', label: 'Navy' },
+        ],
+      },
+    ],
+  },
+];
+
 const V1 = '\\documentclass{article}\n\\begin{document}\nJordan Reyes — Backend Engineer\n\\end{document}';
 const V2 = `${V1.replace('\\end{document}', '')}\\section*{Kubernetes}\n\\end{document}`;
+
+/** A one-byte PDF: enough to assert a preview renders, not to lay one out. */
+const PDF = 'JVBERi0xLjcK';
+
+/** Serialises a turn as the SSE frames the screen actually consumes. */
+const sse = (session: unknown): string =>
+  [
+    `data: ${JSON.stringify({ type: 'phase', phase: 'writing' })}\n\n`,
+    `data: ${JSON.stringify({ type: 'phase', phase: 'compiling' })}\n\n`,
+    `data: ${JSON.stringify({ type: 'result', session })}\n\n`,
+  ].join('');
 
 /** One stubbed backend, shared by the whole file. */
 async function stubHarnessApi(page: Page) {
   let turns = 0;
+  // The stub holds session state because the screen's whole job here is to keep
+  // one session moving — a stub that answered every call identically could not
+  // tell a template switch from a no-op.
+  let state = { ...SESSION, templateKey: 'classic-serif', vibe: { density: 'balanced', order: 'experience-first' }, canRevert: false };
+  let snapshot: typeof state | null = null;
+
+  const turn = (patch: Record<string, unknown>) => {
+    turns += 1;
+    state = { ...state, ...patch, revision: turns, compiled: true } as typeof state;
+    return { ...state, pdfBase64: PDF };
+  };
 
   await page.route('**/api/resume-harness/options', (route: Route) =>
     route.fulfill({ json: OPTIONS }),
   );
 
-  await page.route('**/api/resume-harness/sessions', (route: Route) =>
-    route.fulfill({ status: 201, json: SESSION }),
+  await page.route('**/api/resume-harness/templates', (route: Route) =>
+    route.fulfill({ json: TEMPLATES }),
   );
 
-  await page.route('**/api/resume-harness/sessions/*/turns', (route: Route) => {
-    turns += 1;
+  await page.route('**/api/resume-harness/sessions', async (route: Route) => {
+    const body = route.request().postDataJSON() || {};
+    state = {
+      ...state,
+      templateKey: body.templateKey || 'classic-serif',
+      vibe: body.vibe || state.vibe,
+      canRevert: false,
+    };
+    await route.fulfill({ status: 201, json: state });
+  });
+
+  await page.route('**/api/resume-harness/sessions/*/turns/stream', (route: Route) =>
     route.fulfill({
-      status: 201,
-      json: {
-        ...SESSION,
-        revision: turns,
-        compiled: true,
-        latex: turns === 1 ? V1 : V2,
-        summary:
-          turns === 1 ? 'Created resume.tex.' : 'Added a Kubernetes section.',
-        // A one-byte PDF is enough: the assertion is that a preview renders,
-        // not that Chromium can lay out a real document.
-        pdfBase64: 'JVBERi0xLjcK',
-      },
+      status: 200,
+      contentType: 'text/event-stream',
+      body: sse(
+        turn({
+          latex: turns === 0 ? V1 : V2,
+          summary: turns === 0 ? 'Created resume.tex.' : 'Added a Kubernetes section.',
+        }),
+      ),
+    }),
+  );
+
+  await page.route(
+    '**/api/resume-harness/sessions/*/template/stream',
+    (route: Route) => {
+      const { templateKey, vibe } = route.request().postDataJSON();
+      snapshot = { ...state };
+      const template = TEMPLATES.find((t) => t.key === templateKey)!;
+      // The server drops knobs the new template does not declare; the stub has
+      // to as well, or the screen's own merge would never be exercised.
+      const kept: Record<string, string> = {};
+      for (const knob of template.knobs) {
+        const chosen = (vibe || state.vibe)[knob.key];
+        kept[knob.key] = knob.options.some((o) => o.value === chosen)
+          ? chosen
+          : knob.defaultValue;
+      }
+      route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: sse(
+          turn({
+            templateKey,
+            vibe: kept,
+            canRevert: true,
+            latex: `${V2}\n% ${template.name}`,
+            summary: `Re-applied to ${template.name}.`,
+          }),
+        ),
+      });
+    },
+  );
+
+  await page.route('**/api/resume-harness/sessions/*/vibe/stream', (route: Route) => {
+    const { vibe } = route.request().postDataJSON();
+    snapshot = { ...state };
+    route.fulfill({
+      status: 200,
+      contentType: 'text/event-stream',
+      body: sse(
+        turn({
+          vibe: { ...state.vibe, ...vibe },
+          canRevert: true,
+          latex: `${V2}\n% relaid out`,
+          summary: 'Re-applied the résumé to the new look.',
+        }),
+      ),
     });
   });
 
-  await page.route('**/api/resume-harness/sessions/*', (route: Route) =>
-    route.fulfill({ json: { ...SESSION, status: 'ended' } }),
+  await page.route('**/api/resume-harness/sessions/*/revert-look', (route: Route) => {
+    if (!snapshot) {
+      return route.fulfill({ status: 409, json: { message: 'Nothing to revert' } });
+    }
+    turns += 1;
+    state = { ...snapshot, revision: turns, canRevert: false };
+    snapshot = null;
+    route.fulfill({
+      status: 201,
+      json: { ...state, summary: 'Restored the previous look.', pdfBase64: PDF },
+    });
+  });
+
+  await page.route('**/api/resume-harness/sessions/*/pdf', (route: Route) =>
+    route.fulfill({ json: { pdfBase64: state.compiled ? PDF : null } }),
   );
+
+  await page.route('**/api/resume-harness/sessions/*', (route: Route) => {
+    if (route.request().method() === 'DELETE') {
+      state = { ...state, status: 'ended' };
+    }
+    return route.fulfill({ json: state });
+  });
 }
 
 test.describe('LaTeX résumé — agent harness', () => {
@@ -151,7 +320,9 @@ test.describe('LaTeX résumé — agent harness', () => {
     // The original document survived — this is an edit, not a regeneration.
     await expect(page.getByTestId('latex-source')).toContainText('Jordan Reyes');
     await expect(page.getByTestId('session-revision')).toHaveText('2');
-    await expect(page.getByTestId('turn-summary')).toContainText('Kubernetes');
+    // `.last()` because the transcript keeps every turn; the newest one is the
+    // reply to the change just requested.
+    await expect(page.getByTestId('turn-summary').last()).toContainText('Kubernetes');
 
     await expectNoHorizontalOverflow(page, 'resume');
   });
@@ -169,6 +340,11 @@ test.describe('LaTeX résumé — agent harness', () => {
     // there is no such operation — only "start a new one".
     await expect(page.getByTestId('switch-harness')).toBeVisible();
     await expect(page.getByRole('button', { name: /^switch harness$/i })).toHaveCount(0);
+
+    // Finish the session before checking the setup-screen outage state. Active
+    // sessions now intentionally survive reloads, so leaving it open would
+    // restore the workspace instead of returning to setup.
+    await page.getByTestId('end-session').click();
 
     // Platform unreachable: the screen says so rather than offering a start
     // button that cannot work.
@@ -278,7 +454,7 @@ test.describe('résumé — model and effort selection', () => {
     await stubHarnessApi(page);
     await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
 
-    await expect(page.getByTestId('model-select')).toHaveValue('claude-sonnet-4-5');
+    await expect(page.getByTestId('model-select')).toHaveValue('anthropic/claude-sonnet-4-5');
     await expect(page.getByTestId('effort-select')).toHaveValue('high');
     await expect(page.getByTestId('resolved-alias')).toHaveText(
       'anthropic/claude-sonnet-4-5/high',
@@ -292,9 +468,17 @@ test.describe('résumé — model and effort selection', () => {
 
     // A model with a single effort disables the control rather than pretending
     // there is a choice.
-    await page.getByTestId('model-select').selectOption('nova-micro');
+    await page.getByTestId('model-select').selectOption('bedrock/nova-micro');
     await expect(page.getByTestId('resolved-alias')).toHaveText('bedrock/nova-micro/low');
     await expect(page.getByTestId('effort-select')).toBeDisabled();
+
+    await expect(
+      page.getByTestId('model-select').locator('option', { hasText: /Nova Lite · cheap/ }),
+    ).toHaveCount(1);
+    await page.getByTestId('model-select').selectOption('bedrock/nova-lite');
+    await expect(page.getByTestId('resolved-alias')).toHaveText(
+      'bedrock/nova-lite/low',
+    );
   });
 
   test('starts the session on the alias the selectors resolved to', async ({ page }) => {
@@ -368,6 +552,226 @@ test.describe('résumé — the required-field gate fails closed', () => {
   test('opens only on an explicit ready:true', async ({ page }) => {
     await withOptions(page, OPTIONS);
     await expect(page.getByTestId('required-gate')).toHaveCount(0);
+    await expect(page.getByTestId('start-session')).toBeEnabled();
+  });
+});
+
+/**
+ * Templates and the in-session vibe change.
+ *
+ * The behaviour worth protecting is that a look change is a *change to a live
+ * session*, not a restart: the same session id, the same content, one more
+ * revision. And that applying one is deliberate — nudging a select must not
+ * start a turn that costs money and takes half a minute.
+ */
+test.describe('résumé — templates and vibe', () => {
+  test('picks a template before starting and sends it with the session', async ({ page }) => {
+    await stubHarnessApi(page);
+    let sent: any = null;
+    await page.route('**/api/resume-harness/sessions', async (route: Route) => {
+      sent = route.request().postDataJSON();
+      await route.fulfill({
+        status: 201,
+        json: { ...SESSION, templateKey: sent.templateKey, vibe: sent.vibe, canRevert: false },
+      });
+    });
+
+    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
+
+    await expect(page.getByTestId('template-picker')).toBeVisible({ timeout: 20_000 });
+    // Every seeded template is offered, with a preview to choose between.
+    await expect(page.getByTestId('template-card-classic-serif')).toBeVisible();
+    await expect(page.getByTestId('template-card-modern-sans')).toBeVisible();
+    await expect(page.getByTestId('template-preview-modern-sans').locator('svg')).toBeVisible();
+
+    await page.getByTestId('template-card-modern-sans').click();
+    // The knobs follow the template: modern-sans declares an accent, classic
+    // declares a section order, and the picker must not offer the wrong one.
+    await expect(page.getByTestId('setup-knob-accent')).toBeVisible();
+    await expect(page.getByTestId('setup-knob-order')).toHaveCount(0);
+
+    await page.getByTestId('setup-knob-accent').selectOption('navy');
+    await page.getByTestId('start-session').click();
+    await expect(page.getByTestId('session-bar')).toBeVisible();
+
+    expect(sent.templateKey).toBe('modern-sans');
+    expect(sent.vibe.accent).toBe('navy');
+    await expect(page.getByTestId('session-template')).toHaveText('Modern Sans');
+  });
+
+  test('restores the active template, vibe and render after a reload', async ({ page }) => {
+    await stubHarnessApi(page);
+    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
+
+    await page.getByTestId('template-card-modern-sans').click();
+    await page.getByTestId('setup-knob-accent').selectOption('navy');
+    await page.getByTestId('start-session').click();
+    await page.getByTestId('instruction').fill('Build my résumé.');
+    await page.getByTestId('send-instruction').click();
+    await expect(page.getByTestId('session-revision')).toHaveText('1');
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+
+    await expect(page.getByTestId('session-bar')).toBeVisible();
+    await expect(page.getByTestId('session-template')).toHaveText('Modern Sans');
+    await expect(page.getByTestId('session-revision')).toHaveText('1');
+    await expect(page.getByTestId('pdf-preview')).toBeVisible();
+    await page.getByTestId('look-toggle').click();
+    await expect(page.getByTestId('look-knob-accent')).toHaveValue('navy');
+  });
+
+  test('blocks a replacement start while an active session is still restoring', async ({ page }) => {
+    await stubHarnessApi(page);
+    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
+    await page.getByTestId('start-session').click();
+
+    let releaseRestore!: () => void;
+    const restoreReleased = new Promise<void>((resolve) => {
+      releaseRestore = resolve;
+    });
+    await page.route('**/api/resume-harness/sessions/*', async (route: Route) => {
+      if (route.request().method() !== 'GET') return route.fallback();
+      await restoreReleased;
+      return route.fulfill({ json: SESSION });
+    });
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('start-session')).toBeDisabled();
+    releaseRestore();
+    await expect(page.getByTestId('session-bar')).toBeVisible();
+  });
+
+  test('keeps the active session across reloads when PDF restoration is temporarily down', async ({
+    page,
+    guards,
+  }) => {
+    guards.allowFailures(/\/api\/resume-harness\/sessions\/.*\/pdf/);
+    guards.allowConsoleErrors();
+    await stubHarnessApi(page);
+    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
+    await page.getByTestId('start-session').click();
+    await page.getByTestId('instruction').fill('Build my résumé.');
+    await page.getByTestId('send-instruction').click();
+    await expect(page.getByTestId('session-revision')).toHaveText('1');
+
+    await page.route('**/api/resume-harness/sessions/*/pdf', (route: Route) =>
+      route.fulfill({ status: 503, json: { message: 'PDF temporarily unavailable' } }),
+    );
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('session-bar')).toBeVisible();
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('session-bar')).toBeVisible();
+  });
+
+  test('chooses another harness before carrying the résumé into a new session', async ({
+    page,
+  }) => {
+    await stubHarnessApi(page);
+    const starts: any[] = [];
+    await page.route('**/api/resume-harness/sessions', async (route: Route) => {
+      const body = route.request().postDataJSON();
+      starts.push(body);
+      const chosen = OPTIONS.harnesses.find((item) => item.id === body.harness)!;
+      await route.fulfill({
+        status: 201,
+        json: {
+          ...SESSION,
+          harness: body.harness,
+          harnessLabel: chosen.label,
+          templateKey: 'classic-serif',
+          vibe: { density: 'balanced', order: 'experience-first' },
+          canRevert: false,
+        },
+      });
+    });
+
+    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
+    await page.getByTestId('start-session').click();
+    await page.getByTestId('switch-harness').click();
+
+    await expect(page.getByTestId('harness-codex')).toBeVisible();
+    await page.getByTestId('harness-codex').click();
+    await page.getByTestId('template-card-modern-sans').click();
+    await page.getByTestId('start-session').click();
+
+    expect(starts).toHaveLength(2);
+    expect(starts[1]).toMatchObject({
+      harness: 'codex',
+      carryFromSessionId: SESSION.id,
+      templateKey: 'modern-sans',
+    });
+    await expect(page.getByTestId('session-harness')).toHaveText('Codex');
+  });
+
+  test('changes the look mid-session, keeping the same session and the content', async ({ page }) => {
+    await stubHarnessApi(page);
+    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
+
+    await page.getByTestId('start-session').click();
+    await page.getByTestId('instruction').fill('Build a résumé for a backend engineer.');
+    await page.getByTestId('send-instruction').click();
+    await expect(page.getByTestId('session-revision')).toHaveText('1');
+
+    await page.getByTestId('look-toggle').click();
+
+    // Nothing has moved yet, so there is nothing to apply — a turn costs money.
+    await expect(page.getByTestId('apply-look')).toBeDisabled();
+    await expect(page.getByTestId('look-status')).toContainText(/current look/i);
+
+    await page.getByTestId('look-knob-density').selectOption('compact');
+    await expect(page.getByTestId('apply-look')).toBeEnabled();
+    await page.getByTestId('apply-look').click();
+
+    // Same session, one more revision — this is a change, not a restart.
+    await expect(page.getByTestId('session-revision')).toHaveText('2');
+    await expect(page.getByTestId('latex-source')).toContainText('Jordan Reyes');
+    await expect(page.getByTestId('turn-summary').last()).toContainText(/new look/i);
+    await expect(page.getByTestId('look-current')).toContainText('Compact');
+
+    await expectNoHorizontalOverflow(page, 'resume-look');
+  });
+
+  test('switches template mid-session and steps back to the previous look', async ({ page }) => {
+    await stubHarnessApi(page);
+    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
+
+    await page.getByTestId('start-session').click();
+    await page.getByTestId('instruction').fill('Build my résumé.');
+    await page.getByTestId('send-instruction').click();
+    await expect(page.getByTestId('session-revision')).toHaveText('1');
+
+    await page.getByTestId('look-toggle').click();
+    // Nothing to go back to until something has changed.
+    await expect(page.getByTestId('revert-look')).toBeDisabled();
+
+    await page.getByTestId('look-template-modern-sans').click();
+    await expect(page.getByTestId('look-status')).toContainText(/re-applied, not rewritten/i);
+    await page.getByTestId('apply-look').click();
+
+    await expect(page.getByTestId('session-template')).toHaveText('Modern Sans');
+    await expect(page.getByTestId('session-revision')).toHaveText('2');
+    // Content carried across the switch rather than being regenerated.
+    await expect(page.getByTestId('latex-source')).toContainText('Jordan Reyes');
+
+    // One step back is now offered, and taking it restores the earlier look.
+    await expect(page.getByTestId('look-revert-available')).toBeVisible();
+    await page.getByTestId('revert-look').click();
+
+    await expect(page.getByTestId('session-template')).toHaveText('Classic Serif');
+    await expect(page.getByTestId('revert-look')).toBeDisabled();
+  });
+
+  test('offers no look controls when the catalogue is empty, and still generates', async ({ page }) => {
+    await stubHarnessApi(page);
+    await page.route('**/api/resume-harness/templates', (route: Route) =>
+      route.fulfill({ json: [] }),
+    );
+    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
+
+    // A missing catalogue is a note, not a blocker: the agent has its own
+    // layout, and refusing to write a résumé over typography would be absurd.
+    await expect(page.getByTestId('templates-empty')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId('template-picker')).toHaveCount(0);
     await expect(page.getByTestId('start-session')).toBeEnabled();
   });
 });

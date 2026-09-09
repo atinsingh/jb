@@ -49,7 +49,21 @@ export class OpenCodeHarness implements HarnessAdapter {
           contents: this.config(proxy.baseUrl, alias),
         },
       ],
-      command: ['opencode', 'run', PROMPT_PLACEHOLDER],
+      command: [
+        'opencode',
+        'run',
+        // HOME is the persistent session workspace. Continue keeps the
+        // conversation and its corrections across product turns; on an empty
+        // workspace OpenCode starts a session automatically.
+        '--continue',
+        // The container is the approval boundary. Auto approval lets OpenCode
+        // run the build command its contract requires instead of silently
+        // skipping shell tools in non-interactive mode.
+        '--auto',
+        // User-level plugins would make identical sandboxes behave differently.
+        '--pure',
+        PROMPT_PLACEHOLDER,
+      ],
       proxyHeaders: harnessProxyHeaders(this.id),
     };
   }

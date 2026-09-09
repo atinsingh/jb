@@ -1,0 +1,16 @@
+---
+description: Jobocate working contract — smallest change, tests first, no backfills
+alwaysApply: true
+---
+
+# Jobocate workflow
+
+Follow `AGENTS.md` (and `CLAUDE.md` for layout/env). This rule beats generic “inspect the whole repo” or “verify in the browser” habits.
+
+**Order:** graphify query → failing test that encodes the goal → smallest implementation → only existing tests plus that goal test.
+
+- Edit only files the task needs. No drive-by refactors, extra docs, or adjacent rewrites.
+- Product is not live: change current schema/DTOs/UI. No migrations, dual-read, or old+new compatibility unless asked.
+- Scope is `backend/` and `frontend/` unless the user names another package.
+- Do not add frontend Jest/RTL, new env flags, or mock out the unit under test.
+- After add/rename of backend/frontend code: `graphify update .` from repo root.

@@ -5,7 +5,8 @@ import { HARNESS_IDS, HarnessId } from '../harness/harness.types';
 export type ResumeHarnessSessionDocument =
   HydratedDocument<ResumeHarnessSession>;
 
-export type ResumeHarnessSessionStatus = 'active' | 'ended' | 'failed';
+export type ResumeHarnessSessionStatus =
+  'provisioning' | 'active' | 'ended' | 'failed';
 
 /** One recorded exchange with the harness. */
 @Schema({ _id: false })
@@ -27,12 +28,56 @@ export class ResumeHarnessTurn {
   @Prop()
   summary?: string;
 
+  /**
+   * Ways the document still looks like scaffolding rather than a résumé, after
+   * the repair budget ran out. A passing build is not the same as a finished
+   * document, and this is where that difference is recorded.
+   */
+  @Prop({ type: [String], default: [] })
+  contentWarnings?: string[];
+
   @Prop({ default: () => new Date() })
   createdAt: Date;
 }
 
-const ResumeHarnessTurnSchema =
-  SchemaFactory.createForClass(ResumeHarnessTurn);
+const ResumeHarnessTurnSchema = SchemaFactory.createForClass(ResumeHarnessTurn);
+
+/**
+ * The résumé as it stood before the last template or vibe change.
+ *
+ * JOB-98 keeps only the current revision — `latex` is overwritten every turn —
+ * so a look change is a destructive rewrite of the only copy. Re-seating
+ * content on a new skeleton is also the turn most likely to lose a section, and
+ * it is issued by the product rather than typed by the candidate. Snapshotting
+ * before the change is what makes "back to the previous look" possible at all.
+ *
+ * One level deep on purpose: full per-revision history is JOB-105, and two
+ * mechanisms for the same thing would have to be reconciled later.
+ */
+@Schema({ _id: false })
+export class ResumeHarnessLookSnapshot {
+  @Prop({ default: '' })
+  latex: string;
+
+  @Prop()
+  templateKey?: string;
+
+  @Prop({ type: Object, default: {} })
+  vibe: Record<string, string>;
+
+  @Prop({ default: 0 })
+  revision: number;
+
+  @Prop({ default: false })
+  compiled: boolean;
+
+  @Prop({ default: () => new Date() })
+  at: Date;
+}
+
+const ResumeHarnessLookSnapshotSchema = SchemaFactory.createForClass(
+  ResumeHarnessLookSnapshot,
+);
 
 /**
  * A resume-generation session: one user, one harness, one sandbox.
@@ -44,7 +89,12 @@ const ResumeHarnessTurnSchema =
  */
 @Schema({ timestamps: true, collection: 'resume_harness_sessions' })
 export class ResumeHarnessSession {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    index: true,
+  })
   userId: Types.ObjectId;
 
   // `type: String` is explicit because `HarnessId` is a union and Mongoose
@@ -76,7 +126,11 @@ export class ResumeHarnessSession {
   @Prop()
   tier?: string;
 
-  @Prop({ required: true, enum: ['active', 'ended', 'failed'], default: 'active' })
+  @Prop({
+    required: true,
+    enum: ['provisioning', 'active', 'ended', 'failed'],
+    default: 'provisioning',
+  })
   status: ResumeHarnessSessionStatus;
 
   /** Role this resume targets, if the candidate named one. */
@@ -86,6 +140,25 @@ export class ResumeHarnessSession {
   /** Pasted job description to tailor against. */
   @Prop()
   jobDescription?: string;
+
+  /**
+   * The template this résumé is written to, by `ResumeTemplate.key`.
+   *
+   * Unlike `harness` this is freely changeable for the life of the session: a
+   * template switch is a re-apply of content the session already holds, not a
+   * rebind of a live sandbox. It is stored rather than derived so it survives a
+   * reload and comes with the résumé into a new session on another harness.
+   */
+  @Prop()
+  templateKey?: string;
+
+  /** Knob choices in force, as `knobKey -> optionValue`. */
+  @Prop({ type: Object, default: {} })
+  vibe: Record<string, string>;
+
+  /** The résumé before the last look change; the one step "back" can restore. */
+  @Prop({ type: ResumeHarnessLookSnapshotSchema })
+  previousLook?: ResumeHarnessLookSnapshot;
 
   /** Current LaTeX source. Survives teardown so it can seed the next session. */
   @Prop({ default: '' })
@@ -99,6 +172,27 @@ export class ResumeHarnessSession {
 
   @Prop()
   compileLog?: string;
+
+  /**
+   * Ways the current revision still looks like scaffolding rather than a
+   * résumé. A passing build is not a finished document — filler typesets as
+   * cleanly as a career — so this is where that difference is recorded.
+   */
+  @Prop({ type: [String], default: [] })
+  contentWarnings?: string[];
+
+  /**
+   * The candidate's name at session creation.
+   *
+   * Kept here so a turn can check the document actually names them without
+   * rebuilding the whole profile context on every turn.
+   */
+  @Prop()
+  candidateName?: string;
+
+  /** Exact source used by deterministic post-turn factual checks. */
+  @Prop()
+  candidateMarkdown?: string;
 
   /** The session this one carried its artifact forward from, if any. */
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'ResumeHarnessSession' })
@@ -114,8 +208,15 @@ export class ResumeHarnessSession {
   updatedAt?: Date;
 }
 
-export const ResumeHarnessSessionSchema = SchemaFactory.createForClass(
-  ResumeHarnessSession,
-);
+export const ResumeHarnessSessionSchema =
+  SchemaFactory.createForClass(ResumeHarnessSession);
 
 ResumeHarnessSessionSchema.index({ userId: 1, status: 1, createdAt: -1 });
+ResumeHarnessSessionSchema.index(
+  { userId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { status: { $in: ['provisioning', 'active'] } },
+    name: 'one_live_resume_harness_session_per_user',
+  },
+);

@@ -1,7 +1,8 @@
 # Browser verification prompt (reusable)
 
 Paste the block below when you want a ticket verified in a real browser.
-Replace `JOB-NN` and the model/harness line; everything else stays.
+Replace `JOB-NN` and the model/harness line when the ticket requires something
+more specific; everything else stays.
 
 The auth section is the important change: **do not put a password in the
 prompt.** Claude cannot type passwords into login forms, and the run will stall
@@ -33,15 +34,38 @@ password, and authenticates as the real account.
 > **Start everything first, and prove each piece is actually current** — see
 > the pitfalls below. Then walk the ticket's verification steps.
 >
-> Use **Amazon Nova Micro** (`bedrock/nova-micro/low`) — cheapest model that
-> exercises the whole path.
+> Before spending time in the browser, run the fast harness probe from
+> `backend/`: `npm run harness:probe-opencode -- --alias <alias>`. It uses the
+> production OpenCode adapter, context files, Docker sandbox, LiteLLM route,
+> compiler and content guard without the UI. Use `--passes 3` when model or
+> prompt quality across revisions is under test. A failing probe blocks the
+> browser pass; a passing probe does not replace ticket-required UI evidence.
+>
+> Use **Amazon Nova 2 Lite** (`bedrock/nova-2-lite/low`) for the default browser
+> smoke run. Ticket-specific model requirements take precedence. If a ticket
+> requires a different minimum model or excludes Nova, run that model as well
+> and use the required-model result for sign-off. Check
+> `infra/litellm/MODELS.md` first: a protocol-only model is not a sign-off
+> model.
+>
+> **Use at least three prompts in the same session.** Generate from
+> `CANDIDATE.md`, ask for a factual audit/removal of empty sections, then ask
+> for a presentation improvement that must preserve every supported fact.
+> Compare every revision with `CANDIDATE.md`. Any invented employer, role,
+> date, degree, skill, credential, metric, or professional characterization is
+> a failure even when the PDF compiles. Send one explicit correction prompt;
+> if the unsupported claim survives, classify the model as unsuitable for
+> candidate documents.
 >
 > **Persist every artifact before teardown.** Compiled PDFs live only inside
 > the session sandbox and are destroyed with it; `getPdf` returns `null` once
-> the session ends. Before ending a session or removing any container, copy the
-> PDF and the LaTeX out to `docs/job-NN-verification/` (`docker cp`, or the
-> API's base64 while the session is still active). Save a screenshot at each
-> ticket step to the same folder. That directory is gitignored.
+> the session ends. Before ending a session or removing any container, download
+> the PDF through the product's export control and copy the LaTeX out to
+> `docs/job-NN-verification/` (`docker cp`, or the API's base64 while the
+> session is still active). Render every PDF page to an image and inspect it for
+> legibility, clipping, overlap, placeholders, correct identity/contact details,
+> and preserved career facts. Save a screenshot at each ticket step to the same
+> folder. That directory is gitignored.
 >
 > Report honestly: what passed, what failed, and which failures are the
 > product versus the harness/tooling.

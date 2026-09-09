@@ -1,0 +1,14 @@
+---
+description: Verify with tests, not the browser-use skill
+alwaysApply: true
+---
+
+# Verification
+
+Do **not** use the browser-use skill, Browser Use CDP, or a manual click-through of the app unless the user explicitly asks.
+
+You may start, restart, and stop the local backend/frontend dev servers and required Docker Compose services when verification needs them. Keep long-lived servers in separate terminals, and stop only processes you started unless the user asks for broader cleanup. Never run a backend build concurrently with its watch server; both rewrite `backend/dist`, so stop the watcher before building and restart it afterward.
+
+- Backend behavior: write the failing Jest spec first (`backend/`, colocated `*.spec.ts`). HTTP/auth/RBAC/cross-module: extend or add `backend/test/*.e2e-spec.ts` (Mongo `jobocate_e2e`, never the dev DB).
+- User-visible flow: smallest Playwright spec under `e2e/`. Copy/layout-only with no coverage request: skip new tests.
+- A test is done when reverting the feature would fail it. No screenshot-assert of whole pages.

@@ -87,6 +87,8 @@ A test is done when it would fail if the feature were reverted. That is the whol
 
 ## Run (when you need to verify)
 
+Agents are authorized to start, restart, and stop these local services when implementation or verification needs them. Use separate long-lived terminals for the backend and frontend, and stop only processes you started unless the user asks for broader cleanup. Do not run `npm run build` in `backend/` while its watch server is starting or running because both commands rewrite `backend/dist`; stop the watcher first, build, then restart it.
+
 ```bash
 docker compose up -d mongodb          # if 27017 is taken, Mongo may already be on 27018 — match MONGODB_URI
 cd backend && npm run start:dev       # http://localhost:8000/health

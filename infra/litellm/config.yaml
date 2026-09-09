@@ -16,6 +16,9 @@
 #
 # Adding an alias is an entry here plus a row in `harness_model_aliases`
 # (which tiers may select it). Neither is a deploy.
+#
+# What is proven 200 vs never-offer (Llama, etc.) lives in MODELS.md next to
+# this file. Reconcile that note before adding a Bedrock id.
 
 model_list:
   # ----------------------------------------------------------- anthropic ---
@@ -68,9 +71,10 @@ model_list:
   #    harness is independent of the provider. Codex and OpenCode drive a
   #    Bedrock-backed Claude alias through the OpenAI-compatible route without
   #    knowing or caring.
-  # Every id below was read off this account's own entitlement listing with
-  # `npm run harness:bedrock-check` — not guessed. Re-run that after any
-  # account or region change and reconcile this block against its output.
+  # Every id below was entitled on this account (`harness:bedrock-check`) AND
+  # returned a Converse `toolUse` with a `toolUseId` (the harness path). Listing
+  # is not enough: Sonnet 5 / Opus 5 403, Haiku 4.5 404s on the use-case form,
+  # Llama streams without usable writes. Re-probe after account/region changes.
   #
   # WHY IAM CREDENTIALS AND NOT THE BEDROCK API KEY
   #
@@ -97,47 +101,12 @@ model_list:
   #
   # If a future LiteLLM lets the Converse handler tolerate bearer auth, this can
   # go back to AWS_BEARER_TOKEN_BEDROCK and drop the IAM pair entirely.
-  - model_name: bedrock/claude-haiku-4-5/low
-    litellm_params:
-      model: bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0
-      aws_region_name: os.environ/AWS_REGION
-      aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
-      aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
-      reasoning_effort: low
-
-  - model_name: bedrock/claude-sonnet-5/low
-    litellm_params:
-      model: bedrock/us.anthropic.claude-sonnet-5
-      aws_region_name: os.environ/AWS_REGION
-      aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
-      aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
-      reasoning_effort: low
-
-  - model_name: bedrock/claude-sonnet-5/high
-    litellm_params:
-      model: bedrock/us.anthropic.claude-sonnet-5
-      aws_region_name: os.environ/AWS_REGION
-      aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
-      aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
-      reasoning_effort: high
-
-  - model_name: bedrock/claude-opus-5/high
-    litellm_params:
-      model: bedrock/us.anthropic.claude-opus-5
-      aws_region_name: os.environ/AWS_REGION
-      aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
-      aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
-      reasoning_effort: high
-
-  # `xhigh` is the sweet spot for agentic coding work on the current Opus/Sonnet
-  # generation, which is exactly what a harness editing LaTeX is doing.
-  - model_name: bedrock/claude-opus-5/xhigh
-    litellm_params:
-      model: bedrock/us.anthropic.claude-opus-5
-      aws_region_name: os.environ/AWS_REGION
-      aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
-      aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
-      reasoning_effort: xhigh
+  #
+  # Anthropic on Bedrock is not listed. The IAM principal LiteLLM uses gets
+  # `Model use case details have not been submitted` (404) on every Claude
+  # profile, including ones a Bedrock API key can Converse. Until that form is
+  # filed for the IAM user, a Bedrock Claude alias is a session that 404s —
+  # the Llama failure mode. Claude stays on the Anthropic Console aliases.
 
   # Amazon Nova — the cheap end of Bedrock.
   #
@@ -173,6 +142,28 @@ model_list:
       aws_region_name: os.environ/AWS_REGION
       aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
       aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
+
+  - model_name: bedrock/nova-2-lite/low
+    litellm_params:
+      model: bedrock/us.amazon.nova-2-lite-v1:0
+      aws_region_name: os.environ/AWS_REGION
+      aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
+      aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
+
+  # Candidate-facing Bedrock fallback. Besides the streaming tool-call probe,
+  # this passed the production OpenCode adapter's three-pass scripted résumé
+  # check on 2026-09-09 after session continuity and grounding were fixed.
+  - model_name: bedrock/qwen3-coder-next/low
+    litellm_params:
+      model: bedrock/qwen.qwen3-coder-next
+      aws_region_name: os.environ/AWS_REGION
+      aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
+      aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
+
+  # Meta Llama is deliberately not served. Bedrock refuses tool use on the
+  # streaming Converse route, and even with LiteLLM fake_stream the models dump
+  # empty writes (or JSON-as-text) instead of a filled resume.tex. Offering them
+  # is offering a session that cannot produce a résumé.
 
   # -------------------------------------------------------------- openai ---
   - model_name: openai/gpt-5.1-codex/low

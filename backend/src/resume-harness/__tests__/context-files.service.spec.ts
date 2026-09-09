@@ -8,7 +8,8 @@ describe('ContextFilesService', () => {
     workdir: '/workspace',
     texPath: 'resume.tex',
     pdfPath: 'build/resume.pdf',
-    buildCommand: 'latexmk -pdf -interaction=nonstopmode -outdir=build resume.tex',
+    buildCommand:
+      'latexmk -pdf -interaction=nonstopmode -outdir=build resume.tex',
   };
 
   const fileNames = (id: (typeof HARNESS_IDS)[number]) =>
@@ -62,7 +63,9 @@ describe('ContextFilesService', () => {
 
   it('serves byte-identical shared rules to every harness', () => {
     const bodies = HARNESS_IDS.map(
-      (id) => service.filesFor(id, input).find((f) => f.path === 'AGENTS.md')!.contents,
+      (id) =>
+        service.filesFor(id, input).find((f) => f.path === 'AGENTS.md')!
+          .contents,
     );
     expect(new Set(bodies).size).toBe(1);
   });
@@ -100,10 +103,149 @@ describe('ContextFilesService — candidate facts', () => {
       .find((f) => f.path === 'AGENTS.md')!.contents;
     expect(agents).toContain('CANDIDATE.md');
     expect(agents).toMatch(/do not invent|never invent/i);
+    expect(agents).toMatch(
+      /existing[\s\S]*not a[\s\S]*source of factual truth/i,
+    );
+    expect(agents).toMatch(/exact source line/i);
   });
 
   it('omits the file entirely when there are no facts to give', () => {
-    const files = service.filesFor('codex', { ...input, candidateMarkdown: '' });
+    const files = service.filesFor('codex', {
+      ...input,
+      candidateMarkdown: '',
+    });
     expect(files.find((f) => f.path === 'CANDIDATE.md')).toBeUndefined();
+  });
+});
+
+/**
+ * The template condition reaches the harness through the shared rules.
+ *
+ * A template selection or a vibe change is only real if the file the harness
+ * actually reads says so. `AGENTS.md` is that file for every harness, and
+ * Claude Code reaches it through the `@AGENTS.md` import — so the condition is
+ * written once and the no-duplication rule above still holds.
+ */
+describe('ContextFilesService — template condition', () => {
+  const service = new ContextFilesService();
+
+  const template = {
+    key: 'modern-sans',
+    name: 'Modern Sans',
+    description: 'Left-aligned header with a rule.',
+    skeleton: '\documentclass{article}\n% modern-sans skeleton\n',
+    constraints: ['Keep the rule under the name.', 'One column only.'],
+    look: [
+      {
+        key: 'density',
+        label: 'Density',
+        choice: 'compact',
+        choiceLabel: 'Compact',
+        directive: 'Tighten vertical spacing to fit one page.',
+      },
+      {
+        key: 'accent',
+        label: 'Accent',
+        choice: 'navy',
+        choiceLabel: 'Navy',
+        directive: 'Use the navy accent on section headings only.',
+      },
+    ],
+  };
+
+  const withTemplate = {
+    workdir: '/workspace',
+    texPath: 'resume.tex',
+    pdfPath: 'build/resume.pdf',
+    buildCommand: 'latexmk -pdf -outdir=build resume.tex',
+    candidateMarkdown: '# Candidate facts\n\n- Name: Jordan Reyes\n',
+    template,
+  };
+
+  it('writes the skeleton as its own file rather than inlining it in the rules', () => {
+    for (const id of HARNESS_IDS) {
+      const files = service.filesFor(id, withTemplate);
+      const skeleton = files.find((f) => f.path === 'TEMPLATE.tex');
+      expect(skeleton).toBeDefined();
+      expect(skeleton!.contents).toContain('% modern-sans skeleton');
+    }
+  });
+
+  it('states the selected template and every knob choice in AGENTS.md', () => {
+    const agents = service
+      .filesFor('codex', withTemplate)
+      .find((f) => f.path === 'AGENTS.md')!.contents;
+
+    expect(agents).toContain('Modern Sans');
+    expect(agents).toContain('TEMPLATE.tex');
+    expect(agents).toContain('Keep the rule under the name.');
+    expect(agents).toContain('Tighten vertical spacing to fit one page.');
+    expect(agents).toContain('Use the navy accent on section headings only.');
+  });
+
+  it('tells the harness a look change must not change the facts', () => {
+    const agents = service
+      .filesFor('opencode', withTemplate)
+      .find((f) => f.path === 'AGENTS.md')!.contents;
+    // Re-applying content onto a new skeleton is the one operation most likely
+    // to lose an employer or a date, so the rule is explicit.
+    expect(agents).toMatch(/re-?apply/i);
+    expect(agents).toMatch(/do not (change|invent|drop)|never (change|drop)/i);
+  });
+
+  it('keeps the condition out of CLAUDE.md, which imports it instead', () => {
+    const files = service.filesFor('claude-code', withTemplate);
+    const claude = files.find((f) => f.path === 'CLAUDE.md')!.contents;
+    const agents = files.find((f) => f.path === 'AGENTS.md')!.contents;
+
+    expect(claude).toMatch(/^@AGENTS\.md$/m);
+    expect(claude).not.toContain('Modern Sans');
+    expect(claude).not.toContain('Tighten vertical spacing to fit one page.');
+
+    const meaningful = (s: string) =>
+      s
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => l.length > 24 && !l.startsWith('#'));
+    const claudeLines = new Set(meaningful(claude));
+    expect(meaningful(agents).filter((l) => claudeLines.has(l))).toEqual([]);
+  });
+
+  it('changes the rules when the look changes, so a stale condition is visible', () => {
+    const before = service
+      .filesFor('codex', withTemplate)
+      .find((f) => f.path === 'AGENTS.md')!.contents;
+
+    const after = service
+      .filesFor('codex', {
+        ...withTemplate,
+        template: {
+          ...template,
+          look: [
+            {
+              ...template.look[0],
+              choice: 'airy',
+              choiceLabel: 'Airy',
+              directive: 'Open the spacing up.',
+            },
+            template.look[1],
+          ],
+        },
+      })
+      .find((f) => f.path === 'AGENTS.md')!.contents;
+
+    expect(after).not.toBe(before);
+    expect(after).toContain('Open the spacing up.');
+    expect(after).not.toContain('Tighten vertical spacing to fit one page.');
+  });
+
+  it('omits the template section entirely when no template is selected', () => {
+    const files = service.filesFor('codex', {
+      ...withTemplate,
+      template: undefined,
+    });
+    expect(files.find((f) => f.path === 'TEMPLATE.tex')).toBeUndefined();
+    const agents = files.find((f) => f.path === 'AGENTS.md')!.contents;
+    expect(agents).not.toContain('TEMPLATE.tex');
   });
 });

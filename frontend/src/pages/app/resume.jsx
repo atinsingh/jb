@@ -7,9 +7,15 @@ import AppTopNav from '@/components/app/AppTopNav';
 import { ErrorState } from '@/components/app/AppStates';
 import {
   endHarnessSession,
+  getHarnessPdf,
   getHarnessOptions,
+  getHarnessSession,
+  getResumeTemplates,
+  revertResumeLook,
   startHarnessSession,
   streamHarnessTurn,
+  streamTemplateChange,
+  streamVibeChange,
 } from '@/services/resumeHarnessApi';
 
 /**
@@ -30,7 +36,12 @@ import {
  * the agent's own narration and the phase it is in rather than a spinner that
  * cannot distinguish thinking from hung.
  *
- * Templates are JOB-99; session history is JOB-105.
+ * The look — template plus a handful of knobs — is chosen before the session
+ * and changeable at any point during it. That asymmetry with the agent picker
+ * is deliberate and is stated on both controls: changing the agent needs a new
+ * sandbox, changing the look does not.
+ *
+ * Session history is JOB-105.
  */
 
 const T = {
@@ -106,11 +117,19 @@ const PHASE_COPY = {
   writing: 'Writing the résumé…',
   compiling: 'Compiling LaTeX…',
   fixing: 'Build failed — fixing it…',
+  relayout: 'Re-applying to the new look…',
 };
+
+const ACTIVE_SESSION_KEY = 'jobocate.resumeHarness.activeSessionId';
 
 export default function AppResume() {
   const [options, setOptions] = useState(null);
   const [optionsError, setOptionsError] = useState(null);
+
+  /** The seeded template catalogue, and the look the next session will use. */
+  const [templates, setTemplates] = useState(null);
+  const [templateKey, setTemplateKey] = useState('');
+  const [vibe, setVibe] = useState({});
 
   const [harness, setHarness] = useState('opencode');
   const [alias, setAlias] = useState('');
@@ -120,6 +139,8 @@ export default function AppResume() {
   const [companyUrl, setCompanyUrl] = useState('');
 
   const [session, setSession] = useState(null);
+  const [sessionRestoreDone, setSessionRestoreDone] = useState(false);
+  const [carryFromSessionId, setCarryFromSessionId] = useState('');
   const [instruction, setInstruction] = useState('');
   const [phase, setPhase] = useState('idle');
   const [error, setError] = useState(null);
@@ -135,20 +156,92 @@ export default function AppResume() {
     setOptionsError(null);
     try {
       const res = await getHarnessOptions();
-      setOptions(res);
+      const models = offeredModels(res?.models);
+      setOptions({ ...res, models });
       if (res?.harnesses?.length) {
         const preferred = res.harnesses.find((h) => h.id === 'opencode');
         setHarness((preferred || res.harnesses[0]).id);
       }
-      if (res?.models?.length) setAlias(res.models[0].alias);
+      if (models.length) setAlias(models[0].alias);
     } catch (e) {
       setOptionsError(e);
     }
   }, []);
 
+  /**
+   * The catalogue loads separately from `options`.
+   *
+   * A failure here must not take the screen down: a résumé without a chosen
+   * template is still a résumé, and the backend falls back to the catalogue
+   * default. So this sets an empty list and the picker says so, rather than
+   * throwing the candidate to the error state.
+   */
+  const loadTemplates = useCallback(async () => {
+    try {
+      const list = await getResumeTemplates();
+      setTemplates(list);
+      if (list.length) {
+        setTemplateKey((current) => current || list[0].key);
+        setVibe((current) =>
+          Object.keys(current).length ? current : defaultVibe(list[0]),
+        );
+      }
+    } catch {
+      setTemplates([]);
+    }
+  }, []);
+
   useEffect(() => {
     loadOptions();
-  }, [loadOptions]);
+    loadTemplates();
+  }, [loadOptions, loadTemplates]);
+
+  useEffect(() => {
+    const sessionId = window.sessionStorage.getItem(ACTIVE_SESSION_KEY);
+    if (!sessionId) {
+      setSessionRestoreDone(true);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const restore = async () => {
+      try {
+        const current = await getHarnessSession(sessionId);
+        if (cancelled) return;
+        if (current.status !== 'active') {
+          window.sessionStorage.removeItem(ACTIVE_SESSION_KEY);
+          return;
+        }
+
+        setSession(current);
+        setHarness(current.harness);
+        setAlias(current.alias);
+        setTemplateKey(current.templateKey || '');
+        setVibe(current.vibe || {});
+        setPhase('ready');
+
+        if (current.compiled) {
+          try {
+            const pdf = await getHarnessPdf(sessionId);
+            if (!cancelled) setPdfBase64(pdf?.pdfBase64 || '');
+          } catch {
+            // The session is already restored. A transient render fetch must
+            // not discard its ID and turn the next reload into a new session.
+            if (!cancelled) setPdfBase64('');
+          }
+        }
+      } catch {
+        if (!cancelled) window.sessionStorage.removeItem(ACTIVE_SESSION_KEY);
+      } finally {
+        if (!cancelled) setSessionRestoreDone(true);
+      }
+    };
+    restore();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Keep the newest line in view while the agent narrates.
   useEffect(() => {
@@ -173,7 +266,9 @@ export default function AppResume() {
   const platformDown = options && options.sandboxAvailable === false;
   const sessionOver = session && session.status !== 'active';
 
-  const start = async (carryFromSessionId) => {
+  const start = async (requestedSourceSessionId) => {
+    if (!sessionRestoreDone) return;
+    const sourceSessionId = requestedSourceSessionId || carryFromSessionId;
     setError(null);
     setPhase('provisioning');
     try {
@@ -182,9 +277,17 @@ export default function AppResume() {
         ...(alias ? { alias } : {}),
         ...(targetRole.trim() ? { targetRole: targetRole.trim() } : {}),
         ...(composedJobContext() ? { jobDescription: composedJobContext() } : {}),
-        ...(carryFromSessionId ? { carryFromSessionId } : {}),
+        ...(sourceSessionId ? { carryFromSessionId: sourceSessionId } : {}),
+        // These are also sent while carrying. They begin as the source
+        // session's look, and any visible setup change must be honoured.
+        ...(templateKey ? { templateKey } : {}),
+        ...(Object.keys(vibe).length ? { vibe } : {}),
       });
       setSession(next);
+      setCarryFromSessionId('');
+      window.sessionStorage.setItem(ACTIVE_SESSION_KEY, next.id);
+      setTemplateKey(next.templateKey || '');
+      setVibe(next.vibe || {});
       setPdfBase64('');
       setMessages([]);
       setPhase('ready');
@@ -192,6 +295,19 @@ export default function AppResume() {
       setError(e);
       setPhase('idle');
     }
+  };
+
+  const chooseOtherHarness = () => {
+    if (!session || busy) return;
+    const alternative = options?.harnesses?.find(
+      (item) => item.id !== session.harness,
+    );
+    if (alternative) setHarness(alternative.id);
+    setCarryFromSessionId(session.id);
+    setSession(null);
+    setPdfBase64('');
+    setError(null);
+    setPhase('idle');
   };
 
   /**
@@ -253,10 +369,125 @@ export default function AppResume() {
     }
   };
 
+  /**
+   * Choose a template before the session exists.
+   *
+   * The knobs reset to the new template's defaults, keeping any choice the new
+   * template still offers. Carrying a setting the new template never declared
+   * would show a control that cannot do anything.
+   */
+  const pickTemplate = (key) => {
+    const next = (templates || []).find((t) => t.key === key);
+    if (!next) return;
+    setTemplateKey(key);
+    setVibe((current) => mergeVibe(next, current));
+  };
+
+  /**
+   * Apply a look change to the live session.
+   *
+   * One streamed turn, exactly like an instruction: the backend rewrites the
+   * context files, then asks the harness to re-apply the résumé to them. The
+   * transcript records it as a message so the change is visible in the same
+   * place every other change is.
+   */
+  const applyLook = async (next) => {
+    if (!session || busy) return;
+    const changingTemplate =
+      next.templateKey && next.templateKey !== session.templateKey;
+
+    setError(null);
+    setPhase('working');
+    setLiveText('');
+    setLivePhase('relayout');
+    setMessages((m) => [
+      ...m,
+      {
+        role: 'you',
+        text: changingTemplate
+          ? `Switch to the ${templateName(templates, next.templateKey)} template.`
+          : `Change the look: ${describeVibe(templates, session.templateKey, next.vibe)}.`,
+      },
+    ]);
+
+    const handle = (event) => {
+      if (event.type === 'phase') setLivePhase(event.phase);
+      else if (event.type === 'token')
+        setLiveText((t) => (t + event.text).slice(-4000));
+      else if (event.type === 'result') {
+        const s = event.session;
+        setSession(s);
+        setTemplateKey(s.templateKey || '');
+        setVibe(s.vibe || {});
+        if (s.pdfBase64) setPdfBase64(s.pdfBase64);
+        setMessages((m) => [
+          ...m,
+          {
+            role: 'agent',
+            text: s.summary || 'Re-applied the résumé to the new look.',
+            compiled: s.compiled,
+            revision: s.revision,
+          },
+        ]);
+      } else if (event.type === 'error') {
+        const err = new Error(event.message);
+        err.status = event.status;
+        setError(err);
+      }
+    };
+
+    try {
+      if (changingTemplate) {
+        await streamTemplateChange(
+          session.id,
+          { templateKey: next.templateKey, ...(next.vibe ? { vibe: next.vibe } : {}) },
+          handle,
+        );
+      } else {
+        await streamVibeChange(session.id, { vibe: next.vibe }, handle);
+      }
+    } catch (e) {
+      setError(e);
+    } finally {
+      setLiveText('');
+      setLivePhase(null);
+      setPhase('ready');
+    }
+  };
+
+  /** One step back. No model turn — the previous source is already good. */
+  const revertLook = async () => {
+    if (!session || busy) return;
+    setError(null);
+    setPhase('working');
+    try {
+      const s = await revertResumeLook(session.id);
+      setSession(s);
+      setTemplateKey(s.templateKey || '');
+      setVibe(s.vibe || {});
+      if (s.pdfBase64) setPdfBase64(s.pdfBase64);
+      setMessages((m) => [
+        ...m,
+        { role: 'you', text: 'Go back to the previous look.' },
+        {
+          role: 'agent',
+          text: s.summary || 'Restored the previous look.',
+          compiled: s.compiled,
+          revision: s.revision,
+        },
+      ]);
+    } catch (e) {
+      setError(e);
+    } finally {
+      setPhase('ready');
+    }
+  };
+
   const end = async () => {
     if (!session) return;
     try {
       setSession(await endHarnessSession(session.id));
+      window.sessionStorage.removeItem(ACTIVE_SESSION_KEY);
     } catch (e) {
       setError(e);
     }
@@ -305,6 +536,52 @@ export default function AppResume() {
           border-color: var(--jb-v3-accent);
           box-shadow: 0 0 0 3px color-mix(in srgb, var(--jb-v3-accent) 14%, transparent);
         }
+        /*
+         * Setup is two columns: what you type on the left, what it will look
+         * like on the right. The form is a narrow reading column and does not
+         * want the full 1240px, so the space beside it was simply empty.
+         */
+        .jbres-setup {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(300px, 400px);
+          gap: 18px;
+          align-items: start;
+        }
+        /* The picker follows you down a long form rather than scrolling away. */
+        .jbres-aside {
+          position: sticky;
+          top: 20px;
+        }
+        @media (max-width: 1060px) {
+          .jbres-setup {
+            grid-template-columns: minmax(0, 1fr);
+          }
+          .jbres-aside {
+            position: static;
+          }
+        }
+        /*
+         * Show the top of each page mock rather than the whole sheet. Five full
+         * portrait previews stacked two-up make a panel taller than the screen,
+         * and the part that distinguishes these templates from each other —
+         * the header treatment and the first heading — is all at the top.
+         */
+        .jbres-preview {
+          height: 92px;
+          overflow: hidden;
+        }
+        .jbres-preview svg {
+          display: block;
+          width: 100%;
+          height: auto;
+        }
+        /* Keep every card the same height whatever the description length. */
+        .jbres-card-desc {
+          display: -webkit-box;
+          -webkit-line-clamp: 3;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
       `}</style>
 
       <div id="jbres" style={{ padding: '28px 32px 64px', maxWidth: 1240, margin: '0 auto' }}>
@@ -328,8 +605,14 @@ export default function AppResume() {
               setJobUrl,
               companyUrl,
               setCompanyUrl,
+              templates,
+              templateKey,
+              pickTemplate,
+              vibe,
+              setVibe,
               busy,
               phase,
+              sessionRestoreDone,
               start,
             }}
           />
@@ -352,6 +635,10 @@ export default function AppResume() {
               downloadPdf,
               end,
               start,
+              templates,
+              applyLook,
+              revertLook,
+              chooseOtherHarness,
             }}
           />
         )}
@@ -364,7 +651,8 @@ export default function AppResume() {
 
 function Setup(p) {
   return (
-    <div style={{ maxWidth: 720 }}>
+    <div>
+      <div style={{ maxWidth: 720 }}>
       <div style={{ ...label, color: T.accent, marginBottom: 10 }}>Résumé</div>
       <h1
         style={{
@@ -400,6 +688,7 @@ function Setup(p) {
           }
         />
       )}
+      </div>
 
       {!p.options ? (
         // Still asking the server whether generation is possible. Showing the
@@ -408,6 +697,7 @@ function Setup(p) {
         <div
           data-testid="options-loading"
           style={{
+            maxWidth: 720,
             border: `1px solid ${T.line}`,
             background: T.panel,
             borderRadius: 3,
@@ -419,12 +709,36 @@ function Setup(p) {
           Checking your profile…
         </div>
       ) : p.blocked ? (
-        <RequiredGate profile={p.profile} />
+        // Kept to the reading column: a full-width red panel would shout, and
+        // this is a short list of four fields.
+        <div style={{ maxWidth: 720 }}>
+          <RequiredGate profile={p.profile} />
+        </div>
       ) : (
-        <>
-          <ProfileFacts profile={p.profile} />
-          <SetupForm {...p} />
-        </>
+        /*
+         * What you tell the agent on the left; what the result will look like
+         * on the right. The form is a reading column and stops at ~720px, so
+         * the rest of the width was empty — and the picker is the one control
+         * here that is worth seeing while you fill the rest in.
+         */
+        <div className="jbres-setup">
+          <div style={{ minWidth: 0 }}>
+            <ProfileFacts profile={p.profile} />
+            <SetupForm {...p} />
+          </div>
+
+          <aside className="jbres-aside">
+            <Card testId="template-panel">
+              <TemplatePicker
+                templates={p.templates}
+                templateKey={p.templateKey}
+                pickTemplate={p.pickTemplate}
+                vibe={p.vibe}
+                setVibe={p.setVibe}
+              />
+            </Card>
+          </aside>
+        </div>
       )}
     </div>
   );
@@ -550,6 +864,18 @@ function RequiredGate({ profile }) {
  * for: same model, more care, more cost. Folded into a single "Sonnet · thorough"
  * line it reads as a different model, and the choice disappears.
  */
+/** Llama is not served and cannot write a résumé; hide leftover catalogue rows. */
+function offeredModels(models) {
+  return (models || []).filter(
+    (m) => !/llama/i.test(`${m.alias || ''} ${m.model || ''}`),
+  );
+}
+
+/** One selectable family: same provider + model, effort is the other control. */
+function modelFamily(m) {
+  return `${m.provider || ''}/${m.model}`;
+}
+
 function ModelAndEffort({ models, alias, setAlias, tier }) {
   if (!models.length) {
     return (
@@ -566,21 +892,23 @@ function ModelAndEffort({ models, alias, setAlias, tier }) {
 
   const selected = models.find((m) => m.alias === alias) || models[0];
 
-  // Distinct models, in the order the backend ranked them.
+  // Distinct families in backend rank order. Keying on `model` alone would
+  // collapse Bedrock Llama (or Bedrock Haiku) into another row that happens
+  // to reuse the short id, so they would never appear in the list.
   const byModel = [];
   for (const m of models) {
-    if (!byModel.some((x) => x.model === m.model)) byModel.push(m);
+    if (!byModel.some((x) => modelFamily(x) === modelFamily(m))) byModel.push(m);
   }
 
-  // Efforts available for the chosen model — the set differs per model, so
+  // Efforts available for the chosen family — the set differs per model, so
   // this is recomputed rather than assumed.
-  const efforts = models.filter((m) => m.model === selected.model);
+  const efforts = models.filter((m) => modelFamily(m) === modelFamily(selected));
 
-  const pickModel = (model) => {
+  const pickModel = (family) => {
     // Keep the current effort if the new model offers it; otherwise take that
     // model's first, so switching model never lands on an alias that does not
     // exist.
-    const forModel = models.filter((m) => m.model === model);
+    const forModel = models.filter((m) => modelFamily(m) === family);
     const sameEffort = forModel.find((m) => m.effort === selected.effort);
     setAlias((sameEffort || forModel[0]).alias);
   };
@@ -594,13 +922,13 @@ function ModelAndEffort({ models, alias, setAlias, tier }) {
           </span>
           <select
             data-testid="model-select"
-            value={selected.model}
+            value={modelFamily(selected)}
             onChange={(e) => pickModel(e.target.value)}
             style={field}
           >
             {byModel.map((m) => (
-              <option key={m.model} value={m.model}>
-                {m.model}
+              <option key={modelFamily(m)} value={modelFamily(m)}>
+                {m.label || m.model}
               </option>
             ))}
           </select>
@@ -728,7 +1056,12 @@ function SetupForm(p) {
           <button
             data-testid="start-session"
             onClick={() => p.start()}
-            disabled={p.busy || p.platformDown || !p.options?.models?.length}
+            disabled={
+              !p.sessionRestoreDone ||
+              p.busy ||
+              p.platformDown ||
+              !p.options?.models?.length
+            }
             style={{
               ...primaryBtn,
               opacity: p.busy || p.platformDown ? 0.45 : 1,
@@ -763,6 +1096,11 @@ function Workspace(p) {
         }}
       >
         <Stat k="Agent" v={session.harnessLabel} testId="session-harness" />
+        <Stat
+          k="Template"
+          v={templateName(p.templates, session.templateKey) || '—'}
+          testId="session-template"
+        />
         <Stat k="Model" v={session.model} testId="session-model" />
         <Stat k="Effort" v={session.effort} testId="session-effort" />
         <Stat k="Revision" v={String(session.revision)} testId="session-revision" />
@@ -785,7 +1123,7 @@ function Workspace(p) {
         )}
         <button
           data-testid="switch-harness"
-          onClick={() => p.start(session.id)}
+          onClick={p.chooseOtherHarness}
           disabled={p.busy}
           style={ghostBtn}
         >
@@ -801,6 +1139,50 @@ function Workspace(p) {
       )}
       {p.error && (
         <Notice tone="error" data-testid="harness-error" text={p.error.message} />
+      )}
+
+      {/*
+        * A passing build is not a finished résumé.
+        *
+        * LaTeX compiles filler exactly as happily as a career, so a session can
+        * report "build passing" twice and hand back a page of placeholders.
+        * When the server can see that has happened, say so here rather than
+        * letting the green build state speak for the document.
+        */}
+      {session.contentWarnings?.length > 0 && (
+        <div
+          data-testid="content-warning"
+          style={{
+            border: '1px solid #e0b970',
+            background: 'color-mix(in srgb, #9a6a2e 6%, var(--jb-v3-panel))',
+            borderRadius: 3,
+            padding: '13px 16px',
+            marginBottom: 16,
+          }}
+        >
+          <div style={{ fontSize: 13.5, fontWeight: 600, color: '#9a6a2e', marginBottom: 6 }}>
+            This compiled, but it still reads as a template
+          </div>
+          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: T.fg2, lineHeight: 1.6 }}>
+            {session.contentWarnings.map((w, i) => (
+              <li key={i}>{w}</li>
+            ))}
+          </ul>
+          <p style={{ fontSize: 12.5, color: T.fg3, margin: '9px 0 0', lineHeight: 1.5 }}>
+            Ask for it again, or try a stronger model — the agent left
+            placeholder text in the document.
+          </p>
+        </div>
+      )}
+
+      {!p.sessionOver && (
+        <LookPanel
+          templates={p.templates}
+          session={session}
+          busy={p.busy}
+          applyLook={p.applyLook}
+          revertLook={p.revertLook}
+        />
       )}
 
       <div
@@ -1008,6 +1390,9 @@ function Bubble({ message }) {
   return (
     <div style={{ display: 'flex', justifyContent: you ? 'flex-end' : 'flex-start' }}>
       <div
+        // The agent's own account of what it changed. Tagged so a test can
+        // assert the screen reported the change, not just that the LaTeX moved.
+        data-testid={you ? undefined : 'turn-summary'}
         style={{
           maxWidth: '86%',
           background: you ? T.accent : T.sunk,
@@ -1075,6 +1460,361 @@ function ProfileFacts({ profile }) {
         <p style={{ fontSize: 12.5, color: T.fg3, margin: '8px 0 0' }}>
           Your profile is complete — nothing else needed here.
         </p>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------ template and look --- */
+
+/** Every knob at the value the template declares as its default. */
+function defaultVibe(template) {
+  const out = {};
+  for (const knob of template?.knobs || []) out[knob.key] = knob.defaultValue;
+  return out;
+}
+
+/**
+ * The look for `template`, keeping what `current` chose where it still applies.
+ *
+ * Templates declare different knobs — an accent means nothing on a template
+ * with no colour — so a value the new template does not offer is dropped rather
+ * than carried as a setting that cannot take effect. The backend does the same
+ * thing server-side; this keeps the control in step with it.
+ */
+function mergeVibe(template, current) {
+  const out = defaultVibe(template);
+  for (const knob of template?.knobs || []) {
+    const chosen = current?.[knob.key];
+    if (chosen && knob.options.some((o) => o.value === chosen)) {
+      out[knob.key] = chosen;
+    }
+  }
+  return out;
+}
+
+const templateName = (templates, key) =>
+  (templates || []).find((t) => t.key === key)?.name || '';
+
+/** "Density Compact, Accent Navy" — for the transcript line. */
+function describeVibe(templates, templateKey, vibe) {
+  const template = (templates || []).find((t) => t.key === templateKey);
+  return Object.entries(vibe || {})
+    .map(([key, value]) => {
+      const knob = template?.knobs.find((k) => k.key === key);
+      const option = knob?.options.find((o) => o.value === value);
+      return knob && option ? `${knob.label} ${option.label}` : `${key} ${value}`;
+    })
+    .join(', ');
+}
+
+/**
+ * Choosing the template before the session starts.
+ *
+ * Previews are drawn rather than compiled — JOB-98 does not persist compiled
+ * output, so a real PDF thumbnail would mean a LaTeX build per card on every
+ * page load. What the candidate is choosing between is the layout, and the
+ * layout is what the drawing shows.
+ */
+function TemplatePicker({ templates, templateKey, pickTemplate, vibe, setVibe }) {
+  if (templates === null) {
+    return (
+      <Field title="Template">
+        <p data-testid="templates-loading" style={{ fontSize: 13.5, color: T.fg3, margin: 0 }}>
+          Loading templates…
+        </p>
+      </Field>
+    );
+  }
+
+  if (!templates.length) {
+    // The backend still generates without one, so this is a note rather than a
+    // blocker — saying "unavailable" and disabling Start would be a lie.
+    return (
+      <Field title="Template">
+        <p data-testid="templates-empty" style={{ fontSize: 13.5, color: T.fg3, margin: 0 }}>
+          No templates are installed, so the agent will use its own layout.
+        </p>
+      </Field>
+    );
+  }
+
+  const selected = templates.find((t) => t.key === templateKey) || templates[0];
+
+  return (
+    <>
+      <Field
+        title="Template"
+        hint="Changeable at any point once you start — your content comes with it."
+      >
+        <div
+          data-testid="template-picker"
+          style={{
+            display: 'grid',
+            // Two per row in the side column, more when the layout stacks and
+            // the panel gets the full width back.
+            gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+            gap: 10,
+          }}
+        >
+          {templates.map((t) => {
+            const on = t.key === selected.key;
+            return (
+              <button
+                key={t.key}
+                data-testid={`template-card-${t.key}`}
+                aria-pressed={on}
+                onClick={() => pickTemplate(t.key)}
+                title={t.description}
+                style={{
+                  fontFamily: 'inherit',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  padding: 0,
+                  overflow: 'hidden',
+                  background: T.panel,
+                  border: `1px solid ${on ? T.accent : T.line}`,
+                  boxShadow: on
+                    ? `0 0 0 2px color-mix(in srgb, var(--jb-v3-accent) 18%, transparent)`
+                    : 'none',
+                  borderRadius: 3,
+                  transition: 'border-color .15s ease, box-shadow .15s ease',
+                }}
+              >
+                <div
+                  data-testid={`template-preview-${t.key}`}
+                  className="jbres-preview"
+                  aria-hidden="true"
+                  style={{
+                    background: T.sunk,
+                    borderBottom: `1px solid ${T.line}`,
+                    padding: '10px 14px 0',
+                    color: T.fg,
+                    lineHeight: 0,
+                  }}
+                  dangerouslySetInnerHTML={{ __html: t.previewSvg }}
+                />
+                <div style={{ padding: '9px 11px 11px' }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: on ? T.accent : T.fg }}>
+                    {t.name}
+                  </div>
+                  <div
+                    className="jbres-card-desc"
+                    style={{ fontSize: 11, color: T.fg3, lineHeight: 1.45, marginTop: 3 }}
+                  >
+                    {t.description}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </Field>
+
+      <Field title="Look" hint="Presentation only. These never change what your résumé claims.">
+        <KnobRow
+          template={selected}
+          vibe={vibe}
+          onChange={(key, value) => setVibe((v) => ({ ...v, [key]: value }))}
+          idPrefix="setup"
+        />
+      </Field>
+    </>
+  );
+}
+
+/** The knob selects for one template. Shared by setup and the live session. */
+function KnobRow({ template, vibe, onChange, disabled, idPrefix }) {
+  if (!template?.knobs?.length) return null;
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+        gap: 10,
+      }}
+    >
+      {template.knobs.map((knob) => (
+        <div key={knob.key}>
+          <span style={{ ...label, fontSize: 9.5, display: 'block', marginBottom: 6 }}>
+            {knob.label}
+          </span>
+          <select
+            data-testid={`${idPrefix}-knob-${knob.key}`}
+            value={vibe?.[knob.key] ?? knob.defaultValue}
+            disabled={disabled}
+            onChange={(e) => onChange(knob.key, e.target.value)}
+            style={{ ...field, opacity: disabled ? 0.55 : 1 }}
+          >
+            {knob.options.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Changing the look of a live session.
+ *
+ * Draft-then-apply rather than apply-on-change: every application is a real
+ * harness turn that costs money and takes tens of seconds, so nudging a select
+ * must not start one. The button says how many things will change, and stays
+ * disabled until something has.
+ */
+function LookPanel({ templates, session, busy, applyLook, revertLook }) {
+  const current = (templates || []).find((t) => t.key === session.templateKey);
+  const [draftTemplate, setDraftTemplate] = useState(session.templateKey || '');
+  const [draftVibe, setDraftVibe] = useState(session.vibe || {});
+  const [open, setOpen] = useState(false);
+
+  // The session is the source of truth: a completed change, or a revert, resets
+  // the draft to whatever actually landed.
+  useEffect(() => {
+    setDraftTemplate(session.templateKey || '');
+    setDraftVibe(session.vibe || {});
+  }, [session.templateKey, session.vibe, session.revision]);
+
+  if (!templates?.length || !session.templateKey) return null;
+
+  const draft = templates.find((t) => t.key === draftTemplate) || current;
+  const templateChanged = draftTemplate !== session.templateKey;
+  const changedKnobs = Object.keys(draftVibe).filter(
+    (k) => draftVibe[k] !== session.vibe?.[k],
+  );
+  const dirty = templateChanged || changedKnobs.length > 0;
+
+  const pick = (key) => {
+    const next = templates.find((t) => t.key === key);
+    if (!next) return;
+    setDraftTemplate(key);
+    setDraftVibe(mergeVibe(next, draftVibe));
+  };
+
+  return (
+    <div
+      data-testid="look-panel"
+      style={{
+        background: T.panel,
+        border: `1px solid ${T.line}`,
+        borderRadius: 3,
+        marginBottom: 16,
+      }}
+    >
+      <button
+        data-testid="look-toggle"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        style={{
+          width: '100%',
+          fontFamily: 'inherit',
+          background: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          padding: '12px 18px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          color: T.fg,
+        }}
+      >
+        <span style={label}>Look</span>
+        <span data-testid="look-current" style={{ fontSize: 13, color: T.fg2 }}>
+          {current?.name || session.templateKey}
+          {describeVibe(templates, session.templateKey, session.vibe)
+            ? ` · ${describeVibe(templates, session.templateKey, session.vibe)}`
+            : ''}
+        </span>
+        <span style={{ flex: 1 }} />
+        {session.canRevert && (
+          <span data-testid="look-revert-available" style={{ ...label, fontSize: 9.5, color: T.accent }}>
+            1 step back available
+          </span>
+        )}
+        <span aria-hidden="true" style={{ color: T.fg3, fontSize: 12 }}>
+          {open ? '▲' : '▼'}
+        </span>
+      </button>
+
+      {open && (
+        <div style={{ borderTop: `1px solid ${T.line}`, padding: 18, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <span style={{ ...label, fontSize: 9.5, display: 'block', marginBottom: 8 }}>
+              Template
+            </span>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {templates.map((t) => {
+                const on = t.key === draftTemplate;
+                return (
+                  <button
+                    key={t.key}
+                    data-testid={`look-template-${t.key}`}
+                    aria-pressed={on}
+                    disabled={busy}
+                    onClick={() => pick(t.key)}
+                    style={{
+                      ...ghostBtn,
+                      fontSize: 12.5,
+                      padding: '7px 13px',
+                      color: on ? T.accentInk : T.fg2,
+                      background: on ? T.accent : 'transparent',
+                      borderColor: on ? T.accent : T.line,
+                      opacity: busy ? 0.55 : 1,
+                    }}
+                  >
+                    {t.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <KnobRow
+            template={draft}
+            vibe={draftVibe}
+            disabled={busy}
+            idPrefix="look"
+            onChange={(key, value) => setDraftVibe((v) => ({ ...v, [key]: value }))}
+          />
+
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              data-testid="apply-look"
+              disabled={busy || !dirty}
+              onClick={() =>
+                applyLook(
+                  templateChanged
+                    ? { templateKey: draftTemplate, vibe: draftVibe }
+                    : { vibe: draftVibe },
+                )
+              }
+              style={{ ...primaryBtn, opacity: busy || !dirty ? 0.45 : 1 }}
+            >
+              {busy ? 'Re-applying…' : 'Apply look'}
+            </button>
+
+            <button
+              data-testid="revert-look"
+              disabled={busy || !session.canRevert}
+              onClick={revertLook}
+              style={{ ...ghostBtn, opacity: busy || !session.canRevert ? 0.45 : 1 }}
+            >
+              Back to previous look
+            </button>
+
+            <span data-testid="look-status" style={{ fontSize: 12.5, color: T.fg3 }}>
+              {dirty
+                ? templateChanged
+                  ? `Switching to ${draft?.name}. Your content is re-applied, not rewritten.`
+                  : `${changedKnobs.length} change${changedKnobs.length > 1 ? 's' : ''} to apply.`
+                : 'Nothing to apply — this is the current look.'}
+            </span>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -42,8 +42,19 @@ const apiCall = async (endpoint, options = {}) => {
 export const getHarnessOptions = () => apiCall('/api/resume-harness/options');
 
 /**
+ * GET /api/resume-harness/templates
+ * -> [{ key, name, description, previewSvg, constraints[], knobs[] }]
+ *
+ * Not tier-filtered, and deliberately so: a template is a layout, not a
+ * capability. What a plan buys is the model that writes the words, which
+ * `getHarnessOptions` already reports.
+ */
+export const getResumeTemplates = () => apiCall('/api/resume-harness/templates');
+
+/**
  * POST /api/resume-harness/sessions
- * { harness, alias?, targetRole?, jobDescription?, carryFromSessionId? }
+ * { harness, alias?, targetRole?, jobDescription?, carryFromSessionId?,
+ *   templateKey?, vibe? }
  *   -> session
  *
  * Only per-résumé inputs are sent. Name, location, LinkedIn, work
@@ -91,19 +102,16 @@ export const runHarnessTurn = (id, payload) =>
  * Uses fetch + a stream reader rather than EventSource, because EventSource
  * cannot POST a body or set an Authorization header.
  */
-export const streamHarnessTurn = async (id, payload, onEvent) => {
+const streamPost = async (path, payload, onEvent) => {
   const token = await getAccessToken();
-  const res = await fetch(
-    `${API_URL}/api/resume-harness/sessions/${id}/turns/stream`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify(payload),
+  const res = await fetch(`${API_URL}${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-  );
+    body: JSON.stringify(payload),
+  });
 
   if (!res.ok || !res.body) {
     const body = await res.json().catch(() => ({}));
@@ -136,6 +144,38 @@ export const streamHarnessTurn = async (id, payload, onEvent) => {
     }
   }
 };
+
+export const streamHarnessTurn = (id, payload, onEvent) =>
+  streamPost(`/api/resume-harness/sessions/${id}/turns/stream`, payload, onEvent);
+
+/**
+ * POST /api/resume-harness/sessions/:id/template/stream
+ * { templateKey, vibe? }
+ *
+ * Switching template is a re-apply of the résumé the session already holds, so
+ * it streams like any other turn — the harness is doing the same amount of work
+ * and the screen should show it.
+ */
+export const streamTemplateChange = (id, payload, onEvent) =>
+  streamPost(
+    `/api/resume-harness/sessions/${id}/template/stream`,
+    payload,
+    onEvent,
+  );
+
+/** POST /api/resume-harness/sessions/:id/vibe/stream — { vibe } */
+export const streamVibeChange = (id, payload, onEvent) =>
+  streamPost(`/api/resume-harness/sessions/${id}/vibe/stream`, payload, onEvent);
+
+/**
+ * POST /api/resume-harness/sessions/:id/revert-look -> session
+ *
+ * Not streamed: this one does not run the model. The previous source is already
+ * known-good, so it is written back and rebuilt — which is the point, because
+ * this exists for the case where the model's last attempt went wrong.
+ */
+export const revertResumeLook = (id) =>
+  apiCall(`/api/resume-harness/sessions/${id}/revert-look`, { method: 'POST' });
 
 /** GET /api/resume-harness/sessions/:id/pdf -> { pdfBase64 } */
 export const getHarnessPdf = (id) =>

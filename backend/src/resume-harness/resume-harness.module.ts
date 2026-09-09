@@ -5,6 +5,7 @@ import { ResumeHarnessService } from './resume-harness.service';
 import { ModelAliasService } from './model-alias.service';
 import { CandidateContextService } from './candidate-context.service';
 import { ContextFilesService } from './context-files.service';
+import { ResumeTemplateService } from './resume-template.service';
 import { HarnessRegistry } from './harness/harness.registry';
 import { SandboxService } from './sandbox/sandbox.service';
 import { AgentPlatformClient } from './sandbox/agent-platform.client';
@@ -35,7 +36,7 @@ function sandboxDriverFactory(): SandboxDriver {
   return new DockerSandboxDriver({
     image: process.env.RESUME_SANDBOX_IMAGE || 'jobocate/resume-harness:latest',
     workdir: SANDBOX_WORKDIR,
-    ttlSeconds: Number(process.env.RESUME_SANDBOX_TTL_SECONDS || 3600),
+    ttlSeconds: Number(process.env.RESUME_SANDBOX_TTL_SECONDS || 900),
     network: process.env.RESUME_SANDBOX_NETWORK,
   });
 }
@@ -48,6 +49,10 @@ import {
   HarnessModelAlias,
   HarnessModelAliasSchema,
 } from './schemas/harness-model-alias.schema';
+import {
+  ResumeTemplate,
+  ResumeTemplateSchema,
+} from './schemas/resume-template.schema';
 import { User, UserSchema } from '../schemas/user.schema';
 import {
   UserPreferences,
@@ -59,6 +64,7 @@ import {
     MongooseModule.forFeature([
       { name: ResumeHarnessSession.name, schema: ResumeHarnessSessionSchema },
       { name: HarnessModelAlias.name, schema: HarnessModelAliasSchema },
+      { name: ResumeTemplate.name, schema: ResumeTemplateSchema },
       { name: User.name, schema: UserSchema },
       { name: UserPreferences.name, schema: UserPreferencesSchema },
     ]),
@@ -69,11 +75,12 @@ import {
     ModelAliasService,
     CandidateContextService,
     ContextFilesService,
+    ResumeTemplateService,
     HarnessRegistry,
     SandboxService,
     { provide: SANDBOX_DRIVER, useFactory: sandboxDriverFactory },
     LatexService,
   ],
-  exports: [ResumeHarnessService, ModelAliasService],
+  exports: [ResumeHarnessService, ModelAliasService, ResumeTemplateService],
 })
 export class ResumeHarnessModule {}

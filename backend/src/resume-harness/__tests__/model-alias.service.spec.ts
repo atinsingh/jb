@@ -124,6 +124,53 @@ describe('ModelAliasService', () => {
     );
   });
 
+  it('does not offer leftover Llama rows still marked active in Mongo', async () => {
+    // LiteLLM and the seed no longer serve Llama. Old alias documents stay
+    // isActive until someone re-seeds; the picker must not wait on that.
+    const llama = {
+      alias: 'bedrock/llama3-3-70b/low',
+      provider: 'bedrock',
+      model: 'llama3-3-70b',
+      effort: 'low',
+      label: 'Llama 3.3 70B · low cost',
+      tiers: ['PRO', 'ELITE'],
+      defaultForTiers: ['PRO'],
+      isActive: true,
+      rank: 1,
+    };
+    signedInAs('PRO');
+    aliasModel.find.mockReturnValue(findReturning([llama, PRO_ALIAS]));
+
+    const allowed = await service.listForUser('u1');
+    expect(allowed.map((a) => a.alias)).toEqual([PRO_ALIAS.alias]);
+
+    await expect(
+      service.resolveForUser('u1', llama.alias),
+    ).rejects.toThrow(/not available on your plan/i);
+
+    const resolved = await service.resolveForUser('u1');
+    expect(resolved.alias).toBe(PRO_ALIAS.alias);
+  });
+
+  it('does not offer Bedrock Claude ids this account cannot invoke', async () => {
+    const dead = {
+      alias: 'bedrock/claude-sonnet-5/high',
+      provider: 'bedrock',
+      model: 'claude-sonnet-5',
+      effort: 'high',
+      label: 'Sonnet 5 · thorough (Bedrock)',
+      tiers: ['PRO', 'ELITE'],
+      defaultForTiers: ['PRO'],
+      isActive: true,
+      rank: 1,
+    };
+    signedInAs('PRO');
+    aliasModel.find.mockReturnValue(findReturning([dead, PRO_ALIAS]));
+
+    const allowed = await service.listForUser('u1');
+    expect(allowed.map((a) => a.alias)).toEqual([PRO_ALIAS.alias]);
+  });
+
   it('contains no hardcoded model id, effort level or tier->model mapping', () => {
     const source = readFileSync(
       join(__dirname, '..', 'model-alias.service.ts'),

@@ -56,7 +56,8 @@ describe('DockerSandboxDriver', () => {
     expect(argv).toEqual(expect.arrayContaining(['--name', 'resume-sess-1']));
     expect(argv).toEqual(expect.arrayContaining(['-w', '/workspace']));
     expect(argv).toEqual(expect.arrayContaining(['--label', 'session=sess-1']));
-    expect(argv).toEqual(expect.arrayContaining(['--label', 'harness=codex']));
+    expect(argv).toEqual(expect.arrayContaining(['--memory', '512m']));
+    expect(argv).toEqual(expect.arrayContaining(['--pids-limit', '512']));
     expect(argv[argv.length - 3]).toBe('jobocate/resume-harness:latest');
   });
 

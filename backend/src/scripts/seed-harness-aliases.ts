@@ -19,22 +19,9 @@ import {
 
 const ALIASES = [
   // --- Amazon Bedrock ---
-  // Only seed aliases the proxy actually serves: a row here that has no
-  // matching `model_name` in infra/litellm/config.yaml offers the candidate a
-  // model that 404s at request time. Confirm with `npm run harness:bedrock-check`.
-  {
-    alias: 'bedrock/claude-haiku-4-5/low',
-    provider: 'bedrock',
-    model: 'claude-haiku-4-5',
-    effort: 'low',
-    label: 'Haiku 4.5 · fast (Bedrock)',
-    tiers: ['FREE', 'PRO', 'ELITE'],
-    // The FREE default. Ranked ahead of the Console alias below so there is
-    // exactly one winner for the tier, not a rank tie-break nobody reads.
-    defaultForTiers: ['FREE'],
-    rank: 15,
-  },
-  // Amazon Nova — cheapest models on the proxy.
+  // LiteLLM talks to Bedrock with IAM. On this account that path can tool-call
+  // Nova, not Claude (Anthropic use-case form 404). Do not seed Claude-on-
+  // Bedrock aliases until a live proxy call returns a tool id.
   //
   // Deliberately NOT a default for any tier. Nova is the right tool for
   // verifying auth, alias resolution and harness tagging without spending
@@ -80,25 +67,36 @@ const ALIASES = [
     rank: 80,
   },
   {
-    alias: 'bedrock/claude-sonnet-5/high',
+    alias: 'bedrock/nova-2-lite/low',
     provider: 'bedrock',
-    model: 'claude-sonnet-5',
-    effort: 'high',
-    label: 'Sonnet 5 · thorough (Bedrock)',
-    tiers: ['PRO', 'ELITE'],
-    defaultForTiers: ['PRO'],
-    rank: 18,
+    model: 'nova-2-lite',
+    effort: 'low',
+    label: 'Nova 2 Lite · cheap',
+    maxOutputTokens: 8192,
+    maxInputTokens: 128000,
+    tiers: ['FREE', 'PRO', 'ELITE'],
+    defaultForTiers: [],
+    rank: 82,
   },
+  // Qwen3 Coder Next uses the same Bedrock IAM route and needs no vendor key.
+  // It passed the production OpenCode adapter's three-pass scripted check on
+  // 2026-09-09 after session continuity and factual grounding were fixed.
   {
-    alias: 'bedrock/claude-opus-5/xhigh',
+    alias: 'bedrock/qwen3-coder-next/low',
     provider: 'bedrock',
-    model: 'claude-opus-5',
-    effort: 'xhigh',
-    label: 'Opus 5 · maximum (Bedrock)',
-    tiers: ['ELITE'],
-    defaultForTiers: ['ELITE'],
-    rank: 8,
+    model: 'qwen3-coder-next',
+    effort: 'low',
+    label: 'Qwen3 Coder Next · capable',
+    maxOutputTokens: 8192,
+    maxInputTokens: 128000,
+    tiers: ['FREE', 'PRO', 'ELITE'],
+    defaultForTiers: [],
+    rank: 35,
   },
+  // Meta Llama is not seeded. 3.1 8B never tool-calls; 4 Maverick/Scout and
+  // 3.3 70B emit writes with empty content (or dump JSON as text), so a
+  // session on them cannot produce a résumé. Re-seeding deactivates any
+  // leftover rows below.
 
   // --- Anthropic Console ---
   {
@@ -108,7 +106,9 @@ const ALIASES = [
     effort: 'low',
     label: 'Haiku 4.5 · fast',
     tiers: ['FREE', 'PRO', 'ELITE'],
-    // Selectable on FREE, but the Bedrock alias above is the tier default.
+    // The FREE default. Bedrock Haiku 4.5 is not callable on this account
+    // (Anthropic use-case form). Console Haiku is.
+    defaultForTiers: ['FREE'],
     rank: 40,
   },
   {
@@ -127,7 +127,7 @@ const ALIASES = [
     effort: 'high',
     label: 'Sonnet 4.5 · thorough',
     tiers: ['PRO', 'ELITE'],
-    // Selectable, but Bedrock owns the tier default — that is the key we have.
+    defaultForTiers: ['PRO'],
     rank: 20,
   },
   {
@@ -155,7 +155,7 @@ const ALIASES = [
     effort: 'max',
     label: 'Opus 4.5 · maximum',
     tiers: ['ELITE'],
-    // Selectable, but Bedrock owns the tier default — that is the key we have.
+    defaultForTiers: ['ELITE'],
     rank: 5,
   },
 ];
@@ -174,6 +174,19 @@ async function main() {
       { upsert: true },
     );
     console.log(`✓ ${doc.alias}  →  ${doc.tiers.join(', ')}`);
+  }
+
+  // A retired alias (no tools, or a 400 on the harness path) must disappear
+  // from the picker. Upserting the live set leaves the old row selectable.
+  const keep = ALIASES.map((d) => d.alias);
+  const retired = await AliasModel.updateMany(
+    { alias: { $nin: keep } },
+    { $set: { isActive: false } },
+  );
+  if (retired.modifiedCount) {
+    console.log(
+      `Deactivated ${retired.modifiedCount} alias(es) no longer in the catalogue.`,
+    );
   }
 
   console.log(`\nSeeded ${ALIASES.length} aliases.`);

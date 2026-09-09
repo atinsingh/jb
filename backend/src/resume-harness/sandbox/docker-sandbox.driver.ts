@@ -92,9 +92,11 @@ export class DockerSandboxDriver implements SandboxDriver {
       'no-new-privileges',
       '--cap-drop',
       'ALL',
-      // Bound the blast radius of a runaway agent loop.
+      // Bound the blast radius of a runaway agent loop. Ceiling, not a
+      // reservation — idle is a sleep. 512m is tight for latexmk; OOM is a
+      // failed compile, not a second container.
       '--memory',
-      '2g',
+      '512m',
       '--pids-limit',
       '512',
     ];

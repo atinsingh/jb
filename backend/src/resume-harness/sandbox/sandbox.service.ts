@@ -36,7 +36,7 @@ export class SandboxService {
     process.env.RESUME_SANDBOX_IMAGE || 'jobocate/resume-harness:latest';
 
   private readonly ttlSeconds = Number(
-    process.env.RESUME_SANDBOX_TTL_SECONDS || 3600,
+    process.env.RESUME_SANDBOX_TTL_SECONDS || 900,
   );
 
   constructor(
