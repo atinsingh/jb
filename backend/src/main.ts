@@ -13,6 +13,7 @@ import { AppLoggerService } from './common/logger/logger.service';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import helmet from 'helmet';
 import { join } from 'path';
+import { servePublicUploads } from './storage/public-uploads';
 
 // Initialize logger early (before app creation)
 const earlyLogger = new AppLoggerService();
@@ -36,9 +37,9 @@ async function bootstrap() {
     // Serve locally-stored uploads (StorageService local driver) at /uploads/*.
     // No-op for the s3 driver, which returns absolute/presigned URLs instead.
     const storageLocalPath = process.env.STORAGE_LOCAL_PATH || './uploads';
-    app.useStaticAssets(
+    servePublicUploads(
+      app,
       join(process.cwd(), storageLocalPath.replace(/^\.\//, '')),
-      { prefix: '/uploads/' },
     );
 
   // Security response headers (HSTS, noSniff, frameguard, etc.). CSP is disabled

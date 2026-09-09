@@ -25,6 +25,11 @@ export interface ExecResult {
   stderr: string;
 }
 
+export interface ReapedSandbox {
+  sandboxId: string;
+  sessionId?: string;
+}
+
 export interface SandboxDriver {
   /** Whether this driver has what it needs to run at all (config, binary). */
   isConfigured(): boolean;
@@ -47,6 +52,7 @@ export interface SandboxDriver {
     onChunk: (chunk: string) => void,
     opts?: { timeoutSeconds?: number; cwd?: string },
   ): Promise<ExecResult>;
+  sweepExpired(now?: Date): Promise<ReapedSandbox[]>;
   destroy(id: string): Promise<void>;
 }
 

@@ -3,6 +3,7 @@ import {
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { ReapedSandbox } from './sandbox-driver.interface';
 
 /**
  * Thin HTTP client for a self-hosted LiteLLM Agent Platform deployment
@@ -167,6 +168,11 @@ export class AgentPlatformClient {
         `Sandbox ${sandboxId} teardown failed (TTL will reap it): ${err?.message}`,
       );
     }
+  }
+
+  async sweepExpired(): Promise<ReapedSandbox[]> {
+    // Agent Platform receives ttl_seconds at creation and owns its own expiry.
+    return [];
   }
 
   private async request<T = any>(

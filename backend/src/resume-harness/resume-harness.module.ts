@@ -58,6 +58,7 @@ import {
   UserPreferences,
   UserPreferencesSchema,
 } from '../schemas/user-preferences.schema';
+import { ResumeSandboxReaperService } from './resume-sandbox-reaper.service';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import {
     ResumeTemplateService,
     HarnessRegistry,
     SandboxService,
+    ResumeSandboxReaperService,
     { provide: SANDBOX_DRIVER, useFactory: sandboxDriverFactory },
     LatexService,
   ],

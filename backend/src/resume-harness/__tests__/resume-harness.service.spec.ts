@@ -11,6 +11,7 @@ import { SandboxService } from '../sandbox/sandbox.service';
 import { LatexService } from '../latex/latex.service';
 import { ResumeHarnessSession } from '../schemas/resume-harness-session.schema';
 import { LITELLM_TAG_HEADER } from '../harness/harness.types';
+import { StorageService } from '../../storage/storage.service';
 
 /**
  * A minimally realistic résumé.
@@ -91,6 +92,7 @@ describe('ResumeHarnessService', () => {
   const latex: any = {
     compile: jest.fn(async () => ({ ok: true, log: '', pdfBase64: 'JVBER' })),
   };
+  const storage: any = { put: jest.fn(async () => ({})), getBuffer: jest.fn(async () => Buffer.from('%PDF')) };
 
   const modelAlias: any = {
     resolveForUser: jest.fn(async () => ALIAS),
@@ -157,6 +159,7 @@ describe('ResumeHarnessService', () => {
         },
         { provide: SandboxService, useValue: sandbox },
         { provide: LatexService, useValue: latex },
+        { provide: StorageService, useValue: storage },
         { provide: ModelAliasService, useValue: modelAlias },
         { provide: CandidateContextService, useValue: candidateContext },
         { provide: ResumeTemplateService, useValue: templates },
@@ -252,6 +255,7 @@ describe('ResumeHarnessService', () => {
       (service as any).registry,
       sandbox,
       latex,
+      storage,
     );
 
     let firstProvisionEnteredResolve!: () => void;

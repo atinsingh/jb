@@ -52,4 +52,40 @@ describe('SandboxService.isAvailable', () => {
 
     expect(ping).toHaveBeenCalledTimes(1);
   });
+
+  it('labels each new resume sandbox with its configured expiration time', async () => {
+    const originalTtl = process.env.RESUME_SANDBOX_TTL_SECONDS;
+    process.env.RESUME_SANDBOX_TTL_SECONDS = '900';
+    const create = jest.fn(async () => 'resume-session-1');
+    const service = new SandboxService(makeClient({ create } as any));
+    const now = jest.spyOn(Date, 'now').mockReturnValue(
+      new Date('2026-09-09T16:00:00.000Z').getTime(),
+    );
+    try {
+      await service.provision({
+        sessionId: 'session-1',
+        harness: 'codex',
+        env: {},
+        files: [],
+      });
+
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          labels: expect.objectContaining({
+            app: 'jobocate',
+            surface: 'resume-harness',
+            session: 'session-1',
+            expiresAt: '2026-09-09T16:15:00.000Z',
+          }),
+        }),
+      );
+    } finally {
+      now.mockRestore();
+      if (originalTtl === undefined) {
+        delete process.env.RESUME_SANDBOX_TTL_SECONDS;
+      } else {
+        process.env.RESUME_SANDBOX_TTL_SECONDS = originalTtl;
+      }
+    }
+  });
 });

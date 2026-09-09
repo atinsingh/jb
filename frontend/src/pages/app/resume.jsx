@@ -6,11 +6,16 @@ import Link from 'next/link';
 import AppTopNav from '@/components/app/AppTopNav';
 import { ErrorState } from '@/components/app/AppStates';
 import {
+  deleteHarnessSession,
   endHarnessSession,
+  endHarnessSessionKeepalive,
   getHarnessPdf,
   getHarnessOptions,
   getHarnessSession,
   getResumeTemplates,
+  listHarnessSessions,
+  renameHarnessSession,
+  restoreHarnessRevision,
   revertResumeLook,
   startHarnessSession,
   streamHarnessTurn,
@@ -40,8 +45,6 @@ import {
  * and changeable at any point during it. That asymmetry with the agent picker
  * is deliberate and is stated on both controls: changing the agent needs a new
  * sandbox, changing the look does not.
- *
- * Session history is JOB-105.
  */
 
 const T = {
@@ -139,6 +142,13 @@ export default function AppResume() {
   const [companyUrl, setCompanyUrl] = useState('');
 
   const [session, setSession] = useState(null);
+  const [sessions, setSessions] = useState(null);
+  const [sessionsError, setSessionsError] = useState(false);
+  const [sessionsOpen, setSessionsOpen] = useState(true);
+  const lifecycleEnded = useRef(new Set());
+  const sessionRef = useRef(null);
+  const pdfRequestRef = useRef(0);
+  sessionRef.current = session;
   const [sessionRestoreDone, setSessionRestoreDone] = useState(false);
   const [carryFromSessionId, setCarryFromSessionId] = useState('');
   const [instruction, setInstruction] = useState('');
@@ -151,6 +161,87 @@ export default function AppResume() {
   const [liveText, setLiveText] = useState('');
   const [livePhase, setLivePhase] = useState(null);
   const transcriptRef = useRef(null);
+
+  const loadSessions = useCallback(async () => {
+    try {
+      setSessions(await listHarnessSessions());
+      setSessionsError(false);
+    } catch {
+      setSessionsError(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSessions();
+  }, [loadSessions, session?.id, session?.revision, session?.status, session?.name]);
+
+  useEffect(() => {
+    const release = (unmounting = false) => {
+      const current = sessionRef.current;
+      if (current?.status !== 'active' || lifecycleEnded.current.has(current.id)) return;
+      lifecycleEnded.current.add(current.id);
+      void endHarnessSessionKeepalive(current.id).then(() => {
+        if (!unmounting) loadSessions();
+      });
+      if (!unmounting) setSession((value) => value?.id === current.id ? { ...value, status: 'ended' } : value);
+    };
+    const pagehide = () => release();
+    const visibilitychange = () => {
+      if (document.visibilityState === 'hidden') release();
+    };
+    window.addEventListener('pagehide', pagehide);
+    document.addEventListener('visibilitychange', visibilitychange);
+    return () => {
+      window.removeEventListener('pagehide', pagehide);
+      document.removeEventListener('visibilitychange', visibilitychange);
+      pdfRequestRef.current += 1;
+      release(true);
+    };
+  }, [loadSessions]);
+
+  const acceptSession = useCallback((response) => {
+    const current = lifecycleEnded.current.has(response.id)
+      ? { ...response, status: 'ended' } : response;
+    sessionRef.current = current;
+    setSession(current);
+    if (current.status !== 'active' && window.sessionStorage.getItem(ACTIVE_SESSION_KEY) === current.id) {
+      window.sessionStorage.removeItem(ACTIVE_SESSION_KEY);
+    }
+    return current;
+  }, []);
+
+  const selectSession = useCallback((response) => {
+    pdfRequestRef.current += 1;
+    const current = acceptSession(response);
+    setHarness(current.harness);
+    setAlias(current.alias);
+    setTargetRole(current.targetRole || '');
+    setTemplateKey(current.templateKey || '');
+    setVibe(current.vibe || {});
+    setMessages((current.turns || []).flatMap((turn) => [
+      { role: 'you', text: turn.instruction || (turn.kind === 'restore' ? `Restore revision ${turn.restoredFromRevision}.` : 'Change the look.') },
+      { role: 'agent', text: turn.summary || 'Done.', compiled: turn.compiled, revision: turn.revision },
+    ]));
+    setInstruction('');
+    setPdfBase64('');
+    setSessionsOpen(false);
+    return current;
+  }, [acceptSession]);
+
+  const loadPdf = useCallback(async (current, cancelled = () => false) => {
+    const request = ++pdfRequestRef.current;
+    if (!current.hasCurrentPdf) return;
+    const isCurrent = () => !cancelled()
+      && request === pdfRequestRef.current
+      && sessionRef.current?.id === current.id
+      && sessionRef.current?.revision === current.revision;
+    try {
+      const pdf = await getHarnessPdf(current.id);
+      if (isCurrent()) setPdfBase64(pdf?.pdfBase64 || '');
+    } catch {
+      if (isCurrent()) setPdfBase64('');
+    }
+  }, []);
 
   const loadOptions = useCallback(async () => {
     setOptionsError(null);
@@ -203,6 +294,7 @@ export default function AppResume() {
       return undefined;
     }
 
+    setPhase('working');
     let cancelled = false;
     const restore = async () => {
       try {
@@ -213,27 +305,16 @@ export default function AppResume() {
           return;
         }
 
-        setSession(current);
-        setHarness(current.harness);
-        setAlias(current.alias);
-        setTemplateKey(current.templateKey || '');
-        setVibe(current.vibe || {});
-        setPhase('ready');
-
-        if (current.compiled) {
-          try {
-            const pdf = await getHarnessPdf(sessionId);
-            if (!cancelled) setPdfBase64(pdf?.pdfBase64 || '');
-          } catch {
-            // The session is already restored. A transient render fetch must
-            // not discard its ID and turn the next reload into a new session.
-            if (!cancelled) setPdfBase64('');
-          }
-        }
+        selectSession(current);
+        // A transient PDF failure must not discard the restored session ID.
+        await loadPdf(current, () => cancelled);
       } catch {
         if (!cancelled) window.sessionStorage.removeItem(ACTIVE_SESSION_KEY);
       } finally {
-        if (!cancelled) setSessionRestoreDone(true);
+        if (!cancelled) {
+          setSessionRestoreDone(true);
+          setPhase('ready');
+        }
       }
     };
     restore();
@@ -241,7 +322,7 @@ export default function AppResume() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [selectSession, loadPdf]);
 
   // Keep the newest line in view while the agent narrates.
   useEffect(() => {
@@ -283,13 +364,16 @@ export default function AppResume() {
         ...(templateKey ? { templateKey } : {}),
         ...(Object.keys(vibe).length ? { vibe } : {}),
       });
+      sessionRef.current = next;
       setSession(next);
+      setSessionsOpen(false);
       setCarryFromSessionId('');
       window.sessionStorage.setItem(ACTIVE_SESSION_KEY, next.id);
       setTemplateKey(next.templateKey || '');
       setVibe(next.vibe || {});
       setPdfBase64('');
       setMessages([]);
+      await loadPdf(next);
       setPhase('ready');
     } catch (e) {
       setError(e);
@@ -297,17 +381,31 @@ export default function AppResume() {
     }
   };
 
-  const chooseOtherHarness = () => {
+  const chooseOtherHarness = async () => {
     if (!session || busy) return;
-    const alternative = options?.harnesses?.find(
-      (item) => item.id !== session.harness,
-    );
-    if (alternative) setHarness(alternative.id);
-    setCarryFromSessionId(session.id);
-    setSession(null);
-    setPdfBase64('');
     setError(null);
-    setPhase('idle');
+    setPhase('working');
+    try {
+      if (session.status === 'active') {
+        lifecycleEnded.current.add(session.id);
+        await endHarnessSession(session.id);
+      }
+      const alternative = options?.harnesses?.find(
+        (item) => item.id !== session.harness,
+      );
+      if (alternative) setHarness(alternative.id);
+      setCarryFromSessionId(session.id);
+      window.sessionStorage.removeItem(ACTIVE_SESSION_KEY);
+      setSession(null);
+      setSessionsOpen(true);
+      setPdfBase64('');
+      await loadSessions();
+    } catch (e) {
+      lifecycleEnded.current.delete(session.id);
+      setError(e);
+    } finally {
+      setPhase('idle');
+    }
   };
 
   /**
@@ -328,7 +426,7 @@ export default function AppResume() {
 
   const send = async () => {
     const text = instruction.trim();
-    if (!session || !text || busy) return;
+    if (!session || sessionOver || !text || busy) return;
 
     setError(null);
     setPhase('working');
@@ -342,8 +440,7 @@ export default function AppResume() {
         if (event.type === 'phase') setLivePhase(event.phase);
         else if (event.type === 'token') setLiveText((t) => (t + event.text).slice(-4000));
         else if (event.type === 'result') {
-          const s = event.session;
-          setSession(s);
+          const s = acceptSession(event.session);
           if (s.pdfBase64) setPdfBase64(s.pdfBase64);
           setMessages((m) => [
             ...m,
@@ -392,7 +489,7 @@ export default function AppResume() {
    * place every other change is.
    */
   const applyLook = async (next) => {
-    if (!session || busy) return;
+    if (!session || sessionOver || busy) return;
     const changingTemplate =
       next.templateKey && next.templateKey !== session.templateKey;
 
@@ -415,8 +512,7 @@ export default function AppResume() {
       else if (event.type === 'token')
         setLiveText((t) => (t + event.text).slice(-4000));
       else if (event.type === 'result') {
-        const s = event.session;
-        setSession(s);
+        const s = acceptSession(event.session);
         setTemplateKey(s.templateKey || '');
         setVibe(s.vibe || {});
         if (s.pdfBase64) setPdfBase64(s.pdfBase64);
@@ -457,12 +553,11 @@ export default function AppResume() {
 
   /** One step back. No model turn — the previous source is already good. */
   const revertLook = async () => {
-    if (!session || busy) return;
+    if (!session || sessionOver || busy) return;
     setError(null);
     setPhase('working');
     try {
-      const s = await revertResumeLook(session.id);
-      setSession(s);
+      const s = acceptSession(await revertResumeLook(session.id));
       setTemplateKey(s.templateKey || '');
       setVibe(s.vibe || {});
       if (s.pdfBase64) setPdfBase64(s.pdfBase64);
@@ -484,19 +579,80 @@ export default function AppResume() {
   };
 
   const end = async () => {
-    if (!session) return;
+    if (!session || sessionOver || busy) return;
+    setPhase('working');
     try {
-      setSession(await endHarnessSession(session.id));
+      lifecycleEnded.current.add(session.id);
+      acceptSession(await endHarnessSession(session.id));
       window.sessionStorage.removeItem(ACTIVE_SESSION_KEY);
     } catch (e) {
+      lifecycleEnded.current.delete(session.id);
       setError(e);
+    } finally {
+      setPhase('ready');
     }
   };
 
-  /**
-   * The compiled file lives only inside the session sandbox and dies with it,
-   * so downloading is the only durable copy until JOB-105 persists artifacts.
-   */
+  const reopen = async (id) => {
+    if (busy) return;
+    setError(null);
+    setPhase('working');
+    try {
+      if (session?.status === 'active' && session.id !== id) {
+        const ended = await endHarnessSession(session.id);
+        lifecycleEnded.current.add(session.id);
+        acceptSession(ended);
+        window.sessionStorage.removeItem(ACTIVE_SESSION_KEY);
+      }
+      const current = selectSession(await getHarnessSession(id));
+      if (current.status === 'active') window.sessionStorage.setItem(ACTIVE_SESSION_KEY, id);
+      else window.sessionStorage.removeItem(ACTIVE_SESSION_KEY);
+      await loadPdf(current);
+      await loadSessions();
+    } catch (e) {
+      setError(e);
+    } finally {
+      setPhase('ready');
+    }
+  };
+
+  const restoreRevision = async (revision) => {
+    if (!session || busy) return;
+    setError(null);
+    setPhase('working');
+    try {
+      await restoreHarnessRevision(session.id, revision);
+      const current = selectSession(await getHarnessSession(session.id));
+      await loadPdf(current);
+      await loadSessions();
+    } catch (e) {
+      setError(e);
+    } finally {
+      setPhase('ready');
+    }
+  };
+
+  const rename = async (id, name) => {
+    const current = await renameHarnessSession(id, name);
+    setSession((value) => value?.id === id ? { ...value, name: current.name } : value);
+    await loadSessions();
+  };
+
+  const remove = async (id) => {
+    await deleteHarnessSession(id);
+    lifecycleEnded.current.add(id);
+    if (window.sessionStorage.getItem(ACTIVE_SESSION_KEY) === id) window.sessionStorage.removeItem(ACTIVE_SESSION_KEY);
+    if (session?.id === id) {
+      setSession(null);
+      setPdfBase64('');
+      setMessages([]);
+      setPhase('idle');
+      setSessionsOpen(true);
+    }
+    if (carryFromSessionId === id) setCarryFromSessionId('');
+    await loadSessions();
+  };
+
   const downloadPdf = () => {
     if (!pdfBase64) return;
     const bytes = Uint8Array.from(atob(pdfBase64), (c) => c.charCodeAt(0));
@@ -585,6 +741,27 @@ export default function AppResume() {
       `}</style>
 
       <div id="jbres" style={{ padding: '28px 32px 64px', maxWidth: 1240, margin: '0 auto' }}>
+        <div style={{ maxWidth: 720 }}>
+          <div style={{ ...label, color: T.accent, marginBottom: 10 }}>Résumé</div>
+          <h1 style={{ fontFamily: T.display, fontWeight: 600, letterSpacing: '-0.04em', fontSize: 38, lineHeight: 1.03, margin: '0 0 10px' }}>
+            Write it with an agent.
+          </h1>
+          <p style={{ fontSize: 15.5, color: T.fg3, margin: '0 0 28px', lineHeight: 1.55 }}>
+            Your details come straight from your account — you never retype them here.
+            Give it a target, then shape the result in conversation.
+          </p>
+        </div>
+        <PastSessions
+          sessions={sessions}
+          unavailable={sessionsError}
+          open={sessionsOpen}
+          setOpen={setSessionsOpen}
+          templates={templates}
+          busy={busy}
+          reopen={reopen}
+          rename={rename}
+          remove={remove}
+        />
         {!session ? (
           <Setup
             {...{
@@ -639,11 +816,85 @@ export default function AppResume() {
               applyLook,
               revertLook,
               chooseOtherHarness,
+              restoreRevision,
             }}
           />
         )}
       </div>
     </Shell>
+  );
+}
+
+function sessionTime(value) {
+  return value ? new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'Time unavailable';
+}
+
+function PastSessions({ sessions, unavailable, open, setOpen, templates, busy, reopen, rename, remove }) {
+  const [editing, setEditing] = useState(null);
+  const [name, setName] = useState('');
+  const [deleting, setDeleting] = useState(null);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState('');
+  const act = async (action) => {
+    setPending(true);
+    setError('');
+    try {
+      await action();
+      setEditing(null);
+      setDeleting(null);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setPending(false);
+    }
+  };
+  const disabled = busy || pending;
+  return (
+    <details data-testid="past-sessions" open={open} onToggle={(event) => setOpen(event.currentTarget.open)} style={{ border: `1px solid ${T.line}`, borderRadius: 3, background: T.panel, marginBottom: 22 }}>
+      <summary style={{ padding: '13px 18px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>Past résumé sessions</summary>
+      <div style={{ padding: '0 18px 14px', fontSize: 13, color: T.fg2 }}>
+        {unavailable ? (
+          <p data-testid="sessions-unavailable" style={{ color: T.fg3, margin: 0 }}>Past sessions are temporarily unavailable. You can still start a new résumé.</p>
+        ) : sessions === null ? (
+          <p style={{ color: T.fg3, margin: 0 }}>Loading past sessions…</p>
+        ) : !sessions.length ? (
+          <p data-testid="sessions-empty" style={{ color: T.fg3, margin: 0 }}>Your first résumé starts below. Its drafts and PDFs will be saved here.</p>
+        ) : sessions.map((item) => (
+          <div key={item.id} style={{ borderTop: `1px solid ${T.line}`, padding: '13px 0', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+            <div style={{ flex: '1 1 300px', minWidth: 0, overflowWrap: 'anywhere' }}>
+              <div style={{ fontWeight: 600, color: T.fg, marginBottom: 5 }}>{item.name || 'Untitled résumé'}</div>
+              <div style={{ color: T.fg3, lineHeight: 1.7 }}>
+                {item.targetRole && <span>{item.targetRole} · </span>}
+                {item.harnessLabel || item.harness} · {item.modelLabel || item.model} · {templateName(templates, item.templateKey) || 'Default template'}
+              </div>
+              <div style={{ color: T.fg3, lineHeight: 1.7 }}>
+                {item.revisionCount ?? item.revision} revisions · {item.compiled ? 'Build passing' : item.revision ? 'Build failing' : 'Not built'} · {item.status} · Updated {sessionTime(item.updatedAt)}
+              </div>
+            </div>
+            {editing === item.id ? (
+              <form onSubmit={(event) => { event.preventDefault(); if (name.trim()) act(() => rename(item.id, name.trim())); }} style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                <input aria-label="Session name" autoFocus maxLength={200} value={name} onChange={(event) => setName(event.target.value)} disabled={disabled} style={{ ...field, width: 220 }} />
+                <button type="submit" disabled={disabled || !name.trim()} style={ghostBtn}>Save name</button>
+                <button type="button" disabled={pending} onClick={() => setEditing(null)} style={ghostBtn}>Cancel</button>
+              </form>
+            ) : deleting === item.id ? (
+              <div role="group" aria-label="Confirm permanent deletion" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+                <span>This deletes every revision and PDF. It cannot be undone.</span>
+                <button disabled={disabled} onClick={() => act(() => remove(item.id))} style={ghostBtn}>Delete permanently</button>
+                <button disabled={pending} onClick={() => setDeleting(null)} style={ghostBtn}>Cancel</button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                <button disabled={disabled} onClick={() => reopen(item.id)} style={ghostBtn}>Reopen</button>
+                <button disabled={disabled} onClick={() => { setEditing(item.id); setName(item.name || ''); setDeleting(null); }} style={ghostBtn}>Rename</button>
+                <button disabled={disabled} onClick={() => { setDeleting(item.id); setEditing(null); }} style={ghostBtn}>Delete</button>
+              </div>
+            )}
+          </div>
+        ))}
+        {error && <p role="alert">{error}</p>}
+      </div>
+    </details>
   );
 }
 
@@ -653,24 +904,6 @@ function Setup(p) {
   return (
     <div>
       <div style={{ maxWidth: 720 }}>
-      <div style={{ ...label, color: T.accent, marginBottom: 10 }}>Résumé</div>
-      <h1
-        style={{
-          fontFamily: T.display,
-          fontWeight: 600,
-          letterSpacing: '-0.04em',
-          fontSize: 38,
-          lineHeight: 1.03,
-          margin: '0 0 10px',
-        }}
-      >
-        Write it with an agent.
-      </h1>
-      <p style={{ fontSize: 15.5, color: T.fg3, margin: '0 0 28px', lineHeight: 1.55 }}>
-        Your details come straight from your account — you never retype them here.
-        Give it a target, then shape the result in conversation.
-      </p>
-
       {p.platformDown && (
         <Notice
           data-testid="platform-unavailable"
@@ -1117,7 +1350,7 @@ function Workspace(p) {
           </button>
         )}
         {!p.sessionOver && (
-          <button data-testid="end-session" onClick={p.end} style={ghostBtn}>
+          <button data-testid="end-session" onClick={p.end} disabled={p.busy} style={ghostBtn}>
             End session
           </button>
         )}
@@ -1132,10 +1365,10 @@ function Workspace(p) {
       </div>
 
       {p.sessionOver && (
-        <Notice
-          data-testid="session-ended"
-          text="This session has ended and its sandbox is released. Download the PDF before leaving — it is not kept after teardown."
-        />
+        <div style={{ marginBottom: 16 }}>
+          <Notice data-testid="session-ended" text="This session has ended and its sandbox is released. Your document, PDFs and revisions are saved." />
+          <button disabled={p.busy} onClick={() => p.start(session.id)} style={primaryBtn}>Continue from here</button>
+        </div>
       )}
       {p.error && (
         <Notice tone="error" data-testid="harness-error" text={p.error.message} />
@@ -1354,6 +1587,25 @@ function Workspace(p) {
                 : 'Your résumé appears here once it compiles.'}
             </div>
           )}
+
+          <details data-testid="revision-history" style={{ borderTop: `1px solid ${T.line}` }}>
+            <summary style={{ ...label, padding: '11px 18px', cursor: 'pointer' }}>Revision history ({session.revisionCount ?? session.turns?.length ?? 0})</summary>
+            <div style={{ maxHeight: 220, overflow: 'auto', padding: '0 18px' }}>
+              {!(session.turns || []).length && <p style={{ fontSize: 13, color: T.fg3 }}>Your revisions will appear after the first generation.</p>}
+              {[...(session.turns || [])].reverse().map((turn) => (
+                <div key={turn.revision} style={{ borderTop: `1px solid ${T.line}`, padding: '11px 0', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ flex: 1, minWidth: 0, fontSize: 12.5, lineHeight: 1.6, overflowWrap: 'anywhere' }}>
+                    <div style={{ color: T.fg }}>Revision {turn.revision}{turn.revision === session.revision ? ' · current' : ''}</div>
+                    {turn.summary && <div style={{ color: T.fg2 }}>{turn.summary}</div>}
+                    {turn.instruction && <div style={{ color: T.fg2 }}>Instruction: {turn.instruction}</div>}
+                    {!turn.summary && !turn.instruction && <div style={{ color: T.fg2 }}>Résumé updated.</div>}
+                    <div style={{ color: T.fg3 }}>{sessionTime(turn.createdAt)} · Build {turn.compiled ? 'passing' : 'failing'}</div>
+                  </div>
+                  <button aria-label={`Restore revision ${turn.revision}`} disabled={p.busy} onClick={() => p.restoreRevision(turn.revision)} style={ghostBtn}>Restore</button>
+                </div>
+              ))}
+            </div>
+          </details>
 
           <details style={{ borderTop: `1px solid ${T.line}` }}>
             <summary style={{ ...label, padding: '11px 18px', cursor: 'pointer' }}>

@@ -34,7 +34,11 @@ describe('DockerSandboxDriver', () => {
   beforeEach(() => {
     calls = [];
     nextResult = { code: 0, stdout: 'container-id-abc\n', stderr: '' };
-    run.mockClear();
+    run.mockReset();
+    run.mockImplementation(async (argv: string[], stdin?: string) => {
+      calls.push({ argv, stdin });
+      return nextResult;
+    });
   });
 
   const argvOf = (i: number) => calls[i].argv;
@@ -150,6 +154,78 @@ describe('DockerSandboxDriver', () => {
   it('survives a teardown of something already gone', async () => {
     nextResult = { code: 1, stdout: '', stderr: 'No such container' };
     await expect(driver().destroy('ghost')).resolves.toBeUndefined();
+  });
+
+  it('reaps only expired resume-harness containers selected by both ownership labels', async () => {
+    run.mockImplementation(async (argv: string[]) => {
+      calls.push({ argv });
+      if (argv[0] === 'ps') {
+        return {
+          code: 0,
+          stdout: [
+            JSON.stringify({
+              sandboxId: 'aaaaaaaaaaaa',
+              app: 'jobocate',
+              surface: 'resume-harness',
+              sessionId: 'session-expired',
+              expiresAt: '2026-09-09T15:59:59.000Z',
+            }),
+            JSON.stringify({
+              sandboxId: 'cccccccccccc',
+              app: 'jobocate',
+              surface: 'resume-harness',
+              sessionId: 'session-future',
+              expiresAt: '2026-09-09T16:00:01.000Z',
+            }),
+            JSON.stringify({
+              sandboxId: 'dddddddddddd',
+              app: 'not-jobocate',
+              surface: 'resume-harness',
+              sessionId: 'session-other-app',
+              expiresAt: '2026-09-09T15:00:00.000Z',
+            }),
+            JSON.stringify({
+              sandboxId: 'eeeeeeeeeeee',
+              app: 'jobocate',
+              surface: 'interview',
+              sessionId: 'session-other-surface',
+              expiresAt: '2026-09-09T15:00:00.000Z',
+            }),
+            JSON.stringify({
+              sandboxId: 'ffffffffffff',
+              app: 'jobocate',
+              surface: 'resume-harness',
+              sessionId: 'session-attacker',
+              expiresAt:
+                'invalid\nunrelated-db\tjobocate\tresume-harness\tsession-injected\t2026-09-09T15:00:00.000Z',
+            }),
+          ].join('\n'),
+          stderr: '',
+        };
+      }
+      return { code: 0, stdout: '', stderr: '' };
+    });
+
+    const reaped = await driver().sweepExpired(
+      new Date('2026-09-09T16:00:00.000Z'),
+    );
+
+    expect(argvOf(0)).toEqual([
+      'ps',
+      '-a',
+      '--filter',
+      'label=app=jobocate',
+      '--filter',
+      'label=surface=resume-harness',
+      '--format',
+      '{"sandboxId":{{json .ID}},"app":{{json (.Label "app")}},"surface":{{json (.Label "surface")}},"sessionId":{{json (.Label "session")}},"expiresAt":{{json (.Label "expiresAt")}}}',
+    ]);
+    expect(calls.slice(1).map(({ argv }) => argv)).toEqual([
+      ['rm', '-f', 'aaaaaaaaaaaa'],
+    ]);
+    expect(reaped).toEqual([
+      { sandboxId: 'aaaaaaaaaaaa', sessionId: 'session-expired' },
+    ]);
   });
 
   it('reports unavailable when the daemon does not answer', async () => {

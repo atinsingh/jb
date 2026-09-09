@@ -75,6 +75,19 @@ export const startHarnessSession = (payload) =>
 export const getHarnessSession = (id) =>
   apiCall(`/api/resume-harness/sessions/${id}`);
 
+export const listHarnessSessions = () => apiCall('/api/resume-harness/sessions');
+
+export const renameHarnessSession = (id, name) =>
+  apiCall(`/api/resume-harness/sessions/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name }),
+  });
+
+export const restoreHarnessRevision = (id, revision) =>
+  apiCall(`/api/resume-harness/sessions/${id}/revisions/${revision}/restore`, {
+    method: 'POST',
+  });
+
 /**
  * POST /api/resume-harness/sessions/:id/turns
  * { instruction } -> session + { summary, pdfBase64 }
@@ -181,6 +194,25 @@ export const revertResumeLook = (id) =>
 export const getHarnessPdf = (id) =>
   apiCall(`/api/resume-harness/sessions/${id}/pdf`);
 
-/** DELETE /api/resume-harness/sessions/:id — ends the session, frees the sandbox. */
+/** Release the sandbox while retaining the document and revision history. */
 export const endHarnessSession = (id) =>
+  apiCall(`/api/resume-harness/sessions/${id}/end`, { method: 'POST' });
+
+/** Permanently delete the session and its stored artifacts. */
+export const deleteHarnessSession = (id) =>
   apiCall(`/api/resume-harness/sessions/${id}`, { method: 'DELETE' });
+
+/** Best effort during navigation or tab suspension; the server also reaps idle sandboxes. */
+export const endHarnessSessionKeepalive = async (id) => {
+  try {
+    const token = await getAccessToken();
+    if (!token) return;
+    await fetch(`${API_URL}/api/resume-harness/sessions/${id}/end`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      keepalive: true,
+    });
+  } catch {
+    // A closing page cannot guarantee delivery; history remains on the server.
+  }
+};

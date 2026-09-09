@@ -293,9 +293,9 @@ describe('Resume harness (e2e)', () => {
         .expect(200);
 
       await api(app)
-        .delete(`/api/resume-harness/sessions/${sessionId}`)
+        .post(`/api/resume-harness/sessions/${sessionId}/end`)
         .set(auth(candidate.token))
-        .expect(200);
+        .expect(201);
 
       expect(platform.sandboxes.has(before.body.sandboxId)).toBe(false);
 
@@ -333,6 +333,40 @@ describe('Resume harness (e2e)', () => {
     // The new sandbox starts with the resume already on disk.
     const box = platform.sandboxes.get(second.body.sandboxId)!;
     expect(box.files.get('resume.tex')).toBe(generated.body.latex);
+  });
+
+  it('keeps ended sessions and PDFs, restores revisions, and deletes only the caller’s history', async () => {
+    const started = await api(app).post('/api/resume-harness/sessions')
+      .set(auth(candidate.token)).send({ harness: 'codex', targetRole: '  Staff Engineer  ' }).expect(201);
+    const url = `/api/resume-harness/sessions/${started.body.id}`;
+    expect(started.body.name).toBe('Staff Engineer');
+    const generated = await api(app).post(`${url}/turns`).set(auth(candidate.token))
+      .send({ instruction: 'Build my résumé.' }).expect(201);
+    expect(generated.body.turns[0]).toMatchObject({ kind: 'instruction', revision: 1, hasPdf: true });
+    expect(generated.body.turns[0].pdfKey).toBeUndefined();
+    await api(app).patch(url).set(auth(candidate.token)).send({ name: '   ' }).expect(400);
+    const renamed = await api(app).patch(url).set(auth(candidate.token)).send({ name: '  Platform résumé  ' }).expect(200);
+    expect(renamed.body.name).toBe('Platform résumé');
+    await api(app).post(`${url}/end`).set(auth(candidate.token)).expect(201);
+    const persisted = await api(app).get(`${url}/pdf`).set(auth(candidate.token)).expect(200);
+    expect(persisted.body.pdfBase64).toBe(generated.body.pdfBase64);
+    const restored = await api(app).post(`${url}/revisions/1/restore`).set(auth(candidate.token)).expect(201);
+    expect(restored.body).toMatchObject({ status: 'ended', revision: 2, latex: generated.body.latex });
+    expect(restored.body.turns[1]).toMatchObject({ kind: 'restore', restoredFromRevision: 1 });
+    const listed = await api(app).get('/api/resume-harness/sessions').set(auth(candidate.token)).expect(200);
+    expect(listed.body[0].id).toBe(started.body.id);
+    const outsider = await registerUser(app, 'ROLE_CANDIDATE', 'resume-history-outsider');
+    for (const [method, suffix, body] of [
+      ['get', '', undefined], ['get', '/pdf', undefined], ['patch', '', { name: 'Foreign' }],
+      ['post', '/end', undefined], ['post', '/revisions/1/restore', undefined], ['delete', '', undefined],
+    ] as const) {
+      const req = api(app)[method](`${url}${suffix}`).set(auth(outsider.token));
+      await (body ? req.send(body) : req).expect(404);
+    }
+    await api(app).post('/api/resume-harness/sessions').set(auth(outsider.token))
+      .send({ harness: 'codex', carryFromSessionId: started.body.id }).expect(404);
+    await api(app).delete(url).set(auth(candidate.token)).expect(200);
+    await api(app).get(url).set(auth(candidate.token)).expect(404);
   });
 
   /**
@@ -500,9 +534,9 @@ describe('Resume harness (e2e)', () => {
 
       it('refuses a look change once the session has ended', async () => {
         await api(app)
-          .delete(`/api/resume-harness/sessions/${sessionId}`)
+          .post(`/api/resume-harness/sessions/${sessionId}/end`)
           .set(auth(candidate.token))
-          .expect(200);
+          .expect(201);
 
         await api(app)
           .post(`/api/resume-harness/sessions/${sessionId}/template`)

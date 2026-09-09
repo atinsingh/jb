@@ -11,6 +11,24 @@ export type ResumeHarnessSessionStatus =
 /** One recorded exchange with the harness. */
 @Schema({ _id: false })
 export class ResumeHarnessTurn {
+  @Prop({ default: '' })
+  latex: string;
+
+  @Prop()
+  pdfKey?: string;
+
+  @Prop()
+  templateKey?: string;
+
+  @Prop({ type: Object, default: {} })
+  vibe: Record<string, string>;
+
+  @Prop({ type: String, required: true, enum: ['instruction', 'look-change', 'restore'] })
+  kind: 'instruction' | 'look-change' | 'restore';
+
+  @Prop()
+  restoredFromRevision?: number;
+
   @Prop({ required: true })
   instruction: string;
 
@@ -43,43 +61,6 @@ export class ResumeHarnessTurn {
 const ResumeHarnessTurnSchema = SchemaFactory.createForClass(ResumeHarnessTurn);
 
 /**
- * The résumé as it stood before the last template or vibe change.
- *
- * JOB-98 keeps only the current revision — `latex` is overwritten every turn —
- * so a look change is a destructive rewrite of the only copy. Re-seating
- * content on a new skeleton is also the turn most likely to lose a section, and
- * it is issued by the product rather than typed by the candidate. Snapshotting
- * before the change is what makes "back to the previous look" possible at all.
- *
- * One level deep on purpose: full per-revision history is JOB-105, and two
- * mechanisms for the same thing would have to be reconciled later.
- */
-@Schema({ _id: false })
-export class ResumeHarnessLookSnapshot {
-  @Prop({ default: '' })
-  latex: string;
-
-  @Prop()
-  templateKey?: string;
-
-  @Prop({ type: Object, default: {} })
-  vibe: Record<string, string>;
-
-  @Prop({ default: 0 })
-  revision: number;
-
-  @Prop({ default: false })
-  compiled: boolean;
-
-  @Prop({ default: () => new Date() })
-  at: Date;
-}
-
-const ResumeHarnessLookSnapshotSchema = SchemaFactory.createForClass(
-  ResumeHarnessLookSnapshot,
-);
-
-/**
  * A resume-generation session: one user, one harness, one sandbox.
  *
  * `harness` is written once at creation and never updated. Swapping it would
@@ -89,6 +70,12 @@ const ResumeHarnessLookSnapshotSchema = SchemaFactory.createForClass(
  */
 @Schema({ timestamps: true, collection: 'resume_harness_sessions' })
 export class ResumeHarnessSession {
+  @Prop({ trim: true, maxlength: 200 })
+  name?: string;
+
+  @Prop()
+  pdfKey?: string;
+
   @Prop({
     type: MongooseSchema.Types.ObjectId,
     ref: 'User',
@@ -156,10 +143,6 @@ export class ResumeHarnessSession {
   @Prop({ type: Object, default: {} })
   vibe: Record<string, string>;
 
-  /** The résumé before the last look change; the one step "back" can restore. */
-  @Prop({ type: ResumeHarnessLookSnapshotSchema })
-  previousLook?: ResumeHarnessLookSnapshot;
-
   /** Current LaTeX source. Survives teardown so it can seed the next session. */
   @Prop({ default: '' })
   latex: string;
@@ -212,6 +195,7 @@ export const ResumeHarnessSessionSchema =
   SchemaFactory.createForClass(ResumeHarnessSession);
 
 ResumeHarnessSessionSchema.index({ userId: 1, status: 1, createdAt: -1 });
+ResumeHarnessSessionSchema.index({ userId: 1, updatedAt: -1 });
 ResumeHarnessSessionSchema.index(
   { userId: 1 },
   {

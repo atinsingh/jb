@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
   IsIn,
   IsMongoId,
@@ -20,6 +21,15 @@ import { HARNESS_IDS, HarnessId } from '../harness/harness.types';
  * catalogue into code the seed is supposed to own.
  */
 export type VibeDto = Record<string, string>;
+
+export class RenameSessionDto {
+  @ApiProperty()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  name: string;
+}
 
 export class StartSessionDto {
   @ApiProperty({ enum: HARNESS_IDS })

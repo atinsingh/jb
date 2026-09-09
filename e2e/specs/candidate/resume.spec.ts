@@ -72,6 +72,8 @@ const OPTIONS = {
 
 const SESSION = {
   id: 'sess-e2e-1',
+  name: 'Backend engineer résumé',
+  targetRole: 'Backend Engineer',
   harness: 'codex',
   harnessLabel: 'Codex',
   sandboxId: 'sbx-e2e-1',
@@ -83,6 +85,10 @@ const SESSION = {
   status: 'active',
   latex: '',
   revision: 0,
+  revisionCount: 0,
+  turns: [] as any[],
+  hasCurrentPdf: false,
+  updatedAt: '2026-09-09T12:00:00.000Z',
   compiled: false,
 };
 
@@ -167,6 +173,7 @@ const sse = (session: unknown): string =>
 /** One stubbed backend, shared by the whole file. */
 async function stubHarnessApi(page: Page) {
   let turns = 0;
+  let exists = false;
   // The stub holds session state because the screen's whole job here is to keep
   // one session moving — a stub that answered every call identically could not
   // tell a template switch from a no-op.
@@ -175,7 +182,8 @@ async function stubHarnessApi(page: Page) {
 
   const turn = (patch: Record<string, unknown>) => {
     turns += 1;
-    state = { ...state, ...patch, revision: turns, compiled: true } as typeof state;
+    state = { ...state, ...patch, revision: turns, revisionCount: turns, compiled: true, hasCurrentPdf: true } as typeof state;
+    state.turns = [...state.turns, { ...patch, revision: turns, latex: state.latex, compiled: true, hasPdf: true, kind: 'instruction', createdAt: SESSION.updatedAt }];
     return { ...state, pdfBase64: PDF };
   };
 
@@ -188,9 +196,12 @@ async function stubHarnessApi(page: Page) {
   );
 
   await page.route('**/api/resume-harness/sessions', async (route: Route) => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: exists ? [state] : [] });
     const body = route.request().postDataJSON() || {};
+    exists = true;
     state = {
       ...state,
+      status: 'active',
       templateKey: body.templateKey || 'classic-serif',
       vibe: body.vibe || state.vibe,
       canRevert: false,
@@ -204,6 +215,7 @@ async function stubHarnessApi(page: Page) {
       contentType: 'text/event-stream',
       body: sse(
         turn({
+          instruction: route.request().postDataJSON().instruction,
           latex: turns === 0 ? V1 : V2,
           summary: turns === 0 ? 'Created resume.tex.' : 'Added a Kubernetes section.',
         }),
@@ -278,11 +290,216 @@ async function stubHarnessApi(page: Page) {
 
   await page.route('**/api/resume-harness/sessions/*', (route: Route) => {
     if (route.request().method() === 'DELETE') {
-      state = { ...state, status: 'ended' };
+      exists = false;
+    }
+    if (route.request().method() === 'PATCH') {
+      state = { ...state, name: route.request().postDataJSON().name };
     }
     return route.fulfill({ json: state });
   });
+
+  await page.route('**/api/resume-harness/sessions/*/end', (route: Route) => {
+    state = { ...state, status: 'ended' };
+    return route.fulfill({ json: state });
+  });
+
+  await page.route('**/api/resume-harness/sessions/*/revisions/*/restore', (route: Route) => {
+    const revision = Number(route.request().url().split('/').at(-2));
+    const source = state.turns.find((entry) => entry.revision === revision);
+    return route.fulfill({ json: turn({ ...source, kind: 'restore', restoredFromRevision: revision, summary: `Restored revision ${revision}.` }) });
+  });
 }
+
+test.describe('résumé session operation integrity', () => {
+  test.describe.configure({ mode: 'default' });
+
+  test('a delayed reopen response cannot reactivate a session after pagehide', async ({ page }) => {
+    await stubHarnessApi(page);
+    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
+    await page.getByTestId('start-session').click();
+    await page.getByTestId('instruction').fill('Build my résumé.');
+    await page.getByTestId('send-instruction').click();
+    await expect(page.getByTestId('session-revision')).toHaveText('1');
+    let pending: Route | undefined;
+    await page.route(`**/api/resume-harness/sessions/${SESSION.id}`, (route) => { pending = route; });
+    await page.getByTestId('past-sessions').locator('summary').click();
+    await page.getByRole('button', { name: 'Reopen', exact: true }).click();
+    await expect.poll(() => !!pending).toBe(true);
+    const ended = page.waitForRequest((request) => request.url().endsWith(`/${SESSION.id}/end`));
+    await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+    await ended;
+    await expect(page.getByTestId('session-ended')).toBeVisible();
+    await pending!.fulfill({ json: { ...SESSION, status: 'active', revision: 1, revisionCount: 1, latex: V1, compiled: true, hasCurrentPdf: true } });
+    await expect(page.getByTestId('pdf-preview')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Continue from here' })).toBeEnabled();
+    await expect(page.getByTestId('session-ended')).toBeVisible();
+    await expect(page.getByTestId('instruction')).toHaveCount(0);
+    expect(await page.evaluate(() => sessionStorage.getItem('jobocate.resumeHarness.activeSessionId'))).toBeNull();
+  });
+
+  test('keeps reopen and restore busy until their delayed PDF matches the selected revision', async ({ page }) => {
+    await stubHarnessApi(page);
+    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
+    await page.getByTestId('start-session').click();
+    await page.getByTestId('instruction').fill('Build my résumé.');
+    await page.getByTestId('send-instruction').click();
+    await expect(page.getByTestId('session-revision')).toHaveText('1');
+    let pendingPdf: Route | undefined;
+    await page.route('**/api/resume-harness/sessions/*/pdf', (route) => { pendingPdf = route; });
+    await page.getByTestId('past-sessions').locator('summary').click();
+    await page.getByRole('button', { name: 'Reopen', exact: true }).click();
+    await expect.poll(() => !!pendingPdf).toBe(true);
+    try {
+      await expect(page.getByTestId('instruction')).toBeDisabled();
+      await expect(page.getByTestId('switch-harness')).toBeDisabled();
+      await page.getByTestId('revision-history').locator('summary').click();
+      await expect(page.getByRole('button', { name: 'Restore revision 1', exact: true })).toBeDisabled();
+    } finally {
+      await pendingPdf!.fulfill({ json: { pdfBase64: PDF } });
+    }
+    await expect(page.getByTestId('instruction')).toBeEnabled();
+    await expect(page.getByTestId('pdf-preview')).toHaveAttribute('src', `data:application/pdf;base64,${PDF}`);
+    pendingPdf = undefined;
+    await page.getByRole('button', { name: 'Restore revision 1', exact: true }).click();
+    await expect.poll(() => !!pendingPdf).toBe(true);
+    const restoredPdf = 'JVBERi0xLjgK';
+    try {
+      await expect(page.getByTestId('session-revision')).toHaveText('2');
+      await expect(page.getByTestId('instruction')).toBeDisabled();
+      await expect(page.getByRole('button', { name: 'Restore revision 1', exact: true })).toBeDisabled();
+    } finally {
+      await pendingPdf!.fulfill({ json: { pdfBase64: restoredPdf } });
+    }
+    await expect(page.getByTestId('instruction')).toBeEnabled();
+    await expect(page.getByTestId('pdf-preview')).toHaveAttribute('src', `data:application/pdf;base64,${restoredPdf}`);
+  });
+
+  test('a failed destination reopen leaves the released source visibly ended', async ({ page, guards }) => {
+    guards.allowFailures(/\/api\/resume-harness\/sessions\/unavailable-session$/);
+    guards.allowConsoleErrors();
+    await stubHarnessApi(page);
+    await page.route('**/api/resume-harness/sessions', (route) => route.request().method() === 'GET'
+      ? route.fulfill({ json: [SESSION, { ...SESSION, id: 'unavailable-session', name: 'Other résumé' }] })
+      : route.fallback());
+    await page.route('**/api/resume-harness/sessions/unavailable-session', (route) =>
+      route.fulfill({ status: 503, json: { message: 'Cannot reopen this session right now.' } }));
+    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
+    await page.getByTestId('start-session').click();
+    await page.getByTestId('past-sessions').locator('summary').click();
+    await page.getByRole('button', { name: 'Reopen', exact: true }).last().click();
+    await expect(page.getByTestId('harness-error')).toContainText('Cannot reopen this session right now.');
+    await expect(page.getByTestId('session-ended')).toBeVisible();
+    await expect(page.getByTestId('instruction')).toHaveCount(0);
+    await expect(page.getByTestId('look-toggle')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Continue from here' })).toBeEnabled();
+    expect(await page.evaluate(() => sessionStorage.getItem('jobocate.resumeHarness.activeSessionId'))).toBeNull();
+  });
+
+  test('revision history shows the original instruction alongside its summary', async ({ page }) => {
+    await stubHarnessApi(page);
+    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
+    await page.getByTestId('start-session').click();
+    await page.getByTestId('instruction').fill('Lead with my backend engineering work.');
+    await page.getByTestId('send-instruction').click();
+    await expect(page.getByTestId('session-revision')).toHaveText('1');
+    const history = page.getByTestId('revision-history');
+    await history.locator('summary').click();
+    await expect(history).toContainText('Created resume.tex.');
+    await expect(history).toContainText('Lead with my backend engineering work.');
+  });
+});
+
+test.describe('résumé session history', () => {
+  test('reopens a persisted PDF after reload, restores in place, renames and deletes', async ({ page }) => {
+    await stubHarnessApi(page);
+    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('sessions-empty')).toBeVisible();
+    await page.getByTestId('start-session').click();
+    await page.getByTestId('instruction').fill('Build my résumé.');
+    await page.getByTestId('send-instruction').click();
+    await expect(page.getByTestId('session-revision')).toHaveText('1');
+    await page.getByTestId('instruction').fill('Add Kubernetes.');
+    await page.getByTestId('send-instruction').click();
+    await expect(page.getByTestId('session-revision')).toHaveText('2');
+    await page.getByTestId('end-session').click();
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    const past = page.getByTestId('past-sessions');
+    await expect(past).toContainText('Backend engineer résumé');
+    await expect(past).toContainText('2 revisions');
+    await past.getByRole('button', { name: 'Reopen', exact: true }).click();
+    await expect(page.getByTestId('pdf-preview')).toHaveAttribute('src', `data:application/pdf;base64,${PDF}`);
+    await expect(page.getByTestId('instruction')).toHaveCount(0);
+    await expect(page.getByTestId('look-toggle')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Continue from here' })).toBeVisible();
+    await page.getByTestId('revision-history').locator('summary').click();
+    await page.getByRole('button', { name: 'Restore revision 1', exact: true }).click();
+    await expect(page).toHaveURL(/\/app\/resume$/);
+    await expect(page.getByTestId('session-revision')).toHaveText('3');
+    await expect(page.getByTestId('latex-source')).not.toContainText('Kubernetes');
+    await expect(page.getByTestId('pdf-preview')).toBeVisible();
+    await expect(page.getByTestId('revision-history')).toContainText('Restored revision 1.');
+    await past.locator('summary').click();
+    await expect(past).toContainText('3 revisions');
+    await past.getByRole('button', { name: 'Rename', exact: true }).click();
+    await past.getByRole('textbox', { name: 'Session name' }).fill('Platform engineer');
+    await past.getByRole('button', { name: 'Save name' }).click();
+    await expect(past).toContainText('Platform engineer');
+    const continuing = page.waitForRequest((request) => request.method() === 'POST' && request.url().endsWith('/resume-harness/sessions'));
+    await page.getByRole('button', { name: 'Continue from here' }).click();
+    expect((await continuing).postDataJSON().carryFromSessionId).toBe(SESSION.id);
+    await expect(page.getByTestId('instruction')).toBeVisible();
+    await expect(page.getByTestId('pdf-preview')).toBeVisible();
+    await past.locator('summary').click();
+    await past.getByRole('button', { name: 'Delete', exact: true }).click();
+    await expect(past.getByRole('button', { name: 'Delete permanently' })).toBeVisible();
+    await past.getByRole('button', { name: 'Delete permanently' }).click();
+    await expect(page.getByTestId('sessions-empty')).toBeVisible();
+    await expect(page.getByTestId('start-session')).toBeEnabled();
+  });
+
+  test('list failure leaves generation usable', async ({ page, guards }) => {
+    guards.allowFailures(/\/api\/resume-harness\/sessions$/);
+    guards.allowConsoleErrors();
+    await stubHarnessApi(page);
+    await page.route('**/api/resume-harness/sessions', (route: Route) =>
+      route.request().method() === 'GET'
+        ? route.fulfill({ status: 503, json: { message: 'History unavailable' } })
+        : route.fallback(),
+    );
+    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('sessions-unavailable')).toBeVisible();
+    await page.getByTestId('start-session').click();
+    await page.getByTestId('instruction').fill('Build my résumé.');
+    await page.getByTestId('send-instruction').click();
+    await expect(page.getByTestId('pdf-preview')).toBeVisible();
+  });
+
+  test('hidden and pagehide send one authenticated lifecycle end and never delete', async ({ page }) => {
+    await stubHarnessApi(page);
+    const ends: any[] = [];
+    const deletes: string[] = [];
+    page.on('request', (request) => {
+      if (request.url().endsWith(`/${SESSION.id}/end`)) ends.push(request);
+      if (request.method() === 'DELETE') deletes.push(request.url());
+    });
+    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
+    await page.getByTestId('start-session').click();
+    await expect(page.getByTestId('session-bar')).toBeVisible();
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+      document.dispatchEvent(new Event('visibilitychange'));
+      window.dispatchEvent(new Event('pagehide'));
+    });
+    await expect.poll(() => ends.length).toBe(1);
+    expect(ends[0].method()).toBe('POST');
+    expect(ends[0].headers().authorization).toMatch(/^Bearer /);
+    await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('past-sessions')).toContainText('ended');
+    expect(ends).toHaveLength(1);
+    expect(deletes).toHaveLength(0);
+  });
+});
 
 test.describe('LaTeX résumé — agent harness', () => {
   test('picks a harness, generates, then changes the same résumé', async ({ page }) => {
@@ -485,6 +702,7 @@ test.describe('résumé — model and effort selection', () => {
     await stubHarnessApi(page);
     let sent: any = null;
     await page.route('**/api/resume-harness/sessions', async (route: Route) => {
+      if (route.request().method() === 'GET') return route.fallback();
       sent = route.request().postDataJSON();
       await route.fulfill({ status: 201, json: SESSION });
     });
@@ -569,6 +787,7 @@ test.describe('résumé — templates and vibe', () => {
     await stubHarnessApi(page);
     let sent: any = null;
     await page.route('**/api/resume-harness/sessions', async (route: Route) => {
+      if (route.request().method() === 'GET') return route.fallback();
       sent = route.request().postDataJSON();
       await route.fulfill({
         status: 201,
@@ -601,6 +820,8 @@ test.describe('résumé — templates and vibe', () => {
 
   test('restores the active template, vibe and render after a reload', async ({ page }) => {
     await stubHarnessApi(page);
+    // Best-effort teardown may be lost; recover a sandbox still marked active.
+    await page.route('**/api/resume-harness/sessions/*/end', (route) => route.fulfill({ json: SESSION }));
     await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
 
     await page.getByTestId('template-card-modern-sans').click();
@@ -622,6 +843,7 @@ test.describe('résumé — templates and vibe', () => {
 
   test('blocks a replacement start while an active session is still restoring', async ({ page }) => {
     await stubHarnessApi(page);
+    await page.route('**/api/resume-harness/sessions/*/end', (route) => route.fulfill({ json: SESSION }));
     await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
     await page.getByTestId('start-session').click();
 
@@ -648,6 +870,7 @@ test.describe('résumé — templates and vibe', () => {
     guards.allowFailures(/\/api\/resume-harness\/sessions\/.*\/pdf/);
     guards.allowConsoleErrors();
     await stubHarnessApi(page);
+    await page.route('**/api/resume-harness/sessions/*/end', (route) => route.fulfill({ json: SESSION }));
     await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
     await page.getByTestId('start-session').click();
     await page.getByTestId('instruction').fill('Build my résumé.');
@@ -669,6 +892,7 @@ test.describe('résumé — templates and vibe', () => {
     await stubHarnessApi(page);
     const starts: any[] = [];
     await page.route('**/api/resume-harness/sessions', async (route: Route) => {
+      if (route.request().method() === 'GET') return route.fallback();
       const body = route.request().postDataJSON();
       starts.push(body);
       const chosen = OPTIONS.harnesses.find((item) => item.id === body.harness)!;
@@ -687,7 +911,9 @@ test.describe('résumé — templates and vibe', () => {
 
     await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
     await page.getByTestId('start-session').click();
+    const ending = page.waitForRequest((request) => request.method() === 'POST' && request.url().endsWith(`/${SESSION.id}/end`));
     await page.getByTestId('switch-harness').click();
+    await ending;
 
     await expect(page.getByTestId('harness-codex')).toBeVisible();
     await page.getByTestId('harness-codex').click();

@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   ExecResult,
+  ReapedSandbox,
   SandboxDriver,
   SANDBOX_DRIVER,
 } from './sandbox-driver.interface';
@@ -78,6 +79,9 @@ export class SandboxService {
         surface: 'resume-harness',
         harness: input.harness,
         session: input.sessionId,
+        expiresAt: new Date(
+          Date.now() + this.ttlSeconds * 1000,
+        ).toISOString(),
       },
     });
 
@@ -138,5 +142,9 @@ export class SandboxService {
   async destroy(sandboxId: string): Promise<void> {
     await this.client.destroy(sandboxId);
     this.logger.log(`Sandbox ${sandboxId} destroyed`);
+  }
+
+  sweepExpired(now?: Date): Promise<ReapedSandbox[]> {
+    return this.client.sweepExpired(now);
   }
 }

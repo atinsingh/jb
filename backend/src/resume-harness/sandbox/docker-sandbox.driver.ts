@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { execFile } from 'child_process';
 import {
   ExecResult,
+  ReapedSandbox,
   SandboxDriver,
   SandboxSpec,
 } from './sandbox-driver.interface';
@@ -216,6 +217,69 @@ export class DockerSandboxDriver implements SandboxDriver {
     if (res.code !== 0) {
       this.logger.warn(`Sandbox ${id} teardown: ${res.stderr.trim()}`);
     }
+  }
+
+  async sweepExpired(now = new Date()): Promise<ReapedSandbox[]> {
+    const format =
+      '{"sandboxId":{{json .ID}},"app":{{json (.Label "app")}},"surface":{{json (.Label "surface")}},"sessionId":{{json (.Label "session")}},"expiresAt":{{json (.Label "expiresAt")}}}';
+    const listed = await this.run([
+      'ps',
+      '-a',
+      '--filter',
+      'label=app=jobocate',
+      '--filter',
+      'label=surface=resume-harness',
+      '--format',
+      format,
+    ]);
+    if (listed.code !== 0) {
+      throw new Error(
+        `listing expired sandboxes failed: ${listed.stderr.trim() || listed.stdout.trim()}`,
+      );
+    }
+
+    const reaped: ReapedSandbox[] = [];
+    for (const line of listed.stdout.split(/\r?\n/)) {
+      if (!line) continue;
+      let row: Record<string, unknown>;
+      try {
+        row = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      const { sandboxId, app, surface, sessionId, expiresAt } = row;
+      if (
+        typeof sandboxId !== 'string' ||
+        !/^[a-f0-9]{12,64}$/i.test(sandboxId) ||
+        typeof expiresAt !== 'string'
+      ) {
+        continue;
+      }
+      const expiry = Date.parse(expiresAt);
+      if (
+        app !== 'jobocate' ||
+        surface !== 'resume-harness' ||
+        !Number.isFinite(expiry) ||
+        expiry >= now.getTime()
+      ) {
+        continue;
+      }
+
+      const removed = await this.run(['rm', '-f', sandboxId]);
+      if (removed.code === 0) {
+        reaped.push({
+          sandboxId,
+          sessionId: typeof sessionId === 'string' && sessionId
+            ? sessionId
+            : undefined,
+        });
+      } else {
+        this.logger.warn(
+          `Expired sandbox ${sandboxId} teardown: ${removed.stderr.trim()}`,
+        );
+      }
+    }
+    return reaped;
   }
 }
 

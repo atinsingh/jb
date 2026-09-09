@@ -10,6 +10,7 @@ import { HarnessRegistry } from '../harness/harness.registry';
 import { SandboxService } from '../sandbox/sandbox.service';
 import { LatexService } from '../latex/latex.service';
 import { ResumeHarnessSession } from '../schemas/resume-harness-session.schema';
+import { StorageService } from '../../storage/storage.service';
 
 /**
  * Template selection and in-session vibe changes.
@@ -190,6 +191,7 @@ describe('ResumeHarnessService — template and vibe', () => {
         },
         { provide: SandboxService, useValue: sandbox },
         { provide: LatexService, useValue: latex },
+        { provide: StorageService, useValue: { put: jest.fn(async () => ({})), getBuffer: jest.fn(async () => Buffer.from('%PDF')) } },
         { provide: ModelAliasService, useValue: modelAlias },
         { provide: CandidateContextService, useValue: candidateContext },
         { provide: ResumeTemplateService, useValue: templates },

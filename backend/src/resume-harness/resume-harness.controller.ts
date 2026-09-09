@@ -4,6 +4,8 @@ import {
   Delete,
   Get,
   Param,
+  ParseIntPipe,
+  Patch,
   Post,
   Request,
   Res,
@@ -23,6 +25,7 @@ import {
   RunTurnDto,
   SelectTemplateDto,
   StartSessionDto,
+  RenameSessionDto,
 } from './dto/resume-harness.dto';
 
 /**
@@ -65,6 +68,21 @@ export class ResumeHarnessController {
   @ApiResponse({ status: 403, description: 'Alias not permitted on this plan' })
   start(@Request() req, @Body() dto: StartSessionDto) {
     return this.service.startSession(this.userId(req), dto);
+  }
+
+  @Get('sessions')
+  list(@Request() req) {
+    return this.service.listSessions(this.userId(req));
+  }
+
+  @Patch('sessions/:id')
+  rename(@Request() req, @Param('id') id: string, @Body() dto: RenameSessionDto) {
+    return this.service.renameSession(this.userId(req), id, dto);
+  }
+
+  @Post('sessions/:id/revisions/:revision/restore')
+  restore(@Request() req, @Param('id') id: string, @Param('revision', ParseIntPipe) revision: number) {
+    return this.service.restoreRevision(this.userId(req), id, revision);
   }
 
   @Get('sessions/:id')
@@ -178,8 +196,7 @@ export class ResumeHarnessController {
   /**
    * One step back to the look before the last change.
    *
-   * Not streamed, because it does not run the model: the previous source is
-   * already known-good and is simply written back and rebuilt.
+   * Not streamed: it restores a stored revision without running the model.
    */
   @Post('sessions/:id/revert-look')
   @ApiOperation({ summary: 'Restore the résumé as it was before the last look change' })
@@ -188,10 +205,16 @@ export class ResumeHarnessController {
     return this.service.revertLook(this.userId(req), id);
   }
 
-  @Delete('sessions/:id')
+  @Post('sessions/:id/end')
   @ApiOperation({ summary: 'End the session and release its sandbox' })
   end(@Request() req, @Param('id') id: string) {
     return this.service.endSession(this.userId(req), id);
+  }
+
+  @Delete('sessions/:id')
+  @ApiOperation({ summary: 'Delete the session and all its artifacts' })
+  delete(@Request() req, @Param('id') id: string) {
+    return this.service.deleteSession(this.userId(req), id);
   }
 
   // ------------------------------------------------------------ internals ---

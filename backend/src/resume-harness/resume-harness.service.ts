@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
@@ -10,7 +11,9 @@ import { Model } from 'mongoose';
 import {
   ResumeHarnessSession,
   ResumeHarnessSessionDocument,
+  ResumeHarnessTurn,
 } from './schemas/resume-harness-session.schema';
+import { StorageService } from '../storage/storage.service';
 import { ModelAliasService } from './model-alias.service';
 import { CandidateContextService } from './candidate-context.service';
 import {
@@ -74,6 +77,11 @@ export interface ApplyVibeInput {
 
 export interface SessionView {
   id: string;
+  name: string;
+  targetRole?: string;
+  revisionCount: number;
+  hasCurrentPdf: boolean;
+  turns: Array<Omit<ResumeHarnessTurn, 'pdfKey'> & { hasPdf: boolean }>;
   harness: HarnessId;
   harnessLabel: string;
   sandboxId?: string;
@@ -100,6 +108,8 @@ export interface SessionView {
   /** Whether one step back to the previous look is available. */
   canRevert: boolean;
   createdAt?: Date;
+  updatedAt?: Date;
+  endedAt?: Date;
 }
 
 export interface TurnResult extends SessionView {
@@ -130,6 +140,7 @@ const PROVISIONING_LEASE_MS = 2 * 60 * 1000;
 export class ResumeHarnessService {
   private readonly logger = new Logger(ResumeHarnessService.name);
   private readonly startTails = new Map<string, Promise<void>>();
+  private readonly mutationTails = new Map<string, Promise<void>>();
 
   constructor(
     @InjectModel(ResumeHarnessSession.name)
@@ -141,6 +152,7 @@ export class ResumeHarnessService {
     private readonly registry: HarnessRegistry,
     private readonly sandbox: SandboxService,
     private readonly latex: LatexService,
+    private readonly storage: StorageService,
   ) {}
 
   /** Harness + model choices the caller may make, for the picker UI. */
@@ -197,9 +209,24 @@ export class ResumeHarnessService {
     // rather than being quietly downgraded.
     const alias = await this.modelAlias.resolveForUser(userId, input.alias);
 
-    const carried = input.carryFromSessionId
-      ? await this.mustFind(userId, input.carryFromSessionId)
+    const carriedState = input.carryFromSessionId
+      ? await this.withSessionMutationLock(
+          userId,
+          input.carryFromSessionId,
+          async () => {
+            const session = await this.mustFind(
+              userId,
+              input.carryFromSessionId!,
+            );
+            const pdf =
+              session.compiled && session.pdfKey
+                ? await this.storage.getBuffer(session.pdfKey)
+                : undefined;
+            return { session, pdf };
+          },
+        )
       : null;
+    const carried = carriedState?.session;
 
     // The template and look this session runs under. A carried-forward session
     // brings its own, so changing harness never silently resets the look.
@@ -225,6 +252,7 @@ export class ResumeHarnessService {
 
     const session = await this.sessionModel.create({
       userId,
+      name: input.targetRole?.trim() || undefined,
       harness: input.harness,
       alias: alias.alias,
       provider: alias.provider,
@@ -250,75 +278,151 @@ export class ResumeHarnessService {
     });
 
     const sessionId = String((session as any)._id);
-    const boot = adapter.bootstrap({
-      sessionId,
-      workdir: SANDBOX_WORKDIR,
-      proxy: this.proxyAuth(),
-      alias,
-      contextFiles: this.contextFiles.filesFor(input.harness, {
-        workdir: SANDBOX_WORKDIR,
-        texPath: TEX_PATH,
-        pdfPath: PDF_PATH,
-        buildCommand: BUILD_COMMAND,
-        candidateMarkdown,
-        template: look.template
-          ? this.templates.condition(look.template, look.vibe)
-          : undefined,
-      }),
-    });
-
-    // Carrying the artifact forward is the supported way to change harness, so
-    // the new sandbox starts with the existing resume already on disk — under
-    // the carried template's condition from its very first turn.
-    const files: HarnessContextFile[] = carried?.latex
-      ? [...boot.files, { path: TEX_PATH, contents: carried.latex }]
-      : boot.files;
-
-    let sandboxId: string | undefined;
-    try {
-      const provisioned = await this.sandbox.provision({
+    return this.withSessionMutationLock(userId, sessionId, async () => {
+      const boot = adapter.bootstrap({
         sessionId,
-        harness: input.harness,
-        env: boot.env,
-        files,
+        workdir: SANDBOX_WORKDIR,
+        proxy: this.proxyAuth(),
+        alias,
+        contextFiles: this.contextFiles.filesFor(input.harness, {
+          workdir: SANDBOX_WORKDIR,
+          texPath: TEX_PATH,
+          pdfPath: PDF_PATH,
+          buildCommand: BUILD_COMMAND,
+          candidateMarkdown,
+          template: look.template
+            ? this.templates.condition(look.template, look.vibe)
+            : undefined,
+        }),
       });
-      sandboxId = provisioned.sandboxId;
-      (session as any).sandboxId = sandboxId;
-      (session as any).status = 'active';
-      await (session as any).save();
-    } catch (error) {
-      if (sandboxId) {
-        try {
-          await this.sandbox.destroy(sandboxId);
-        } catch (cleanupError) {
-          this.logger.error(
-            `Failed to clean up sandbox ${sandboxId} after session start failed`,
-            cleanupError instanceof Error ? cleanupError.stack : undefined,
-          );
-        }
-      }
-      (session as any).status = 'failed';
-      try {
-        await (session as any).save();
-      } catch {
-        // Preserve the original start failure. The unique live-session index
-        // excludes `failed`, and the sandbox has already been destroyed.
-      }
-      throw error;
-    }
 
-    return this.view(session);
+      // Carrying the artifact forward is the supported way to change harness, so
+      // the new sandbox starts with the existing resume already on disk — under
+      // the carried template's condition from its very first turn.
+      const files: HarnessContextFile[] = carried?.latex
+        ? [...boot.files, { path: TEX_PATH, contents: carried.latex }]
+        : boot.files;
+
+      let sandboxId: string | undefined;
+      let copiedPdfKey: string | undefined;
+      try {
+        if (carried?.latex) {
+          let pdfKey: string | undefined;
+          if (carriedState?.pdf) {
+            pdfKey = `resume-harness/${userId}/${sessionId}/revisions/1.pdf`;
+            await this.storage.put(pdfKey, carriedState.pdf, {
+              contentType: 'application/pdf',
+            });
+            copiedPdfKey = pdfKey;
+          }
+          session.revision = 1;
+          session.compiled = carried.compiled;
+          session.compileLog = carried.compileLog;
+          session.contentWarnings = [...(carried.contentWarnings || [])];
+          session.pdfKey = pdfKey;
+          session.turns.push({
+            instruction: 'Carried the résumé from the previous session.',
+            kind: 'restore',
+            revision: 1,
+            latex: carried.latex,
+            templateKey: carried.templateKey,
+            vibe: { ...carried.vibe },
+            compiled: carried.compiled,
+            compileLog: carried.compileLog,
+            contentWarnings: [...(carried.contentWarnings || [])],
+            pdfKey,
+            createdAt: new Date(),
+          });
+        }
+        const provisioned = await this.sandbox.provision({
+          sessionId,
+          harness: input.harness,
+          env: boot.env,
+          files,
+        });
+        sandboxId = provisioned.sandboxId;
+        (session as any).sandboxId = sandboxId;
+        (session as any).status = 'active';
+        await (session as any).save();
+      } catch (error) {
+        if (copiedPdfKey) {
+          await this.deleteUncommittedPdf(copiedPdfKey);
+          session.pdfKey = undefined;
+          for (const turn of session.turns) {
+            if (turn.pdfKey === copiedPdfKey) turn.pdfKey = undefined;
+          }
+        }
+        if (sandboxId) {
+          try {
+            await this.sandbox.destroy(sandboxId);
+          } catch (cleanupError) {
+            this.logger.error(
+              `Failed to clean up sandbox ${sandboxId} after session start failed`,
+              cleanupError instanceof Error ? cleanupError.stack : undefined,
+            );
+          }
+        }
+        (session as any).status = 'failed';
+        try {
+          await (session as any).save();
+        } catch {
+          // Preserve the original start failure. The unique live-session index
+          // excludes `failed`, and the sandbox has already been destroyed.
+        }
+        throw error;
+      }
+
+      return this.view(session);
+    });
   }
 
   async getSession(userId: string, sessionId: string): Promise<SessionView> {
     return this.view(await this.mustFind(userId, sessionId));
   }
 
+  async listSessions(userId: string): Promise<SessionView[]> {
+    const sessions = await this.sessionModel
+      .find({ userId })
+      .sort({ updatedAt: -1 })
+      .exec();
+    return sessions.map((session) => this.view(session));
+  }
+
+  async renameSession(
+    userId: string,
+    sessionId: string,
+    input: { name: string },
+  ): Promise<SessionView> {
+    return this.withSessionMutationLock(userId, sessionId, () =>
+      this.renameSessionLocked(userId, sessionId, input),
+    );
+  }
+
+  private async renameSessionLocked(
+    userId: string,
+    sessionId: string,
+    input: { name: string },
+  ): Promise<SessionView> {
+    const session = await this.mustFind(userId, sessionId);
+    if (
+      typeof input.name !== 'string' ||
+      !input.name.trim() ||
+      input.name.trim().length > 200
+    ) {
+      throw new BadRequestException(
+        'Session name must contain between 1 and 200 characters.',
+      );
+    }
+    session.name = input.name.trim();
+    await session.save();
+    return this.view(session);
+  }
+
   /** The compiled PDF for the session's current revision, if it has one. */
   async getPdf(userId: string, sessionId: string): Promise<string | null> {
     const session = await this.mustFind(userId, sessionId);
-    if (!session.sandboxId || session.status !== 'active') return null;
-    return this.sandbox.readFileBase64(session.sandboxId, PDF_PATH);
+    if (!session.compiled || !session.pdfKey) return null;
+    return (await this.storage.getBuffer(session.pdfKey)).toString('base64');
   }
 
   /**
@@ -346,6 +450,17 @@ export class ResumeHarnessService {
    * the frontend does not have to know which it is asking for.
    */
   async runTurn(
+    userId: string,
+    sessionId: string,
+    input: RunTurnInput,
+    onEvent?: (event: { type: string; [k: string]: unknown }) => void,
+  ): Promise<TurnResult> {
+    return this.withSessionMutationLock(userId, sessionId, () =>
+      this.runTurnLocked(userId, sessionId, input, onEvent),
+    );
+  }
+
+  private async runTurnLocked(
     userId: string,
     sessionId: string,
     input: RunTurnInput,
@@ -418,6 +533,18 @@ export class ResumeHarnessService {
     vibe: VibeState | undefined,
     onEvent?: (event: { type: string; [k: string]: unknown }) => void,
   ): Promise<TurnResult> {
+    return this.withSessionMutationLock(userId, sessionId, () =>
+      this.changeLookLocked(userId, sessionId, templateKey, vibe, onEvent),
+    );
+  }
+
+  private async changeLookLocked(
+    userId: string,
+    sessionId: string,
+    templateKey: string | undefined,
+    vibe: VibeState | undefined,
+    onEvent?: (event: { type: string; [k: string]: unknown }) => void,
+  ): Promise<TurnResult> {
     const session = await this.mustFind(userId, sessionId);
     this.assertRunnable(session);
 
@@ -471,42 +598,84 @@ export class ResumeHarnessService {
       return this.view(session);
     }
 
-    // 3. Snapshot, so one step back is possible even though only the current
-    //    revision is stored.
-    session.previousLook = {
-      latex: session.latex || '',
-      templateKey: before.templateKey,
-      vibe: before.vibe,
-      revision: session.revision || 0,
-      compiled: Boolean(session.compiled),
-      at: new Date(),
-    } as any;
     session.templateKey = look.template.key;
     session.vibe = look.vibe;
-    await (session as any).save();
 
-    // 4. Only now is the harness asked to re-apply the résumé.
+    // The completed turn records both the selected look and its artifact.
     const instruction = this.lookInstruction(changes);
-    return this.executeTurn(session, instruction, instruction, onEvent);
+    return this.executeTurn(
+      session,
+      instruction,
+      instruction,
+      onEvent,
+      'look-change',
+    );
   }
 
   /**
    * Put the résumé back the way it looked before the last change.
    *
-   * No harness turn: the previous source is already known-good, so it is
-   * written back and rebuilt. Asking a model to reconstruct a document it has
-   * already produced costs money and can fail — and this operation exists
-   * precisely for the case where the model's last attempt went wrong.
+   * Restore the recorded source and PDF without running the harness or compiler.
    */
   async revertLook(userId: string, sessionId: string): Promise<TurnResult> {
-    const session = await this.mustFind(userId, sessionId);
-    this.assertRunnable(session);
+    return this.withSessionMutationLock(userId, sessionId, () =>
+      this.revertLookLocked(userId, sessionId),
+    );
+  }
 
-    const snapshot = session.previousLook;
-    if (!snapshot) {
+  private async revertLookLocked(
+    userId: string,
+    sessionId: string,
+  ): Promise<TurnResult> {
+    const session = await this.mustFind(userId, sessionId);
+    const revision = this.revertRevision(session);
+    if (revision === undefined) {
       throw new ConflictException(
         'There is no previous look to go back to on this session.',
       );
+    }
+    return this.restoreRevisionLocked(userId, sessionId, revision);
+  }
+
+  private revertRevision(session: ResumeHarnessSession): number | undefined {
+    const turns = session.turns || [];
+    for (let i = turns.length - 1; i > 0; i--) {
+      if (turns[i].kind !== 'look-change') continue;
+      const previous = turns[i - 1].revision;
+      if (
+        turns
+          .slice(i + 1)
+          .some(
+            (turn) =>
+              turn.kind === 'restore' && turn.restoredFromRevision === previous,
+          )
+      )
+        return undefined;
+      return previous;
+    }
+    return undefined;
+  }
+
+  async restoreRevision(
+    userId: string,
+    sessionId: string,
+    revision: number,
+  ): Promise<TurnResult> {
+    return this.withSessionMutationLock(userId, sessionId, () =>
+      this.restoreRevisionLocked(userId, sessionId, revision),
+    );
+  }
+
+  private async restoreRevisionLocked(
+    userId: string,
+    sessionId: string,
+    revision: number,
+  ): Promise<TurnResult> {
+    const session = await this.mustFind(userId, sessionId);
+    const snapshot = session.turns.find((turn) => turn.revision === revision);
+    if (!snapshot) throw new NotFoundException('Resume revision not found');
+    if (session.status === 'provisioning') {
+      throw new ConflictException('Session is still starting.');
     }
 
     const files: HarnessContextFile[] = [
@@ -515,66 +684,113 @@ export class ResumeHarnessService {
 
     // Restore the rules too, or the next turn would run under the condition
     // being reverted away from.
-    if (snapshot.templateKey) {
-      const look = await this.templates.resolve(
-        snapshot.templateKey,
-        undefined,
-        {
-          templateKey: snapshot.templateKey,
-          vibe: snapshot.vibe || {},
-        },
+    if (session.status === 'active') {
+      this.assertRunnable(session);
+      const look = snapshot.templateKey
+        ? await this.templates.resolve(snapshot.templateKey, undefined, {
+            templateKey: snapshot.templateKey,
+            vibe: snapshot.vibe || {},
+          })
+        : undefined;
+      files.push(
+        ...this.contextFiles.filesFor(session.harness, {
+          workdir: SANDBOX_WORKDIR,
+          texPath: TEX_PATH,
+          pdfPath: PDF_PATH,
+          buildCommand: BUILD_COMMAND,
+          template: look?.template
+            ? this.templates.condition(look.template, look.vibe)
+            : undefined,
+        }),
       );
-      if (look.template) {
-        files.push(
-          ...this.contextFiles.filesFor(session.harness, {
-            workdir: SANDBOX_WORKDIR,
-            texPath: TEX_PATH,
-            pdfPath: PDF_PATH,
-            buildCommand: BUILD_COMMAND,
-            template: this.templates.condition(look.template, look.vibe),
-          }),
-        );
-      }
+      if (!look?.template) files.push({ path: 'TEMPLATE.tex', contents: '' });
+      await this.sandbox.writeFiles(session.sandboxId!, files);
     }
-
-    await this.sandbox.writeFiles(session.sandboxId!, files);
-    const compile = await this.latex.compile(session.sandboxId!);
 
     session.latex = snapshot.latex || '';
     session.templateKey = snapshot.templateKey;
-    session.vibe = snapshot.vibe || {};
+    session.vibe = { ...snapshot.vibe };
     session.revision = (session.revision || 0) + 1;
-    session.compiled = compile.ok;
-    session.compileLog = compile.ok ? undefined : compile.log;
-    // One level of undo. Full per-revision history is JOB-105, and keeping a
-    // second stack here would only have to be reconciled with it later.
-    session.previousLook = undefined;
+    session.compiled = snapshot.compiled;
+    session.compileLog = snapshot.compileLog;
+    session.contentWarnings = [...(snapshot.contentWarnings || [])];
+    session.pdfKey = snapshot.compiled ? snapshot.pdfKey : undefined;
     session.turns.push({
-      instruction: 'Went back to the previous look.',
+      instruction: `Restored revision ${revision}.`,
+      kind: 'restore',
+      restoredFromRevision: revision,
+      latex: session.latex,
+      templateKey: session.templateKey,
+      vibe: { ...session.vibe },
+      pdfKey: session.pdfKey,
       revision: session.revision,
-      compiled: compile.ok,
-      compileLog: compile.ok ? undefined : compile.log,
-      summary: 'Restored the résumé as it was before the last look change.',
+      compiled: session.compiled,
+      compileLog: session.compileLog,
+      contentWarnings: [...session.contentWarnings],
+      summary: `Restored revision ${revision}.`,
       createdAt: new Date(),
     } as any);
     await (session as any).save();
 
     return {
       ...this.view(session),
-      summary: 'Restored the résumé as it was before the last look change.',
-      pdfBase64: compile.pdfBase64 || undefined,
+      summary: `Restored revision ${revision}.`,
+      pdfBase64: session.pdfKey
+        ? (await this.storage.getBuffer(session.pdfKey)).toString('base64')
+        : undefined,
     };
   }
 
   async endSession(userId: string, sessionId: string): Promise<SessionView> {
+    return this.withSessionMutationLock(userId, sessionId, () =>
+      this.endSessionLocked(userId, sessionId),
+    );
+  }
+
+  private async endSessionLocked(
+    userId: string,
+    sessionId: string,
+  ): Promise<SessionView> {
     const session = await this.mustFind(userId, sessionId);
-    if (session.status === 'active' && session.sandboxId) {
+    if (session.sandboxId) {
       await this.sandbox.destroy(session.sandboxId);
+      session.sandboxId = undefined;
     }
     session.status = 'ended';
     session.endedAt = new Date();
     await (session as any).save();
     return this.view(session);
+  }
+
+  async deleteSession(
+    userId: string,
+    sessionId: string,
+  ): Promise<{ deleted: true }> {
+    return this.withSessionMutationLock(userId, sessionId, () =>
+      this.deleteSessionLocked(userId, sessionId),
+    );
+  }
+
+  private async deleteSessionLocked(
+    userId: string,
+    sessionId: string,
+  ): Promise<{ deleted: true }> {
+    const session = await this.mustFind(userId, sessionId);
+    if (session.sandboxId) {
+      await this.sandbox.destroy(session.sandboxId);
+      session.sandboxId = undefined;
+      session.status = 'ended';
+      session.endedAt = new Date();
+      await session.save();
+    }
+    const keys = new Set(
+      [session.pdfKey, ...session.turns.map((turn) => turn.pdfKey)].filter(
+        (key): key is string => Boolean(key),
+      ),
+    );
+    for (const key of keys) await this.storage.delete(key);
+    await this.sessionModel.deleteOne({ _id: sessionId, userId }).exec();
+    return { deleted: true };
   }
 
   /** Tear down every other active session for this user. */
@@ -607,7 +823,26 @@ export class ResumeHarnessService {
     userId: string,
     operation: () => Promise<T>,
   ): Promise<T> {
-    const previous = this.startTails.get(userId) || Promise.resolve();
+    return this.withLock(this.startTails, userId, operation);
+  }
+
+  private withSessionMutationLock<T>(
+    userId: string,
+    sessionId: string,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    // Mongo ObjectId strings are case-insensitive; equivalent URLs must share
+    // the same queue.
+    const key = `${userId.toLowerCase()}:${sessionId.toLowerCase()}`;
+    return this.withLock(this.mutationTails, key, operation);
+  }
+
+  private async withLock<T>(
+    tails: Map<string, Promise<void>>,
+    key: string,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    const previous = tails.get(key) || Promise.resolve();
     let release!: () => void;
     const current = new Promise<void>((resolve) => {
       release = resolve;
@@ -616,15 +851,15 @@ export class ResumeHarnessService {
       () => current,
       () => current,
     );
-    this.startTails.set(userId, tail);
+    tails.set(key, tail);
 
     await previous.catch(() => undefined);
     try {
       return await operation();
     } finally {
       release();
-      if (this.startTails.get(userId) === tail) {
-        this.startTails.delete(userId);
+      if (tails.get(key) === tail) {
+        tails.delete(key);
       }
     }
   }
@@ -643,6 +878,7 @@ export class ResumeHarnessService {
     prompt: string,
     recordedInstruction: string,
     onEvent?: (event: { type: string; [k: string]: unknown }) => void,
+    kind: 'instruction' | 'look-change' = 'instruction',
   ): Promise<TurnResult> {
     const adapter = this.registry.get(session.harness);
     const boot = adapter.bootstrap({
@@ -704,12 +940,29 @@ export class ResumeHarnessService {
       content = await this.contentProblems(session, latex);
     }
 
+    const revision = (session.revision || 0) + 1;
+    let pdfKey: string | undefined;
+    if (compile.ok && compile.pdfBase64) {
+      pdfKey = `resume-harness/${session.userId}/${session._id}/revisions/${revision}.pdf`;
+      await this.storage.put(pdfKey, Buffer.from(compile.pdfBase64, 'base64'), {
+        contentType: 'application/pdf',
+      });
+    }
     session.latex = latex;
-    session.revision = (session.revision || 0) + 1;
+    session.revision = revision;
+    session.pdfKey = pdfKey;
+    if (!session.name && kind === 'instruction') {
+      session.name = recordedInstruction.trim().slice(0, 200) || undefined;
+    }
     session.compiled = compile.ok;
     session.compileLog = compile.ok ? undefined : compile.log;
     session.contentWarnings = content;
     session.turns.push({
+      kind,
+      latex,
+      pdfKey,
+      templateKey: session.templateKey,
+      vibe: { ...session.vibe },
       instruction: recordedInstruction,
       revision: session.revision,
       compiled: compile.ok,
@@ -718,7 +971,12 @@ export class ResumeHarnessService {
       summary,
       createdAt: new Date(),
     } as any);
-    await (session as any).save();
+    try {
+      await (session as any).save();
+    } catch (error) {
+      if (pdfKey) await this.deleteUncommittedPdf(pdfKey);
+      throw error;
+    }
 
     if (content.length) {
       this.logger.warn(
@@ -729,8 +987,19 @@ export class ResumeHarnessService {
     return {
       ...this.view(session),
       summary,
-      pdfBase64: compile.pdfBase64 || undefined,
+      pdfBase64: pdfKey ? compile.pdfBase64 : undefined,
     };
+  }
+
+  private async deleteUncommittedPdf(key: string): Promise<void> {
+    try {
+      await this.storage.delete(key);
+    } catch (error) {
+      this.logger.error(
+        `Failed to remove uncommitted resume PDF ${key}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
   }
 
   /** The résumé as it stands on the sandbox's disk. */
@@ -1027,6 +1296,19 @@ export class ResumeHarnessService {
   private view(session: any): SessionView {
     return {
       id: String(session._id),
+      name: session.name || 'Untitled résumé',
+      targetRole: session.targetRole,
+      revisionCount: (session.turns || []).length,
+      hasCurrentPdf: Boolean(session.compiled && session.pdfKey),
+      turns: (session.turns || []).map((turn: any) => {
+        const { pdfKey, ...snapshot } = turn.toObject ? turn.toObject() : turn;
+        return {
+          ...snapshot,
+          vibe: { ...snapshot.vibe },
+          contentWarnings: [...(snapshot.contentWarnings || [])],
+          hasPdf: Boolean(snapshot.compiled && pdfKey),
+        };
+      }),
       harness: session.harness,
       harnessLabel: this.registry.get(session.harness).displayName,
       sandboxId: session.sandboxId,
@@ -1046,8 +1328,10 @@ export class ResumeHarnessService {
         : undefined,
       templateKey: session.templateKey,
       vibe: { ...(session.vibe || {}) },
-      canRevert: Boolean(session.previousLook),
+      canRevert: this.revertRevision(session) !== undefined,
       createdAt: session.createdAt,
+      updatedAt: session.updatedAt,
+      endedAt: session.endedAt,
     };
   }
 }
