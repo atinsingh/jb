@@ -613,6 +613,31 @@ describe('ResumeHarnessService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
+  it('archives and restores the generated resume together with its session', async () => {
+    const session = await start();
+    const stored = store.find((item) => String(item._id) === session.id);
+    stored.turns = [{ revision: 1, instruction: 'Legacy revision' }];
+    stored.save.mockClear();
+    stored.save.mockRejectedValue(
+      new Error('turns.0.kind: Path `kind` is required.'),
+    );
+
+    const archived = await service.archiveSession('u1', session.id);
+
+    expect(sandbox.destroy).toHaveBeenCalledWith('sbx-1');
+    expect(archived.status).toBe('ended');
+    expect(archived.archivedAt).toBeInstanceOf(Date);
+    expect(archived.sandboxId).toBeUndefined();
+    expect(stored.save).not.toHaveBeenCalled();
+
+    const restored = await service.restoreSession('u1', session.id);
+
+    expect(restored.archivedAt).toBeUndefined();
+    expect(restored.status).toBe('ended');
+    expect(restored.revisionCount).toBe(1);
+    expect(stored.save).not.toHaveBeenCalled();
+  });
+
   it('permanently deletes an older active session without validating legacy turns', async () => {
     const session = await start();
     const stored = store.find((item) => String(item._id) === session.id);

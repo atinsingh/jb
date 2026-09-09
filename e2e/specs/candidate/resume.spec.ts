@@ -303,6 +303,16 @@ async function stubHarnessApi(page: Page) {
     return route.fulfill({ json: state });
   });
 
+  await page.route('**/api/resume-harness/sessions/*/archive', (route: Route) => {
+    state = { ...state, status: 'ended', archivedAt: '2026-09-09T13:00:00.000Z' } as typeof state;
+    return route.fulfill({ json: state });
+  });
+
+  await page.route('**/api/resume-harness/sessions/*/restore', (route: Route) => {
+    state = { ...state, archivedAt: undefined } as typeof state;
+    return route.fulfill({ json: state });
+  });
+
   await page.route('**/api/resume-harness/sessions/*/revisions/*/restore', (route: Route) => {
     const revision = Number(route.request().url().split('/').at(-2));
     const source = state.turns.find((entry) => entry.revision === revision);
@@ -328,11 +338,19 @@ test.describe('résumé session operation integrity', () => {
 });
 
 test.describe('résumé session history', () => {
-  test('manages agent sessions from the résumé library instead of the authoring page', async ({ page }) => {
+  test('shows one create action and manages an AI resume as its linked session', async ({ page }) => {
     await stubHarnessApi(page);
-    await page.route('**/api/resume-builder', (route: Route) =>
-      route.fulfill({ json: [] }),
-    );
+    await page.route('**/api/resume-builder', (route: Route) => route.fulfill({ json: [{
+      id: 'imported-1',
+      name: 'Imported profile',
+      template: 'modern',
+      status: 'ready',
+      creationMethod: 'ai_rewrite',
+      source: { originalFilename: 'profile.pdf', importedAt: SESSION.updatedAt },
+      createdAt: SESSION.updatedAt,
+      updatedAt: SESSION.updatedAt,
+      version: 1,
+    }] }));
 
     await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('past-sessions')).toHaveCount(0);
@@ -342,23 +360,51 @@ test.describe('résumé session history', () => {
     await page.getByTestId('end-session').click();
 
     await page.goto('/app/resume-library', { waitUntil: 'domcontentloaded' });
-    const library = page.getByTestId('agent-resume-sessions');
-    await expect(library).toContainText('Backend engineer résumé');
-    await expect(library).toContainText('1 revision');
+    await expect(page.getByRole('button', { name: 'Create Resume', exact: true })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: 'New agent résumé' })).toHaveCount(0);
+    await expect(page.getByText('Job-tailored', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Draft', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Ready', { exact: true })).toHaveCount(0);
 
-    await library.getByRole('button', { name: 'Rename' }).click();
-    await library.getByRole('textbox', { name: 'Session name' }).fill('Platform résumé');
-    await library.getByRole('button', { name: 'Save name' }).click();
-    await expect(library).toContainText('Platform résumé');
+    let generated = page.getByTestId(`resume-session-${SESSION.id}`);
+    await expect(generated).toContainText('Backend engineer résumé');
+    await expect(generated).toContainText('AI-generated');
+    await expect(generated).toContainText('1 revision');
+    await expect(page.getByTestId('resume-imported-1')).toContainText('Imported');
 
-    await library.getByRole('button', { name: 'Open session' }).click();
+    const downloaded = page.waitForEvent('download');
+    await generated.getByRole('button', { name: 'More actions' }).click();
+    await generated.getByRole('button', { name: 'Download PDF' }).click();
+    expect((await downloaded).suggestedFilename()).toBe('Backend engineer résumé.pdf');
+
+    await generated.getByRole('button', { name: 'More actions' }).click();
+    await page.getByRole('button', { name: 'Rename' }).click();
+    await page.getByRole('textbox', { name: 'Resume name' }).fill('Platform résumé');
+    await page.getByRole('button', { name: 'Save' }).click();
+    generated = page.getByTestId(`resume-session-${SESSION.id}`);
+    await expect(generated).toContainText('Platform résumé');
+
+    await generated.getByRole('button', { name: 'More actions' }).click();
+    await generated.getByRole('button', { name: 'Archive', exact: true }).click();
+    await expect(generated).toHaveCount(0);
+    await page.getByRole('button', { name: 'Archived', exact: true }).click();
+    generated = page.getByTestId(`resume-session-${SESSION.id}`);
+    await expect(generated).toBeVisible();
+    await generated.getByRole('button', { name: 'More actions' }).click();
+    await generated.getByRole('button', { name: 'Restore', exact: true }).click();
+    await page.getByRole('button', { name: 'All', exact: true }).click();
+
+    generated = page.getByTestId(`resume-session-${SESSION.id}`);
+    await generated.getByRole('button', { name: 'Open resume' }).click();
     await expect(page).toHaveURL(/\/app\/resume\?session=sess-e2e-1$/);
     await expect(page.getByTestId('pdf-preview')).toBeVisible();
 
     await page.goto('/app/resume-library', { waitUntil: 'domcontentloaded' });
-    await page.getByTestId('agent-resume-sessions').getByRole('button', { name: 'Delete' }).click();
-    await page.getByRole('button', { name: 'Delete session' }).click();
-    await expect(page.getByTestId('agent-sessions-empty')).toBeVisible();
+    generated = page.getByTestId(`resume-session-${SESSION.id}`);
+    await generated.getByRole('button', { name: 'More actions' }).click();
+    await page.getByRole('button', { name: 'Delete' }).click();
+    await page.getByRole('button', { name: 'Delete resume & session' }).click();
+    await expect(generated).toHaveCount(0);
   });
 
   test('reopens a persisted PDF, restores in place, and continues from it', async ({ page }) => {
@@ -402,12 +448,31 @@ test.describe('résumé session history', () => {
     );
     await page.route('**/api/resume-builder', (route: Route) => route.fulfill({ json: [] }));
     await page.goto('/app/resume-library', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByTestId('agent-resume-sessions')).toContainText('temporarily unavailable');
-    await page.getByRole('button', { name: 'New agent résumé' }).click();
+    await expect(page.locator('main').getByRole('alert')).toContainText('temporarily unavailable');
+    await page.getByRole('button', { name: 'Create Resume', exact: true }).click();
     await page.getByTestId('start-session').click();
     await page.getByTestId('instruction').fill('Build my résumé.');
     await page.getByTestId('send-instruction').click();
     await expect(page.getByTestId('pdf-preview')).toBeVisible();
+  });
+
+  test('resume-builder failure does not hide AI-generated resumes', async ({ page, guards }) => {
+    guards.allowFailures(/\/api\/resume-builder$/);
+    guards.allowConsoleErrors();
+    await stubHarnessApi(page);
+    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
+    await page.getByTestId('start-session').click();
+    await page.getByTestId('instruction').fill('Build my résumé.');
+    await page.getByTestId('send-instruction').click();
+    await page.getByTestId('end-session').click();
+    await page.route('**/api/resume-builder', (route: Route) =>
+      route.fulfill({ status: 503, json: { message: 'Imports unavailable' } }),
+    );
+
+    await page.goto('/app/resume-library', { waitUntil: 'domcontentloaded' });
+
+    await expect(page.locator('main').getByRole('alert')).toContainText('Imported résumés are temporarily unavailable');
+    await expect(page.getByTestId(`resume-session-${SESSION.id}`)).toContainText('AI-generated');
   });
 
   test('hidden and pagehide send one authenticated lifecycle end and never delete', async ({ page }) => {
@@ -432,7 +497,7 @@ test.describe('résumé session history', () => {
     expect(ends[0].headers().authorization).toMatch(/^Bearer /);
     await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
     await page.goto('/app/resume-library', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByTestId('agent-resume-sessions')).toContainText('Ended');
+    await expect(page.getByTestId(`resume-session-${SESSION.id}`)).toBeVisible();
     expect(ends).toHaveLength(1);
     expect(deletes).toHaveLength(0);
   });

@@ -211,6 +211,18 @@ export class ResumeHarnessController {
     return this.service.endSession(this.userId(req), id);
   }
 
+  @Post('sessions/:id/archive')
+  @ApiOperation({ summary: 'Archive the generated résumé and its session' })
+  archive(@Request() req, @Param('id') id: string) {
+    return this.service.archiveSession(this.userId(req), id);
+  }
+
+  @Post('sessions/:id/restore')
+  @ApiOperation({ summary: 'Restore an archived résumé session to the library' })
+  restoreSession(@Request() req, @Param('id') id: string) {
+    return this.service.restoreSession(this.userId(req), id);
+  }
+
   @Delete('sessions/:id')
   @ApiOperation({ summary: 'Delete the session and all its artifacts' })
   delete(@Request() req, @Param('id') id: string) {

@@ -187,6 +187,10 @@ export class ResumeHarnessSession {
   @Prop()
   endedAt?: Date;
 
+  /** Hidden from the active library without deleting its revisions or PDFs. */
+  @Prop()
+  archivedAt?: Date;
+
   createdAt?: Date;
   updatedAt?: Date;
 }

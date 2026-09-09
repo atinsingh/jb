@@ -198,6 +198,14 @@ export const getHarnessPdf = (id) =>
 export const endHarnessSession = (id) =>
   apiCall(`/api/resume-harness/sessions/${id}/end`, { method: 'POST' });
 
+/** Archive the generated résumé and its complete session history. */
+export const archiveHarnessSession = (id) =>
+  apiCall(`/api/resume-harness/sessions/${id}/archive`, { method: 'POST' });
+
+/** Return an archived generated résumé and session to the active library. */
+export const restoreArchivedHarnessSession = (id) =>
+  apiCall(`/api/resume-harness/sessions/${id}/restore`, { method: 'POST' });
+
 /** Permanently delete the session and its stored artifacts. */
 export const deleteHarnessSession = (id) =>
   apiCall(`/api/resume-harness/sessions/${id}`, { method: 'DELETE' });

@@ -5,7 +5,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { motion, AnimatePresence } from 'framer-motion';
 import AppTopNav from '@/components/app/AppTopNav';
-import { LoadingState, EmptyState, ErrorState, InlineError } from '@/components/app/AppStates';
+import { LoadingState, EmptyState, InlineError } from '@/components/app/AppStates';
 import { getTemplate, resolveTheme } from '@/components/resume/resumeTemplates';
 import { uploadResume } from '@/services/api';
 import {
@@ -17,16 +17,18 @@ import {
   renameResume,
   archiveResume,
   unarchiveResume,
-  createResume,
   createResumeVersion,
   getResumeVersions,
   downloadResumePdf,
   generateResumePdf,
 } from '@/services/resumeApi';
 import {
+  archiveHarnessSession,
   deleteHarnessSession,
+  getHarnessPdf,
   listHarnessSessions,
   renameHarnessSession,
+  restoreArchivedHarnessSession,
 } from '@/services/resumeHarnessApi';
 
 /* ------------------------------------------------------------ helpers --- */
@@ -58,27 +60,17 @@ const relTime = (d) => {
   return fmtDate(d);
 };
 
-const STATUS_META = {
-  draft: { label: 'Draft', bg: 'var(--jb-v3-control)', ink: 'var(--jb-v3-warn)' },
-  ready: { label: 'Ready', bg: 'var(--jb-v3-accent-soft)', ink: 'var(--jb-v3-accent)' },
-  needs_review: { label: 'Needs review', bg: 'var(--jb-v3-danger-soft)', ink: 'var(--jb-v3-warn)' },
-  archived: { label: 'Archived', bg: 'var(--jb-v3-line)', ink: 'var(--jb-v3-fg-3)' },
-};
 const METHOD_META = {
-  manual: { label: 'Manual', icon: '✎' },
+  manual: { label: 'Created', icon: '✎' },
   imported: { label: 'Imported', icon: '↧' },
-  ai_rewrite: { label: 'AI rewrite', icon: '✦' },
-  job_tailored: { label: 'Tailored', icon: '◎' },
+  ai_generated: { label: 'AI-generated', icon: '✦' },
   duplicate: { label: 'Duplicate', icon: '⧉' },
 };
 
 const FILTERS = [
   { key: 'all', label: 'All' },
+  { key: 'ai_generated', label: 'AI-generated' },
   { key: 'imported', label: 'Imported' },
-  { key: 'ai_rewrite', label: 'AI-generated' },
-  { key: 'job_tailored', label: 'Job-tailored' },
-  { key: 'draft', label: 'Draft' },
-  { key: 'ready', label: 'Ready' },
   { key: 'archived', label: 'Archived' },
 ];
 const SORTS = [
@@ -135,9 +127,6 @@ export default function ResumeLibrary() {
   const [busyId, setBusyId] = useState(null);
   const [agentSessions, setAgentSessions] = useState(null);
   const [agentSessionsError, setAgentSessionsError] = useState(null);
-  const [agentBusyId, setAgentBusyId] = useState(null);
-  const [agentRenaming, setAgentRenaming] = useState(null);
-  const [agentDelete, setAgentDelete] = useState(null);
 
   const [importOpen, setImportOpen] = useState(false);
   const [versionsFor, setVersionsFor] = useState(null);
@@ -177,28 +166,47 @@ export default function ResumeLibrary() {
   }, [loadAgentSessions]);
 
   /* -------------------------------------------------------- derived --- */
+  const libraryItems = useMemo(() => {
+    const saved = resumes.map((resume) => ({
+      ...resume,
+      libraryKind: 'resume',
+      creationMethod:
+        resume.source || ['imported', 'ai_rewrite'].includes(resume.creationMethod)
+          ? 'imported'
+          : resume.creationMethod === 'duplicate'
+            ? 'duplicate'
+            : 'manual',
+    }));
+    const generated = (agentSessions || []).map((session) => ({
+      ...session,
+      id: `session:${session.id}`,
+      sessionId: session.id,
+      libraryKind: 'agent',
+      creationMethod: 'ai_generated',
+      status: session.archivedAt ? 'archived' : 'active',
+      template: session.templateKey || 'modern',
+      version: session.revisionCount ?? session.revision ?? 0,
+    }));
+    return [...generated, ...saved];
+  }, [agentSessions, resumes]);
+
+  const libraryLoading = loading || agentSessions === null;
+
   const summary = useMemo(() => {
-    const active = resumes.filter((r) => r.status !== 'archived');
-    const weekAgo = Date.now() - 7 * 864e5;
-    const recent = active.filter((r) => new Date(r.updatedAt).getTime() > weekAgo).length;
-    const tailored = active.filter((r) => r.creationMethod === 'job_tailored').length;
-    const scored = active.filter((r) => typeof r.atsScore === 'number');
-    const avgAts = scored.length
-      ? Math.round(scored.reduce((a, r) => a + r.atsScore, 0) / scored.length)
-      : null;
-    return { total: active.length, recent, tailored, avgAts };
-  }, [resumes]);
+    const active = libraryItems.filter((r) => r.status !== 'archived');
+    const generated = active.filter((r) => r.libraryKind === 'agent').length;
+    const imported = active.filter((r) => r.creationMethod === 'imported').length;
+    const archived = libraryItems.filter((r) => r.status === 'archived').length;
+    return { total: active.length, generated, imported, archived };
+  }, [libraryItems]);
 
   const visible = useMemo(() => {
-    let list = resumes.slice();
+    let list = libraryItems.slice();
     if (filter === 'archived') list = list.filter((r) => r.status === 'archived');
     else {
       list = list.filter((r) => r.status !== 'archived');
       if (filter === 'imported') list = list.filter((r) => r.creationMethod === 'imported' || !!r.source);
-      else if (filter === 'ai_rewrite') list = list.filter((r) => r.creationMethod === 'ai_rewrite');
-      else if (filter === 'job_tailored') list = list.filter((r) => r.creationMethod === 'job_tailored');
-      else if (filter === 'draft') list = list.filter((r) => r.status === 'draft');
-      else if (filter === 'ready') list = list.filter((r) => r.status === 'ready');
+      else if (filter === 'ai_generated') list = list.filter((r) => r.libraryKind === 'agent');
     }
     const q = query.trim().toLowerCase();
     if (q) {
@@ -216,7 +224,7 @@ export default function ResumeLibrary() {
       used: (a, b) => (b.applicationCount || 0) - (a.applicationCount || 0),
     }[sort];
     return list.sort(cmp);
-  }, [resumes, filter, query, sort]);
+  }, [libraryItems, filter, query, sort]);
 
   /* --------------------------------------------------------- actions --- */
   const withBusy = async (id, fn, okRefresh = true) => {
@@ -232,15 +240,46 @@ export default function ResumeLibrary() {
     }
   };
 
-  const openEditor = (r) => router.push(`/app/resume?id=${r.id}`);
+  const openEditor = (r) =>
+    router.push(
+      r.libraryKind === 'agent'
+        ? `/app/resume?session=${encodeURIComponent(r.sessionId)}`
+        : `/app/resume?id=${r.id}`,
+    );
   const onDuplicate = (r) => withBusy(r.id, () => duplicateResume(r.id));
   const onSetPrimary = (r) => withBusy(r.id, () => setPrimaryResume(r.id));
-  const onArchive = (r) =>
-    withBusy(r.id, () => (r.status === 'archived' ? unarchiveResume(r.id) : archiveResume(r.id)));
+  const onArchive = (r) => withBusy(
+    r.id,
+    async () => {
+      if (r.libraryKind === 'agent') {
+        if (r.status === 'archived') await restoreArchivedHarnessSession(r.sessionId);
+        else await archiveHarnessSession(r.sessionId);
+        await loadAgentSessions();
+        return;
+      }
+      if (r.status === 'archived') await unarchiveResume(r.id);
+      else await archiveResume(r.id);
+    },
+    r.libraryKind !== 'agent',
+  );
   const onDownload = (r) =>
     withBusy(
       r.id,
       async () => {
+        if (r.libraryKind === 'agent') {
+          const { pdfBase64 } = await getHarnessPdf(r.sessionId);
+          if (!pdfBase64) throw new Error('This résumé does not have a PDF yet.');
+          const bytes = Uint8Array.from(atob(pdfBase64), (char) => char.charCodeAt(0));
+          const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `${r.name || 'resume'}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 0);
+          return;
+        }
         try {
           const blob = await downloadResumePdf(r.id);
           window.open(URL.createObjectURL(blob), '_blank');
@@ -254,43 +293,30 @@ export default function ResumeLibrary() {
     );
   const onCreateVersion = (r) =>
     withBusy(r.id, () => createResumeVersion(r.id, `Snapshot · ${new Date().toLocaleString()}`));
-  const doDelete = (r) => withBusy(r.id, () => deleteResume(r.id));
-  const doRename = (r, name) => withBusy(r.id, () => renameResume(r.id, name));
-  const openAgentSession = (session) =>
-    router.push(`/app/resume?session=${encodeURIComponent(session.id)}`);
-  const renameAgentSession = async (session, name) => {
-    setAgentBusyId(session.id);
-    setAgentSessionsError(null);
-    try {
-      const updated = await renameHarnessSession(session.id, name);
-      setAgentSessions((items) =>
-        items.map((item) =>
-          item.id === session.id ? { ...item, name: updated.name } : item,
-        ),
-      );
-      setAgentRenaming(null);
-    } catch (e) {
-      setAgentSessionsError(e);
-    } finally {
-      setAgentBusyId(null);
-    }
-  };
-  const deleteAgentSession = async (session) => {
-    setAgentBusyId(session.id);
-    setAgentSessionsError(null);
-    try {
-      await deleteHarnessSession(session.id);
-      setAgentSessions((items) =>
-        items.filter((item) => item.id !== session.id),
-      );
-      setAgentDelete(null);
-    } catch (e) {
-      setAgentSessionsError(e);
-      setAgentDelete(null);
-    } finally {
-      setAgentBusyId(null);
-    }
-  };
+  const doDelete = (r) => withBusy(
+    r.id,
+    async () => {
+      if (r.libraryKind === 'agent') {
+        await deleteHarnessSession(r.sessionId);
+        await loadAgentSessions();
+      } else {
+        await deleteResume(r.id);
+      }
+    },
+    r.libraryKind !== 'agent',
+  );
+  const doRename = (r, name) => withBusy(
+    r.id,
+    async () => {
+      if (r.libraryKind === 'agent') {
+        await renameHarnessSession(r.sessionId, name);
+        await loadAgentSessions();
+      } else {
+        await renameResume(r.id, name);
+      }
+    },
+    r.libraryKind !== 'agent',
+  );
 
   /* ------------------------------------------------------------- ui --- */
   return (
@@ -309,10 +335,6 @@ export default function ResumeLibrary() {
         #jbapp .jb-btn:active { transform: translateY(1px); }
         #jbapp .jb-menu-item:hover { background: var(--jb-v3-control); }
         #jbapp .jb-row:hover { background: var(--jb-v3-panel); }
-        #jbapp .jb-agent-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: center; }
-        @media (max-width: 760px) {
-          #jbapp .jb-agent-row { grid-template-columns: minmax(0, 1fr); gap: 14px; }
-        }
         @keyframes jbskel { 0%{opacity:.5} 50%{opacity:1} 100%{opacity:.5} }
       `}</style>
 
@@ -349,8 +371,7 @@ export default function ResumeLibrary() {
                   My Resumes
                 </h1>
                 <p style={{ margin: 0, fontSize: 13.5, color: 'var(--jb-v3-fg-2)', maxWidth: 560 }}>
-                  Keep a tailored resume for every role. Import an existing one, rewrite it with AI, or
-                  build from scratch — every version stays in one place.
+                  Create with the résumé agent or import a file. Conversations, revisions, and PDFs stay with the résumé they produced.
                 </p>
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
@@ -360,16 +381,8 @@ export default function ResumeLibrary() {
                 <button
                   type="button"
                   className="jb-btn"
-                  onClick={() =>
-                    withBusy(
-                      'new',
-                      async () => {
-                        const r = await createResume({ template: 'modern', name: 'Untitled Resume' });
-                        router.push(`/app/resume?id=${r._id || r.id}`);
-                      },
-                      false,
-                    )
-                  }
+                  aria-label="Create Resume"
+                  onClick={() => router.push('/app/resume')}
                   style={primaryBtn}
                 >
                   + Create Resume
@@ -380,26 +393,24 @@ export default function ResumeLibrary() {
 
           <div style={{ padding: '22px 32px 60px', flex: 1 }}>
             {actionError && <InlineError error={actionError} />}
-
-            <AgentSessions
-              sessions={agentSessions}
-              error={agentSessionsError}
-              busyId={agentBusyId}
-              renaming={agentRenaming}
-              onStart={() => router.push('/app/resume')}
-              onOpen={openAgentSession}
-              onRename={setAgentRenaming}
-              onCancelRename={() => setAgentRenaming(null)}
-              onSaveRename={renameAgentSession}
-              onDelete={setAgentDelete}
-            />
+            {error && (
+              <div role="alert" style={{ padding: '13px 16px', marginBottom: 18, color: 'var(--jb-v3-danger)', background: 'var(--jb-v3-danger-soft)', fontSize: 13 }}>
+                Imported résumés are temporarily unavailable. AI-generated résumés remain available.
+                <button type="button" onClick={load} style={{ ...textBtn, marginLeft: 8, color: 'inherit' }}>Retry</button>
+              </div>
+            )}
+            {agentSessionsError && (
+              <div role="alert" style={{ padding: '13px 16px', marginBottom: 18, color: 'var(--jb-v3-danger)', background: 'var(--jb-v3-danger-soft)', fontSize: 13 }}>
+                AI-generated résumés are temporarily unavailable. You can still create or import a résumé.
+              </div>
+            )}
 
             {/* SUMMARY CARDS */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 22 }}>
-              <SummaryCard label="Total resumes" value={loading ? '—' : summary.total} hint="active" />
-              <SummaryCard label="Updated this week" value={loading ? '—' : summary.recent} hint="last 7 days" />
-              <SummaryCard label="Job-tailored" value={loading ? '—' : summary.tailored} hint="for specific roles" />
-              <SummaryCard label="Avg ATS score" value={loading ? '—' : summary.avgAts != null ? `${summary.avgAts}%` : '—'} hint={summary.avgAts != null ? 'across scored' : 'not scored yet'} />
+              <SummaryCard label="Total resumes" value={libraryLoading ? '—' : summary.total} hint="in your library" />
+              <SummaryCard label="AI-generated" value={libraryLoading ? '—' : summary.generated} hint="linked to sessions" />
+              <SummaryCard label="Imported" value={libraryLoading ? '—' : summary.imported} hint="uploaded by you" />
+              <SummaryCard label="Archived" value={libraryLoading ? '—' : summary.archived} hint="available to restore" />
             </div>
 
             {/* TOOLBAR */}
@@ -455,23 +466,20 @@ export default function ResumeLibrary() {
             </div>
 
             {/* BODY */}
-            {loading ? (
+            {libraryLoading ? (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(268px,1fr))', gap: 16 }}>
                 {Array.from({ length: 6 }).map((_, i) => (
                   <div key={i} style={{ height: 250, borderRadius: 2, background: 'var(--jb-v3-line)', animation: 'jbskel 1.2s ease-in-out infinite' }} />
                 ))}
               </div>
-            ) : error ? (
-              <ErrorState error={error} onRetry={load} />
-            ) : resumes.length === 0 ? (
+            ) : libraryItems.length === 0 ? (
               <EmptyState
                 icon="📄"
                 title="No resumes yet"
-                hint="Import an existing resume or create one from scratch to get started."
+                hint="Create one with the résumé agent or import your existing PDF or DOCX."
                 action={
                   <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
                     <button type="button" className="jb-btn" onClick={() => setImportOpen(true)} style={secondaryBtn}>↧ Import</button>
-                    <button type="button" className="jb-btn" onClick={() => router.push('/app/resume')} style={primaryBtn}>+ Create</button>
                   </div>
                 }
               />
@@ -525,8 +533,10 @@ export default function ResumeLibrary() {
         {confirmDelete && (
           <ConfirmDialog
             title={`Delete “${confirmDelete.name}”?`}
-            body="This permanently removes the resume and its version history. Any job applications that used it keep their record."
-            confirmLabel="Delete resume"
+            body={confirmDelete.libraryKind === 'agent'
+              ? 'This permanently removes the AI-generated résumé, its linked session, every revision, and every saved PDF.'
+              : 'This permanently removes the résumé and its version history. Any job applications that used it keep their record.'}
+            confirmLabel={confirmDelete.libraryKind === 'agent' ? 'Delete resume & session' : 'Delete resume'}
             danger
             onCancel={() => setConfirmDelete(null)}
             onConfirm={async () => { const r = confirmDelete; setConfirmDelete(null); await doDelete(r); }}
@@ -539,174 +549,12 @@ export default function ResumeLibrary() {
             onSave={async (name) => { const r = renaming; setRenaming(null); await doRename(r, name); }}
           />
         )}
-        {agentDelete && (
-          <ConfirmDialog
-            title={`Delete “${agentDelete.name || 'Untitled résumé'}”?`}
-            body="This permanently removes the session, every revision, and its saved PDFs. This cannot be undone."
-            confirmLabel="Delete session"
-            danger
-            onCancel={() => setAgentDelete(null)}
-            onConfirm={() => deleteAgentSession(agentDelete)}
-          />
-        )}
       </AnimatePresence>
     </>
   );
 }
 
 /* ===================================================== sub-components === */
-function AgentSessions({
-  sessions,
-  error,
-  busyId,
-  renaming,
-  onStart,
-  onOpen,
-  onRename,
-  onCancelRename,
-  onSaveRename,
-  onDelete,
-}) {
-  return (
-    <section
-      data-testid="agent-resume-sessions"
-      aria-labelledby="agent-resume-heading"
-      style={{
-        background: 'var(--jb-v3-panel)',
-        border: '1px solid var(--jb-v3-line)',
-        borderRadius: 2,
-        marginBottom: 26,
-        overflow: 'hidden',
-      }}
-    >
-      <div
-        style={{
-          padding: '20px 22px',
-          borderBottom: '1px solid var(--jb-v3-line)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 20,
-          flexWrap: 'wrap',
-        }}
-      >
-        <div>
-          <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--jb-v3-accent)', marginBottom: 6 }}>
-            Agent workspace
-          </div>
-          <h2 id="agent-resume-heading" style={{ margin: '0 0 5px', fontSize: 21, letterSpacing: '-0.025em' }}>
-            Agent-written résumés
-          </h2>
-          <p style={{ margin: 0, color: 'var(--jb-v3-fg-2)', fontSize: 13.5 }}>
-            Reopen a conversation, continue from any saved draft, or clean up work you no longer need.
-          </p>
-        </div>
-        <button type="button" className="jb-btn" onClick={onStart} style={primaryBtn}>
-          + New agent résumé
-        </button>
-      </div>
-
-      {error && (
-        <div role="alert" style={{ padding: '13px 22px', color: 'var(--jb-v3-danger)', background: 'var(--jb-v3-danger-soft)', fontSize: 13 }}>
-          Agent sessions are temporarily unavailable. You can still create a new résumé.
-        </div>
-      )}
-
-      {sessions === null ? (
-        <div style={{ padding: 22, color: 'var(--jb-v3-fg-3)', fontSize: 13 }}>
-          Loading agent sessions…
-        </div>
-      ) : sessions.length === 0 ? (
-        <div data-testid="agent-sessions-empty" style={{ padding: '26px 22px' }}>
-          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 5 }}>No agent sessions yet</div>
-          <div style={{ color: 'var(--jb-v3-fg-2)', fontSize: 13.5 }}>
-            Start with a target role and shape the résumé through conversation. Every revision and PDF will appear here.
-          </div>
-        </div>
-      ) : (
-        <div>
-          {sessions.map((session, index) => {
-            const revisionCount = session.revisionCount ?? session.revision ?? 0;
-            const pending = busyId === session.id;
-            const build = session.compiled
-              ? 'PDF ready'
-              : revisionCount
-                ? 'Build needs attention'
-                : 'Not built yet';
-            return (
-              <article
-                key={session.id}
-                className="jb-agent-row"
-                style={{
-                  padding: '17px 22px',
-                  borderTop: index ? '1px solid var(--jb-v3-line)' : 'none',
-                  opacity: pending ? 0.6 : 1,
-                }}
-              >
-                <div style={{ minWidth: 0 }}>
-                  {renaming?.id === session.id ? (
-                    <AgentSessionRename
-                      session={session}
-                      busy={pending}
-                      onCancel={onCancelRename}
-                      onSave={onSaveRename}
-                    />
-                  ) : (
-                    <>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap', marginBottom: 7 }}>
-                        <strong style={{ fontSize: 15.5 }}>{session.name || 'Untitled résumé'}</strong>
-                        <span style={{ fontFamily: MONO, fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.08em', color: session.status === 'active' ? 'var(--jb-v3-accent)' : 'var(--jb-v3-fg-3)' }}>
-                          {session.status === 'active' ? 'In progress' : 'Ended'}
-                        </span>
-                      </div>
-                      <div style={{ color: 'var(--jb-v3-fg-2)', fontSize: 13, lineHeight: 1.55 }}>
-                        {session.targetRole || 'No target role'} · {session.harnessLabel || session.harness || 'Agent'} · {session.modelLabel || session.model || 'Model unavailable'}
-                      </div>
-                      <div style={{ color: 'var(--jb-v3-fg-3)', fontSize: 12.5, lineHeight: 1.55 }}>
-                        {humanizeKey(session.templateKey) || 'Default template'} · {revisionCount} revision{revisionCount === 1 ? '' : 's'} · {build} · Updated {relTime(session.updatedAt)}
-                      </div>
-                    </>
-                  )}
-                </div>
-                {renaming?.id !== session.id && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <button type="button" disabled={pending} onClick={() => onOpen(session)} style={{ ...secondaryBtn, padding: '8px 13px', fontSize: 12.5 }}>
-                      Open session
-                    </button>
-                    <button type="button" disabled={pending} onClick={() => onRename(session)} style={textBtn}>
-                      Rename
-                    </button>
-                    <button type="button" disabled={pending} onClick={() => onDelete(session)} style={{ ...textBtn, color: 'var(--jb-v3-danger)' }}>
-                      Delete
-                    </button>
-                  </div>
-                )}
-              </article>
-            );
-          })}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function AgentSessionRename({ session, busy, onCancel, onSave }) {
-  const [name, setName] = useState(session.name || '');
-  return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (name.trim()) onSave(session, name.trim());
-      }}
-      style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}
-    >
-      <input aria-label="Session name" autoFocus maxLength={200} disabled={busy} value={name} onChange={(event) => setName(event.target.value)} style={{ ...inp, width: 260 }} />
-      <button type="submit" disabled={busy || !name.trim()} style={{ ...secondaryBtn, padding: '8px 13px', fontSize: 12.5 }}>Save name</button>
-      <button type="button" disabled={busy} onClick={onCancel} style={textBtn}>Cancel</button>
-    </form>
-  );
-}
-
 function humanizeKey(value) {
   if (!value) return '';
   return String(value)
@@ -723,11 +571,6 @@ function SummaryCard({ label, value, hint }) {
       <div style={{ fontSize: 12, color: 'var(--jb-v3-fg-3)' }}>{hint}</div>
     </div>
   );
-}
-
-function StatusBadge({ status }) {
-  const m = STATUS_META[status] || STATUS_META.draft;
-  return <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 2, background: m.bg, color: m.ink }}>{m.label}</span>;
 }
 
 function Thumbnail({ r, h = 132 }) {
@@ -751,17 +594,25 @@ function ActionsMenu({ r, actions }) {
     return () => document.removeEventListener('mousedown', onDoc);
   }, []);
   const isArchived = r.status === 'archived';
-  const items = [
-    { label: 'Open editor', fn: actions.onOpen },
-    { label: 'Rename', fn: actions.onRename },
-    { label: 'Duplicate', fn: actions.onDuplicate },
-    { label: 'Create version', fn: actions.onCreateVersion },
-    { label: 'Version history', fn: actions.onVersions },
-    { label: r.isPrimary ? 'Primary resume ✓' : 'Set as primary', fn: r.isPrimary ? null : actions.onSetPrimary },
-    { label: 'Download PDF', fn: actions.onDownload },
-    { label: isArchived ? 'Unarchive' : 'Archive', fn: actions.onArchive },
-    { label: 'Delete', fn: actions.onDelete, danger: true },
-  ];
+  const items = r.libraryKind === 'agent'
+    ? [
+        { label: 'Open resume', fn: actions.onOpen },
+        { label: 'Rename', fn: actions.onRename },
+        r.hasCurrentPdf ? { label: 'Download PDF', fn: actions.onDownload } : null,
+        { label: isArchived ? 'Restore' : 'Archive', fn: actions.onArchive },
+        { label: 'Delete', fn: actions.onDelete, danger: true },
+      ].filter(Boolean)
+    : [
+        { label: 'Open resume', fn: actions.onOpen },
+        { label: 'Rename', fn: actions.onRename },
+        { label: 'Duplicate', fn: actions.onDuplicate },
+        { label: 'Create version', fn: actions.onCreateVersion },
+        { label: 'Version history', fn: actions.onVersions },
+        { label: r.isPrimary ? 'Primary resume ✓' : 'Set as primary', fn: r.isPrimary ? null : actions.onSetPrimary },
+        { label: 'Download PDF', fn: actions.onDownload },
+        { label: isArchived ? 'Restore' : 'Archive', fn: actions.onArchive },
+        { label: 'Delete', fn: actions.onDelete, danger: true },
+      ];
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <button
@@ -799,15 +650,16 @@ function ResumeCard({ r, busy, ...actions }) {
   const method = METHOD_META[r.creationMethod] || METHOD_META.manual;
   return (
     <motion.div
+      data-testid={r.libraryKind === 'agent' ? `resume-session-${r.sessionId}` : `resume-${r.id}`}
       layout
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       className="jb-card"
       style={{ position: 'relative', background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, padding: 14, opacity: busy ? 0.6 : 1 }}
     >
-      <div onClick={actions.onOpen} style={{ cursor: 'pointer' }}>
+      <button type="button" aria-label="Open resume" onClick={actions.onOpen} style={{ display: 'block', width: '100%', padding: 0, border: 0, background: 'transparent', cursor: 'pointer' }}>
         <Thumbnail r={r} />
-      </div>
+      </button>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginTop: 12 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -822,17 +674,25 @@ function ResumeCard({ r, busy, ...actions }) {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
-        <StatusBadge status={r.status} />
         <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--jb-v3-fg-2)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ color: r.creationMethod === 'ai_rewrite' ? 'var(--jb-v3-accent)' : 'var(--jb-v3-fg-3)' }}>{method.icon}</span>{method.label}
+          <span style={{ color: r.creationMethod === 'ai_generated' ? 'var(--jb-v3-accent)' : 'var(--jb-v3-fg-3)' }}>{method.icon}</span>{method.label}
         </span>
-        <span style={{ fontFamily: MONO, fontSize: 11, color: 'var(--jb-v3-fg-3)' }}>v{r.version}</span>
+        <span style={{ fontFamily: MONO, fontSize: 11, color: 'var(--jb-v3-fg-3)' }}>
+          {r.libraryKind === 'agent'
+            ? `${r.version} revision${r.version === 1 ? '' : 's'}`
+            : `v${r.version}`}
+        </span>
         {typeof r.atsScore === 'number' && (
           <span style={{ fontFamily: MONO, fontSize: 11, color: 'var(--jb-v3-accent)' }}>ATS {r.atsScore}%</span>
         )}
       </div>
 
-      {r.source?.originalFilename ? (
+      {r.libraryKind === 'agent' ? (
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--jb-v3-line)', fontSize: 11.5, color: 'var(--jb-v3-fg-3)', lineHeight: 1.5 }}>
+          <div>{r.harnessLabel || r.harness || 'Agent'} · {r.modelLabel || r.model || 'Model unavailable'}</div>
+          <div>{humanizeKey(r.templateKey) || 'Default template'} · {r.hasCurrentPdf ? 'PDF saved' : 'No PDF yet'}</div>
+        </div>
+      ) : r.source?.originalFilename ? (
         <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--jb-v3-line)', fontSize: 11.5, color: 'var(--jb-v3-fg-3)', lineHeight: 1.5 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', overflow: 'hidden' }}>
             <span aria-hidden>↧</span>
@@ -862,12 +722,12 @@ function ResumeTable({ rows, busyId, ...h }) {
   return (
     <div style={{ background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, overflow: 'hidden' }}>
       <div style={{ display: 'grid', gridTemplateColumns: '2.4fr 1.4fr 1fr 1.6fr 0.7fr 40px', gap: 12, padding: '11px 18px', borderBottom: '1px solid var(--jb-v3-line)', fontFamily: MONO, fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--jb-v3-fg-3)' }}>
-        <span>Resume</span><span>Status / Method</span><span>Version</span><span>Source · Imported</span><span>Edited</span><span />
+        <span>Resume</span><span>Source</span><span>History</span><span>Details</span><span>Edited</span><span />
       </div>
       {rows.map((r) => {
         const method = METHOD_META[r.creationMethod] || METHOD_META.manual;
         return (
-          <div key={r.id} className="jb-row" style={{ display: 'grid', gridTemplateColumns: '2.4fr 1.4fr 1fr 1.6fr 0.7fr 40px', gap: 12, padding: '13px 18px', borderBottom: '1px solid var(--jb-v3-line)', alignItems: 'center', fontSize: 13, opacity: busyId === r.id ? 0.6 : 1 }}>
+          <div data-testid={r.libraryKind === 'agent' ? `resume-session-${r.sessionId}` : `resume-${r.id}`} key={r.id} className="jb-row" style={{ display: 'grid', gridTemplateColumns: '2.4fr 1.4fr 1fr 1.6fr 0.7fr 40px', gap: 12, padding: '13px 18px', borderBottom: '1px solid var(--jb-v3-line)', alignItems: 'center', fontSize: 13, opacity: busyId === r.id ? 0.6 : 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
               <div style={{ width: 34, height: 44, borderRadius: 2, overflow: 'hidden', border: '1px solid var(--jb-v3-line)', flexShrink: 0 }}>
                 <Thumbnail r={r} h={44} />
@@ -881,12 +741,16 @@ function ResumeTable({ rows, busyId, ...h }) {
               </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <StatusBadge status={r.status} />
               <span style={{ fontSize: 11.5, color: 'var(--jb-v3-fg-2)' }}>{method.icon} {method.label}</span>
             </div>
-            <span style={{ fontFamily: MONO, fontSize: 12, color: 'var(--jb-v3-fg-2)' }}>v{r.version}{typeof r.atsScore === 'number' ? ` · ATS ${r.atsScore}%` : ''}</span>
+            <span style={{ fontFamily: MONO, fontSize: 12, color: 'var(--jb-v3-fg-2)' }}>{r.libraryKind === 'agent' ? `${r.version} revision${r.version === 1 ? '' : 's'}` : `v${r.version}`}{typeof r.atsScore === 'number' ? ` · ATS ${r.atsScore}%` : ''}</span>
             <div style={{ fontSize: 12, color: 'var(--jb-v3-fg-3)', minWidth: 0 }}>
-              {r.source?.originalFilename ? (
+              {r.libraryKind === 'agent' ? (
+                <>
+                  <div>{r.harnessLabel || r.harness || 'Agent'} · {r.modelLabel || r.model || 'Model unavailable'}</div>
+                  <div>{r.hasCurrentPdf ? 'PDF saved' : 'No PDF yet'}</div>
+                </>
+              ) : r.source?.originalFilename ? (
                 <>
                   <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={r.source.originalFilename}>{r.source.originalFilename} · {fmtBytes(r.source.fileSize)}</div>
                   <div>{fmtDate(r.source.importedAt)}</div>

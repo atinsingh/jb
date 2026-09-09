@@ -110,6 +110,7 @@ export interface SessionView {
   createdAt?: Date;
   updatedAt?: Date;
   endedAt?: Date;
+  archivedAt?: Date;
 }
 
 export interface TurnResult extends SessionView {
@@ -762,6 +763,47 @@ export class ResumeHarnessService {
     return this.view(session);
   }
 
+  async archiveSession(userId: string, sessionId: string): Promise<SessionView> {
+    return this.withSessionMutationLock(userId, sessionId, async () => {
+      const session = await this.mustFind(userId, sessionId);
+      if (session.sandboxId) {
+        await this.sandbox.destroy(session.sandboxId);
+        session.sandboxId = undefined;
+      }
+      session.status = 'ended';
+      session.endedAt = session.endedAt || new Date();
+      session.archivedAt = new Date();
+      await this.sessionModel
+        .updateOne(
+          { _id: sessionId, userId },
+          {
+            $set: {
+              status: session.status,
+              endedAt: session.endedAt,
+              archivedAt: session.archivedAt,
+            },
+            $unset: { sandboxId: 1 },
+          },
+        )
+        .exec();
+      return this.view(session);
+    });
+  }
+
+  async restoreSession(userId: string, sessionId: string): Promise<SessionView> {
+    return this.withSessionMutationLock(userId, sessionId, async () => {
+      const session = await this.mustFind(userId, sessionId);
+      session.archivedAt = undefined;
+      await this.sessionModel
+        .updateOne(
+          { _id: sessionId, userId },
+          { $unset: { archivedAt: 1 } },
+        )
+        .exec();
+      return this.view(session);
+    });
+  }
+
   async deleteSession(
     userId: string,
     sessionId: string,
@@ -1345,6 +1387,7 @@ export class ResumeHarnessService {
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
       endedAt: session.endedAt,
+      archivedAt: session.archivedAt,
     };
   }
 }
