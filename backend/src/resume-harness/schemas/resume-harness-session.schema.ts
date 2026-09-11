@@ -54,11 +54,34 @@ export class ResumeHarnessTurn {
   @Prop({ type: [String], default: [] })
   contentWarnings?: string[];
 
+  /** This revision intentionally contains user-requested draft placeholders. */
+  @Prop({ default: false })
+  placeholderDraft?: boolean;
+
   @Prop({ default: () => new Date() })
   createdAt: Date;
 }
 
 const ResumeHarnessTurnSchema = SchemaFactory.createForClass(ResumeHarnessTurn);
+
+@Schema({ _id: false })
+export class ResumeHarnessMessage {
+  @Prop({ required: true, enum: ['user', 'assistant'] })
+  role: 'user' | 'assistant';
+
+  @Prop({ required: true })
+  text: string;
+
+  /** Present only when this message produced a stored document revision. */
+  @Prop()
+  revision?: number;
+
+  @Prop({ default: () => new Date() })
+  createdAt: Date;
+}
+
+const ResumeHarnessMessageSchema =
+  SchemaFactory.createForClass(ResumeHarnessMessage);
 
 /**
  * A resume-generation session: one user, one harness, one sandbox.
@@ -128,6 +151,14 @@ export class ResumeHarnessSession {
   @Prop()
   jobDescription?: string;
 
+  /** Source posting URL, retained independently from its extracted text. */
+  @Prop({ maxlength: 2000 })
+  jobUrl?: string;
+
+  /** Non-blocking explanation when optional job context could not be resolved. */
+  @Prop({ maxlength: 1000 })
+  jobContextWarning?: string;
+
   /**
    * The template this résumé is written to, by `ResumeTemplate.key`.
    *
@@ -164,6 +195,10 @@ export class ResumeHarnessSession {
   @Prop({ type: [String], default: [] })
   contentWarnings?: string[];
 
+  /** Allows previewing an explicitly requested draft while warnings stay visible. */
+  @Prop({ default: false })
+  placeholderDraft?: boolean;
+
   /**
    * The candidate's name at session creation.
    *
@@ -183,6 +218,10 @@ export class ResumeHarnessSession {
 
   @Prop({ type: [ResumeHarnessTurnSchema], default: [] })
   turns: ResumeHarnessTurn[];
+
+  /** Complete chat history, independent from document revision history. */
+  @Prop({ type: [ResumeHarnessMessageSchema], default: [] })
+  conversation: ResumeHarnessMessage[];
 
   @Prop()
   endedAt?: Date;

@@ -1,48 +1,45 @@
-// ATS compatibility checking.
-//
-// Two endpoints answering two DIFFERENT questions — keeping them apart is the
-// whole design:
-//
-//   checkAts  — "will a parser read this résumé at all?" A property of the
-//               document. Deterministic, no model involved, and PERSISTED to
-//               the résumé as atsScore, which is what the library's score ring
-//               and sort read.
-//
-//   matchAts  — "does this résumé match THIS job?" A property of a pairing, so
-//               it changes per application and is deliberately EPHEMERAL. It
-//               never overwrites atsScore, because a stored number that moved
-//               every time you looked at a different job would be meaningless.
-//
-// Follows the fetch/auth/error convention in services/applyQueueApi.js.
-
 import { API_URL } from '@/config/api';
 import { getAccessToken } from '@/lib/apiClient';
+
+// This module deliberately exposes two independent ATS concepts. `checkAts`
+// and `matchAts` serve stored Resume documents; the session functions below
+// run Resume-Matcher against generated ResumeHarnessSession revisions.
 
 const apiCall = async (endpoint, options = {}) => {
   const token = await getAccessToken();
   const headers = { 'Content-Type': 'application/json', ...options.headers };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
+  if (token) headers.Authorization = `Bearer ${token}`;
   const response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
-
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Request failed' }));
-    const detail = Array.isArray(error.message) ? error.message.join(', ') : error.message;
-    throw new Error(detail || 'Request failed');
+    const body = await response.json().catch(() => ({}));
+    const detail = Array.isArray(body.message) ? body.message.join(', ') : body.message;
+    const error = new Error(detail || 'ATS request failed');
+    error.status = response.status;
+    throw error;
   }
-  return response.json();
+  // Nest/Express serializes a `null` controller result as an empty successful
+  // response. For the latest-result endpoint that means this résumé revision
+  // has not been analyzed yet; it is not an ATS outage.
+  const text = await response.text();
+  return text.trim() ? JSON.parse(text) : null;
 };
 
-// POST /api/resume-builder/:id/ats-check
-//   -> { score, checkedAt, extractedTextLength, findings: [{ code, severity, message, fix }] }
-// Every finding carries an actionable fix by construction.
-export const checkAts = async (resumeId) =>
+export const getLatestAtsSession = (resumeSessionId) =>
+  apiCall(`/api/ats/resume-sessions/${resumeSessionId}/latest`);
+
+export const startAtsSession = (payload) =>
+  apiCall('/api/ats/sessions', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+export const runAtsSession = (id) =>
+  apiCall(`/api/ats/sessions/${id}/run`, { method: 'POST' });
+
+export const checkAts = (resumeId) =>
   apiCall(`/api/resume-builder/${resumeId}/ats-check`, { method: 'POST' });
 
-// POST /api/resume-builder/:id/ats-match  { jobDescription }
-//   -> { coverage, matched[], missing[], keywordCount }
-// `missing` is the actionable part; a bare percentage tells a candidate nothing.
-export const matchAts = async (resumeId, jobDescription) =>
+export const matchAts = (resumeId, jobDescription) =>
   apiCall(`/api/resume-builder/${resumeId}/ats-match`, {
     method: 'POST',
     body: JSON.stringify({ jobDescription }),

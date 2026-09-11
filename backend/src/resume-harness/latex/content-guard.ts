@@ -29,6 +29,15 @@ export interface ContentGuardInput {
   candidateMarkdown?: string;
 }
 
+/** Whether the factual source contains at least one career-content category. */
+export function hasCareerEvidence(candidateMarkdown?: string): boolean | undefined {
+  return candidateMarkdown
+    ? /^(?:##\s+(?:Experience|Education|Skills|Certifications|Achievements)\s*|-\s*Headline\s*:|Summary\s*:)/im.test(
+        candidateMarkdown,
+      )
+    : undefined;
+}
+
 /**
  * Filler no template list could enumerate, because it comes from the model
  * rather than from the skeleton.
@@ -117,11 +126,17 @@ export function findContentProblems(input: ContentGuardInput): string[] {
   }
 
   const words = prose(latex);
-  const candidateHasCareerEvidence = candidateMarkdown
-    ? /^(?:##\s+(?:Experience|Education|Skills|Certifications|Achievements)\s*|-\s*Headline\s*:|Summary\s*:)/im.test(
-        candidateMarkdown,
-      )
-    : undefined;
+  const candidateHasCareerEvidence = hasCareerEvidence(candidateMarkdown);
+
+  // Identity alone can typeset into a technically valid PDF, but it is not a
+  // usable resume. Do not publish a page that contains only a name and contact
+  // details when the factual source has no experience, education, skills, or
+  // other career evidence for the agent to use.
+  if (candidateHasCareerEvidence === false) {
+    problems.push(
+      'CANDIDATE.md contains no career facts; import a resume or add experience, education, skills, certifications, or achievements before publishing a PDF',
+    );
+  }
 
   // 3. A compiler accepts duplicate document endings and empty section
   // scaffolding, but both render as a broken candidate document.

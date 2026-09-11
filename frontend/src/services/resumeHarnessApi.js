@@ -53,7 +53,7 @@ export const getResumeTemplates = () => apiCall('/api/resume-harness/templates')
 
 /**
  * POST /api/resume-harness/sessions
- * { harness, alias?, targetRole?, jobDescription?, carryFromSessionId?,
+ * { harness, alias?, targetRole?, jobDescription?, jobUrl?, carryFromSessionId?,
  *   templateKey?, vibe? }
  *   -> session
  *

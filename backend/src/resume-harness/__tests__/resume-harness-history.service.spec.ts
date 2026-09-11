@@ -17,7 +17,7 @@ describe('Resume harness saved sessions and revisions', () => {
   let docs: any[];
   let artifacts: Map<string, Buffer>;
   const source =
-    '\\documentclass{article}\n\\begin{document}\nJordan Reyes\\\\\njordan@example.com\n\\end{document}';
+    '\\documentclass{article}\n\\begin{document}\nJordan Reyes\\\\\njordan@example.com\n\\section*{Experience}\nStaff Engineer at Stripe, 2019--2024.\\\\\nImproved payment platform reliability.\n\\end{document}';
   const pdf = Buffer.from('%PDF-1.7 first');
   const model: any = {
     create: jest.fn(async (data) => {
@@ -51,6 +51,19 @@ describe('Resume harness saved sessions and revisions', () => {
       }));
       return result;
     }),
+    updateOne: jest.fn((query, update) => ({
+      exec: async () => {
+        const doc = docs.find(
+          (candidate) =>
+            candidate._id === query._id && candidate.userId === query.userId,
+        );
+        if (doc) {
+          Object.assign(doc, update.$set || {});
+          for (const key of Object.keys(update.$unset || {})) delete doc[key];
+        }
+        return { acknowledged: true, modifiedCount: doc ? 1 : 0 };
+      },
+    })),
     deleteOne: jest.fn((query) => ({
       exec: async () => {
         docs = docs.filter(
@@ -114,6 +127,13 @@ describe('Resume harness saved sessions and revisions', () => {
       artifacts.delete(key);
     });
     sandbox.destroy.mockResolvedValue(undefined);
+    sandbox.exec.mockReset().mockResolvedValue({
+      exitCode: 0,
+      stdout: 'I updated the résumé and verified the result.',
+    });
+    sandbox.readFile
+      .mockReset()
+      .mockImplementation(async () => `${source}\n% edit ${sandbox.exec.mock.calls.length}`);
     latex.compile.mockResolvedValue({
       ok: true,
       log: '',
@@ -133,7 +153,8 @@ describe('Resume harness saved sessions and revisions', () => {
           provide: CandidateContextService,
           useValue: {
             build: async () => ({
-              markdown: '- Name: Jordan Reyes',
+              markdown:
+                '# Candidate facts\n\n## Identity\n\n- Name: Jordan Reyes\n\n## Experience\n\n### Staff Engineer — Stripe\n2019 – 2024',
               summary: { name: 'Jordan Reyes' },
             }),
           },
@@ -302,7 +323,7 @@ describe('Resume harness saved sessions and revisions', () => {
     const reverted = await service.revertLook('u1', carried.id);
     expect(reverted).toMatchObject({
       revision: 3,
-      latex: source,
+      latex: `${source}\n% edit 1`,
       templateKey: 'classic',
       compiled: true,
       hasCurrentPdf: true,
@@ -344,7 +365,7 @@ describe('Resume harness saved sessions and revisions', () => {
     );
     expect(docs[0].turns[0]).toMatchObject({
       revision: 1,
-      latex: source,
+      latex: `${source}\n% edit 1`,
       pdfKey: key,
       templateKey: 'classic',
       vibe: {},
@@ -372,7 +393,7 @@ describe('Resume harness saved sessions and revisions', () => {
     });
     expect(result.name).toBe('Build my résumé');
     expect(result.turns[1]).toMatchObject({
-      latex: source,
+      latex: result.latex,
       compiled: false,
       compileLog: 'bad build',
     });
@@ -407,7 +428,7 @@ describe('Resume harness saved sessions and revisions', () => {
       revision: 3,
       kind: 'restore',
       restoredFromRevision: 1,
-      latex: source,
+      latex: `${source}\n% edit 1`,
       templateKey: 'classic',
       vibe: {},
       compiled: true,
@@ -415,7 +436,9 @@ describe('Resume harness saved sessions and revisions', () => {
     });
     expect(sandbox.writeFiles).toHaveBeenLastCalledWith(
       'box',
-      expect.arrayContaining([{ path: 'resume.tex', contents: source }]),
+      expect.arrayContaining([
+        { path: 'resume.tex', contents: `${source}\n% edit 1` },
+      ]),
     );
     expect(latex.compile).toHaveBeenCalledTimes(compileCalls);
     await service.endSession('u1', session.id);
@@ -427,7 +450,7 @@ describe('Resume harness saved sessions and revisions', () => {
     expect(sandbox.writeFiles).not.toHaveBeenCalled();
     const next = await start({ carryFromSessionId: session.id });
     expect(next).toMatchObject({
-      latex: source,
+      latex: `${source}\n% edit 2`,
       templateKey: 'modern',
       vibe: { density: 'compact' },
     });

@@ -11,7 +11,15 @@
 # No credential is baked in. Every key reaches a container as an environment
 # variable at provision time, and it is always a LiteLLM virtual key.
 
-FROM node:20-bookworm-slim
+FROM node:20-bookworm-slim AS node-runtime
+
+# Resume-Matcher is pinned because its internal score contract is the source of
+# truth for JOB-101. This image already includes Python 3.13 and the installed
+# `app` package; Jobocate adds the agent CLIs and TeX to the same container.
+FROM ghcr.io/srbhr/resume-matcher:1.3.0
+
+USER root
+COPY --from=node-runtime /usr/local/ /usr/local/
 
 # TeX Live: `recommended` covers the packages a resume realistically needs
 # (fontspec, enumitem, geometry, hyperref, titlesec) without pulling the ~5GB
@@ -40,15 +48,17 @@ RUN npm install -g --no-fund --no-audit \
 # spending time on a network fetch.
 RUN npm install -g --no-fund --no-audit @ai-sdk/openai-compatible
 
+COPY jobocate_ats.py /opt/resume-matcher/jobocate_ats.py
+RUN chmod 0555 /opt/resume-matcher/jobocate_ats.py
+
 WORKDIR /workspace
 RUN mkdir -p /workspace/build
 
 # Non-root: the harness has no reason to write outside the workspace, and the
 # sandbox is the isolation boundary the adapters rely on when they disable
 # interactive approval.
-RUN useradd --create-home --home-dir /workspace --shell /bin/bash harness \
-    && chown -R harness:harness /workspace
-USER harness
+RUN chown -R appuser:appuser /workspace
+USER appuser
 
 ENV HOME=/workspace \
     NODE_NO_WARNINGS=1 \

@@ -193,7 +193,7 @@ Sponsorship not required. Relocation not open.
     expect(problems.join(' ')).toMatch(/Summary.*no career evidence/i);
   });
 
-  it('accepts a contact-only document when the profile has no career facts to add', () => {
+  it('rejects a contact-only document when the profile has no career facts to add', () => {
     const contactOnly = String.raw`\documentclass{article}
 \begin{document}
 Harkit\\
@@ -208,12 +208,12 @@ Toronto
 - Email: harkit@example.com
 - Location: Toronto
 `;
-    expect(
-      findContentProblems({
-        latex: contactOnly,
-        candidateName: 'Harkit',
-        candidateMarkdown,
-      }),
-    ).toEqual([]);
+    const problems = findContentProblems({
+      latex: contactOnly,
+      candidateName: 'Harkit',
+      candidateMarkdown,
+    });
+
+    expect(problems.join(' ')).toMatch(/no career facts/i);
   });
 });

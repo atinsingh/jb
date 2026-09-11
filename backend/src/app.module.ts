@@ -17,6 +17,7 @@ import { AgentsModule } from './agents/agents.module';
 import { CoverLettersModule } from './cover-letters/cover-letters.module';
 import { ResumeBuilderModule } from './resume-builder/resume-builder.module';
 import { ResumeHarnessModule } from './resume-harness/resume-harness.module';
+import { AtsModule } from './ats/ats.module';
 import { BillingModule } from './billing/billing.module';
 import { EntitlementModule } from './entitlement/entitlement.module';
 import { LLMModule } from './llm/llm.module';
@@ -117,6 +118,7 @@ function getEnvFilePath(): string[] {
     CoverLettersModule,
     ResumeBuilderModule,
     ResumeHarnessModule,
+    AtsModule,
     BillingModule,
     EntitlementModule,
     LLMModule,

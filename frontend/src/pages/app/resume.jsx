@@ -20,6 +20,11 @@ import {
   streamTemplateChange,
   streamVibeChange,
 } from '@/services/resumeHarnessApi';
+import {
+  getLatestAtsSession,
+  runAtsSession,
+  startAtsSession,
+} from '@/services/atsApi';
 
 /**
  * The résumé surface. One screen: set up a session, then talk to it.
@@ -151,10 +156,13 @@ export default function AppResume() {
   const [phase, setPhase] = useState('idle');
   const [error, setError] = useState(null);
   const [pdfBase64, setPdfBase64] = useState('');
+  const [ats, setAts] = useState(null);
+  const [atsBusy, setAtsBusy] = useState(false);
+  const [atsWarning, setAtsWarning] = useState('');
 
   /** The conversation: what was asked, and what the agent did about it. */
   const [messages, setMessages] = useState([]);
-  const [liveText, setLiveText] = useState('');
+  const [liveActivities, setLiveActivities] = useState([]);
   const [livePhase, setLivePhase] = useState(null);
   const transcriptRef = useRef(null);
 
@@ -197,12 +205,11 @@ export default function AppResume() {
     setHarness(current.harness);
     setAlias(current.alias);
     setTargetRole(current.targetRole || '');
+    setJobDescription(current.jobDescription || '');
+    setJobUrl(current.jobUrl || '');
     setTemplateKey(current.templateKey || '');
     setVibe(current.vibe || {});
-    setMessages((current.turns || []).flatMap((turn) => [
-      { role: 'you', text: turn.instruction || (turn.kind === 'restore' ? `Restore revision ${turn.restoredFromRevision}.` : 'Change the look.') },
-      { role: 'agent', text: turn.summary || 'Done.', compiled: turn.compiled, revision: turn.revision },
-    ]));
+    setMessages(sessionMessages(current));
     setInstruction('');
     setPdfBase64('');
     return current;
@@ -314,11 +321,40 @@ export default function AppResume() {
     };
   }, [router.isReady, router.query.session, selectSession, loadPdf]);
 
+  useEffect(() => {
+    if (!session?.id || !session.revision) {
+      setAts(null);
+      setAtsWarning('');
+      return undefined;
+    }
+    setAtsWarning('');
+    let cancelled = false;
+    getLatestAtsSession(session.id)
+      .then((result) => {
+        if (!cancelled) setAts(result);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          if (error?.status === 404) {
+            // A new résumé revision normally has no ATS result yet. That is an
+            // empty state, not an outage; the candidate can start the first
+            // analysis with the button beside it.
+            setAts(null);
+          } else {
+            setAtsWarning('ATS analysis is temporarily unavailable. Your résumé is still saved and editable.');
+          }
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.id, session?.revision]);
+
   // Keep the newest line in view while the agent narrates.
   useEffect(() => {
     const el = transcriptRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, liveText, livePhase]);
+  }, [messages, liveActivities, livePhase]);
 
   const profile = options?.profile;
 
@@ -347,7 +383,8 @@ export default function AppResume() {
         harness,
         ...(alias ? { alias } : {}),
         ...(targetRole.trim() ? { targetRole: targetRole.trim() } : {}),
-        ...(composedJobContext() ? { jobDescription: composedJobContext() } : {}),
+        ...(composedPastedJobDescription() ? { jobDescription: composedPastedJobDescription() } : {}),
+        ...(jobUrl.trim() ? { jobUrl: jobUrl.trim() } : {}),
         ...(sourceSessionId ? { carryFromSessionId: sourceSessionId } : {}),
         // These are also sent while carrying. They begin as the source
         // session's look, and any visible setup change must be honoured.
@@ -360,6 +397,7 @@ export default function AppResume() {
       window.sessionStorage.setItem(ACTIVE_SESSION_KEY, next.id);
       setTemplateKey(next.templateKey || '');
       setVibe(next.vibe || {});
+      setJobUrl(next.jobUrl || jobUrl.trim());
       setPdfBase64('');
       setMessages([]);
       await loadPdf(next);
@@ -395,19 +433,13 @@ export default function AppResume() {
     }
   };
 
-  /**
-   * The job context sent to the harness.
-   *
-   * The URLs are labelled rather than fetched: nothing in this system reads
-   * them, and pretending otherwise would be worse than saying so. They give the
-   * model the company's name and the posting's identity, which is usually
-   * enough to pitch tone; the pasted text is what actually carries detail.
-   */
-  const composedJobContext = () => {
+  /** Pasted text wins; the backend resolves jobUrl only when this is empty. */
+  const composedPastedJobDescription = () => {
     const parts = [];
-    if (jobUrl.trim()) parts.push(`Job posting URL: ${jobUrl.trim()}`);
-    if (companyUrl.trim()) parts.push(`Company website: ${companyUrl.trim()}`);
     if (jobDescription.trim()) parts.push(jobDescription.trim());
+    if (jobDescription.trim() && companyUrl.trim()) {
+      parts.push(`Company website: ${companyUrl.trim()}`);
+    }
     return parts.join('\n\n');
   };
 
@@ -418,26 +450,20 @@ export default function AppResume() {
     setError(null);
     setPhase('working');
     setInstruction('');
-    setLiveText('');
+    setLiveActivities([]);
     setLivePhase('writing');
     setMessages((m) => [...m, { role: 'you', text }]);
 
     try {
       await streamHarnessTurn(session.id, { instruction: text }, (event) => {
         if (event.type === 'phase') setLivePhase(event.phase);
-        else if (event.type === 'token') setLiveText((t) => (t + event.text).slice(-4000));
+        else if (event.type === 'activity') {
+          setLiveActivities((current) => upsertActivity(current, event.activity));
+        }
         else if (event.type === 'result') {
           const s = acceptSession(event.session);
           if (s.pdfBase64) setPdfBase64(s.pdfBase64);
-          setMessages((m) => [
-            ...m,
-            {
-              role: 'agent',
-              text: s.summary || 'Done.',
-              compiled: s.compiled,
-              revision: s.revision,
-            },
-          ]);
+          setMessages(sessionMessages(s));
         } else if (event.type === 'error') {
           const err = new Error(event.message);
           err.status = event.status;
@@ -447,7 +473,7 @@ export default function AppResume() {
     } catch (e) {
       setError(e);
     } finally {
-      setLiveText('');
+      setLiveActivities([]);
       setLivePhase(null);
       setPhase('ready');
     }
@@ -482,7 +508,7 @@ export default function AppResume() {
 
     setError(null);
     setPhase('working');
-    setLiveText('');
+    setLiveActivities([]);
     setLivePhase('relayout');
     setMessages((m) => [
       ...m,
@@ -496,8 +522,9 @@ export default function AppResume() {
 
     const handle = (event) => {
       if (event.type === 'phase') setLivePhase(event.phase);
-      else if (event.type === 'token')
-        setLiveText((t) => (t + event.text).slice(-4000));
+      else if (event.type === 'activity') {
+        setLiveActivities((current) => upsertActivity(current, event.activity));
+      }
       else if (event.type === 'result') {
         const s = acceptSession(event.session);
         setTemplateKey(s.templateKey || '');
@@ -532,7 +559,7 @@ export default function AppResume() {
     } catch (e) {
       setError(e);
     } finally {
-      setLiveText('');
+      setLiveActivities([]);
       setLivePhase(null);
       setPhase('ready');
     }
@@ -577,6 +604,38 @@ export default function AppResume() {
       setError(e);
     } finally {
       setPhase('ready');
+    }
+  };
+
+  const runAts = async () => {
+    if (!session?.revision || sessionOver || atsBusy) return;
+    const description = (session.jobDescription || jobDescription).trim();
+    if (!description) return;
+    setAtsBusy(true);
+    setAtsWarning('');
+    try {
+      const logicalSession = ats || await startAtsSession({
+        resumeSessionId: session.id,
+        sourceRevision: session.revision,
+        jobDescription: description,
+      });
+      setAts(logicalSession);
+      const analysis = await runAtsSession(logicalSession.id);
+      setAts(analysis);
+      if (analysis.status === 'failed') {
+        setAtsWarning(
+          analysis.unavailableReason ||
+            'ATS analysis is temporarily unavailable. Your résumé is still saved and editable.',
+        );
+      }
+    } catch (e) {
+      setAtsWarning(
+        e?.message
+          ? `ATS analysis is temporarily unavailable: ${e.message}`
+          : 'ATS analysis is temporarily unavailable. Your résumé is still saved and editable.',
+      );
+    } finally {
+      setAtsBusy(false);
     }
   };
 
@@ -730,7 +789,7 @@ export default function AppResume() {
               session,
               sessionOver,
               messages,
-              liveText,
+              liveActivities,
               livePhase,
               transcriptRef,
               instruction,
@@ -748,6 +807,13 @@ export default function AppResume() {
               revertLook,
               chooseOtherHarness,
               restoreRevision,
+              ats,
+              atsBusy,
+              atsWarning,
+              runAts,
+              atsJobDescription: session.jobDescription || jobDescription,
+              atsJobUrl: session.jobUrl || jobUrl,
+              jobContextWarning: session.jobContextWarning,
             }}
           />
         )}
@@ -763,6 +829,48 @@ function sessionTime(value) {
         timeStyle: 'short',
       })
     : 'Time unavailable';
+}
+
+function sessionMessages(session) {
+  if (session.conversation?.length) {
+    return session.conversation.map((message) => {
+      const turn = message.revision == null
+        ? null
+        : (session.turns || []).find((candidate) => candidate.revision === message.revision);
+      return {
+        role: message.role === 'user' ? 'you' : 'agent',
+        text: message.text,
+        revision: message.revision,
+        compiled: turn?.compiled,
+      };
+    });
+  }
+  return (session.turns || []).flatMap((turn) => [
+    {
+      role: 'you',
+      text:
+        turn.instruction ||
+        (turn.kind === 'restore'
+          ? `Restore revision ${turn.restoredFromRevision}.`
+          : 'Change the look.'),
+    },
+    {
+      role: 'agent',
+      text: turn.summary || 'Résumé updated.',
+      compiled: turn.compiled,
+      revision: turn.revision,
+    },
+  ]);
+}
+
+function upsertActivity(current, activity) {
+  if (!activity?.label) return current;
+  const id = activity.id || activity.label;
+  const index = current.findIndex((item) => (item.id || item.label) === id);
+  if (index === -1) return [...current, activity].slice(-12);
+  const next = [...current];
+  next[index] = { ...next[index], ...activity };
+  return next;
 }
 
 /* ------------------------------------------------------------------ setup --- */
@@ -1261,7 +1369,7 @@ function Workspace(p) {
           }}
         >
           <div style={{ fontSize: 13.5, fontWeight: 600, color: '#9a6a2e', marginBottom: 6 }}>
-            This compiled, but it still reads as a template
+            This compiled, but it is not ready to publish
           </div>
           <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: T.fg2, lineHeight: 1.6 }}>
             {session.contentWarnings.map((w, i) => (
@@ -1269,8 +1377,9 @@ function Workspace(p) {
             ))}
           </ul>
           <p style={{ fontSize: 12.5, color: T.fg3, margin: '9px 0 0', lineHeight: 1.5 }}>
-            Ask for it again, or try a stronger model — the agent left
-            placeholder text in the document.
+            {p.pdfBase64
+              ? 'This preview is a working draft. Replace its placeholders with real career details before publishing.'
+              : 'The preview is withheld until the document has real career content. Import a résumé or add the missing facts in Settings, then generate again.'}
           </p>
         </div>
       )}
@@ -1284,6 +1393,17 @@ function Workspace(p) {
           revertLook={p.revertLook}
         />
       )}
+
+      <AtsPanel
+        session={session}
+        result={p.ats}
+        busy={p.atsBusy}
+        warning={p.atsWarning}
+        jobDescription={p.atsJobDescription}
+        jobUrl={p.atsJobUrl}
+        jobContextWarning={p.jobContextWarning}
+        run={p.runAts}
+      />
 
       <div
         style={{
@@ -1347,26 +1467,31 @@ function Workspace(p) {
                   />
                   {PHASE_COPY[p.livePhase] || 'Working…'}
                 </div>
-                {p.liveText && (
-                  <pre
-                    data-testid="live-tokens"
+                {p.liveActivities?.length > 0 && (
+                  <div
+                    data-testid="activity-log"
                     style={{
                       margin: '8px 0 0',
-                      padding: 12,
+                      padding: '9px 11px',
                       background: T.sunk,
                       border: `1px solid ${T.line}`,
                       borderRadius: 3,
-                      fontFamily: T.mono,
                       fontSize: 11.5,
                       lineHeight: 1.55,
                       color: T.fg3,
-                      whiteSpace: 'pre-wrap',
                       maxHeight: 220,
                       overflow: 'auto',
                     }}
                   >
-                    {p.liveText}
-                  </pre>
+                    {p.liveActivities.map((activity) => (
+                      <div key={activity.id || activity.label} style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+                        <span aria-hidden="true" style={{ color: activity.status === 'error' ? '#b45b4c' : T.accent }}>
+                          {activity.status === 'completed' ? '✓' : activity.status === 'error' ? '×' : '·'}
+                        </span>
+                        <span>{activity.label}</span>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             )}
@@ -1499,6 +1624,107 @@ function Workspace(p) {
         </section>
       </div>
     </>
+  );
+}
+
+function AtsPanel({ session, result, busy, warning, jobDescription, jobUrl, jobContextWarning, run }) {
+  const stale = Boolean(result && result.sourceRevision !== session.revision);
+  const completed = result?.status === 'completed';
+  const goodToSubmit = completed && result.semanticMatch > 70;
+  const canRun = session.status === 'active'
+    && session.revision > 0
+    && Boolean(jobDescription?.trim())
+    && !busy;
+  const missingContext = session.revision > 0
+    && !jobDescription?.trim()
+    && !jobUrl?.trim();
+  const visibleWarning = jobContextWarning || (missingContext
+    ? 'Add a job description or job URL to run ATS matching. You can continue working on the résumé without it.'
+    : warning);
+
+  return (
+    <section
+      data-testid="ats-panel"
+      style={{
+        background: T.panel,
+        border: `1px solid ${stale ? '#e0b970' : T.line}`,
+        borderRadius: 3,
+        padding: 18,
+        marginBottom: 18,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 18, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 260 }}>
+          <div style={{ ...label, marginBottom: 7 }}>ATS match</div>
+          <p style={{ margin: 0, color: T.fg2, fontSize: 13.5, lineHeight: 1.55 }}>
+            Score this exact résumé revision against the job description in the same agent sandbox.
+          </p>
+          {!session.revision && (
+            <p style={{ margin: '8px 0 0', color: T.fg3, fontSize: 12.5 }}>Generate the résumé before running an analysis.</p>
+          )}
+          {visibleWarning && (
+            <p data-testid="ats-job-warning" style={{ margin: '8px 0 0', color: '#9a6a2e', fontSize: 12.5 }}>{visibleWarning}</p>
+          )}
+          {session.status !== 'active' && (
+            <p style={{ margin: '8px 0 0', color: T.fg3, fontSize: 12.5 }}>Saved results remain available. Continue from here to run it again.</p>
+          )}
+          {stale && (
+            <p data-testid="ats-stale" style={{ margin: '8px 0 0', color: '#9a6a2e', fontSize: 12.5, fontWeight: 600 }}>
+              This result is for revision {result.sourceRevision}; the résumé is now revision {session.revision}.
+            </p>
+          )}
+        </div>
+
+        {completed && (
+          <div style={{ textAlign: 'right', minWidth: 90 }}>
+            <div data-testid="ats-score" style={{ fontFamily: T.display, lineHeight: 1, color: T.fg, whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: 42 }}>{Math.round(result.semanticMatch)}</span>
+              <span style={{ fontSize: 15, color: T.fg3 }}>/100</span>
+            </div>
+            <div
+              data-testid="ats-submit-guidance"
+              style={{ marginTop: 7, fontSize: 12.5, fontWeight: 600, color: goodToSubmit ? '#4f9b73' : '#9a6a2e' }}
+            >
+              {goodToSubmit ? 'Good to submit' : 'Improve before submitting'}
+            </div>
+            <div data-testid="ats-revision" style={{ ...label, marginTop: 5 }}>Revision {result.sourceRevision}</div>
+          </div>
+        )}
+        <button
+          data-testid="run-ats"
+          onClick={run}
+          disabled={!canRun}
+          style={{ ...primaryBtn, opacity: canRun ? 1 : 0.45 }}
+        >
+          {busy ? 'Analyzing…' : completed ? 'Refresh ATS analysis' : 'Analyze ATS match'}
+        </button>
+      </div>
+
+      {completed && (
+        <div style={{ marginTop: 16, paddingTop: 15, borderTop: `1px solid ${T.line}`, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 18 }}>
+          <div>
+            <div style={{ ...label, marginBottom: 7 }}>Breakdown</div>
+            <div style={{ fontSize: 12.5, color: T.fg2, lineHeight: 1.7 }}>
+              <div>Keywords · {Math.round(result.subScores?.keywordMatch ?? 0)}</div>
+              <div>Skills · {Math.round(result.subScores?.skillsCoverage ?? 0)}</div>
+              <div>Sections · {Math.round(result.subScores?.sectionCompleteness ?? 0)}</div>
+            </div>
+          </div>
+          <div data-testid="ats-gaps">
+            <div style={{ ...label, marginBottom: 7 }}>Missing keywords</div>
+            <p style={{ margin: 0, fontSize: 12.5, color: T.fg2, lineHeight: 1.6 }}>
+              {result.keywordGaps?.length ? result.keywordGaps.join(', ') : 'No material gaps found.'}
+            </p>
+          </div>
+          <div data-testid="ats-suggestions">
+            <div style={{ ...label, marginBottom: 7 }}>Recommendations</div>
+            <ul style={{ margin: 0, paddingLeft: 17, fontSize: 12.5, color: T.fg2, lineHeight: 1.6 }}>
+              {(result.suggestions || []).map((item) => <li key={item}>{item}</li>)}
+            </ul>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 

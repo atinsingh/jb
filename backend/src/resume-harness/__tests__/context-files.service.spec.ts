@@ -33,6 +33,15 @@ describe('ContextFilesService', () => {
     expect(agents).toMatch(/edit .*resume\.tex in place/i);
   });
 
+  it('requires a useful conversational response and edits only when requested', () => {
+    const agents = fileNamed('codex', 'AGENTS.md')!.contents;
+
+    expect(agents).toMatch(/answer.*question/i);
+    expect(agents).toMatch(/only edit.*resume\.tex.*request/i);
+    expect(agents).toMatch(/what (?:you )?changed/i);
+    expect(agents).not.toMatch(/one-line summary/i);
+  });
+
   it('gives Claude Code a CLAUDE.md that imports AGENTS.md instead of copying it', () => {
     expect(fileNames('claude-code').sort()).toEqual(['AGENTS.md', 'CLAUDE.md']);
 
@@ -107,6 +116,16 @@ describe('ContextFilesService — candidate facts', () => {
       /existing[\s\S]*not a[\s\S]*source of factual truth/i,
     );
     expect(agents).toMatch(/exact source line/i);
+  });
+
+  it('requires a labeled placeholder draft when the profile has identity but no career facts', () => {
+    const agents = service
+      .filesFor('opencode', input)
+      .find((f) => f.path === 'AGENTS.md')!.contents;
+
+    expect(agents).toMatch(/placeholder draft/i);
+    expect(agents).toMatch(/summary[\s\S]*experience[\s\S]*skills[\s\S]*education/i);
+    expect(agents).toMatch(/never[\s\S]*job description[\s\S]*candidate facts/i);
   });
 
   it('omits the file entirely when there are no facts to give', () => {

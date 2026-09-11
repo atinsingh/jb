@@ -2,6 +2,7 @@ import {
   HarnessAdapter,
   HarnessBootstrap,
   HarnessBootstrapInput,
+  HarnessOutput,
   LITELLM_TAG_HEADER,
   PROMPT_PLACEHOLDER,
   ResolvedModelAlias,
@@ -62,6 +63,10 @@ export class OpenCodeHarness implements HarnessAdapter {
         '--auto',
         // User-level plugins would make identical sandboxes behave differently.
         '--pure',
+        // JSONL separates intermediate text, tool use and the final response.
+        // The service exposes tool activity live and saves only the final text.
+        '--format',
+        'json',
         PROMPT_PLACEHOLDER,
       ],
       proxyHeaders: harnessProxyHeaders(this.id),
@@ -70,6 +75,46 @@ export class OpenCodeHarness implements HarnessAdapter {
 
   turnCommand(bootstrap: HarnessBootstrap, prompt: string): string[] {
     return fillPrompt(bootstrap.command, prompt);
+  }
+
+  parseOutput(stdout: string): HarnessOutput {
+    const text: string[] = [];
+    const activities = new Map<string, HarnessOutput['activities'][number]>();
+
+    for (const line of stdout.split(/\r?\n/)) {
+      if (!line.trim()) continue;
+      try {
+        const event = JSON.parse(line);
+        const part = event?.part;
+        if (event?.type === 'text' && part?.type === 'text' && part.text?.trim()) {
+          text.push(part.text.trim());
+        }
+        if (event?.type === 'tool_use' && part?.type === 'tool') {
+          const eventId = part.callID || part.id;
+          const id = String(eventId || `${activities.size}`);
+          const status = ['pending', 'running', 'completed', 'error'].includes(part.state?.status)
+            ? part.state.status
+            : undefined;
+          activities.set(id, {
+            ...(eventId ? { id } : {}),
+            label: String(part.state?.title || this.toolLabel(part.tool)).slice(0, 240),
+            status,
+          });
+        }
+      } catch {
+        // OpenCode may place a diagnostic on stdout. It is not assistant text.
+      }
+    }
+
+    return {
+      response: text.at(-1),
+      activities: [...activities.values()],
+    };
+  }
+
+  private toolLabel(tool: unknown): string {
+    const name = String(tool || 'tool').replace(/[_-]+/g, ' ');
+    return `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
   }
 
   private config(baseUrl: string, alias: ResolvedModelAlias): string {

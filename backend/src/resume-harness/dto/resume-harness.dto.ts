@@ -82,6 +82,15 @@ export class StartSessionDto {
 
   @ApiPropertyOptional({
     description:
+      'Public job-posting URL used when no description is pasted. Fetch and extraction failures are non-blocking.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  jobUrl?: string;
+
+  @ApiPropertyOptional({
+    description:
       'Template to write to. Omitted means the carried session’s template, ' +
       'then the catalogue default.',
   })

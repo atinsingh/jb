@@ -97,6 +97,17 @@ export interface HarnessBootstrap {
   proxyHeaders: Record<string, string>;
 }
 
+export interface HarnessActivity {
+  id?: string;
+  label: string;
+  status?: 'pending' | 'running' | 'completed' | 'error';
+}
+
+export interface HarnessOutput {
+  response?: string;
+  activities: HarnessActivity[];
+}
+
 /** Substituted with the turn's instruction when the command is executed. */
 export const PROMPT_PLACEHOLDER = '__JOBOCATE_PROMPT__';
 
@@ -112,6 +123,8 @@ export interface HarnessAdapter {
   bootstrap(input: HarnessBootstrapInput): HarnessBootstrap;
   /** Fills the prompt into the bootstrap command for one turn. */
   turnCommand(bootstrap: HarnessBootstrap, prompt: string): string[];
+  /** Separates user-facing output from structured tool activity when supported. */
+  parseOutput?(stdout: string): HarnessOutput;
 }
 
 /** The tag every proxy request from `id` carries. */

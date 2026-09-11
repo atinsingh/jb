@@ -59,9 +59,12 @@ import {
   UserPreferencesSchema,
 } from '../schemas/user-preferences.schema';
 import { ResumeSandboxReaperService } from './resume-sandbox-reaper.service';
+import { IngestionModule } from '../ingestion/ingestion.module';
+import { JobDescriptionResolverService } from './job-description-resolver.service';
 
 @Module({
   imports: [
+    IngestionModule,
     MongooseModule.forFeature([
       { name: ResumeHarnessSession.name, schema: ResumeHarnessSessionSchema },
       { name: HarnessModelAlias.name, schema: HarnessModelAliasSchema },
@@ -80,9 +83,10 @@ import { ResumeSandboxReaperService } from './resume-sandbox-reaper.service';
     HarnessRegistry,
     SandboxService,
     ResumeSandboxReaperService,
+    JobDescriptionResolverService,
     { provide: SANDBOX_DRIVER, useFactory: sandboxDriverFactory },
     LatexService,
   ],
-  exports: [ResumeHarnessService, ModelAliasService, ResumeTemplateService],
+  exports: [ResumeHarnessService, ModelAliasService, ResumeTemplateService, SandboxService],
 })
 export class ResumeHarnessModule {}

@@ -74,6 +74,7 @@ const SESSION = {
   id: 'sess-e2e-1',
   name: 'Backend engineer résumé',
   targetRole: 'Backend Engineer',
+  jobDescription: '',
   harness: 'codex',
   harnessLabel: 'Codex',
   sandboxId: 'sbx-e2e-1',
@@ -87,6 +88,7 @@ const SESSION = {
   revision: 0,
   revisionCount: 0,
   turns: [] as any[],
+  conversation: [] as any[],
   hasCurrentPdf: false,
   updatedAt: '2026-09-09T12:00:00.000Z',
   compiled: false,
@@ -159,8 +161,8 @@ const TEMPLATES = [
 const V1 = '\\documentclass{article}\n\\begin{document}\nJordan Reyes — Backend Engineer\n\\end{document}';
 const V2 = `${V1.replace('\\end{document}', '')}\\section*{Kubernetes}\n\\end{document}`;
 
-/** A one-byte PDF: enough to assert a preview renders, not to lay one out. */
-const PDF = 'JVBERi0xLjcK';
+/** One-page PDF with hand-checked dark text, so a white canvas cannot pass. */
+const PDF = 'JVBERi0xLjcKJYGBgYEKCjYgMCBvYmoKPDwKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL0xlbmd0aCAxNzYKPj4Kc3RyZWFtCnicdc69CgIxDADgPU/RWRDTXH5aEMHzThxchL6AiIqiw4n4/KaHi6CkCaUJzTdAWwBDjccZZpvj7XV8Xg77qWFOnNBSDjGFcgLiULYQx9EYjPxgKHeY81LXRsoatScUUrHs2RBSR8iNrrwvyn4X7dU0exWfoEUoVygT6AvsYPgnycakiURTiPRTovkjiWJS96Jw/d9VUXXUdfWVW3dUH1WB8UfpRs609spfojcS1z2/CmVuZHN0cmVhbQplbmRvYmoKCjcgMCBvYmoKPDwKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL1R5cGUgL09ialN0bQovTiA1Ci9GaXJzdCAyNgovTGVuZ3RoIDM3NAo+PgpzdHJlYW0KeJzVUlFLwzAQfs+vuEd9kFzTLmlkDOa2KshQNkFRfKhtGBVJpM1k/nvv2s3hg/gs5Uju7rvLd70vAQQFWQYpmBwyGKUKRmBSC+OxkHef7w7kbblxnZDXTd3BE2EQVvAs5CxsfYRETCbiiJ2VsXwLGzEUQcLgA+K2DfW2ci2Mi0VRIBpE1BmZRlRzOmdklkyRTzmV053MZHujmEkR0ynlisG0GWo432NH+/oFnYTVjJkP2Cwf/O93+a3F0EP9xcdOhFyGel5GByfzc4VKo00wyVOL6vGUfkfryhj+73A9/yb4Xyf8sWdeLy+5dayBfsty5bqwbStaO+OKQBm+XLm3DxebqjwzaHPiaXJLGutLjjlrMqVzNdL5PkfPyYebl1dX9W3YXezi5ToyvyHAsaWrm/Ii7EiZSJ9OFBirWJ9T70NkxfZa9ZGYsqf3+v0xDpMVcr19ib3LwUTIi7Jz/RhHnkTCV6Fu/AbkfeOnvmsOAe74Bbw+zSsKZW5kc3RyZWFtCmVuZG9iagoKOCAwIG9iago8PAovU2l6ZSA5Ci9Sb290IDIgMCBSCi9JbmZvIDMgMCBSCi9GaWx0ZXIgL0ZsYXRlRGVjb2RlCi9UeXBlIC9YUmVmCi9MZW5ndGggNDEKL1cgWyAxIDIgMiBdCi9JbmRleCBbIDAgOSBdCj4+CnN0cmVhbQp4nBXEwQ0AIAwDsUuKhPix/37M0RI/DHSbDUnJqdISF6Tz84MBXKIDOgplbmRzdHJlYW0KZW5kb2JqCgpzdGFydHhyZWYKNzQxCiUlRU9G';
 
 /** Serialises a turn as the SSE frames the screen actually consumes. */
 const sse = (session: unknown): string =>
@@ -174,16 +176,28 @@ const sse = (session: unknown): string =>
 async function stubHarnessApi(page: Page) {
   let turns = 0;
   let exists = false;
+  let ats: any = null;
   // The stub holds session state because the screen's whole job here is to keep
   // one session moving — a stub that answered every call identically could not
   // tell a template switch from a no-op.
   let state = { ...SESSION, templateKey: 'classic-serif', vibe: { density: 'balanced', order: 'experience-first' }, canRevert: false };
   let snapshot: typeof state | null = null;
 
+  // Keep this UI-contract stub independent from a locally running Nest app;
+  // AuthContext loads the candidate envelope on every protected page.
+  await page.route('**/api/auth/me', (route: Route) =>
+    route.fulfill({ json: { user: { id: 'candidate-e2e-1', role: 'ROLE_CANDIDATE' } } }),
+  );
+
   const turn = (patch: Record<string, unknown>) => {
     turns += 1;
     state = { ...state, ...patch, revision: turns, revisionCount: turns, compiled: true, hasCurrentPdf: true } as typeof state;
     state.turns = [...state.turns, { ...patch, revision: turns, latex: state.latex, compiled: true, hasPdf: true, kind: 'instruction', createdAt: SESSION.updatedAt }];
+    state.conversation = [
+      ...state.conversation,
+      { role: 'user', text: String(patch.instruction || ''), createdAt: SESSION.updatedAt },
+      { role: 'assistant', text: String(patch.summary || 'Résumé updated.'), revision: turns, createdAt: SESSION.updatedAt },
+    ];
     return { ...state, pdfBase64: PDF };
   };
 
@@ -202,6 +216,11 @@ async function stubHarnessApi(page: Page) {
     state = {
       ...state,
       status: 'active',
+      jobUrl: body.jobUrl || '',
+      jobDescription:
+        body.jobDescription ||
+        (body.jobUrl ? 'Extracted Platform Engineer role requiring Kubernetes and Terraform.' : ''),
+      jobContextWarning: undefined,
       templateKey: body.templateKey || 'classic-serif',
       vibe: body.vibe || state.vibe,
       canRevert: false,
@@ -209,19 +228,43 @@ async function stubHarnessApi(page: Page) {
     await route.fulfill({ status: 201, json: state });
   });
 
-  await page.route('**/api/resume-harness/sessions/*/turns/stream', (route: Route) =>
-    route.fulfill({
+  await page.route('**/api/resume-harness/sessions/*/turns/stream', (route: Route) => {
+    const instruction = route.request().postDataJSON().instruction;
+    if (/what else can you do/i.test(instruction)) {
+      state = {
+        ...state,
+        conversation: [
+          ...state.conversation,
+          { role: 'user', text: instruction, createdAt: SESSION.updatedAt },
+          {
+            role: 'assistant',
+            text: 'I can tailor your summary, prioritize factual experience, and tighten the layout. Tell me which role or accomplishment you want to emphasize.',
+            createdAt: SESSION.updatedAt,
+          },
+        ],
+      };
+      return route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: sse({
+          ...state,
+          summary: state.conversation.at(-1).text,
+          documentChanged: false,
+        }),
+      });
+    }
+    return route.fulfill({
       status: 200,
       contentType: 'text/event-stream',
       body: sse(
         turn({
-          instruction: route.request().postDataJSON().instruction,
+          instruction,
           latex: turns === 0 ? V1 : V2,
           summary: turns === 0 ? 'Created resume.tex.' : 'Added a Kubernetes section.',
         }),
       ),
-    }),
-  );
+    });
+  });
 
   await page.route(
     '**/api/resume-harness/sessions/*/template/stream',
@@ -317,6 +360,46 @@ async function stubHarnessApi(page: Page) {
     const revision = Number(route.request().url().split('/').at(-2));
     const source = state.turns.find((entry) => entry.revision === revision);
     return route.fulfill({ json: turn({ ...source, kind: 'restore', restoredFromRevision: revision, summary: `Restored revision ${revision}.` }) });
+  });
+
+  await page.route('**/api/ats/resume-sessions/*/latest', (route: Route) =>
+    route.fulfill({ json: ats }),
+  );
+
+  await page.route('**/api/ats/sessions', (route: Route) => {
+    const body = route.request().postDataJSON();
+    ats = {
+      id: 'ats-e2e-1',
+      resumeSessionId: state.id,
+      sourceRevision: body.sourceRevision,
+      currentRevision: state.revision,
+      stale: false,
+      status: 'ready',
+      harness: state.harness,
+      alias: state.alias,
+    };
+    return route.fulfill({ status: 201, json: ats });
+  });
+
+  await page.route('**/api/ats/sessions/*/run', (route: Route) => {
+    ats = {
+      ...ats,
+      sourceRevision: state.revision,
+      currentRevision: state.revision,
+      stale: false,
+      status: 'completed',
+      semanticMatch: 78.5,
+      subScores: {
+        keywordMatch: 72.5,
+        skillsCoverage: 81,
+        sectionCompleteness: 90,
+      },
+      keywordGaps: ['Kubernetes', 'Terraform'],
+      injectableKeywords: ['Kubernetes'],
+      suggestions: ['Add Kubernetes to a factual project bullet.'],
+      analyzedAt: '2026-09-09T12:30:00.000Z',
+    };
+    return route.fulfill({ json: ats });
   });
 }
 
@@ -419,7 +502,8 @@ test.describe('résumé session history', () => {
     await expect(page.getByTestId('session-revision')).toHaveText('2');
     await page.getByTestId('end-session').click();
     await page.goto(`/app/resume?session=${SESSION.id}`, { waitUntil: 'domcontentloaded' });
-    await expect(page.getByTestId('pdf-preview')).toHaveAttribute('src', `data:application/pdf;base64,${PDF}`);
+    await expect(page.getByTestId('pdf-preview')).toBeVisible();
+    await expect(page.locator('iframe[data-testid="pdf-preview"]')).toBeVisible();
     await expect(page.getByTestId('instruction')).toHaveCount(0);
     await expect(page.getByTestId('look-toggle')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Continue from here' })).toBeVisible();
@@ -544,6 +628,130 @@ test.describe('LaTeX résumé — agent harness', () => {
     await expect(page.getByTestId('turn-summary').last()).toContainText('Kubernetes');
 
     await expectNoHorizontalOverflow(page, 'resume');
+  });
+
+  test('scores the current revision in the same workspace and marks it stale after an edit', async ({ page }) => {
+    await stubHarnessApi(page);
+    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
+
+    await page.getByTestId('job-description').fill('Backend engineer with Kubernetes and Terraform experience.');
+    await page.getByTestId('start-session').click();
+    await page.getByTestId('instruction').fill('Build the résumé.');
+    await page.getByTestId('send-instruction').click();
+
+    await page.getByTestId('run-ats').click();
+    await expect(page.getByTestId('ats-score')).toHaveText('79');
+    await expect(page.getByTestId('ats-gaps')).toContainText('Kubernetes');
+    await expect(page.getByTestId('ats-suggestions')).toContainText(
+      'Add Kubernetes to a factual project bullet.',
+    );
+
+    await page.getByTestId('instruction').fill('Make the summary shorter.');
+    await page.getByTestId('send-instruction').click();
+    await expect(page.getByTestId('ats-stale')).toBeVisible();
+
+    await page.getByTestId('run-ats').click();
+    await expect(page.getByTestId('ats-stale')).toHaveCount(0);
+    await expect(page.getByTestId('ats-revision')).toHaveText('Revision 2');
+  });
+
+  test('treats an empty successful latest ATS response as not yet analyzed, not an outage', async ({ page }) => {
+    await stubHarnessApi(page);
+    await page.route('**/api/ats/resume-sessions/*/latest', (route: Route) =>
+      route.fulfill({ status: 200, body: '' }),
+    );
+    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
+
+    await page.getByTestId('job-description').fill('Backend engineer with Kubernetes experience.');
+    await page.getByTestId('start-session').click();
+    await page.getByTestId('instruction').fill('Build the résumé.');
+    const latest = page.waitForResponse((response) =>
+      /\/api\/ats\/resume-sessions\/.*\/latest/.test(response.url()),
+    );
+    await page.getByTestId('send-instruction').click();
+    await latest;
+
+    await expect(page.getByTestId('ats-job-warning')).toHaveCount(0, { timeout: 2_000 });
+    await expect(page.getByTestId('run-ats')).toHaveText('Analyze ATS match');
+  });
+
+  test('uses a job URL when pasted text is absent and does not show the missing-context warning', async ({ page }) => {
+    await stubHarnessApi(page);
+    let startBody: any;
+    await page.route('**/api/resume-harness/sessions', async (route: Route) => {
+      if (route.request().method() === 'POST') startBody = route.request().postDataJSON();
+      await route.fallback();
+    });
+    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
+
+    await page.getByTestId('job-url').fill('https://jobs.example.com/platform-engineer');
+    await page.getByTestId('start-session').click();
+    await page.getByTestId('instruction').fill('Build the résumé.');
+    await page.getByTestId('send-instruction').click();
+
+    expect(startBody).toMatchObject({
+      jobUrl: 'https://jobs.example.com/platform-engineer',
+    });
+    expect(startBody.jobDescription).toBeUndefined();
+    await expect(page.getByTestId('ats-job-warning')).toHaveCount(0);
+    await expect(page.getByTestId('run-ats')).toBeEnabled();
+  });
+
+  test('shows one non-fatal warning and no error when job context and ATS history are unavailable', async ({ page, guards }) => {
+    await stubHarnessApi(page);
+    guards.allowFailures(/\/api\/ats\/resume-sessions\/.*\/latest/);
+    guards.allowConsoleErrors();
+    await page.route('**/api/ats/resume-sessions/*/latest', (route: Route) =>
+      route.fulfill({ status: 503, json: { message: 'ATS service unavailable' } }),
+    );
+    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
+
+    await page.getByTestId('start-session').click();
+    await page.getByTestId('instruction').fill('Build the résumé.');
+    await page.getByTestId('send-instruction').click();
+
+    await expect(page.getByTestId('ats-job-warning')).toHaveCount(1);
+    await expect(page.getByTestId('ats-job-warning')).toContainText(/job description or job URL/i);
+    await expect(page.getByTestId('ats-error')).toHaveCount(0);
+    await expect(page.getByTestId('harness-error')).toHaveCount(0);
+  });
+
+  test('keeps questions conversational and creates revisions only for document changes', async ({ page }) => {
+    await stubHarnessApi(page);
+    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
+    await page.getByTestId('start-session').click();
+    await page.getByTestId('instruction').fill('Build the résumé.');
+    await page.getByTestId('send-instruction').click();
+    await expect(page.getByTestId('session-revision')).toHaveText('1');
+
+    await page.getByTestId('instruction').fill('What else can you do?');
+    await page.getByTestId('send-instruction').click();
+
+    const reply = page.getByTestId('turn-summary').last();
+    await expect(reply).toContainText('I can tailor your summary');
+    await expect(reply).not.toContainText(/revision 1/i);
+    await expect(page.getByTestId('session-revision')).toHaveText('1');
+    await expect(page.getByTestId('revision-history')).toContainText('Revision history (1)');
+  });
+
+  test('uses the native PDF viewer instead of rasterizing revision canvases', async ({ page }) => {
+    await stubHarnessApi(page);
+    await page.goto('/app/resume', { waitUntil: 'domcontentloaded' });
+    await page.getByTestId('start-session').click();
+    await page.getByTestId('instruction').fill('Build the résumé.');
+    await page.getByTestId('send-instruction').click();
+
+    const preview = page.locator('iframe[data-testid="pdf-preview"]');
+    await expect(preview).toBeVisible();
+    await expect(preview).toHaveAttribute('src', /^data:application\/pdf;base64,/);
+    await expect(page.locator('[data-testid^="pdf-page-"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="pdf-preview"] canvas')).toHaveCount(0);
+
+    await page.getByTestId('instruction').fill('Tighten the summary.');
+    await page.getByTestId('send-instruction').click();
+    await expect(page.getByTestId('session-revision')).toHaveText('2');
+    await expect(preview).toBeVisible();
+    await expect(page.locator('[data-testid^="pdf-page-"]')).toHaveCount(0);
   });
 
   test('offers a new session instead of a harness switch, and degrades when the platform is down', async ({

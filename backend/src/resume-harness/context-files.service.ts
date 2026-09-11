@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { HarnessContextFile, HarnessId } from './harness/harness.types';
+import { hasCareerEvidence } from './latex/content-guard';
 
 /** One resolved knob choice, with the sentence the harness is given for it. */
 export interface LookDirective {
@@ -101,10 +102,21 @@ export class ContextFilesService {
   /** The rules every harness follows, byte-identical for all three. */
   sharedRules(input: SharedRulesInput): string {
     const { texPath, pdfPath, buildCommand, workdir } = input;
+    const sectionRule = hasCareerEvidence(input.candidateMarkdown) === false
+      ? `- CANDIDATE.md has identity but no career facts. In this case, create and
+  maintain a clearly labeled placeholder draft with Summary, Experience, Skills,
+  and Education sections so the candidate can fill them later. Placeholder text
+  is scaffolding, not a factual claim. Never turn the job description into
+  candidate facts, and never imply that its requirements are their experience.`
+      : `- A section named Experience, Education, Skills, Certifications or Achievements
+  is allowed only when CANDIDATE.md contains that section. A professional
+  Summary is allowed only when the profile contains career evidence to
+  summarize. Otherwise leave the section out.`;
     return `# Resume agent rules
 
-You maintain one LaTeX resume in this workspace. You are not a chat assistant:
-finish the edit, leave the workspace compiling, and stop.
+You are the candidate's résumé agent and collaborator. Maintain one LaTeX
+resume in this workspace, answer questions about it clearly, and make requested
+edits without turning every conversation into a document change.
 
 ## Files
 
@@ -134,6 +146,19 @@ do not work around a broken package by deleting the section that uses it.
   not ask you to touch. Never regenerate the file from scratch to satisfy a
   small change, and never renumber or reorder supported sections you were not
   asked about.
+- Only edit ${texPath} when the candidate requests a résumé change. If the
+  instruction is a question, asks what you can do, or requests advice, inspect
+  the workspace and answer the question without rewriting the document.
+
+## Response contract
+
+- Speak directly to the candidate in a useful, conversational response.
+- When you changed the résumé, explain what you changed and why it helps.
+- When you did not change it, answer the question and suggest a concrete next
+  step when one is useful.
+- Mention a build problem only when one remains unresolved. Do not reduce a
+  successful response to "build succeeded" or "done".
+- Keep the response concise, usually two to five sentences or a short list.
 
 ## Content rules
 
@@ -145,10 +170,7 @@ do not work around a broken package by deleting the section that uses it.
   source of factual truth: a claim does not become valid because an earlier
   model wrote it. Do not invent employers, roles, dates, degrees, skills,
   certifications, metrics or professional characterizations.
-- A section named Experience, Education, Skills, Certifications or Achievements
-  is allowed only when CANDIDATE.md contains that section. A professional
-  Summary is allowed only when the profile contains career evidence to
-  summarize. Otherwise leave the section out.
+${sectionRule}
 - Before finishing, audit every factual claim in ${texPath}. For each claim you
   must be able to identify its exact source line in CANDIDATE.md or the current
   instruction. Delete any claim you cannot trace. Do this silently; do not put
@@ -249,7 +271,7 @@ belong below.
   preamble details the shared rules require you to preserve.
 - Do not ask for permission or propose a plan; the sandbox is the boundary and
   no human is watching this turn.
-- Reply with a one-line summary of what changed. No preamble, no file dumps.
+- Follow the shared response contract. No file dumps or internal tool logs.
 `;
   }
 }

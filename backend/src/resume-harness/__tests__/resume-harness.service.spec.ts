@@ -12,6 +12,7 @@ import { LatexService } from '../latex/latex.service';
 import { ResumeHarnessSession } from '../schemas/resume-harness-session.schema';
 import { LITELLM_TAG_HEADER } from '../harness/harness.types';
 import { StorageService } from '../../storage/storage.service';
+import { JobDescriptionResolverService } from '../job-description-resolver.service';
 
 /**
  * A minimally realistic résumé.
@@ -132,10 +133,28 @@ describe('ResumeHarnessService', () => {
 
   const candidateContext: any = {
     build: jest.fn(async () => ({
-      markdown: '# Candidate facts\n\n- Name: Jordan Reyes\n',
+      markdown: [
+        '# Candidate facts',
+        '',
+        '## Identity',
+        '',
+        '- Name: Jordan Reyes',
+        '',
+        '## Experience',
+        '',
+        '### Staff Engineer — Stripe',
+        '2019 – 2024',
+      ].join('\n'),
       missing: [],
       hasEnoughToGenerate: true,
       summary: { name: 'Jordan Reyes', roles: [] },
+    })),
+  };
+
+  const jobDescriptions: any = {
+    resolve: jest.fn(async () => ({
+      description: 'Platform Engineer\n\nBuild Kubernetes platforms with Terraform.',
+      finalUrl: 'https://jobs.example.com/platform-engineer',
     })),
   };
 
@@ -194,6 +213,7 @@ describe('ResumeHarnessService', () => {
         { provide: ModelAliasService, useValue: modelAlias },
         { provide: CandidateContextService, useValue: candidateContext },
         { provide: ResumeTemplateService, useValue: templates },
+        { provide: JobDescriptionResolverService, useValue: jobDescriptions },
       ],
     }).compile();
 
@@ -202,6 +222,55 @@ describe('ResumeHarnessService', () => {
 
   const start = (harness: any = 'claude-code') =>
     service.startSession('u1', { harness });
+
+  it('prefers pasted job text and does not fetch the supplied job URL', async () => {
+    const session = await service.startSession('u1', {
+      harness: 'codex',
+      jobUrl: 'https://jobs.example.com/platform-engineer',
+      jobDescription: 'Pasted role requirements',
+    });
+
+    expect(jobDescriptions.resolve).not.toHaveBeenCalled();
+    expect(session).toMatchObject({
+      jobUrl: 'https://jobs.example.com/platform-engineer',
+      jobDescription: 'Pasted role requirements',
+    });
+  });
+
+  it('extracts job text from a URL without blocking session creation', async () => {
+    const session = await service.startSession('u1', {
+      harness: 'codex',
+      jobUrl: 'https://jobs.example.com/platform-engineer',
+    });
+
+    expect(jobDescriptions.resolve).toHaveBeenCalledWith(
+      'https://jobs.example.com/platform-engineer',
+    );
+    expect(session).toMatchObject({
+      jobUrl: 'https://jobs.example.com/platform-engineer',
+      jobDescription:
+        'Platform Engineer\n\nBuild Kubernetes platforms with Terraform.',
+    });
+    expect(session.jobContextWarning).toBeUndefined();
+  });
+
+  it('starts normally and exposes one warning when URL extraction fails', async () => {
+    jobDescriptions.resolve.mockResolvedValueOnce({
+      finalUrl: 'https://jobs.example.com/protected',
+      warning: 'We could not read that job URL. Paste the description.',
+    });
+
+    const session = await service.startSession('u1', {
+      harness: 'codex',
+      jobUrl: 'https://jobs.example.com/protected',
+    });
+
+    expect(session.status).toBe('active');
+    expect(session.jobDescription).toBeUndefined();
+    expect(session.jobContextWarning).toBe(
+      'We could not read that job URL. Paste the description.',
+    );
+  });
 
   it('provisions exactly one sandbox per session and binds it to the session', async () => {
     const a = await start();
@@ -401,6 +470,24 @@ describe('ResumeHarnessService', () => {
     expect(LITELLM_TAG_HEADER).toBe('x-litellm-tags');
   });
 
+  it('gives in-sandbox ATS tooling the same LiteLLM route and credential as generation', async () => {
+    const oldUrl = process.env.RESUME_HARNESS_LITELLM_INTERNAL_URL;
+    const oldKey = process.env.RESUME_HARNESS_LITELLM_KEY;
+    process.env.RESUME_HARNESS_LITELLM_INTERNAL_URL = 'http://litellm:4000';
+    process.env.RESUME_HARNESS_LITELLM_KEY = 'sk-one-user-key';
+    try {
+      await start('codex');
+      const { env } = sandbox.provision.mock.calls[0][0];
+      expect(env.JOBOCATE_LITELLM_BASE_URL).toBe('http://litellm:4000');
+      expect(env.JOBOCATE_LITELLM_API_KEY).toBe('sk-one-user-key');
+    } finally {
+      if (oldUrl === undefined) delete process.env.RESUME_HARNESS_LITELLM_INTERNAL_URL;
+      else process.env.RESUME_HARNESS_LITELLM_INTERNAL_URL = oldUrl;
+      if (oldKey === undefined) delete process.env.RESUME_HARNESS_LITELLM_KEY;
+      else process.env.RESUME_HARNESS_LITELLM_KEY = oldKey;
+    }
+  });
+
   it('records the tier-resolved model and effort on the session', async () => {
     const session = await start();
     expect(modelAlias.resolveForUser).toHaveBeenCalledWith('u1', undefined);
@@ -443,6 +530,78 @@ describe('ResumeHarnessService', () => {
     expect(sandbox.provision).toHaveBeenCalledTimes(1);
     const execTargets = sandbox.exec.mock.calls.map((c: any[]) => c[0]);
     expect(new Set(execTargets)).toEqual(new Set(['sbx-1']));
+  });
+
+  it('records a conversational answer without creating a document revision', async () => {
+    const session = await start('opencode');
+    sandbox.readFile.mockResolvedValueOnce(resumeDoc('v1'));
+    await service.runTurn('u1', session.id, {
+      instruction: 'Build my résumé.',
+    });
+
+    sandbox.exec.mockResolvedValueOnce({
+      exitCode: 0,
+      stdout: [
+        JSON.stringify({ type: 'text', part: { type: 'text', text: 'I will inspect the résumé.' } }),
+        JSON.stringify({ type: 'tool_use', part: { type: 'tool', tool: 'read', state: { status: 'completed', title: 'Read resume.tex' } } }),
+        JSON.stringify({ type: 'text', part: { type: 'text', text: 'I can tailor the summary, reorder supported sections, and tighten the layout. Tell me which role you want to emphasize.' } }),
+      ].join('\n'),
+      stderr: '',
+    });
+    sandbox.readFile.mockResolvedValueOnce(resumeDoc('v1'));
+
+    const answer = await service.runTurn('u1', session.id, {
+      instruction: 'What else can you do?',
+    });
+
+    expect(answer.revision).toBe(1);
+    expect(answer.documentChanged).toBe(false);
+    expect(answer.summary).toContain('I can tailor the summary');
+    expect(answer.summary).toContain('Tell me which role');
+    expect(answer.summary).not.toContain('I will inspect');
+    expect(answer.turns).toHaveLength(1);
+    expect(answer.conversation.slice(-2)).toMatchObject([
+      { role: 'user', text: 'What else can you do?' },
+      {
+        role: 'assistant',
+        text: expect.stringContaining('I can tailor the summary'),
+        revision: undefined,
+      },
+    ]);
+    expect(latex.compile).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not create a revision or repeat a false success when repair restores the previous source', async () => {
+    const session = await start('opencode');
+    sandbox.readFile.mockResolvedValueOnce(resumeDoc('v1'));
+    await service.runTurn('u1', session.id, {
+      instruction: 'Build my résumé.',
+    });
+
+    sandbox.exec.mockResolvedValueOnce({
+      exitCode: 0,
+      stdout: JSON.stringify({
+        type: 'text',
+        part: {
+          type: 'text',
+          text: 'Done. I tailored the résumé and built the PDF.',
+        },
+      }),
+      stderr: '',
+    });
+    sandbox.readFile
+      .mockResolvedValueOnce(STUB)
+      .mockResolvedValueOnce(resumeDoc('v1'));
+
+    const result = await service.runTurn('u1', session.id, {
+      instruction: 'Tailor it more closely to the job.',
+    });
+
+    expect(result.revision).toBe(1);
+    expect(result.documentChanged).toBe(false);
+    expect(result.turns).toHaveLength(1);
+    expect(result.summary).toMatch(/saved resume\.tex is unchanged/i);
+    expect(result.summary).not.toMatch(/done|tailored the résumé/i);
   });
 
   it('treats the existing document as untrusted output on every update', async () => {
@@ -514,6 +673,45 @@ describe('ResumeHarnessService', () => {
     '\\end{document}',
   ].join('\n');
 
+  const PLACEHOLDER_DRAFT = [
+    '\\documentclass{article}',
+    '\\begin{document}',
+    'Jordan Reyes',
+    '\\section*{Summary}',
+    '[Your professional summary]',
+    '\\section*{Experience}',
+    '[Your role, company, dates, and achievements]',
+    '\\section*{Skills}',
+    '[Your skills]',
+    '\\section*{Education}',
+    '[Your degree and school]',
+    '\\end{document}',
+  ].join('\n');
+
+  it('preserves and renders a placeholder draft when the candidate has no career facts', async () => {
+    candidateContext.build.mockResolvedValueOnce({
+      markdown: '# Candidate facts\n\n## Identity\n\n- Name: Jordan Reyes\n',
+      missing: [],
+      optionalGaps: ['experience', 'education', 'skills'],
+      hasEnoughToGenerate: true,
+      summary: { name: 'Jordan Reyes', roles: [] },
+    });
+    const session = await start('opencode');
+    sandbox.readFile.mockResolvedValueOnce(PLACEHOLDER_DRAFT);
+
+    const result = await service.runTurn('u1', session.id, {
+      instruction: 'Generate my résumé based on the job description.',
+    });
+
+    expect(result.revision).toBe(1);
+    expect(result.documentChanged).toBe(true);
+    expect(result.latex).toContain('[Your professional summary]');
+    expect(result.pdfBase64).toBe('JVBER');
+    expect(result.hasCurrentPdf).toBe(true);
+    expect(result.contentWarnings.length).toBeGreaterThan(0);
+    expect(await service.getPdf('u1', session.id)).toBe('JVBERg==');
+  });
+
   it('treats a document that compiles but is still a placeholder as unfinished', async () => {
     const session = await start();
     sandbox.readFile.mockResolvedValueOnce(STUB);
@@ -532,7 +730,14 @@ describe('ResumeHarnessService', () => {
     expect(result.contentWarnings).toEqual([]);
   });
 
-  it('repairs a career summary that is unsupported by a sparse candidate profile', async () => {
+  it('does not publish a career summary from a sparse candidate profile', async () => {
+    candidateContext.build.mockResolvedValueOnce({
+      markdown: '# Candidate facts\n\n## Identity\n\n- Name: Jordan Reyes\n',
+      missing: [],
+      optionalGaps: ['experience', 'education', 'skills'],
+      hasEnoughToGenerate: true,
+      summary: { name: 'Jordan Reyes', roles: [] },
+    });
     const session = await start('opencode');
     const hallucinated = [
       '\\documentclass{article}',
@@ -561,7 +766,8 @@ describe('ResumeHarnessService', () => {
     expect(JSON.stringify(sandbox.exec.mock.calls[1])).toMatch(
       /no career evidence/i,
     );
-    expect(result.contentWarnings).toEqual([]);
+    expect(result.contentWarnings.join(' ')).toMatch(/no career facts/i);
+    expect(result.pdfBase64).toBeUndefined();
   });
 
   it('records the problem rather than claiming success when it cannot be fixed', async () => {
@@ -583,6 +789,64 @@ describe('ResumeHarnessService', () => {
     expect(result.contentWarnings.join(' ')).toMatch(
       /newlycreatedresumecontent/,
     );
+  });
+
+  it('does not publish a contact-only PDF as a completed resume', async () => {
+    candidateContext.build.mockResolvedValueOnce({
+      markdown: '# Candidate facts\n\n## Identity\n\n- Name: Jordan Reyes\n',
+      missing: [],
+      optionalGaps: ['experience', 'education', 'skills'],
+      hasEnoughToGenerate: true,
+      summary: { name: 'Jordan Reyes', roles: [] },
+    });
+    const session = await start();
+    const contactOnly = [
+      '\\documentclass{article}',
+      '\\begin{document}',
+      'Jordan Reyes\\\\',
+      'jordan@example.com',
+      '\\end{document}',
+    ].join('\n');
+    sandbox.readFile.mockResolvedValue(contactOnly);
+
+    const result = await service.runTurn('u1', session.id, {
+      instruction: 'build it',
+    });
+
+    expect(result.contentWarnings.join(' ')).toMatch(/no career facts/i);
+    expect(result.pdfBase64).toBeUndefined();
+    expect(result.hasCurrentPdf).toBe(false);
+    expect(storage.put).not.toHaveBeenCalled();
+  });
+
+  it('withholds an already stored contact-only PDF when the session is read', async () => {
+    candidateContext.build.mockResolvedValueOnce({
+      markdown: '# Candidate facts\n\n## Identity\n\n- Name: Jordan Reyes\n',
+      missing: [],
+      optionalGaps: ['experience', 'education', 'skills'],
+      hasEnoughToGenerate: true,
+      summary: { name: 'Jordan Reyes', roles: [] },
+    });
+    const started = await start();
+    const stored = store.find((item) => String(item._id) === started.id);
+    stored.latex = [
+      '\\documentclass{article}',
+      '\\begin{document}',
+      'Jordan Reyes\\\\',
+      'jordan@example.com',
+      '\\end{document}',
+    ].join('\n');
+    stored.compiled = true;
+    stored.pdfKey = 'resume-harness/u1/sess-1/revisions/1.pdf';
+    stored.revision = 1;
+    stored.contentWarnings = [];
+
+    const current = await service.getSession('u1', started.id);
+
+    expect(current.contentWarnings.join(' ')).toMatch(/no career facts/i);
+    expect(current.hasCurrentPdf).toBe(false);
+    await expect(service.getPdf('u1', started.id)).resolves.toBeNull();
+    expect(storage.getBuffer).not.toHaveBeenCalled();
   });
 
   it('carries the artifact forward when starting a new session on another harness', async () => {

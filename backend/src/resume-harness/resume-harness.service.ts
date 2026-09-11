@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -11,6 +12,7 @@ import { Model } from 'mongoose';
 import {
   ResumeHarnessSession,
   ResumeHarnessSessionDocument,
+  ResumeHarnessMessage,
   ResumeHarnessTurn,
 } from './schemas/resume-harness-session.schema';
 import { StorageService } from '../storage/storage.service';
@@ -33,12 +35,13 @@ import {
   PDF_PATH,
   TEX_PATH,
 } from './latex/latex.service';
-import { findContentProblems } from './latex/content-guard';
+import { findContentProblems, hasCareerEvidence } from './latex/content-guard';
 import {
   HarnessContextFile,
   HarnessId,
   ResolvedModelAlias,
 } from './harness/harness.types';
+import { JobDescriptionResolverService } from './job-description-resolver.service';
 
 export interface StartSessionInput {
   harness: HarnessId;
@@ -48,6 +51,8 @@ export interface StartSessionInput {
   targetRole?: string;
   /** Pasted job description to tailor against. Also per-résumé. */
   jobDescription?: string;
+  /** Public job posting used when no description is pasted. */
+  jobUrl?: string;
   /** Session whose LaTeX artifact should seed this one. */
   carryFromSessionId?: string;
   /** Template to write to. Omitted means the carried one, then the default. */
@@ -79,9 +84,13 @@ export interface SessionView {
   id: string;
   name: string;
   targetRole?: string;
+  jobDescription?: string;
+  jobUrl?: string;
+  jobContextWarning?: string;
   revisionCount: number;
   hasCurrentPdf: boolean;
   turns: Array<Omit<ResumeHarnessTurn, 'pdfKey'> & { hasPdf: boolean }>;
+  conversation: ResumeHarnessMessage[];
   harness: HarnessId;
   harnessLabel: string;
   sandboxId?: string;
@@ -116,6 +125,7 @@ export interface SessionView {
 export interface TurnResult extends SessionView {
   summary?: string;
   pdfBase64?: string;
+  documentChanged?: boolean;
 }
 
 /** How many times the harness is asked to fix its own build before giving up. */
@@ -154,6 +164,8 @@ export class ResumeHarnessService {
     private readonly sandbox: SandboxService,
     private readonly latex: LatexService,
     private readonly storage: StorageService,
+    @Optional()
+    private readonly jobDescriptions?: JobDescriptionResolverService,
   ) {}
 
   /** Harness + model choices the caller may make, for the picker UI. */
@@ -205,6 +217,21 @@ export class ResumeHarnessService {
     userId: string,
     input: StartSessionInput,
   ): Promise<SessionView> {
+    const jobUrl = input.jobUrl?.trim() || undefined;
+    const pastedJobDescription = input.jobDescription?.trim() || undefined;
+    let jobDescription = pastedJobDescription;
+    let jobContextWarning: string | undefined;
+    if (!jobDescription && jobUrl && this.jobDescriptions) {
+      try {
+        const resolution = await this.jobDescriptions.resolve(jobUrl);
+        jobDescription = resolution.description;
+        jobContextWarning = resolution.warning;
+      } catch {
+        jobContextWarning =
+          'We could not read that job URL. Paste the description to improve résumé tailoring and ATS matching.';
+      }
+    }
+    const resolvedInput = { ...input, jobDescription };
     const adapter = this.registry.get(input.harness);
     // Resolved from the tier at request time; an out-of-tier alias throws here
     // rather than being quietly downgraded.
@@ -245,7 +272,7 @@ export class ResumeHarnessService {
     // Built before the session document because the session records the name,
     // which later turns check the finished résumé actually contains.
     const context = await this.candidateContext.build(userId);
-    const candidateMarkdown = this.withTarget(context.markdown, input);
+    const candidateMarkdown = this.withTarget(context.markdown, resolvedInput);
 
     // One live container per user. A second Start (or a harness change)
     // replaces the old box rather than stacking until TTL.
@@ -266,7 +293,9 @@ export class ResumeHarnessService {
       // process cannot end a half-built session and orphan its sandbox.
       status: 'provisioning',
       targetRole: input.targetRole,
-      jobDescription: input.jobDescription,
+      jobDescription,
+      jobUrl,
+      jobContextWarning,
       candidateName: context.summary?.name,
       candidateMarkdown,
       templateKey: look.template?.key,
@@ -274,16 +303,19 @@ export class ResumeHarnessService {
       latex: carried?.latex || '',
       revision: 0,
       compiled: false,
+      placeholderDraft: false,
       carriedFrom: carried ? carried._id : undefined,
       turns: [],
+      conversation: [],
     });
 
     const sessionId = String((session as any)._id);
     return this.withSessionMutationLock(userId, sessionId, async () => {
+      const proxy = this.proxyAuth();
       const boot = adapter.bootstrap({
         sessionId,
         workdir: SANDBOX_WORKDIR,
-        proxy: this.proxyAuth(),
+        proxy,
         alias,
         contextFiles: this.contextFiles.filesFor(input.harness, {
           workdir: SANDBOX_WORKDIR,
@@ -296,6 +328,11 @@ export class ResumeHarnessService {
             : undefined,
         }),
       });
+      // Resume-Matcher runs inside this same per-user sandbox. Give its
+      // transport adapter the exact route and credential generation already
+      // uses; it never receives a second key or provisions a second box.
+      boot.env.JOBOCATE_LITELLM_BASE_URL = proxy.baseUrl;
+      boot.env.JOBOCATE_LITELLM_API_KEY = proxy.apiKey;
 
       // Carrying the artifact forward is the supported way to change harness, so
       // the new sandbox starts with the existing resume already on disk — under
@@ -320,6 +357,7 @@ export class ResumeHarnessService {
           session.compiled = carried.compiled;
           session.compileLog = carried.compileLog;
           session.contentWarnings = [...(carried.contentWarnings || [])];
+          session.placeholderDraft = Boolean(carried.placeholderDraft);
           session.pdfKey = pdfKey;
           session.turns.push({
             instruction: 'Carried the résumé from the previous session.',
@@ -331,6 +369,7 @@ export class ResumeHarnessService {
             compiled: carried.compiled,
             compileLog: carried.compileLog,
             contentWarnings: [...(carried.contentWarnings || [])],
+            placeholderDraft: Boolean(carried.placeholderDraft),
             pdfKey,
             createdAt: new Date(),
           });
@@ -378,7 +417,7 @@ export class ResumeHarnessService {
   }
 
   async getSession(userId: string, sessionId: string): Promise<SessionView> {
-    return this.view(await this.mustFind(userId, sessionId));
+    return this.validatedView(await this.mustFind(userId, sessionId));
   }
 
   async listSessions(userId: string): Promise<SessionView[]> {
@@ -386,7 +425,7 @@ export class ResumeHarnessService {
       .find({ userId })
       .sort({ updatedAt: -1 })
       .exec();
-    return sessions.map((session) => this.view(session));
+    return Promise.all(sessions.map((session) => this.validatedView(session)));
   }
 
   async renameSession(
@@ -423,6 +462,13 @@ export class ResumeHarnessService {
   async getPdf(userId: string, sessionId: string): Promise<string | null> {
     const session = await this.mustFind(userId, sessionId);
     if (!session.compiled || !session.pdfKey) return null;
+    if (
+      !session.placeholderDraft &&
+      session.latex &&
+      (await this.contentProblems(session, session.latex)).length > 0
+    ) {
+      return null;
+    }
     return (await this.storage.getBuffer(session.pdfKey)).toString('base64');
   }
 
@@ -715,6 +761,7 @@ export class ResumeHarnessService {
     session.compiled = snapshot.compiled;
     session.compileLog = snapshot.compileLog;
     session.contentWarnings = [...(snapshot.contentWarnings || [])];
+    session.placeholderDraft = Boolean(snapshot.placeholderDraft);
     session.pdfKey = snapshot.compiled ? snapshot.pdfKey : undefined;
     session.turns.push({
       instruction: `Restored revision ${revision}.`,
@@ -728,6 +775,7 @@ export class ResumeHarnessService {
       compiled: session.compiled,
       compileLog: session.compileLog,
       contentWarnings: [...session.contentWarnings],
+      placeholderDraft: session.placeholderDraft,
       summary: `Restored revision ${revision}.`,
       createdAt: new Date(),
     } as any);
@@ -944,6 +992,7 @@ export class ResumeHarnessService {
       contextFiles: [],
     });
 
+    const beforeLatex = session.latex || '';
     onEvent?.({ type: 'phase', phase: 'writing' });
     let summary = await this.invoke(
       adapter,
@@ -953,9 +1002,28 @@ export class ResumeHarnessService {
       onEvent,
     );
 
+    let latex = await this.currentLatex(session);
+    let placeholderDraft = this.isPlaceholderDraft(
+      session,
+      recordedInstruction,
+      kind,
+      latex,
+    );
+    if (latex === beforeLatex) {
+      if (!session.name && kind === 'instruction') {
+        session.name = recordedInstruction.trim().slice(0, 200) || undefined;
+      }
+      this.recordConversation(session, recordedInstruction, summary);
+      await (session as any).save();
+      return {
+        ...this.view(session),
+        summary,
+        documentChanged: false,
+      };
+    }
+
     onEvent?.({ type: 'phase', phase: 'compiling' });
     let compile = await this.latex.compile(session.sandboxId!);
-    let latex = await this.currentLatex(session);
     let content = await this.contentProblems(session, latex);
 
     /*
@@ -970,7 +1038,13 @@ export class ResumeHarnessService {
      */
     for (
       let attempt = 0;
-      (!compile.ok || content.length) && attempt < MAX_COMPILE_REPAIRS;
+      (
+        !compile.ok ||
+        (!placeholderDraft && content.some(
+          (problem) =>
+            !problem.startsWith('CANDIDATE.md contains no career facts'),
+        ))
+      ) && attempt < MAX_COMPILE_REPAIRS;
       attempt++
     ) {
       const prompt = compile.ok
@@ -982,22 +1056,48 @@ export class ResumeHarnessService {
         phase: 'fixing',
         log: (compile.ok ? content.join('; ') : compile.log).slice(0, 400),
       });
-      summary = await this.invoke(
+      const repairSummary = await this.invoke(
         adapter,
         boot,
         session.sandboxId!,
         prompt,
         onEvent,
       );
+      if (!summary) summary = repairSummary;
       onEvent?.({ type: 'phase', phase: 'compiling' });
       compile = await this.latex.compile(session.sandboxId!);
       latex = await this.currentLatex(session);
       content = await this.contentProblems(session, latex);
+      placeholderDraft = this.isPlaceholderDraft(
+        session,
+        recordedInstruction,
+        kind,
+        latex,
+      );
+    }
+
+    // The harness can make an intermediate edit which the repair pass later
+    // removes. Only the final file is a revision; repeating the harness's
+    // earlier "Done" claim here would describe a document that was not saved.
+    if (latex === beforeLatex) {
+      const verifiedSummary =
+        'I could not apply that request: after validation, the saved resume.tex is unchanged. No new revision was created.';
+      this.recordConversation(session, recordedInstruction, verifiedSummary);
+      await (session as any).save();
+      return {
+        ...this.view(session),
+        summary: verifiedSummary,
+        documentChanged: false,
+      };
     }
 
     const revision = (session.revision || 0) + 1;
     let pdfKey: string | undefined;
-    if (compile.ok && compile.pdfBase64) {
+    if (
+      compile.ok &&
+      compile.pdfBase64 &&
+      (content.length === 0 || placeholderDraft)
+    ) {
       pdfKey = `resume-harness/${session.userId}/${session._id}/revisions/${revision}.pdf`;
       await this.storage.put(pdfKey, Buffer.from(compile.pdfBase64, 'base64'), {
         contentType: 'application/pdf',
@@ -1012,6 +1112,8 @@ export class ResumeHarnessService {
     session.compiled = compile.ok;
     session.compileLog = compile.ok ? undefined : compile.log;
     session.contentWarnings = content;
+    session.placeholderDraft = placeholderDraft && content.length > 0;
+    session.turns ||= [];
     session.turns.push({
       kind,
       latex,
@@ -1023,9 +1125,16 @@ export class ResumeHarnessService {
       compiled: compile.ok,
       compileLog: compile.ok ? undefined : compile.log,
       contentWarnings: content,
+      placeholderDraft: session.placeholderDraft,
       summary,
       createdAt: new Date(),
     } as any);
+    this.recordConversation(
+      session,
+      recordedInstruction,
+      summary,
+      session.revision,
+    );
     try {
       await (session as any).save();
     } catch (error) {
@@ -1043,7 +1152,35 @@ export class ResumeHarnessService {
       ...this.view(session),
       summary,
       pdfBase64: pdfKey ? compile.pdfBase64 : undefined,
+      documentChanged: true,
     };
+  }
+
+  private recordConversation(
+    session: ResumeHarnessSessionDocument,
+    instruction: string,
+    response?: string,
+    revision?: number,
+  ): void {
+    const createdAt = new Date();
+    session.conversation ||= [];
+    session.conversation.push(
+      {
+        role: 'user',
+        text: instruction.trim(),
+        createdAt,
+      } as any,
+      {
+        role: 'assistant',
+        text:
+          response?.trim() ||
+          (revision
+            ? 'I updated the résumé and verified the saved document.'
+            : 'I reviewed the résumé and did not make a document change.'),
+        revision,
+        createdAt,
+      } as any,
+    );
   }
 
   private async deleteUncommittedPdf(key: string): Promise<void> {
@@ -1055,6 +1192,36 @@ export class ResumeHarnessService {
         error instanceof Error ? error.stack : undefined,
       );
     }
+  }
+
+  /** Recognizes an explicit placeholder request for profiles that have facts. */
+  private requestsPlaceholderDraft(instruction: string): boolean {
+    if (/\b(?:remove|replace|delete|without)\b[^.\n]{0,40}\bplace\s*holders?\b/i.test(instruction)) {
+      return false;
+    }
+    return (
+      /\b(?:add|create|include|use|with)\b[^.\n]{0,60}\bplace\s*holders?\b/i.test(instruction) ||
+      /\bplace\s*holders?\b[^.\n]{0,60}\b(?:fill|populate|later)\b/i.test(instruction)
+    );
+  }
+
+  private isPlaceholderDraft(
+    session: ResumeHarnessSessionDocument,
+    instruction: string,
+    kind: 'instruction' | 'look-change',
+    latex: string,
+  ): boolean {
+    const visiblyPlaceholder =
+      /\bplaceholder\b/i.test(latex) ||
+      /(?<!\\text)(?<![a-zA-Z\\])<\s*[A-Za-z][A-Za-z0-9 _./-]{2,60}\s*>/.test(latex) ||
+      /\[(?:your|insert|add|candidate|name|company|role)[^\]\n]{0,60}\]/i.test(latex);
+    if (!visiblyPlaceholder) return false;
+
+    return (
+      Boolean(session.placeholderDraft) ||
+      hasCareerEvidence(session.candidateMarkdown) === false ||
+      (kind === 'instruction' && this.requestsPlaceholderDraft(instruction))
+    );
   }
 
   /** The résumé as it stands on the sandbox's disk. */
@@ -1107,11 +1274,22 @@ export class ResumeHarnessService {
     prompt: string,
     onEvent?: (event: { type: string; [k: string]: unknown }) => void,
   ): Promise<string | undefined> {
+    let streamBuffer = '';
     const result = onEvent
       ? await this.sandbox.execStream(
           sandboxId,
           adapter.turnCommand(boot, prompt),
-          (chunk) => onEvent({ type: 'token', text: chunk }),
+          (chunk) => {
+            if (!adapter.parseOutput) return;
+            streamBuffer += chunk;
+            const lines = streamBuffer.split(/\r?\n/);
+            streamBuffer = lines.pop() || '';
+            for (const line of lines) {
+              for (const activity of adapter.parseOutput(line).activities) {
+                onEvent({ type: 'activity', activity });
+              }
+            }
+          },
           { timeoutSeconds: 900 },
         )
       : await this.sandbox.exec(sandboxId, adapter.turnCommand(boot, prompt), {
@@ -1128,7 +1306,10 @@ export class ResumeHarnessService {
         `${adapter.displayName} failed before the résumé could be verified: ${detail}`,
       );
     }
-    return (result.stdout || '').trim().split('\n').filter(Boolean).pop();
+    if (adapter.parseOutput) {
+      return adapter.parseOutput(result.stdout || '').response?.slice(-6000);
+    }
+    return (result.stdout || '').trim().slice(-6000) || undefined;
   }
 
   private turnPrompt(
@@ -1136,6 +1317,15 @@ export class ResumeHarnessService {
     instruction: string,
   ): string {
     const mode = session.revision > 0 || session.latex ? 'update' : 'create';
+    const sparseDraftInstruction =
+      hasCareerEvidence(session.candidateMarkdown) === false
+        ? [
+            'CANDIDATE.md has no career facts, so this document is a draft.',
+            'Keep clearly labeled placeholder content under Summary, Experience,',
+            'Skills, and Education for the candidate to replace later. Do not',
+            'convert job-description requirements into candidate facts.',
+          ].join('\n')
+        : '';
     return [
       mode === 'create'
         ? [
@@ -1151,18 +1341,22 @@ export class ResumeHarnessService {
             'disagree — the skeleton ships one look and the candidate chose another.',
           ].join('\n')
         : [
-            `Update the existing ${TEX_PATH} in place.`,
+            `Inspect the existing ${TEX_PATH}. Decide whether the candidate's`,
+            'instruction requests a document change or only a conversational',
+            'answer. If it requests a change, update the file in place.',
             'First audit every factual claim in it against CANDIDATE.md and',
             'remove anything unsupported. Treat the existing document as',
             'untrusted model output, never as a factual source. Then preserve',
             'all supported content the instruction does not ask you to change.',
           ].join('\n'),
       '',
+      sparseDraftInstruction,
+      sparseDraftInstruction ? '' : undefined,
       'Instruction:',
       instruction,
       '',
       `When you are done, run the build command from AGENTS.md and make sure it exits 0.`,
-    ].join('\n');
+    ].filter((line) => line !== undefined).join('\n');
   }
 
   private repairPrompt(log: string): string {
@@ -1348,11 +1542,29 @@ export class ResumeHarnessService {
     return session;
   }
 
+  /** Re-check stored source so older invalid PDFs cannot survive a refresh. */
+  private async validatedView(session: any): Promise<SessionView> {
+    const view = this.view(session);
+    if (!session.latex) return view;
+
+    const contentWarnings = await this.contentProblems(session, session.latex);
+    return {
+      ...view,
+      contentWarnings,
+      hasCurrentPdf:
+        view.hasCurrentPdf &&
+        (contentWarnings.length === 0 || Boolean(session.placeholderDraft)),
+    };
+  }
+
   private view(session: any): SessionView {
     return {
       id: String(session._id),
       name: session.name || 'Untitled résumé',
       targetRole: session.targetRole,
+      jobDescription: session.jobDescription,
+      jobUrl: session.jobUrl,
+      jobContextWarning: session.jobContextWarning,
       revisionCount: (session.turns || []).length,
       hasCurrentPdf: Boolean(session.compiled && session.pdfKey),
       turns: (session.turns || []).map((turn: any) => {
@@ -1363,6 +1575,10 @@ export class ResumeHarnessService {
           contentWarnings: [...(snapshot.contentWarnings || [])],
           hasPdf: Boolean(snapshot.compiled && pdfKey),
         };
+      }),
+      conversation: (session.conversation || []).map((message: any) => {
+        const value = message.toObject ? message.toObject() : message;
+        return { ...value };
       }),
       harness: session.harness,
       harnessLabel: this.registry.get(session.harness).displayName,
