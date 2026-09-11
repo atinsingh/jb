@@ -1,0 +1,18 @@
+# Agent configuration and skill implementations
+.agents/
+.claude/
+.codex/
+.cursor/
+CLAUDE.md
+
+# Generated output and dependencies
+graphify-out/
+node_modules/
+tmp/
+
+# Products and packages outside the AGENTS.md scope
+catalyst-ui-kit/
+design/
+extension/
+mobile/
+packages/
