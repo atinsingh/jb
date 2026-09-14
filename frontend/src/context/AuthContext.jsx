@@ -162,14 +162,42 @@ export const AuthProvider = ({ children }) => {
     }
   }, [loading, user, router.pathname]);
 
-  const login = async (email, password) => {
+  const switchWorkspace = async (role, providedSession) => {
+    const session =
+      providedSession ?? (await supabase.auth.getSession()).data.session;
+    if (!session) throw new Error('Your session expired. Please sign in again.');
+
+    const response = await fetch(`${API_URL}/api/auth/workspace`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ role }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const detail = Array.isArray(payload?.message)
+        ? payload.message.join('; ')
+        : payload?.message;
+      throw new Error(detail || 'Could not open that workspace. Please try again.');
+    }
+
+    loadedForRef.current = session.user.id;
+    setUser(payload.user ?? null);
+    return payload.user ?? null;
+  };
+
+  const login = async (email, password, { role } = {}) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
     if (error) throw new Error(error.message);
 
-    const localUser = await fetchLocalUser(data.session.access_token);
+    const localUser = role
+      ? await switchWorkspace(role, data.session)
+      : await fetchLocalUser(data.session.access_token);
     loadedForRef.current = data.user.id;
     setUser(localUser);
     return { user: localUser };
@@ -263,6 +291,7 @@ export const AuthProvider = ({ children }) => {
     login,
     signup,
     loginWithProvider,
+    switchWorkspace,
     logout,
     resetPassword,
     updatePassword,

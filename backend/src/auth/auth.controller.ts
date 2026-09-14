@@ -1,7 +1,9 @@
-import { Controller, Get, UseGuards, Request, Logger } from '@nestjs/common';
+import { Body, Controller, Get, Patch, UseGuards, Request, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { SupabaseUserSyncService } from './supabase-user-sync.service';
+import { SwitchWorkspaceDto } from './dto/switch-workspace.dto';
 
 /**
  * What is left of the auth controller after Supabase took over identity.
@@ -20,6 +22,8 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
+  constructor(private readonly userSync: SupabaseUserSyncService) {}
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
@@ -29,5 +33,15 @@ export class AuthController {
   async getCurrentUser(@Request() req) {
     this.logger.debug(`Getting current user: ${req.user?.email || 'unknown'}`);
     return { user: req.user };
+  }
+
+  @Patch('workspace')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Switch between candidate and employer workspaces' })
+  @ApiResponse({ status: 200, description: 'Returns the user with the active role' })
+  @ApiResponse({ status: 400, description: 'Role is not self-selectable' })
+  async switchWorkspace(@Request() req, @Body() dto: SwitchWorkspaceDto) {
+    return { user: await this.userSync.switchWorkspaceRole(req.user, dto.role) };
   }
 }

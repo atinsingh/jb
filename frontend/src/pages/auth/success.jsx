@@ -21,11 +21,12 @@ import { useAuth } from '@/context/AuthContext';
  */
 export default function AuthSuccess() {
   const router = useRouter();
-  const { refreshUser } = useAuth();
+  const { refreshUser, switchWorkspace } = useAuth();
   const processedRef = useRef(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    if (!router.isReady) return;
     if (processedRef.current) return;
     processedRef.current = true;
 
@@ -91,16 +92,21 @@ export default function AuthSuccess() {
         await supabase.auth.updateUser({ data: { role: requestedRole } });
       }
 
-      // The Mongo user carries the role; Supabase does not. On a first social
-      // sign-in the backend creates that document on this very call.
-      await refreshUser?.();
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/auth/me`,
-        { headers: { Authorization: `Bearer ${session.access_token}` } },
-      ).catch(() => null);
-
-      const role = response?.ok ? (await response.json())?.user?.role : null;
+      // The same OAuth identity may use both self-service workspaces. On a
+      // signup, metadata gives the local user its initial role; on every later
+      // login, this authenticated operation selects the requested workspace.
+      let role = null;
+      if (requestedRole === 'ROLE_EMPLOYER' || requestedRole === 'ROLE_CANDIDATE') {
+        const localUser = await switchWorkspace?.(requestedRole, session);
+        role = localUser?.role ?? null;
+      } else {
+        await refreshUser?.();
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/auth/me`,
+          { headers: { Authorization: `Bearer ${session.access_token}` } },
+        ).catch(() => null);
+        role = response?.ok ? (await response.json())?.user?.role : null;
+      }
 
       // Honour an explicit ?redirect= if the sign-in was triggered from a
       // protected route, otherwise land on the role's home surface. Only
@@ -123,10 +129,12 @@ export default function AuthSuccess() {
       );
     };
 
-    land();
-    // Intentionally runs once - see processedRef above.
+    land().catch((err) => {
+      setError(err?.message || 'We could not complete that sign-in. Please try again.');
+    });
+    // Runs when query params are ready, then only once - see processedRef above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [router.isReady]);
 
   return (
     <>

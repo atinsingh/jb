@@ -1,9 +1,10 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 
 import { User, UserDocument } from '../schemas/user.schema';
 import { AppLoggerService } from '../common/logger/logger.service';
+import { SelfSelectableRole } from './dto/switch-workspace.dto';
 
 /**
  * Keeps the Mongo `User` collection in step with Supabase Auth.
@@ -64,6 +65,31 @@ export class SupabaseUserSyncService {
       emailVerified: Boolean(claims.email_verified ?? claims.user_metadata?.email_verified),
       provider: this.providerFrom(claims.app_metadata?.provider),
     });
+  }
+
+  /**
+   * Select which self-service workspace this identity is currently using.
+   * Candidate and employer are both visitor-selectable account modes; admin
+   * and agent remain assignments that this flow can neither grant nor remove.
+   */
+  async switchWorkspaceRole(
+    user: UserDocument,
+    requestedRole: SelfSelectableRole,
+  ): Promise<UserDocument> {
+    const selfSelectableRoles = ['ROLE_CANDIDATE', 'ROLE_EMPLOYER'];
+    if (
+      !selfSelectableRoles.includes(user.role) ||
+      !selfSelectableRoles.includes(requestedRole)
+    ) {
+      throw new BadRequestException('This account cannot switch workspaces');
+    }
+
+    if (user.role === requestedRole) return user;
+
+    user.role = requestedRole;
+    await user.save();
+    this.logger.log(`Switched ${user.email} to ${requestedRole}`);
+    return user;
   }
 
   /**

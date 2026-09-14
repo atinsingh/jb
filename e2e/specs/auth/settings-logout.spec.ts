@@ -2,7 +2,9 @@ import { test, expect } from '../../fixtures/test';
 import { createUser, type TestUser } from '../../support/api';
 
 async function signIn(page: any, user: TestUser) {
-  await page.goto('/app/login', { waitUntil: 'domcontentloaded' });
+  const loginPath =
+    user.role === 'ROLE_EMPLOYER' ? '/app/login?as=employer' : '/app/login';
+  await page.goto(loginPath, { waitUntil: 'domcontentloaded' });
   await page.fill('input[name="email"]', user.email);
   await page.fill('input[name="password"]', user.password);
   await page.locator('form').getByRole('button', { name: /^log in$/i }).click();

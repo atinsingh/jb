@@ -79,7 +79,9 @@ export default function AppLogin() {
     setError('');
     setSubmitting(true);
     try {
-      const result = await login(email, password);
+      const result = await login(email, password, {
+        role: asEmployer ? 'ROLE_EMPLOYER' : 'ROLE_CANDIDATE',
+      });
       const requested = router.query.redirect;
       router.replace(
         typeof requested === 'string' && requested.startsWith('/')
@@ -97,6 +99,7 @@ export default function AppLogin() {
     try {
       await loginWithProvider(provider, {
         redirectTo: typeof router.query.redirect === 'string' ? router.query.redirect : undefined,
+        role: asEmployer ? 'ROLE_EMPLOYER' : 'ROLE_CANDIDATE',
       });
     } catch (err) {
       setError(err?.message || 'Could not reach that provider. Please try again.');
