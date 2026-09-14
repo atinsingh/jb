@@ -21,6 +21,12 @@ export interface UpsertApplicantInput {
   ownerId?: string | Types.ObjectId;
   jobId: string | Types.ObjectId; // the EmployerJob._id
   candidateId: string | Types.ObjectId;
+  applicationId?: string | Types.ObjectId;
+  submittedResume?: {
+    artifactId: string | Types.ObjectId;
+    version: number;
+    hash: string;
+  };
   candidateName?: string;
   candidateHeadline?: string;
   candidateEmail?: string;
@@ -66,6 +72,20 @@ export class EmployerPipelineService {
       setOnInsert.ownerId = new Types.ObjectId(String(input.ownerId));
     }
 
+    const applicationSnapshot: Record<string, unknown> = {};
+    if (input.applicationId) {
+      applicationSnapshot.applicationId = new Types.ObjectId(
+        String(input.applicationId),
+      );
+    }
+    if (input.submittedResume) {
+      applicationSnapshot.submittedResume = {
+        artifactId: new Types.ObjectId(String(input.submittedResume.artifactId)),
+        version: input.submittedResume.version,
+        hash: input.submittedResume.hash,
+      };
+    }
+
     return this.applicantModel.findOneAndUpdate(
       { jobId, candidateId },
       {
@@ -78,6 +98,7 @@ export class EmployerPipelineService {
           skills: input.skills ?? [],
           yearsExperience: input.yearsExperience ?? 0,
           aiScore: input.aiScore ?? 0,
+          ...applicationSnapshot,
         },
       },
       { upsert: true, new: true, setDefaultsOnInsert: true },

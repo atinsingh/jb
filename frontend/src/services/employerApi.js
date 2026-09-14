@@ -97,6 +97,10 @@ export const employerPipelineApi = {
       method: 'POST',
       body: JSON.stringify({ text }),
     }),
+  assessResume: (id) =>
+    apiCall(`/api/employer/applicants/${id}/resume-assessment`, {
+      method: 'POST',
+    }),
 };
 
 /* ----------------------------------------------------------- ai recruiter --- */

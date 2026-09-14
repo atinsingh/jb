@@ -7,6 +7,10 @@ import { AgentAssignmentService } from './agent-assignment.service';
 import { ApplicationEventsService } from './application-events.service';
 import { Application, ApplicationSchema } from '../schemas/application.schema';
 import { ApplicationEvent, ApplicationEventSchema } from '../schemas/application-event.schema';
+import {
+  ApplicationArtifact,
+  ApplicationArtifactSchema,
+} from '../schemas/application-artifact.schema';
 import { User, UserSchema } from '../schemas/user.schema';
 import { Job, JobSchema } from '../schemas/job.schema';
 import { Resume, ResumeSchema } from '../schemas/resume.schema';
@@ -30,6 +34,7 @@ import { AutoApplyProcessor } from './auto-apply.processor';
       { name: Resume.name, schema: ResumeSchema },
       { name: JobMatch.name, schema: JobMatchSchema },
       { name: ApplicationEvent.name, schema: ApplicationEventSchema },
+      { name: ApplicationArtifact.name, schema: ApplicationArtifactSchema },
     ]),
     forwardRef(() => MatchingModule),
     forwardRef(() => ApplyRunnerModule),

@@ -48,6 +48,123 @@ function initialsFor(name = '') {
   return (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase();
 }
 
+const assessmentStateCopy = {
+  NOT_RUN: 'Assessment has not run.',
+  RUNNING: 'Resume assessment is running…',
+  STALE: 'Assessment is stale because the submitted resume or job description changed.',
+  NO_RESUME: 'No submitted resume is attached to this applicant.',
+  NO_JOB_DESCRIPTION: 'This job needs a description before its resume can be assessed.',
+  BUDGET_EXHAUSTED: 'ATS match was not run because the employer AI budget is exhausted.',
+  ATS_FAILED: 'ATS matching failed during execution. Retry the assessment.',
+  DETECTOR_FAILED: 'The local AI-content heuristic failed during execution. Retry the assessment.',
+};
+
+const signalLabel = (key) =>
+  String(key)
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/^./, (character) => character.toUpperCase());
+
+function ResumeAssessmentPanel({ assessment, loading, busy, onRun }) {
+  if (loading) return <div style={{ fontSize: 13, color: '#8A8378' }}>Loading resume assessment…</div>;
+
+  const status = assessment?.status || 'NOT_RUN';
+  const inputState = ['NOT_RUN', 'RUNNING', 'STALE', 'NO_RESUME', 'NO_JOB_DESCRIPTION'].includes(status);
+  const ats = assessment?.ats;
+  const aiContent = assessment?.aiContent;
+  const canRun = status !== 'RUNNING';
+
+  return (
+    <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #F2ECE0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>Submitted resume assessment</div>
+          {status === 'PARTIAL' && <div style={{ fontSize: 12, color: '#9A6A2E', marginTop: 3 }}>Partial assessment — the available result is shown below.</div>}
+          {inputState && <div style={{ fontSize: 12, color: status === 'STALE' ? '#9A6A2E' : '#6F685D', marginTop: 3 }}>{assessmentStateCopy[status]}</div>}
+        </div>
+        {canRun && (
+          <button
+            onClick={onRun}
+            disabled={busy}
+            style={{ fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, color: '#fff', background: '#4263EB', border: 'none', borderRadius: 999, padding: '8px 14px', cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}
+          >
+            {busy ? 'Assessing…' : 'Run resume assessment'}
+          </button>
+        )}
+      </div>
+
+      {!inputState && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 12 }}>
+          <section style={{ border: '1px solid #E6DECF', borderRadius: 10, padding: 13 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
+              <strong style={{ fontSize: 13 }}>ATS semantic match</strong>
+              {ats?.status === 'COMPLETE' && (
+                <span style={{ fontFamily: MONO, fontSize: 18, color: '#4263EB' }}>{ats.semanticMatch}/100</span>
+              )}
+            </div>
+            {ats?.status === 'COMPLETE' ? (
+              <>
+                <div style={{ fontSize: 12, fontWeight: 700, color: ats.semanticMatch > 70 ? '#157A49' : '#9A6A2E', marginTop: 4 }}>
+                  {ats.semanticMatch > 70 ? 'Good to submit' : 'Improve before submitting'}
+                </div>
+                {Object.keys(ats.subScores || {}).length > 0 && (
+                  <div style={{ marginTop: 10 }}>
+                    {Object.entries(ats.subScores).map(([key, value]) => (
+                      <div key={key} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginTop: 4 }}>
+                        <span style={{ color: '#6F685D' }}>{signalLabel(key)}</span><span style={{ fontFamily: MONO }}>{value}/100</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {(ats.gaps || []).length > 0 && <div style={{ fontSize: 12, marginTop: 10 }}><b>Missing keywords:</b> {ats.gaps.join(', ')}</div>}
+                {(ats.suggestions || []).length > 0 && <div style={{ fontSize: 12, marginTop: 7 }}><b>Recommendations:</b> {ats.suggestions.join(' ')}</div>}
+              </>
+            ) : (
+              <div style={{ fontSize: 12, lineHeight: 1.45, color: ats?.status === 'ATS_FAILED' ? '#C9622E' : '#6F685D', marginTop: 8 }}>
+                {ats?.status === 'BUDGET_EXHAUSTED'
+                  ? assessmentStateCopy.BUDGET_EXHAUSTED
+                  : ats?.status === 'ATS_FAILED'
+                    ? assessmentStateCopy.ATS_FAILED
+                    : 'ATS match has not run because employer ATS access is not configured yet.'}
+              </div>
+            )}
+          </section>
+
+          <section style={{ border: '1px solid #E6DECF', borderRadius: 10, padding: 13 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
+              <strong style={{ fontSize: 13 }}>AI-content likelihood (directional)</strong>
+              {aiContent?.status === 'COMPLETE' && (
+                <span style={{ fontFamily: MONO, fontSize: 18, color: '#9A6A2E' }}>{aiContent.composite}/100</span>
+              )}
+            </div>
+            <div style={{ fontSize: 11.5, lineHeight: 1.45, color: '#8A5A25', background: '#FBF1E2', borderRadius: 7, padding: '7px 9px', marginTop: 8 }}>
+              Directional evidence only. This heuristic can produce false positives and false negatives and never changes fit, ranking, stage, or hiring actions.
+            </div>
+            {aiContent?.status === 'COMPLETE' ? (
+              <div style={{ marginTop: 9 }}>
+                {Object.entries(aiContent.signals || {}).map(([key, signal]) => (
+                  <div key={key} style={{ padding: '7px 0', borderTop: '1px solid #F2ECE0', fontSize: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                      <span style={{ fontWeight: 600 }}>{signalLabel(key)}</span>
+                      <span style={{ fontFamily: MONO }}>{signal.likelihood}/100</span>
+                    </div>
+                    <div style={{ color: '#777064', marginTop: 2 }}>{signal.explanation}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: aiContent?.status === 'DETECTOR_FAILED' ? '#C9622E' : '#6F685D', marginTop: 8 }}>
+                {aiContent?.status === 'DETECTOR_FAILED'
+                  ? assessmentStateCopy.DETECTOR_FAILED
+                  : 'AI-content likelihood has not run.'}
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function EmployerScreening() {
   const [open, setOpen] = useState(null);
   const [weights, setWeights] = useState({ skills: 35, exp: 30, answers: 20, culture: 15 });
@@ -58,6 +175,9 @@ export default function EmployerScreening() {
   const [error, setError] = useState(null);
   const [actionError, setActionError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [assessments, setAssessments] = useState({});
+  const [assessmentLoading, setAssessmentLoading] = useState({});
+  const [assessmentBusy, setAssessmentBusy] = useState({});
 
   // Fetch AI screening results for all applicants. No sample fallback.
   const load = async () => {
@@ -127,6 +247,50 @@ export default function EmployerScreening() {
     moveStage(applicants.filter((a) => flagFor(a.score).key === 'strong').map((a) => a.id), 'screening');
   const rejectWeak = () =>
     moveStage(applicants.filter((a) => flagFor(a.score).key === 'reject').map((a) => a.id), 'rejected');
+
+  const toggleApplicant = async (id) => {
+    if (open === id) {
+      setOpen(null);
+      return;
+    }
+    setOpen(id);
+    if (!id || /^r\d+$/.test(id) || assessments[id]) return;
+    setAssessmentLoading((current) => ({ ...current, [id]: true }));
+    setActionError(null);
+    try {
+      const applicant = await employerPipelineApi.get(id);
+      setAssessments((current) => ({
+        ...current,
+        [id]: applicant?.resumeAssessment || { status: 'NOT_RUN' },
+      }));
+    } catch (err) {
+      setActionError(err);
+    } finally {
+      setAssessmentLoading((current) => ({ ...current, [id]: false }));
+    }
+  };
+
+  const runResumeAssessment = async (id) => {
+    if (!id || /^r\d+$/.test(id) || assessmentBusy[id]) return;
+    setAssessmentBusy((current) => ({ ...current, [id]: true }));
+    setAssessments((current) => ({
+      ...current,
+      [id]: { ...(current[id] || {}), status: 'RUNNING' },
+    }));
+    setActionError(null);
+    try {
+      const result = await employerPipelineApi.assessResume(id);
+      setAssessments((current) => ({ ...current, [id]: result }));
+    } catch (err) {
+      setActionError(err);
+      setAssessments((current) => ({
+        ...current,
+        [id]: { status: 'ATS_FAILED', ats: { status: 'ATS_FAILED' }, aiContent: { status: 'NOT_RUN' } },
+      }));
+    } finally {
+      setAssessmentBusy((current) => ({ ...current, [id]: false }));
+    }
+  };
 
   const lastRunLabel = lastRun ? lastRun.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '—';
 
@@ -290,7 +454,7 @@ export default function EmployerScreening() {
                     return (
                       <div key={a.id} style={{ borderBottom: `1px solid ${divider}` }}>
                         <div
-                          onClick={() => setOpen((o) => (o === a.id ? null : a.id))}
+                          onClick={() => toggleApplicant(a.id)}
                           style={{ display: 'grid', gridTemplateColumns: GRID, gap: 10, alignItems: 'center', padding: '13px 18px', cursor: 'pointer', background: rowBg }}
                         >
                           <span style={{ fontFamily: MONO, fontSize: 12, color: '#A79E8F', textAlign: 'center' }}>{i + 1}</span>
@@ -320,6 +484,12 @@ export default function EmployerScreening() {
                                   <span>{a.rationale}</span>
                                 </div>
                               )}
+                              <ResumeAssessmentPanel
+                                assessment={assessments[a.id]}
+                                loading={assessmentLoading[a.id]}
+                                busy={assessmentBusy[a.id]}
+                                onRun={() => runResumeAssessment(a.id)}
+                              />
                               <div style={{ display: 'flex', gap: 9 }}>
                                 <Link href={appRoute('Employer Candidates.dc.html')} style={{ fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, color: '#fff', background: '#4263EB', border: 'none', borderRadius: 999, padding: '8px 15px', textDecoration: 'none' }}>View profile →</Link>
                                 <button

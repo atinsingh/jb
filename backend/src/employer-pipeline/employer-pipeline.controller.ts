@@ -24,6 +24,7 @@ import { EmployerPipelineService } from './employer-pipeline.service';
 import { CreateApplicantDto } from './dto/create-applicant.dto';
 import { UpdateStageDto } from './dto/update-stage.dto';
 import { AddNoteDto } from './dto/add-note.dto';
+import { EmployerResumeAssessmentService } from './employer-resume-assessment.service';
 
 @ApiTags('employer-applicants')
 @ApiBearerAuth('JWT-auth')
@@ -31,7 +32,10 @@ import { AddNoteDto } from './dto/add-note.dto';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ROLE_EMPLOYER', 'ROLE_ADMIN')
 export class EmployerPipelineController {
-  constructor(private readonly pipelineService: EmployerPipelineService) {}
+  constructor(
+    private readonly pipelineService: EmployerPipelineService,
+    private readonly resumeAssessmentService: EmployerResumeAssessmentService,
+  ) {}
 
   @Get('stats')
   @ApiOperation({ summary: 'Get applicant counts per stage for the funnel' })
@@ -63,7 +67,8 @@ export class EmployerPipelineController {
   @ApiResponse({ status: 404, description: 'Applicant not found' })
   async findOne(@Param('id') id: string, @Request() req) {
     const ownerId = req.user._id.toString();
-    return this.pipelineService.findOne(ownerId, id);
+    const applicant = await this.pipelineService.findOne(ownerId, id);
+    return this.resumeAssessmentService.markStaleIfNeeded(ownerId, applicant);
   }
 
   @Post()
@@ -100,5 +105,15 @@ export class EmployerPipelineController {
   ) {
     const ownerId = req.user._id.toString();
     return this.pipelineService.addNote(ownerId, id, dto.text);
+  }
+
+  @Post(':id/resume-assessment')
+  @ApiOperation({ summary: 'Assess the exact resume submitted by an applicant' })
+  @ApiParam({ name: 'id', description: 'Applicant ID' })
+  @ApiResponse({ status: 201, description: 'Assessment completed or partially completed' })
+  @ApiResponse({ status: 404, description: 'Applicant not found' })
+  async assessResume(@Param('id') id: string, @Request() req) {
+    const ownerId = req.user._id.toString();
+    return this.resumeAssessmentService.assess(ownerId, id);
   }
 }

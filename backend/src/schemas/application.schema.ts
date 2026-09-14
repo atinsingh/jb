@@ -40,6 +40,8 @@ export class Application {
     screenshotUrl?: string;
     formJsonUrl?: string;
     resumeVersionId?: Types.ObjectId;
+    resumeVersion?: number;
+    resumeHash?: string;
     coverLetterVersionId?: Types.ObjectId;
   };
 

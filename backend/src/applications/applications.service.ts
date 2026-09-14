@@ -9,6 +9,13 @@ import { ApplicationEventsService } from './application-events.service';
 import { EmployerPipelineService } from '../employer-pipeline/employer-pipeline.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AutopilotRulesService } from '../ai-recruiter/autopilot-rules.service';
+import {
+  ApplicationArtifact,
+  ApplicationArtifactDocument,
+  ArtifactType,
+} from '../schemas/application-artifact.schema';
+import { StorageService } from '../storage/storage.service';
+import { createHash } from 'crypto';
 
 @Injectable()
 export class ApplicationsService {
@@ -19,6 +26,9 @@ export class ApplicationsService {
     @InjectModel(Job.name) private jobModel: Model<JobDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(Resume.name) private resumeModel: Model<ResumeDocument>,
+    @InjectModel(ApplicationArtifact.name)
+    private applicationArtifactModel: Model<ApplicationArtifactDocument>,
+    private readonly storageService: StorageService,
     private readonly applicationEventsService: ApplicationEventsService,
     private readonly employerPipelineService: EmployerPipelineService,
     private readonly notificationsService: NotificationsService,
@@ -53,6 +63,7 @@ export class ApplicationsService {
     });
 
     const saved = await application.save();
+    await this.snapshotSubmittedResume(saved, candidateId);
     await this.applicationEventsService.recordEvent({
       applicationId: saved._id as any,
       userId: saved.candidateId,
@@ -263,6 +274,18 @@ export class ApplicationsService {
         ownerId: ownerId || undefined,
         jobId: employerJobId,
         candidateId,
+        applicationId: String(application._id),
+        ...(application.artifacts?.resumeVersionId &&
+        application.artifacts.resumeVersion != null &&
+        application.artifacts.resumeHash
+          ? {
+              submittedResume: {
+                artifactId: String(application.artifacts.resumeVersionId),
+                version: application.artifacts.resumeVersion,
+                hash: application.artifacts.resumeHash,
+              },
+            }
+          : {}),
         aiScore: application.matchScore || 0,
         source: 'jobocate_apply',
         stage: 'applied',
@@ -369,5 +392,92 @@ export class ApplicationsService {
     if (!value) return 0;
     const m = String(value).match(/(19|20)\d{2}/);
     return m ? parseInt(m[0], 10) : 0;
+  }
+
+  /**
+   * Freeze the resume selected at application time. The artifact is the sole
+   * resume source for submission and employer assessment, so later edits to a
+   * candidate's primary resume cannot change what was actually submitted.
+   */
+  private async snapshotSubmittedResume(
+    application: ApplicationDocument,
+    candidateId: string,
+  ): Promise<void> {
+    try {
+      const resume: any = await this.resumeModel
+        .findOne({ userId: new Types.ObjectId(candidateId) })
+        .sort({ isPrimary: -1, updatedAt: -1 })
+        .exec();
+      if (!resume) return;
+
+      const content = JSON.stringify({
+        fullName: resume.fullName,
+        email: resume.email,
+        phone: resume.phone,
+        location: resume.location,
+        website: resume.website,
+        linkedin: resume.linkedin,
+        github: resume.github,
+        headline: resume.headline,
+        summary: resume.summary,
+        profileSummary: resume.profileSummary,
+        skills: resume.skills,
+        experience: resume.experience,
+        education: resume.education,
+        certifications: resume.certifications,
+        projects: resume.projects,
+        languages: resume.languages,
+        customSections: resume.customSections,
+      });
+      const fileUrl = resume.pdfPath || resume.pdfUrl;
+      let sha256 = '';
+      if (fileUrl) {
+        try {
+          const submittedPdf = await this.storageService.getBuffer(fileUrl);
+          sha256 = createHash('sha256').update(submittedPdf).digest('hex');
+        } catch (err) {
+          this.logger.warn(
+            `snapshotSubmittedResume: PDF bytes unavailable for application ${String(
+              application._id,
+            )}: ${err instanceof Error ? err.message : err}`,
+          );
+        }
+      }
+      if (!sha256) {
+        sha256 = createHash('sha256').update(content, 'utf8').digest('hex');
+      }
+      const version = resume.version || 1;
+      const artifact = new this.applicationArtifactModel({
+        applicationId: application._id,
+        userId: new Types.ObjectId(candidateId),
+        type: ArtifactType.RESUME_VERSION,
+        content,
+        version,
+        fileName: `${resume.name || 'Resume'}.pdf`,
+        fileUrl,
+        isActive: true,
+        metadata: {
+          sourceResumeId: String(resume._id),
+          sha256,
+        },
+      });
+      const savedArtifact = await artifact.save();
+      application.artifacts = {
+        ...(application.artifacts || {}),
+        resumeVersionId: savedArtifact._id as Types.ObjectId,
+        resumeVersion: version,
+        resumeHash: sha256,
+      };
+      await this.applicationModel.updateOne(
+        { _id: application._id },
+        { $set: { artifacts: application.artifacts } },
+      );
+    } catch (err) {
+      this.logger.warn(
+        `snapshotSubmittedResume failed for application ${String(
+          application?._id,
+        )}: ${err instanceof Error ? err.message : err}`,
+      );
+    }
   }
 }

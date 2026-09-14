@@ -2,6 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
 import { CandidateMaterialsService } from './candidate-materials.service';
 import { Resume } from '../../schemas/resume.schema';
+import {
+  ApplicationArtifact,
+  ArtifactType,
+} from '../../schemas/application-artifact.schema';
 import { User } from '../../schemas/user.schema';
 import { StorageService } from '../../storage/storage.service';
 import { UsersService } from '../../users/users.service';
@@ -18,6 +22,7 @@ describe('CandidateMaterialsService', () => {
   let service: CandidateMaterialsService;
 
   const resumeModel = { findOne: jest.fn() };
+  const artifactModel = { findOne: jest.fn() };
   const userModel = { findById: jest.fn() };
   const storageService = { getBuffer: jest.fn() };
   const usersService = { getAutofillPayload: jest.fn() };
@@ -27,6 +32,10 @@ describe('CandidateMaterialsService', () => {
       providers: [
         CandidateMaterialsService,
         { provide: getModelToken(Resume.name), useValue: resumeModel },
+        {
+          provide: getModelToken(ApplicationArtifact.name),
+          useValue: artifactModel,
+        },
         { provide: getModelToken(User.name), useValue: userModel },
         { provide: StorageService, useValue: storageService },
         { provide: UsersService, useValue: usersService },
@@ -49,15 +58,28 @@ describe('CandidateMaterialsService', () => {
 
   afterEach(() => jest.clearAllMocks());
 
-  it('assembles basic identity fields + cover letter, and fetches résumé bytes via StorageService', async () => {
-    resumeModel.findOne.mockReturnValue(
-      query({ isPrimary: true, pdfPath: 'resumes/ada.pdf', name: 'Ada Resume' }),
+  it('assembles identity fields and fetches only the application\'s snapshotted résumé artifact', async () => {
+    const applicationId = '64b000000000000000000010';
+    const artifactId = '64b000000000000000000011';
+    artifactModel.findOne.mockReturnValue(
+      query({
+        _id: artifactId,
+        applicationId,
+        userId: USER_ID,
+        type: ArtifactType.RESUME_VERSION,
+        fileUrl: 'applications/exact-ada-v7.pdf',
+        fileName: 'Ada Resume.pdf',
+        version: 7,
+        isActive: true,
+      }),
     );
     const bytes = Buffer.from('%PDF-1.4 fake');
     storageService.getBuffer.mockResolvedValue(bytes);
 
     const materials = await service.assembleMaterials(USER_ID, {
+      _id: applicationId,
       coverLetter: 'Dear hiring manager...',
+      artifacts: { resumeVersionId: artifactId },
     });
 
     expect(materials.fullName).toBe('Ada Lovelace');
@@ -68,28 +90,29 @@ describe('CandidateMaterialsService', () => {
     expect(materials.linkedin).toBe('https://linkedin.com/in/ada');
     expect(materials.coverLetter).toBe('Dear hiring manager...');
 
-    expect(storageService.getBuffer).toHaveBeenCalledWith('resumes/ada.pdf');
-    expect(materials.resumeBuffer).toBe(bytes);
-    expect(materials.resumeFilename).toMatch(/\.pdf$/i);
-  });
-
-  it('falls back to pdfUrl when pdfPath is absent', async () => {
-    resumeModel.findOne.mockReturnValue(
-      query({ isPrimary: true, pdfUrl: 'https://cdn/x.pdf' }),
+    expect(artifactModel.findOne).toHaveBeenCalledWith({
+      _id: expect.anything(),
+      applicationId: expect.anything(),
+      userId: expect.anything(),
+      type: ArtifactType.RESUME_VERSION,
+    });
+    expect(storageService.getBuffer).toHaveBeenCalledWith(
+      'applications/exact-ada-v7.pdf',
     );
-    storageService.getBuffer.mockResolvedValue(Buffer.from('x'));
-
-    await service.assembleMaterials(USER_ID, {});
-
-    expect(storageService.getBuffer).toHaveBeenCalledWith('https://cdn/x.pdf');
+    expect(materials.resumeBuffer).toBe(bytes);
+    expect(materials.resumeFilename).toBe('Ada Resume.pdf');
+    expect(resumeModel.findOne).not.toHaveBeenCalled();
   });
 
-  it('leaves resumeBuffer undefined when there is no primary résumé (no throw)', async () => {
-    resumeModel.findOne.mockReturnValue(query(null));
+  it('does not fall back to the candidate\'s current primary résumé', async () => {
+    artifactModel.findOne.mockReturnValue(query(null));
 
-    const materials = await service.assembleMaterials(USER_ID, {});
+    const materials = await service.assembleMaterials(USER_ID, {
+      _id: '64b000000000000000000010',
+    });
 
     expect(storageService.getBuffer).not.toHaveBeenCalled();
+    expect(resumeModel.findOne).not.toHaveBeenCalled();
     expect(materials.resumeBuffer).toBeUndefined();
     expect(materials.resumeFilename).toBeUndefined();
     // basic fields still assembled
@@ -97,11 +120,16 @@ describe('CandidateMaterialsService', () => {
   });
 
   it('is defensive: a storage read failure does not throw and leaves resumeBuffer undefined', async () => {
-    resumeModel.findOne.mockReturnValue(query({ pdfPath: 'resumes/broken.pdf' }));
+    artifactModel.findOne.mockReturnValue(
+      query({ fileUrl: 'applications/broken.pdf', fileName: 'Resume.pdf' }),
+    );
     storageService.getBuffer.mockRejectedValue(new Error('S3 down'));
     jest.spyOn(service['logger'], 'warn').mockImplementation(() => undefined);
 
-    const materials = await service.assembleMaterials(USER_ID, {});
+    const materials = await service.assembleMaterials(USER_ID, {
+      _id: '64b000000000000000000010',
+      artifacts: { resumeVersionId: '64b000000000000000000011' },
+    });
 
     expect(materials.resumeBuffer).toBeUndefined();
     expect(materials.fullName).toBe('Ada Lovelace');
@@ -109,9 +137,11 @@ describe('CandidateMaterialsService', () => {
 
   it('is defensive: a null autofill payload does not throw', async () => {
     usersService.getAutofillPayload.mockResolvedValue(null);
-    resumeModel.findOne.mockReturnValue(query(null));
+    artifactModel.findOne.mockReturnValue(query(null));
 
-    const materials = await service.assembleMaterials(USER_ID, {});
+    const materials = await service.assembleMaterials(USER_ID, {
+      _id: '64b000000000000000000010',
+    });
 
     expect(materials.fullName).toBeUndefined();
     expect(materials.resumeBuffer).toBeUndefined();

@@ -10,6 +10,10 @@ import { Application, ApplicationSchema } from '../schemas/application.schema';
 import { Job, JobSchema } from '../schemas/job.schema';
 import { Resume, ResumeSchema } from '../schemas/resume.schema';
 import { User, UserSchema } from '../schemas/user.schema';
+import {
+  ApplicationArtifact,
+  ApplicationArtifactSchema,
+} from '../schemas/application-artifact.schema';
 import { LoggerModule } from '../common/logger/logger.module';
 import { ApplyRunnerController } from './apply-runner.controller';
 import { SelectorsController } from './selectors.controller';
@@ -34,6 +38,7 @@ import { isQueueEnabled, QUEUE_ATS } from '../queue/queue.constants';
       { name: Job.name, schema: JobSchema },
       { name: Resume.name, schema: ResumeSchema },
       { name: User.name, schema: UserSchema },
+      { name: ApplicationArtifact.name, schema: ApplicationArtifactSchema },
       { name: JobProfile.name, schema: JobProfileSchema },
     ]),
     // EligibleJobsService supplies the auto-apply-safe, geo-gated candidates.

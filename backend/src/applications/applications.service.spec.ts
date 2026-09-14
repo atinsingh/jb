@@ -6,10 +6,15 @@ import { Application } from '../schemas/application.schema';
 import { User } from '../schemas/user.schema';
 import { Job } from '../schemas/job.schema';
 import { Resume } from '../schemas/resume.schema';
+import {
+  ApplicationArtifact,
+  ArtifactType,
+} from '../schemas/application-artifact.schema';
 import { ApplicationEventsService } from './application-events.service';
 import { EmployerPipelineService } from '../employer-pipeline/employer-pipeline.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AutopilotRulesService } from '../ai-recruiter/autopilot-rules.service';
+import { StorageService } from '../storage/storage.service';
 
 const CAND = new Types.ObjectId().toHexString();
 const OWNER = new Types.ObjectId().toHexString();
@@ -27,10 +32,15 @@ describe('ApplicationsService', () => {
 
   const applicationModel: any = jest.fn();
   applicationModel.findOne = jest.fn();
+  applicationModel.updateOne = jest.fn().mockReturnValue({
+    exec: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
+  });
 
   const jobModel = { findById: jest.fn() };
   const userModel = { findById: jest.fn() };
-  const resumeModel = { find: jest.fn() };
+  const resumeModel = { find: jest.fn(), findOne: jest.fn() };
+  const artifactModel: any = jest.fn();
+  const storageService = { getBuffer: jest.fn() };
   const applicationEventsService = { recordEvent: jest.fn().mockResolvedValue({}) };
   const employerPipelineService = {
     upsertApplicant: jest.fn().mockResolvedValue({ _id: 'app-1' }),
@@ -46,6 +56,11 @@ describe('ApplicationsService', () => {
         { provide: getModelToken(Job.name), useValue: jobModel },
         { provide: getModelToken(User.name), useValue: userModel },
         { provide: getModelToken(Resume.name), useValue: resumeModel },
+        {
+          provide: getModelToken(ApplicationArtifact.name),
+          useValue: artifactModel,
+        },
+        { provide: StorageService, useValue: storageService },
         { provide: ApplicationEventsService, useValue: applicationEventsService },
         { provide: EmployerPipelineService, useValue: employerPipelineService },
         { provide: NotificationsService, useValue: notificationsService },
@@ -71,6 +86,10 @@ describe('ApplicationsService', () => {
         },
       ]),
     );
+    resumeModel.findOne.mockReturnValue({
+      sort: jest.fn().mockReturnThis(),
+      exec: jest.fn().mockResolvedValue(null),
+    });
   });
 
   afterEach(() => jest.clearAllMocks());
@@ -100,6 +119,12 @@ describe('ApplicationsService', () => {
         candidateId: CAND,
         jobId: JOBID,
         matchScore: 77,
+        artifacts: {
+          resumeVersionId: new Types.ObjectId('64b000000000000000000001'),
+          resumeVersion: 7,
+          resumeHash:
+            '621991db50b1db5e14b4dd0472b52671752a4dd07950d6093ef7e2700f50698c',
+        },
       } as any);
 
       expect(employerPipelineService.upsertApplicant).toHaveBeenCalledWith(
@@ -107,6 +132,13 @@ describe('ApplicationsService', () => {
           ownerId: OWNER,
           jobId: EMPLOYER_JOB_ID,
           candidateId: CAND,
+          applicationId: 'a1',
+          submittedResume: {
+            artifactId: '64b000000000000000000001',
+            version: 7,
+            hash:
+              '621991db50b1db5e14b4dd0472b52671752a4dd07950d6093ef7e2700f50698c',
+          },
           aiScore: 77,
           source: 'jobocate_apply',
           stage: 'applied',
@@ -214,6 +246,72 @@ describe('ApplicationsService', () => {
       expect(applicationEventsService.recordEvent).toHaveBeenCalled();
       expect(bridgeSpy).toHaveBeenCalledWith(saved);
       expect(result).toBe(saved);
+    });
+
+    it('snapshots the exact submitted resume into an immutable application artifact', async () => {
+      applicationModel.findOne.mockResolvedValue(null);
+      const saved: any = { _id: new Types.ObjectId(), candidateId: CAND, jobId: JOBID };
+      const save = jest.fn().mockResolvedValue(saved);
+      applicationModel.mockImplementation((doc: any) => ({ ...doc, save }));
+
+      const resumeId = new Types.ObjectId();
+      resumeModel.findOne.mockReturnValue({
+        sort: jest.fn().mockReturnThis(),
+        exec: jest.fn().mockResolvedValue({
+          _id: resumeId,
+          version: 7,
+          name: 'Backend Resume',
+          pdfPath: 'resumes/ada-v7.pdf',
+          fullName: 'Ada Lovelace',
+          summary: 'Builds reliable systems.',
+          skills: ['TypeScript'],
+        }),
+      });
+      storageService.getBuffer.mockResolvedValue(Buffer.from('exact submitted PDF'));
+
+      const artifactId = new Types.ObjectId();
+      const artifactSave = jest.fn().mockResolvedValue({ _id: artifactId });
+      artifactModel.mockImplementation((doc: any) => ({ ...doc, save: artifactSave }));
+      const bridgeSpy = jest
+        .spyOn(service, 'bridgeApplicationToPipeline')
+        .mockResolvedValue(undefined);
+
+      await service.createApplication(CAND, JOBID);
+
+      expect(artifactModel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          applicationId: saved._id,
+          userId: expect.any(Types.ObjectId),
+          type: ArtifactType.RESUME_VERSION,
+          version: 7,
+          fileName: 'Backend Resume.pdf',
+          fileUrl: 'resumes/ada-v7.pdf',
+          isActive: true,
+          metadata: {
+            sourceResumeId: String(resumeId),
+            sha256:
+              '621991db50b1db5e14b4dd0472b52671752a4dd07950d6093ef7e2700f50698c',
+          },
+        }),
+      );
+      expect(applicationModel.updateOne).toHaveBeenCalledWith(
+        { _id: saved._id },
+        {
+          $set: {
+            artifacts: {
+              resumeVersionId: artifactId,
+              resumeVersion: 7,
+              resumeHash:
+                '621991db50b1db5e14b4dd0472b52671752a4dd07950d6093ef7e2700f50698c',
+            },
+          },
+        },
+      );
+      expect(bridgeSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          artifacts: expect.objectContaining({ resumeVersionId: artifactId }),
+        }),
+      );
     });
   });
 

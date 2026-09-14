@@ -14,6 +14,22 @@ export class EmployerApplicant {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: false })
   candidateId?: Types.ObjectId;
 
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Application', index: true })
+  applicationId?: Types.ObjectId;
+
+  @Prop({ type: Object, default: undefined })
+  submittedResume?: {
+    artifactId: Types.ObjectId;
+    version: number;
+    hash: string;
+  };
+
+  @Prop({ type: Object, default: undefined })
+  resumeAssessment?: Record<string, any>;
+
+  @Prop({ type: [Object], default: [] })
+  resumeAssessmentHistory?: Array<Record<string, any>>;
+
   @Prop({ default: '' })
   candidateName?: string;
 
