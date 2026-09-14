@@ -12,6 +12,7 @@ import {
   HAIR,
 } from '@/components/app/v3/kit';
 import { getUserPreferences, updateUserPreferences } from '@/services/api';
+import { useAuth } from '@/context/AuthContext';
 import {
   getUserProfile,
   updateUserProfile,
@@ -133,6 +134,7 @@ function TextRow({ label, value, onChange, readOnly, required }) {
 }
 
 export default function AppSettings() {
+  const { logout } = useAuth();
   const [tab, setTab] = useState('account');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -159,6 +161,8 @@ export default function AppSettings() {
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -283,6 +287,18 @@ export default function AppSettings() {
     setDirty(false);
   };
 
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    setLogoutError(null);
+    try {
+      await logout();
+    } catch (e) {
+      setLogoutError(new Error(`Couldn’t log you out. ${e.message || 'Please try again.'}`));
+      setLoggingOut(false);
+    }
+  };
+
   return (
     <>
       <Head>
@@ -349,6 +365,26 @@ export default function AppSettings() {
                   value={profile.linkedin}
                   onChange={(v) => onProfileChange('linkedin', v)}
                 />
+                <div
+                  style={{
+                    borderBottom: HAIR,
+                    padding: '17px 4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 20,
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div style={mono(10, '0.12em')}>Session</div>
+                    <p style={{ fontSize: 12, color: 'var(--jb-v3-fg-3)', margin: '6px 0 0' }}>
+                      Sign out of Jobocate on this device.
+                    </p>
+                    {logoutError && <div style={{ marginTop: 10 }}><InlineError error={logoutError} /></div>}
+                  </div>
+                  <MonoButton onClick={handleLogout} disabled={loggingOut}>
+                    {loggingOut ? 'Logging out…' : 'Log out'}
+                  </MonoButton>
+                </div>
               </>
             )}
 

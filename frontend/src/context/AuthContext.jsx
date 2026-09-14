@@ -224,7 +224,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+    if (error) throw new Error(error.message);
     loadedForRef.current = null;
     setUser(null);
     router.push(LOGIN_ROUTE);

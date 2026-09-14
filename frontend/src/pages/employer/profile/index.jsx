@@ -5,6 +5,7 @@ import Head from 'next/head';
 import EmployerSidebar from '@/components/employer/EmployerSidebar';
 import { LoadingState, ErrorState, InlineError } from '@/components/employer/EmployerStates';
 import { employerProfileApi } from '@/services/employerApi';
+import { useAuth } from '@/context/AuthContext';
 
 const EMPTY_FORM = { name: '', phone: '', location: '', summary: '' };
 
@@ -24,6 +25,7 @@ const Icon = {
 };
 
 export default function EmployerProfile() {
+  const { logout } = useAuth();
   const [profile, setProfile] = useState(null);
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [loading, setLoading] = useState(true);
@@ -38,6 +40,8 @@ export default function EmployerProfile() {
   const [pwdSaving, setPwdSaving] = useState(false);
   const [pwdError, setPwdError] = useState(null);
   const [pwdOk, setPwdOk] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -115,6 +119,18 @@ export default function EmployerProfile() {
       setPwdError(err);
     } finally {
       setPwdSaving(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    setLogoutError(null);
+    try {
+      await logout();
+    } catch (err) {
+      setLogoutError(new Error(`Couldn’t log you out. ${err.message || 'Please try again.'}`));
+      setLoggingOut(false);
     }
   };
 
@@ -262,7 +278,7 @@ export default function EmployerProfile() {
                   </div>
                   <div style={{ padding: 24 }}>
                     {/* Change password */}
-                    <div style={{ borderBottom: profile.createdAt ? '1px solid #F2ECE0' : 'none', paddingBottom: profile.createdAt ? 20 : 0 }}>
+                    <div style={{ borderBottom: '1px solid #F2ECE0', paddingBottom: 20 }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                         <div>
                           <h4 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 3px' }}>Change password</h4>
@@ -302,7 +318,7 @@ export default function EmployerProfile() {
 
                     {/* Account created */}
                     {profile.createdAt && (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingTop: 20 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '20px 0', borderBottom: '1px solid #F2ECE0' }}>
                         <div>
                           <h4 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 3px' }}>Account created</h4>
                           <p style={{ fontSize: 13, color: '#8A8378', margin: 0 }}>
@@ -314,6 +330,25 @@ export default function EmployerProfile() {
                         </span>
                       </div>
                     )}
+
+                    <div style={{ paddingTop: 20 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                        <div>
+                          <h4 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 3px' }}>Session</h4>
+                          <p style={{ fontSize: 13, color: '#8A8378', margin: 0 }}>Sign out of Jobocate on this device.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleLogout}
+                          disabled={loggingOut}
+                          className="em-ghost"
+                          style={{ ...ghostBtn, opacity: loggingOut ? 0.6 : 1 }}
+                        >
+                          {loggingOut ? 'Logging out…' : 'Log out'}
+                        </button>
+                      </div>
+                      {logoutError && <div style={{ marginTop: 14 }}><InlineError error={logoutError} /></div>}
+                    </div>
                   </div>
                 </div>
               </>
