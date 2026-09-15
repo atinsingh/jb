@@ -96,6 +96,33 @@ test.describe('posting a job', () => {
 });
 
 test.describe('post-a-job CRUD workspace', () => {
+  test('keeps the section chrome dark when the employer theme is dark', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('jobocate-marketing-theme', 'dark');
+    });
+    await page.goto('/employer/jobs/post', { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: /company details/i }).click();
+
+    const themeColors = await page.locator('#emapp').evaluate((root) => {
+      const resolve = (token: string) => {
+        const probe = document.createElement('span');
+        probe.style.backgroundColor = `var(${token})`;
+        root.appendChild(probe);
+        const color = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+        return color;
+      };
+      return { sunk: resolve('--jb-v3-sunk'), control: resolve('--jb-v3-control'), accentSoft: resolve('--jb-v3-accent-soft') };
+    });
+    const sectionHeader = page.locator('#jobPostForm h3').first().locator('..');
+    const activeStep = page.getByRole('button', { name: /company details/i });
+    const logoPlaceholder = page.getByText('Logo', { exact: true }).locator('..').locator('..');
+
+    await expect(sectionHeader).toHaveCSS('background-color', themeColors.sunk);
+    await expect(activeStep).toHaveCSS('background-color', themeColors.accentSoft);
+    await expect(logoPlaceholder).toHaveCSS('background-color', themeColors.control);
+  });
+
   test('uses the v3 surface and can edit and delete an existing job', async ({ page }) => {
     let jobs = [
       {

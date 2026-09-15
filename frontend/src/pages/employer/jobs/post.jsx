@@ -62,16 +62,16 @@ const educationLevels = [
 ];
 
 /* ------------------------------------------------------------- ui atoms --- */
-const monoLabel = { fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9A9286', display: 'block', marginBottom: 7 };
+const monoLabel = { fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--jb-v3-fg-3)', display: 'block', marginBottom: 7 };
 const blueBtn = { display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, color: '#fff', background: '#4263EB', border: 'none', borderRadius: 999, padding: '10px 18px', cursor: 'pointer' };
-const ghostBtn = { display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: '#1B1A16', background: '#FFFEFB', border: '1px solid #D9D0BE', borderRadius: 999, padding: '10px 16px', cursor: 'pointer' };
-const fieldInput = { width: '100%', fontFamily: 'inherit', fontSize: 13.5, color: '#1B1A16', background: '#FBF8F1', border: '1px solid #E1D9C9', borderRadius: 10, padding: '11px 12px', boxSizing: 'border-box' };
+const ghostBtn = { display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: 'var(--jb-v3-fg)', background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line-btn)', borderRadius: 999, padding: '10px 16px', cursor: 'pointer' };
+const fieldInput = { width: '100%', fontFamily: 'inherit', fontSize: 13.5, color: 'var(--jb-v3-fg)', background: 'var(--jb-v3-control)', border: '1px solid var(--jb-v3-line-2)', borderRadius: 10, padding: '11px 12px', boxSizing: 'border-box' };
 const selectStyle = {
   ...fieldInput, cursor: 'pointer', appearance: 'none', paddingRight: 34,
   backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238A8378' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
   backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center',
 };
-const cardStyle = { background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 16, overflow: 'hidden' };
+const cardStyle = { background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 16, overflow: 'hidden' };
 
 const emptyForm = () => ({
   title: '',
@@ -117,9 +117,9 @@ function Field({ label, required, children }) {
 function Section({ title, description, visible, children }) {
   return (
     <div style={{ ...cardStyle, display: visible ? 'block' : 'none' }}>
-      <div style={{ padding: '16px 22px', borderBottom: '1px solid #F2ECE0', background: '#FBF9F4' }}>
-        <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: '#1B1A16' }}>{title}</h3>
-        {description && <p style={{ fontSize: 13, color: '#8A8378', margin: '4px 0 0' }}>{description}</p>}
+      <div style={{ padding: '16px 22px', borderBottom: '1px solid var(--jb-v3-line)', background: 'var(--jb-v3-sunk)' }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: 'var(--jb-v3-fg)' }}>{title}</h3>
+        {description && <p style={{ fontSize: 13, color: 'var(--jb-v3-fg-2)', margin: '4px 0 0' }}>{description}</p>}
       </div>
       <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 20 }}>{children}</div>
     </div>
@@ -421,9 +421,9 @@ function PostJob() {
       {formData[field].length > 0 && (
         <ul style={{ listStyle: 'none', margin: '10px 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: 7 }}>
           {formData[field].map((item, index) => (
-            <li key={index} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: '#FBF9F4', border: '1px solid #F2ECE0', borderRadius: 10, padding: '9px 12px' }}>
-              <span style={{ fontSize: 13, color: '#3A352C' }}>{item}</span>
-              <button type="button" onClick={() => removeItem(field, index)} style={{ flexShrink: 0, width: 20, height: 20, borderRadius: '50%', background: '#F2ECE0', color: '#8A8378', border: 'none', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }} aria-label="Remove">✕</button>
+            <li key={index} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: 'var(--jb-v3-control)', border: '1px solid var(--jb-v3-line)', borderRadius: 10, padding: '9px 12px' }}>
+              <span style={{ fontSize: 13, color: 'var(--jb-v3-fg)' }}>{item}</span>
+              <button type="button" onClick={() => removeItem(field, index)} style={{ flexShrink: 0, width: 20, height: 20, borderRadius: '50%', background: 'var(--jb-v3-line)', color: 'var(--jb-v3-fg-2)', border: 'none', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }} aria-label="Remove">✕</button>
             </li>
           ))}
         </ul>
@@ -516,11 +516,11 @@ function PostJob() {
                     onClick={() => setActiveSection(section.id)}
                     style={{
                       display: 'inline-flex', alignItems: 'center', gap: 8, fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600,
-                      color: on ? '#1F2D6B' : '#8A8378', background: on ? '#EDF0FE' : '#FFFEFB',
-                      border: `1px solid ${on ? '#C7D2FB' : '#E6DECF'}`, borderRadius: 999, padding: '8px 14px', cursor: 'pointer',
+                      color: on ? 'var(--jb-v3-accent-faint)' : 'var(--jb-v3-fg-3)', background: on ? 'var(--jb-v3-accent-soft)' : 'var(--jb-v3-panel)',
+                      border: `1px solid ${on ? 'var(--jb-v3-accent-line)' : 'var(--jb-v3-line)'}`, borderRadius: 999, padding: '8px 14px', cursor: 'pointer',
                     }}
                   >
-                    <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, color: on ? '#4263EB' : '#A79E8F' }}>{index + 1}</span>
+                    <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, color: on ? 'var(--jb-v3-accent-faint)' : 'var(--jb-v3-fg-3)' }}>{index + 1}</span>
                     {section.title}
                   </button>
                 );
@@ -588,11 +588,11 @@ function PostJob() {
                   </select>
                 </Field>
 
-                <div style={{ background: '#F5F7FF', border: '1px solid #C7D2FB', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ background: 'var(--jb-v3-accent-soft)', border: '1px solid var(--jb-v3-accent-line)', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 15 }}>✦</span>
-                    <span style={{ fontSize: 13.5, fontWeight: 700, color: '#1F2D6B' }}>Draft with AI</span>
-                    <span style={{ fontSize: 12, color: '#5A544A' }}>— writes the description, responsibilities and requirements below from the title and skills you give it. Edit anything before publishing.</span>
+                    <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--jb-v3-fg)' }}>Draft with AI</span>
+                    <span style={{ fontSize: 12, color: 'var(--jb-v3-fg-2)' }}>— writes the description, responsibilities and requirements below from the title and skills you give it. Edit anything before publishing.</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
                     <Field label="Key Skills (comma-separated)">
@@ -640,7 +640,7 @@ function PostJob() {
                 </Field>
 
                 <div style={{ display: 'flex', justifyContent: 'center' }}>
-                  <div style={{ width: 96, height: 96, borderRadius: '50%', background: '#FBF9F4', border: '2px dashed #E1D9C9', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                  <div style={{ width: 96, height: 96, borderRadius: '50%', background: 'var(--jb-v3-control)', border: '2px dashed var(--jb-v3-line-dashed)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                     {formData.companyLogo ? (
                       <img src={formData.companyLogo} alt="Company Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
@@ -685,7 +685,7 @@ function PostJob() {
 
               {/* PREVIEW */}
               <Section title="Preview & Submit" description="Review your job posting before submitting." visible={activeSection === 'preview'}>
-                <div style={{ background: '#FBF9F4', border: '1px solid #F2ECE0', borderRadius: 12, padding: 20 }}>
+                <div style={{ background: 'var(--jb-v3-control)', border: '1px solid var(--jb-v3-line)', borderRadius: 12, padding: 20 }}>
                   <h3 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 24, margin: '0 0 4px' }}>{formData.title || 'Job Title'}</h3>
                   <p style={{ fontSize: 13.5, color: '#8A8378', margin: 0 }}>
                     {formData.companyName || 'Company Name'} · {formData.location || 'Location'}{formData.isRemote && ' · Remote'}
