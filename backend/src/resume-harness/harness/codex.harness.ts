@@ -73,6 +73,7 @@ export class CodexHarness implements HarnessAdapter {
     return [
       `model = "${alias.alias}"`,
       'model_provider = "litellm"',
+      `model_reasoning_effort = "${alias.effort}"`,
       ...ceiling,
       // The sandbox is the isolation boundary; no interactive approval exists.
       'approval_policy = "never"',

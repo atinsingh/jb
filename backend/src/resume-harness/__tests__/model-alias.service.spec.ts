@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { getModelToken } from '@nestjs/mongoose';
 import { readFileSync } from 'fs';
 import { join } from 'path';
@@ -40,6 +40,20 @@ describe('ModelAliasService', () => {
     isActive: true,
     rank: 5,
   };
+  const LUNA_ALIASES = ['low', 'medium', 'high', 'xhigh', 'max'].map(
+    (effort, rank) => ({
+      alias: `openai/gpt-5.6-luna/${effort}`,
+      provider: 'openai',
+      model: 'gpt-5.6-luna',
+      effort,
+      label: `GPT-5.6 Luna · ${effort}`,
+      modelLabel: 'GPT-5.6 Luna',
+      tiers: ['PRO', 'ELITE'],
+      defaultForTiers: [],
+      isActive: true,
+      rank: rank + 20,
+    }),
+  );
 
   const aliasModel = { find: jest.fn() };
   const userModel = { findById: jest.fn() };
@@ -54,7 +68,10 @@ describe('ModelAliasService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ModelAliasService,
-        { provide: getModelToken(HarnessModelAlias.name), useValue: aliasModel },
+        {
+          provide: getModelToken(HarnessModelAlias.name),
+          useValue: aliasModel,
+        },
         { provide: getModelToken(User.name), useValue: userModel },
       ],
     }).compile();
@@ -63,7 +80,9 @@ describe('ModelAliasService', () => {
 
   const signedInAs = (tier: string | undefined) => {
     userModel.findById.mockReturnValue({
-      lean: () => ({ exec: async () => ({ _id: 'u1', currentPlanType: tier }) }),
+      lean: () => ({
+        exec: async () => ({ _id: 'u1', currentPlanType: tier }),
+      }),
     });
   };
 
@@ -122,6 +141,56 @@ describe('ModelAliasService', () => {
     expect(resolved.effort).toBe('high');
   });
 
+  it('exposes Luna effort capabilities without leaking provider aliases', async () => {
+    signedInAs('PRO');
+    aliasModel.find.mockReturnValue(findReturning(LUNA_ALIASES));
+
+    const capabilities = await (service as any).capabilitiesForUser('u1');
+
+    expect(capabilities).toEqual([
+      {
+        model: 'gpt-5.6-luna',
+        label: 'GPT-5.6 Luna',
+        efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
+      },
+    ]);
+    expect(capabilities[0]).not.toHaveProperty('provider');
+    expect(capabilities[0]).not.toHaveProperty('alias');
+  });
+
+  it('resolves the exact model and supported effort selected by the user', async () => {
+    signedInAs('PRO');
+    aliasModel.find.mockReturnValue(findReturning(LUNA_ALIASES));
+
+    const resolved = await (service as any).resolveSelectionForUser(
+      'u1',
+      'gpt-5.6-luna',
+      'xhigh',
+    );
+
+    expect(resolved).toMatchObject({
+      alias: 'openai/gpt-5.6-luna/xhigh',
+      provider: 'openai',
+      model: 'gpt-5.6-luna',
+      effort: 'xhigh',
+      tier: 'PRO',
+    });
+  });
+
+  it('rejects an unsupported Luna effort with the supported values', async () => {
+    signedInAs('PRO');
+    aliasModel.find.mockReturnValue(findReturning(LUNA_ALIASES));
+
+    await expect(
+      (service as any).resolveSelectionForUser('u1', 'gpt-5.6-luna', 'minimal'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      (service as any).resolveSelectionForUser('u1', 'gpt-5.6-luna', 'minimal'),
+    ).rejects.toThrow(
+      'Effort "minimal" is not supported for gpt-5.6-luna. Supported: low, medium, high, xhigh, max.',
+    );
+  });
+
   it('rejects an out-of-tier alias instead of silently downgrading', async () => {
     signedInAs('PRO');
     aliasModel.find.mockReturnValue(findReturning([PRO_ALIAS]));
@@ -165,9 +234,9 @@ describe('ModelAliasService', () => {
     const allowed = await service.listForUser('u1');
     expect(allowed.map((a) => a.alias)).toEqual([PRO_ALIAS.alias]);
 
-    await expect(
-      service.resolveForUser('u1', llama.alias),
-    ).rejects.toThrow(/not available on your plan/i);
+    await expect(service.resolveForUser('u1', llama.alias)).rejects.toThrow(
+      /not available on your plan/i,
+    );
 
     const resolved = await service.resolveForUser('u1');
     expect(resolved.alias).toBe(PRO_ALIAS.alias);
@@ -211,7 +280,8 @@ describe('ModelAliasService', () => {
 
     // No tier is named in code except the FREE floor used when a user has no
     // plan at all, which is an auth default rather than a model mapping.
-    const tierLiterals = code.match(/['"`](FREE|PRO|ELITE|INTERVIEW)['"`]/g) || [];
+    const tierLiterals =
+      code.match(/['"`](FREE|PRO|ELITE|INTERVIEW)['"`]/g) || [];
     expect(tierLiterals).toEqual(["'FREE'"]);
   });
 });

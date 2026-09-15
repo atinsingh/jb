@@ -52,6 +52,24 @@ const ALIAS = {
   label: 'Nova Micro · cheapest',
 };
 
+const ROUTED_ALIASES: Record<string, any> = {
+  'claude-code': {
+    alias: 'anthropic/claude-sonnet-4-5/high',
+    provider: 'anthropic',
+    model: 'claude-sonnet-4-5',
+    effort: 'high',
+    label: 'Sonnet 4.5 · high',
+  },
+  codex: {
+    alias: 'openai/gpt-5.1-codex/high',
+    provider: 'openai',
+    model: 'gpt-5.1-codex',
+    effort: 'high',
+    label: 'GPT-5.1 Codex · high',
+  },
+  opencode: ALIAS,
+};
+
 const CLASSIC: any = {
   key: 'classic-serif',
   name: 'Classic Serif',
@@ -132,7 +150,9 @@ describe('ResumeHarnessService — template and vibe', () => {
   };
 
   const modelAlias: any = {
-    resolveForUser: jest.fn(async () => ALIAS),
+    resolveSelectionForUser: jest.fn(async (_userId, model) =>
+      Object.values(ROUTED_ALIASES).find((alias: any) => alias.model === model),
+    ),
     listForUser: jest.fn(async () => [ALIAS]),
   };
 
@@ -191,7 +211,13 @@ describe('ResumeHarnessService — template and vibe', () => {
         },
         { provide: SandboxService, useValue: sandbox },
         { provide: LatexService, useValue: latex },
-        { provide: StorageService, useValue: { put: jest.fn(async () => ({})), getBuffer: jest.fn(async () => Buffer.from('%PDF')) } },
+        {
+          provide: StorageService,
+          useValue: {
+            put: jest.fn(async () => ({})),
+            getBuffer: jest.fn(async () => Buffer.from('%PDF')),
+          },
+        },
         { provide: ModelAliasService, useValue: modelAlias },
         { provide: CandidateContextService, useValue: candidateContext },
         { provide: ResumeTemplateService, useValue: templates },
@@ -203,15 +229,21 @@ describe('ResumeHarnessService — template and vibe', () => {
 
   /** A session that already has a résumé, which is what a look change acts on. */
   const startGenerated = async (harness: any = 'codex') => {
-    const session = await service.startSession('u1', { harness });
+    const selected = ROUTED_ALIASES[harness];
+    const session = await service.startSession('u1', {
+      model: selected.model,
+      effort: selected.effort,
+    });
     sandbox.readFile.mockResolvedValueOnce(resumeDoc('v1'));
     await service.runTurn('u1', session.id, { instruction: 'build it' });
     return session;
   };
 
   it('seeds the sandbox with the template skeleton and its condition at session start', async () => {
+    const selected = ROUTED_ALIASES.codex;
     const session = await service.startSession('u1', {
-      harness: 'codex',
+      model: selected.model,
+      effort: selected.effort,
       templateKey: 'modern-sans',
     });
 
@@ -337,20 +369,26 @@ describe('ResumeHarnessService — template and vibe', () => {
   });
 
   it('carries template and vibe onto a new session on a different harness', async () => {
+    const claude = ROUTED_ALIASES['claude-code'];
     const first = await service.startSession('u1', {
-      harness: 'claude-code',
+      model: claude.model,
+      effort: claude.effort,
       templateKey: 'modern-sans',
       vibe: { density: 'compact' },
     });
     sandbox.readFile.mockResolvedValueOnce(resumeDoc('carried'));
     await service.runTurn('u1', first.id, { instruction: 'build it' });
 
+    const opencode = ROUTED_ALIASES.opencode;
     const next = await service.startSession('u1', {
-      harness: 'opencode',
+      model: opencode.model,
+      effort: opencode.effort,
       carryFromSessionId: first.id,
     });
 
-    expect(next.harness).toBe('opencode');
+    expect(store.find((item) => String(item._id) === next.id).harness).toBe(
+      'opencode',
+    );
     expect(next.templateKey).toBe('modern-sans');
     expect(next.vibe).toEqual({ density: 'compact' });
     expect(next.latex).toBe(resumeDoc('carried'));
@@ -370,8 +408,10 @@ describe('ResumeHarnessService — template and vibe', () => {
     // template before pressing Generate. Writing the new condition is the whole
     // operation; running a turn here would bill them for a document they never
     // asked for, and would leave an empty snapshot for "back" to restore.
+    const selected = ROUTED_ALIASES.codex;
     const session = await service.startSession('u1', {
-      harness: 'codex',
+      model: selected.model,
+      effort: selected.effort,
       templateKey: 'classic-serif',
     });
     sandbox.exec.mockClear();
@@ -392,8 +432,10 @@ describe('ResumeHarnessService — template and vibe', () => {
   });
 
   it('does not spend a turn when the selected look is already active', async () => {
+    const selected = ROUTED_ALIASES.codex;
     const session = await service.startSession('u1', {
-      harness: 'codex',
+      model: selected.model,
+      effort: selected.effort,
       templateKey: 'modern-sans',
     });
     sandbox.exec.mockClear();

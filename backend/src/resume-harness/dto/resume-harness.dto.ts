@@ -24,7 +24,7 @@ export type VibeDto = Record<string, string>;
 
 export class RenameSessionDto {
   @ApiProperty()
-  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   @MinLength(1)
   @MaxLength(200)
@@ -32,24 +32,20 @@ export class RenameSessionDto {
 }
 
 export class StartSessionDto {
-  @ApiProperty({ enum: HARNESS_IDS })
-  @IsIn(HARNESS_IDS as unknown as string[])
-  harness: HarnessId;
-
-  @ApiPropertyOptional({
-    description:
-      'Model+effort alias to run at. Must be one the caller tier permits; ' +
-      'omitted means the tier default.',
-  })
-  @IsOptional()
+  @ApiProperty({ description: 'Model id offered by the options endpoint.' })
   @IsString()
   @MaxLength(200)
-  alias?: string;
+  model: string;
+
+  @ApiProperty({ description: 'Effort offered for the selected model.' })
+  @IsString()
+  @MaxLength(40)
+  effort: string;
 
   @ApiPropertyOptional({
     description:
       'Session whose resume should seed this one. This is the supported way ' +
-      'to change harness.',
+      'to continue in a newly routed session.',
   })
   @IsOptional()
   @IsMongoId()

@@ -10,7 +10,13 @@ import { HarnessModelAlias } from '../src/resume-harness/schemas/harness-model-a
 import { ResumeTemplate } from '../src/resume-harness/schemas/resume-template.schema';
 import { seedResumeTemplates } from '../src/resume-harness/templates/resume-templates.seed';
 import { HARNESS_IDS } from '../src/resume-harness/harness/harness.types';
-import { api, auth, registerUser, resetDatabase, TestUser } from './utils/e2e-app';
+import {
+  api,
+  auth,
+  registerUser,
+  resetDatabase,
+  TestUser,
+} from './utils/e2e-app';
 
 /**
  * The create-then-update vertical slice, run once per harness.
@@ -83,10 +89,18 @@ class FakeSandboxDriver {
     // The LaTeX build.
     if (command[0] === 'sh') {
       if (!box.files.has('resume.tex')) {
-        return { exitCode: 1, stdout: '', stderr: '! LaTeX Error: file not found.' };
+        return {
+          exitCode: 1,
+          stdout: '',
+          stderr: '! LaTeX Error: file not found.',
+        };
       }
       box.files.set('build/resume.pdf', '%PDF-1.7 fake');
-      return { exitCode: 0, stdout: 'Latexmk: All targets are up-to-date', stderr: '' };
+      return {
+        exitCode: 0,
+        stdout: 'Latexmk: All targets are up-to-date',
+        stderr: '',
+      };
     }
 
     // A harness turn: the prompt is the last argv element for all three CLIs.
@@ -124,10 +138,35 @@ const FREE_TIER_ALIAS = {
   model: 'claude-haiku-4-5',
   effort: 'low',
   label: 'Haiku 4.5 · fast',
+  modelLabel: 'Claude Haiku 4.5',
   tiers: ['FREE'],
   defaultForTiers: ['FREE'],
   rank: 10,
   isActive: true,
+};
+
+const FREE_OPENAI_ALIAS = {
+  ...FREE_TIER_ALIAS,
+  alias: 'openai/gpt-5.6-luna/low',
+  provider: 'openai',
+  model: 'gpt-5.6-luna',
+  effort: 'low',
+  label: 'GPT-5.6 Luna · low',
+  modelLabel: 'GPT-5.6 Luna',
+  defaultForTiers: [],
+  rank: 20,
+};
+
+const FREE_BEDROCK_ALIAS = {
+  ...FREE_TIER_ALIAS,
+  alias: 'bedrock/nova-micro/low',
+  provider: 'bedrock',
+  model: 'nova-micro',
+  effort: 'low',
+  label: 'Nova Micro · low',
+  modelLabel: 'Nova Micro',
+  defaultForTiers: [],
+  rank: 30,
 };
 
 const ELITE_ONLY_ALIAS = {
@@ -170,7 +209,12 @@ describe('Resume harness (e2e)', () => {
     candidate = await registerUser(app, 'ROLE_CANDIDATE', 'resume-harness');
 
     const aliases = app.get<Model<any>>(getModelToken(HarnessModelAlias.name));
-    await aliases.create([FREE_TIER_ALIAS, ELITE_ONLY_ALIAS]);
+    await aliases.create([
+      FREE_TIER_ALIAS,
+      FREE_OPENAI_ALIAS,
+      FREE_BEDROCK_ALIAS,
+      ELITE_ONLY_ALIAS,
+    ]);
 
     // The real catalogue, installed the way production installs it. Asserting
     // against the seeded templates rather than fixtures is what makes this
@@ -184,32 +228,47 @@ describe('Resume harness (e2e)', () => {
     await app?.close();
   });
 
-  it('offers every harness and only the aliases the tier permits', async () => {
+  it('offers model capabilities without provider or runtime details', async () => {
     const res = await api(app)
       .get('/api/resume-harness/options')
       .set(auth(candidate.token))
       .expect(200);
 
-    expect(res.body.harnesses.map((h: any) => h.id).sort()).toEqual(
-      [...HARNESS_IDS].sort(),
-    );
-    expect(res.body.models.map((m: any) => m.alias)).toEqual([
-      FREE_TIER_ALIAS.alias,
+    expect(res.body.harnesses).toBeUndefined();
+    expect(res.body.models).toEqual([
+      {
+        model: FREE_TIER_ALIAS.model,
+        label: FREE_TIER_ALIAS.modelLabel,
+        efforts: [FREE_TIER_ALIAS.effort],
+      },
+      {
+        model: FREE_OPENAI_ALIAS.model,
+        label: FREE_OPENAI_ALIAS.modelLabel,
+        efforts: [FREE_OPENAI_ALIAS.effort],
+      },
+      {
+        model: FREE_BEDROCK_ALIAS.model,
+        label: FREE_BEDROCK_ALIAS.modelLabel,
+        efforts: [FREE_BEDROCK_ALIAS.effort],
+      },
     ]);
     expect(res.body.tier).toBe('FREE');
   });
 
-  it('refuses an out-of-tier alias instead of downgrading it', async () => {
+  it('refuses an out-of-tier model instead of downgrading it', async () => {
     await api(app)
       .post('/api/resume-harness/sessions')
       .set(auth(candidate.token))
-      .send({ harness: 'claude-code', alias: ELITE_ONLY_ALIAS.alias })
+      .send({ model: ELITE_ONLY_ALIAS.model, effort: ELITE_ONLY_ALIAS.effort })
       .expect(403);
   });
 
-  // The whole point of the harness abstraction: identical behaviour, identical
-  // API surface, three different agents.
-  describe.each(HARNESS_IDS)('on %s', (harness) => {
+  // Provider metadata chooses the private runtime on the server.
+  describe.each([
+    { alias: FREE_TIER_ALIAS, harness: 'claude-code' },
+    { alias: FREE_OPENAI_ALIAS, harness: 'codex' },
+    { alias: FREE_BEDROCK_ALIAS, harness: 'opencode' },
+  ])('on $harness', ({ alias, harness }) => {
     let sessionId: string;
 
     it('starts a session bound to exactly one sandbox with the right context files', async () => {
@@ -218,13 +277,15 @@ describe('Resume harness (e2e)', () => {
       const res = await api(app)
         .post('/api/resume-harness/sessions')
         .set(auth(candidate.token))
-        .send({ harness })
+        .send({ model: alias.model, effort: alias.effort })
         .expect(201);
 
       sessionId = res.body.id;
-      expect(res.body.harness).toBe(harness);
-      expect(res.body.model).toBe(FREE_TIER_ALIAS.model);
-      expect(res.body.effort).toBe(FREE_TIER_ALIAS.effort);
+      expect(res.body.harness).toBeUndefined();
+      expect(res.body.provider).toBeUndefined();
+      expect(res.body.alias).toBeUndefined();
+      expect(res.body.model).toBe(alias.model);
+      expect(res.body.effort).toBe(alias.effort);
       expect(platform.sandboxes.size).toBe(before + 1);
 
       const box = platform.sandboxes.get(res.body.sandboxId)!;
@@ -239,9 +300,9 @@ describe('Resume harness (e2e)', () => {
       }
 
       // Every harness is authenticated by the proxy key and tagged.
-      expect(JSON.stringify({ env: box.spec.env, files: [...box.files] })).toContain(
-        `harness=${harness}`,
-      );
+      expect(
+        JSON.stringify({ env: box.spec.env, files: [...box.files] }),
+      ).toContain(`harness=${harness}`);
     });
 
     it('generates a compiling LaTeX resume from scratch', async () => {
@@ -307,11 +368,11 @@ describe('Resume harness (e2e)', () => {
     });
   });
 
-  it('carries the resume forward into a new session on a different harness', async () => {
+  it('carries the resume forward into a new server-routed session', async () => {
     const first = await api(app)
       .post('/api/resume-harness/sessions')
       .set(auth(candidate.token))
-      .send({ harness: 'claude-code' })
+      .send({ model: FREE_TIER_ALIAS.model, effort: FREE_TIER_ALIAS.effort })
       .expect(201);
 
     const generated = await api(app)
@@ -323,10 +384,14 @@ describe('Resume harness (e2e)', () => {
     const second = await api(app)
       .post('/api/resume-harness/sessions')
       .set(auth(candidate.token))
-      .send({ harness: 'codex', carryFromSessionId: first.body.id })
+      .send({
+        model: FREE_OPENAI_ALIAS.model,
+        effort: FREE_OPENAI_ALIAS.effort,
+        carryFromSessionId: first.body.id,
+      })
       .expect(201);
 
-    expect(second.body.harness).toBe('codex');
+    expect(second.body.harness).toBeUndefined();
     expect(second.body.latex).toBe(generated.body.latex);
     expect(second.body.sandboxId).not.toBe(first.body.sandboxId);
 
@@ -336,35 +401,88 @@ describe('Resume harness (e2e)', () => {
   });
 
   it('keeps ended sessions and PDFs, restores revisions, and deletes only the caller’s history', async () => {
-    const started = await api(app).post('/api/resume-harness/sessions')
-      .set(auth(candidate.token)).send({ harness: 'codex', targetRole: '  Staff Engineer  ' }).expect(201);
+    const started = await api(app)
+      .post('/api/resume-harness/sessions')
+      .set(auth(candidate.token))
+      .send({
+        model: FREE_OPENAI_ALIAS.model,
+        effort: FREE_OPENAI_ALIAS.effort,
+        targetRole: '  Staff Engineer  ',
+      })
+      .expect(201);
     const url = `/api/resume-harness/sessions/${started.body.id}`;
     expect(started.body.name).toBe('Staff Engineer');
-    const generated = await api(app).post(`${url}/turns`).set(auth(candidate.token))
-      .send({ instruction: 'Build my résumé.' }).expect(201);
-    expect(generated.body.turns[0]).toMatchObject({ kind: 'instruction', revision: 1, hasPdf: true });
+    const generated = await api(app)
+      .post(`${url}/turns`)
+      .set(auth(candidate.token))
+      .send({ instruction: 'Build my résumé.' })
+      .expect(201);
+    expect(generated.body.turns[0]).toMatchObject({
+      kind: 'instruction',
+      revision: 1,
+      hasPdf: true,
+    });
     expect(generated.body.turns[0].pdfKey).toBeUndefined();
-    await api(app).patch(url).set(auth(candidate.token)).send({ name: '   ' }).expect(400);
-    const renamed = await api(app).patch(url).set(auth(candidate.token)).send({ name: '  Platform résumé  ' }).expect(200);
+    await api(app)
+      .patch(url)
+      .set(auth(candidate.token))
+      .send({ name: '   ' })
+      .expect(400);
+    const renamed = await api(app)
+      .patch(url)
+      .set(auth(candidate.token))
+      .send({ name: '  Platform résumé  ' })
+      .expect(200);
     expect(renamed.body.name).toBe('Platform résumé');
     await api(app).post(`${url}/end`).set(auth(candidate.token)).expect(201);
-    const persisted = await api(app).get(`${url}/pdf`).set(auth(candidate.token)).expect(200);
+    const persisted = await api(app)
+      .get(`${url}/pdf`)
+      .set(auth(candidate.token))
+      .expect(200);
     expect(persisted.body.pdfBase64).toBe(generated.body.pdfBase64);
-    const restored = await api(app).post(`${url}/revisions/1/restore`).set(auth(candidate.token)).expect(201);
-    expect(restored.body).toMatchObject({ status: 'ended', revision: 2, latex: generated.body.latex });
-    expect(restored.body.turns[1]).toMatchObject({ kind: 'restore', restoredFromRevision: 1 });
-    const listed = await api(app).get('/api/resume-harness/sessions').set(auth(candidate.token)).expect(200);
+    const restored = await api(app)
+      .post(`${url}/revisions/1/restore`)
+      .set(auth(candidate.token))
+      .expect(201);
+    expect(restored.body).toMatchObject({
+      status: 'ended',
+      revision: 2,
+      latex: generated.body.latex,
+    });
+    expect(restored.body.turns[1]).toMatchObject({
+      kind: 'restore',
+      restoredFromRevision: 1,
+    });
+    const listed = await api(app)
+      .get('/api/resume-harness/sessions')
+      .set(auth(candidate.token))
+      .expect(200);
     expect(listed.body[0].id).toBe(started.body.id);
-    const outsider = await registerUser(app, 'ROLE_CANDIDATE', 'resume-history-outsider');
+    const outsider = await registerUser(
+      app,
+      'ROLE_CANDIDATE',
+      'resume-history-outsider',
+    );
     for (const [method, suffix, body] of [
-      ['get', '', undefined], ['get', '/pdf', undefined], ['patch', '', { name: 'Foreign' }],
-      ['post', '/end', undefined], ['post', '/revisions/1/restore', undefined], ['delete', '', undefined],
+      ['get', '', undefined],
+      ['get', '/pdf', undefined],
+      ['patch', '', { name: 'Foreign' }],
+      ['post', '/end', undefined],
+      ['post', '/revisions/1/restore', undefined],
+      ['delete', '', undefined],
     ] as const) {
       const req = api(app)[method](`${url}${suffix}`).set(auth(outsider.token));
       await (body ? req.send(body) : req).expect(404);
     }
-    await api(app).post('/api/resume-harness/sessions').set(auth(outsider.token))
-      .send({ harness: 'codex', carryFromSessionId: started.body.id }).expect(404);
+    await api(app)
+      .post('/api/resume-harness/sessions')
+      .set(auth(outsider.token))
+      .send({
+        model: FREE_OPENAI_ALIAS.model,
+        effort: FREE_OPENAI_ALIAS.effort,
+        carryFromSessionId: started.body.id,
+      })
+      .expect(404);
     await api(app).delete(url).set(auth(candidate.token)).expect(200);
     await api(app).get(url).set(auth(candidate.token)).expect(404);
   });
@@ -397,7 +515,10 @@ describe('Resume harness (e2e)', () => {
       await api(app).get('/api/resume-harness/templates').expect(401);
     });
 
-    describe.each(['claude-code', 'codex'] as const)('on %s', (harness) => {
+    describe.each([
+      { harness: 'claude-code', alias: FREE_TIER_ALIAS },
+      { harness: 'codex', alias: FREE_OPENAI_ALIAS },
+    ] as const)('on $harness', ({ harness, alias }) => {
       let sessionId: string;
       let sandboxId: string;
 
@@ -405,7 +526,12 @@ describe('Resume harness (e2e)', () => {
         const res = await api(app)
           .post('/api/resume-harness/sessions')
           .set(auth(candidate.token))
-          .send({ harness, templateKey: 'modern-sans', vibe: { accent: 'navy' } })
+          .send({
+            model: alias.model,
+            effort: alias.effort,
+            templateKey: 'modern-sans',
+            vibe: { accent: 'navy' },
+          })
           .expect(201);
 
         sessionId = res.body.id;
@@ -463,7 +589,9 @@ describe('Resume harness (e2e)', () => {
         // Content survives the change — this is a re-apply, not a rewrite.
         expect(res.body.latex.startsWith(before.body.latex)).toBe(true);
 
-        const agents = platform.sandboxes.get(sandboxId)!.files.get('AGENTS.md')!;
+        const agents = platform.sandboxes
+          .get(sandboxId)!
+          .files.get('AGENTS.md')!;
         expect(agents).toContain('forest');
         expect(agents).not.toContain('navy');
       });
@@ -508,9 +636,9 @@ describe('Resume harness (e2e)', () => {
 
         // The rules went back too, or the next turn would run under the
         // template that was just reverted away from.
-        expect(platform.sandboxes.get(sandboxId)!.files.get('AGENTS.md')).toContain(
-          'Modern Sans',
-        );
+        expect(
+          platform.sandboxes.get(sandboxId)!.files.get('AGENTS.md'),
+        ).toContain('Modern Sans');
 
         await api(app)
           .post(`/api/resume-harness/sessions/${sessionId}/revert-look`)
@@ -546,12 +674,13 @@ describe('Resume harness (e2e)', () => {
       });
     });
 
-    it('carries template and look into a new session on a different harness', async () => {
+    it('carries template and look into a new server-routed session', async () => {
       const first = await api(app)
         .post('/api/resume-harness/sessions')
         .set(auth(candidate.token))
         .send({
-          harness: 'claude-code',
+          model: FREE_TIER_ALIAS.model,
+          effort: FREE_TIER_ALIAS.effort,
           templateKey: 'technical-ledger',
           vibe: { accent: 'burgundy', tone: 'technical' },
         })
@@ -566,10 +695,14 @@ describe('Resume harness (e2e)', () => {
       const second = await api(app)
         .post('/api/resume-harness/sessions')
         .set(auth(candidate.token))
-        .send({ harness: 'opencode', carryFromSessionId: first.body.id })
+        .send({
+          model: FREE_BEDROCK_ALIAS.model,
+          effort: FREE_BEDROCK_ALIAS.effort,
+          carryFromSessionId: first.body.id,
+        })
         .expect(201);
 
-      expect(second.body.harness).toBe('opencode');
+      expect(second.body.harness).toBeUndefined();
       expect(second.body.templateKey).toBe('technical-ledger');
       expect(second.body.vibe.accent).toBe('burgundy');
       expect(second.body.vibe.tone).toBe('technical');
@@ -587,7 +720,8 @@ describe('Resume harness (e2e)', () => {
         .post('/api/resume-harness/sessions')
         .set(auth(candidate.token))
         .send({
-          harness: 'codex',
+          model: FREE_OPENAI_ALIAS.model,
+          effort: FREE_OPENAI_ALIAS.effort,
           templateKey: 'classic-serif',
           vibe: { order: 'skills-first' },
         })

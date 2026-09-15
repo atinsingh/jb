@@ -1,4 +1,9 @@
-import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import {
@@ -6,7 +11,7 @@ import {
   HarnessModelAliasDocument,
 } from './schemas/harness-model-alias.schema';
 import { User, UserDocument } from '../schemas/user.schema';
-import { ResolvedModelAlias } from './harness/harness.types';
+import { ModelCapability, ResolvedModelAlias } from './harness/harness.types';
 import { isOfferedHarnessAlias } from './offered-alias';
 
 /**
@@ -61,6 +66,57 @@ export class ModelAliasService {
       .exec();
 
     return this.offered(docs).map((d) => this.toResolved(d, tier));
+  }
+
+  /** Model families and supported efforts safe to expose in the picker. */
+  async capabilitiesForUser(userId: string): Promise<ModelCapability[]> {
+    const aliases = await this.listForUser(userId);
+    const capabilities: ModelCapability[] = [];
+
+    for (const alias of aliases) {
+      let capability = capabilities.find((item) => item.model === alias.model);
+      if (!capability) {
+        capability = {
+          model: alias.model,
+          label: alias.modelLabel || alias.model,
+          efforts: [],
+        };
+        capabilities.push(capability);
+      }
+      if (!capability.efforts.includes(alias.effort)) {
+        capability.efforts.push(alias.effort);
+      }
+    }
+
+    return capabilities;
+  }
+
+  /** Resolve a candidate-facing model+effort selection to its private alias. */
+  async resolveSelectionForUser(
+    userId: string,
+    model: string,
+    effort: string,
+  ): Promise<ResolvedModelAlias> {
+    const tier = await this.tierFor(userId);
+    const allowed = await this.listForTier(tier);
+    const modelAliases = allowed.filter((alias) => alias.model === model);
+
+    if (!modelAliases.length) {
+      throw new ForbiddenException(
+        `Model "${model}" is not available on your plan (${tier}).`,
+      );
+    }
+
+    const selected = modelAliases.find((alias) => alias.effort === effort);
+    if (!selected) {
+      throw new BadRequestException(
+        `Effort "${effort}" is not supported for ${model}. Supported: ${modelAliases
+          .map((alias) => alias.effort)
+          .join(', ')}.`,
+      );
+    }
+
+    return selected;
   }
 
   /**
@@ -126,6 +182,7 @@ export class ModelAliasService {
       model: doc.model,
       effort: doc.effort,
       label: doc.label,
+      modelLabel: doc.modelLabel,
       maxOutputTokens: doc.maxOutputTokens,
       maxInputTokens: doc.maxInputTokens,
       tier,

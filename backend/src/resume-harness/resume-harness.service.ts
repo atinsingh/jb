@@ -44,9 +44,10 @@ import {
 import { JobDescriptionResolverService } from './job-description-resolver.service';
 
 export interface StartSessionInput {
-  harness: HarnessId;
-  /** Optional explicit alias; must be one the caller's tier permits. */
-  alias?: string;
+  /** Candidate-facing model id from the tier-filtered capability catalogue. */
+  model: string;
+  /** Supported effort advertised for the selected model. */
+  effort: string;
   /** Role this résumé targets. A per-résumé input, not a profile fact. */
   targetRole?: string;
   /** Pasted job description to tailor against. Also per-résumé. */
@@ -91,11 +92,7 @@ export interface SessionView {
   hasCurrentPdf: boolean;
   turns: Array<Omit<ResumeHarnessTurn, 'pdfKey'> & { hasPdf: boolean }>;
   conversation: ResumeHarnessMessage[];
-  harness: HarnessId;
-  harnessLabel: string;
   sandboxId?: string;
-  alias: string;
-  provider: string;
   model: string;
   effort: string;
   modelLabel: string;
@@ -168,20 +165,17 @@ export class ResumeHarnessService {
     private readonly jobDescriptions?: JobDescriptionResolverService,
   ) {}
 
-  /** Harness + model choices the caller may make, for the picker UI. */
+  /** Candidate-facing model choices. Runtime and provider stay server-side. */
   async options(userId: string) {
-    const [aliases, tier, sandboxAvailable, context] = await Promise.all([
-      this.modelAlias.listForUser(userId),
+    const [models, tier, sandboxAvailable, context] = await Promise.all([
+      this.modelAlias.capabilitiesForUser(userId),
       this.modelAlias.tierFor(userId),
       this.sandbox.isAvailable(),
       this.candidateContext.build(userId),
     ]);
     return {
       tier,
-      harnesses: this.registry
-        .list()
-        .map((h) => ({ id: h.id, label: h.displayName })),
-      models: aliases,
+      models,
       sandboxAvailable,
       /**
        * What the résumé will be written from. Surfaced so the screen can show
@@ -232,10 +226,13 @@ export class ResumeHarnessService {
       }
     }
     const resolvedInput = { ...input, jobDescription };
-    const adapter = this.registry.get(input.harness);
-    // Resolved from the tier at request time; an out-of-tier alias throws here
-    // rather than being quietly downgraded.
-    const alias = await this.modelAlias.resolveForUser(userId, input.alias);
+    const alias = await this.modelAlias.resolveSelectionForUser(
+      userId,
+      input.model,
+      input.effort,
+    );
+    const adapter = this.registry.forProvider(alias.provider);
+    const harness = adapter.id;
 
     const carriedState = input.carryFromSessionId
       ? await this.withSessionMutationLock(
@@ -281,7 +278,7 @@ export class ResumeHarnessService {
     const session = await this.sessionModel.create({
       userId,
       name: input.targetRole?.trim() || undefined,
-      harness: input.harness,
+      harness,
       alias: alias.alias,
       provider: alias.provider,
       model: alias.model,
@@ -317,7 +314,7 @@ export class ResumeHarnessService {
         workdir: SANDBOX_WORKDIR,
         proxy,
         alias,
-        contextFiles: this.contextFiles.filesFor(input.harness, {
+        contextFiles: this.contextFiles.filesFor(harness, {
           workdir: SANDBOX_WORKDIR,
           texPath: TEX_PATH,
           pdfPath: PDF_PATH,
@@ -334,8 +331,8 @@ export class ResumeHarnessService {
       boot.env.JOBOCATE_LITELLM_BASE_URL = proxy.baseUrl;
       boot.env.JOBOCATE_LITELLM_API_KEY = proxy.apiKey;
 
-      // Carrying the artifact forward is the supported way to change harness, so
-      // the new sandbox starts with the existing resume already on disk — under
+      // Carrying the artifact forward starts a newly routed sandbox with the
+      // existing resume already on disk — under
       // the carried template's condition from its very first turn.
       const files: HarnessContextFile[] = carried?.latex
         ? [...boot.files, { path: TEX_PATH, contents: carried.latex }]
@@ -376,7 +373,7 @@ export class ResumeHarnessService {
         }
         const provisioned = await this.sandbox.provision({
           sessionId,
-          harness: input.harness,
+          harness,
           env: boot.env,
           files,
         });
@@ -811,7 +808,10 @@ export class ResumeHarnessService {
     return this.view(session);
   }
 
-  async archiveSession(userId: string, sessionId: string): Promise<SessionView> {
+  async archiveSession(
+    userId: string,
+    sessionId: string,
+  ): Promise<SessionView> {
     return this.withSessionMutationLock(userId, sessionId, async () => {
       const session = await this.mustFind(userId, sessionId);
       if (session.sandboxId) {
@@ -838,15 +838,15 @@ export class ResumeHarnessService {
     });
   }
 
-  async restoreSession(userId: string, sessionId: string): Promise<SessionView> {
+  async restoreSession(
+    userId: string,
+    sessionId: string,
+  ): Promise<SessionView> {
     return this.withSessionMutationLock(userId, sessionId, async () => {
       const session = await this.mustFind(userId, sessionId);
       session.archivedAt = undefined;
       await this.sessionModel
-        .updateOne(
-          { _id: sessionId, userId },
-          { $unset: { archivedAt: 1 } },
-        )
+        .updateOne({ _id: sessionId, userId }, { $unset: { archivedAt: 1 } })
         .exec();
       return this.view(session);
     });
@@ -1038,13 +1038,13 @@ export class ResumeHarnessService {
      */
     for (
       let attempt = 0;
-      (
-        !compile.ok ||
-        (!placeholderDraft && content.some(
-          (problem) =>
-            !problem.startsWith('CANDIDATE.md contains no career facts'),
-        ))
-      ) && attempt < MAX_COMPILE_REPAIRS;
+      (!compile.ok ||
+        (!placeholderDraft &&
+          content.some(
+            (problem) =>
+              !problem.startsWith('CANDIDATE.md contains no career facts'),
+          ))) &&
+      attempt < MAX_COMPILE_REPAIRS;
       attempt++
     ) {
       const prompt = compile.ok
@@ -1196,12 +1196,20 @@ export class ResumeHarnessService {
 
   /** Recognizes an explicit placeholder request for profiles that have facts. */
   private requestsPlaceholderDraft(instruction: string): boolean {
-    if (/\b(?:remove|replace|delete|without)\b[^.\n]{0,40}\bplace\s*holders?\b/i.test(instruction)) {
+    if (
+      /\b(?:remove|replace|delete|without)\b[^.\n]{0,40}\bplace\s*holders?\b/i.test(
+        instruction,
+      )
+    ) {
       return false;
     }
     return (
-      /\b(?:add|create|include|use|with)\b[^.\n]{0,60}\bplace\s*holders?\b/i.test(instruction) ||
-      /\bplace\s*holders?\b[^.\n]{0,60}\b(?:fill|populate|later)\b/i.test(instruction)
+      /\b(?:add|create|include|use|with)\b[^.\n]{0,60}\bplace\s*holders?\b/i.test(
+        instruction,
+      ) ||
+      /\bplace\s*holders?\b[^.\n]{0,60}\b(?:fill|populate|later)\b/i.test(
+        instruction,
+      )
     );
   }
 
@@ -1213,8 +1221,12 @@ export class ResumeHarnessService {
   ): boolean {
     const visiblyPlaceholder =
       /\bplaceholder\b/i.test(latex) ||
-      /(?<!\\text)(?<![a-zA-Z\\])<\s*[A-Za-z][A-Za-z0-9 _./-]{2,60}\s*>/.test(latex) ||
-      /\[(?:your|insert|add|candidate|name|company|role)[^\]\n]{0,60}\]/i.test(latex);
+      /(?<!\\text)(?<![a-zA-Z\\])<\s*[A-Za-z][A-Za-z0-9 _./-]{2,60}\s*>/.test(
+        latex,
+      ) ||
+      /\[(?:your|insert|add|candidate|name|company|role)[^\]\n]{0,60}\]/i.test(
+        latex,
+      );
     if (!visiblyPlaceholder) return false;
 
     return (
@@ -1356,7 +1368,9 @@ export class ResumeHarnessService {
       instruction,
       '',
       `When you are done, run the build command from AGENTS.md and make sure it exits 0.`,
-    ].filter((line) => line !== undefined).join('\n');
+    ]
+      .filter((line) => line !== undefined)
+      .join('\n');
   }
 
   private repairPrompt(log: string): string {
@@ -1580,11 +1594,7 @@ export class ResumeHarnessService {
         const value = message.toObject ? message.toObject() : message;
         return { ...value };
       }),
-      harness: session.harness,
-      harnessLabel: this.registry.get(session.harness).displayName,
       sandboxId: session.sandboxId,
-      alias: session.alias,
-      provider: session.provider,
       model: session.model,
       effort: session.effort,
       modelLabel: session.modelLabel,

@@ -31,9 +31,9 @@ import {
 /**
  * One harness-agnostic contract for LaTeX resume generation.
  *
- * The chosen harness changes what runs inside the sandbox and nothing about
- * these routes, which is the point: the frontend picks a harness at session
- * start and then talks to the same four endpoints regardless.
+ * The server chooses the harness from private provider metadata. The frontend
+ * selects only model and effort, then talks to the same endpoints regardless
+ * of which runtime was routed behind them.
  */
 @ApiTags('resume-harness')
 @ApiBearerAuth()
@@ -44,7 +44,7 @@ export class ResumeHarnessController {
 
   @Get('options')
   @ApiOperation({
-    summary: 'Harnesses and tier-permitted model+effort aliases for this user',
+    summary: 'Tier-permitted model and effort capabilities for this user',
   })
   options(@Request() req) {
     return this.service.options(this.userId(req));
@@ -58,14 +58,20 @@ export class ResumeHarnessController {
    * model that writes the words, which `options` already reports.
    */
   @Get('templates')
-  @ApiOperation({ summary: 'Predefined LaTeX templates, with previews and knobs' })
+  @ApiOperation({
+    summary: 'Predefined LaTeX templates, with previews and knobs',
+  })
   templates() {
     return this.service.listTemplates();
   }
 
   @Post('sessions')
   @ApiOperation({ summary: 'Start a session and provision its sandbox' })
-  @ApiResponse({ status: 403, description: 'Alias not permitted on this plan' })
+  @ApiResponse({
+    status: 400,
+    description: 'Effort is unsupported by the model',
+  })
+  @ApiResponse({ status: 403, description: 'Model not permitted on this plan' })
   start(@Request() req, @Body() dto: StartSessionDto) {
     return this.service.startSession(this.userId(req), dto);
   }
@@ -76,12 +82,20 @@ export class ResumeHarnessController {
   }
 
   @Patch('sessions/:id')
-  rename(@Request() req, @Param('id') id: string, @Body() dto: RenameSessionDto) {
+  rename(
+    @Request() req,
+    @Param('id') id: string,
+    @Body() dto: RenameSessionDto,
+  ) {
     return this.service.renameSession(this.userId(req), id, dto);
   }
 
   @Post('sessions/:id/revisions/:revision/restore')
-  restore(@Request() req, @Param('id') id: string, @Param('revision', ParseIntPipe) revision: number) {
+  restore(
+    @Request() req,
+    @Param('id') id: string,
+    @Param('revision', ParseIntPipe) revision: number,
+  ) {
     return this.service.restoreRevision(this.userId(req), id, revision);
   }
 
@@ -143,7 +157,10 @@ export class ResumeHarnessController {
    */
   @Post('sessions/:id/template')
   @ApiOperation({ summary: 'Select a template and re-apply the résumé to it' })
-  @ApiResponse({ status: 404, description: 'No such template, or no such session' })
+  @ApiResponse({
+    status: 404,
+    description: 'No such template, or no such session',
+  })
   @ApiResponse({ status: 409, description: 'The session has ended' })
   selectTemplate(
     @Request() req,
@@ -154,7 +171,9 @@ export class ResumeHarnessController {
   }
 
   @Post('sessions/:id/template/stream')
-  @ApiOperation({ summary: 'Select a template, streaming the re-render as SSE' })
+  @ApiOperation({
+    summary: 'Select a template, streaming the re-render as SSE',
+  })
   async selectTemplateStream(
     @Request() req,
     @Param('id') id: string,
@@ -170,7 +189,10 @@ export class ResumeHarnessController {
   /** Move the look dials on the current template, keeping the content. */
   @Post('sessions/:id/vibe')
   @ApiOperation({ summary: 'Apply a vibe change and re-render' })
-  @ApiResponse({ status: 400, description: 'A knob or value this template does not declare' })
+  @ApiResponse({
+    status: 400,
+    description: 'A knob or value this template does not declare',
+  })
   applyVibe(
     @Request() req,
     @Param('id') id: string,
@@ -180,7 +202,9 @@ export class ResumeHarnessController {
   }
 
   @Post('sessions/:id/vibe/stream')
-  @ApiOperation({ summary: 'Apply a vibe change, streaming the re-render as SSE' })
+  @ApiOperation({
+    summary: 'Apply a vibe change, streaming the re-render as SSE',
+  })
   async applyVibeStream(
     @Request() req,
     @Param('id') id: string,
@@ -199,8 +223,13 @@ export class ResumeHarnessController {
    * Not streamed: it restores a stored revision without running the model.
    */
   @Post('sessions/:id/revert-look')
-  @ApiOperation({ summary: 'Restore the résumé as it was before the last look change' })
-  @ApiResponse({ status: 409, description: 'There is no previous look to restore' })
+  @ApiOperation({
+    summary: 'Restore the résumé as it was before the last look change',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'There is no previous look to restore',
+  })
   revertLook(@Request() req, @Param('id') id: string) {
     return this.service.revertLook(this.userId(req), id);
   }
@@ -218,7 +247,9 @@ export class ResumeHarnessController {
   }
 
   @Post('sessions/:id/restore')
-  @ApiOperation({ summary: 'Restore an archived résumé session to the library' })
+  @ApiOperation({
+    summary: 'Restore an archived résumé session to the library',
+  })
   restoreSession(@Request() req, @Param('id') id: string) {
     return this.service.restoreSession(this.userId(req), id);
   }

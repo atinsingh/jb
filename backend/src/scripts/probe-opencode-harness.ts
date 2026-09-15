@@ -98,7 +98,7 @@ const prompts = [
 
 async function main(): Promise<void> {
   const id = `probe-${randomUUID().slice(0, 12)}`;
-  const container = `resume-${id}`;
+  const container = `jb-resume-${id}`;
   const outputDir = join(
     process.cwd(),
     '..',
@@ -150,7 +150,11 @@ async function main(): Promise<void> {
       env: boot.env,
       workdir: SANDBOX_WORKDIR,
       ttlSeconds: 600,
-      labels: { app: 'jobocate', surface: 'resume-harness-probe' },
+      labels: {
+        app: 'jobocate',
+        namespace: 'jb',
+        surface: 'resume-harness-probe',
+      },
     });
     created = true;
     await driver.putFiles(container, boot.files);

@@ -48,6 +48,8 @@ export interface ResolvedModelAlias {
   model: string;
   effort: string;
   label: string;
+  /** Stable model-family label used before an effort is selected. */
+  modelLabel?: string;
   /** Plan type the alias was resolved against; carried for display and support. */
   tier?: string;
   /**
@@ -97,6 +99,13 @@ export interface HarnessBootstrap {
   proxyHeaders: Record<string, string>;
 }
 
+/** Candidate-facing model metadata. Provider, alias, and runtime stay internal. */
+export interface ModelCapability {
+  model: string;
+  label: string;
+  efforts: string[];
+}
+
 export interface HarnessActivity {
   id?: string;
   label: string;
@@ -131,14 +140,10 @@ export interface HarnessAdapter {
 export const harnessTag = (id: HarnessId): string => `harness=${id}`;
 
 /** Header map shared by all adapters. */
-export const harnessProxyHeaders = (
-  id: HarnessId,
-): Record<string, string> => ({
+export const harnessProxyHeaders = (id: HarnessId): Record<string, string> => ({
   [LITELLM_TAG_HEADER]: harnessTag(id),
 });
 
 /** Default prompt substitution shared by all adapters. */
-export const fillPrompt = (
-  command: string[],
-  prompt: string,
-): string[] => command.map((arg) => (arg === PROMPT_PLACEHOLDER ? prompt : arg));
+export const fillPrompt = (command: string[], prompt: string): string[] =>
+  command.map((arg) => (arg === PROMPT_PLACEHOLDER ? prompt : arg));

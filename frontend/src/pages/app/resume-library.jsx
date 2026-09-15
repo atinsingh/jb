@@ -1,13 +1,17 @@
-'use client';
+"use client";
 
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import Head from 'next/head';
-import { useRouter } from 'next/router';
-import { motion, AnimatePresence } from 'framer-motion';
-import AppTopNav from '@/components/app/AppTopNav';
-import { LoadingState, EmptyState, InlineError } from '@/components/app/AppStates';
-import { getTemplate, resolveTheme } from '@/components/resume/resumeTemplates';
-import { uploadResume } from '@/services/api';
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import Head from "next/head";
+import { useRouter } from "next/router";
+import { motion, AnimatePresence } from "framer-motion";
+import AppTopNav from "@/components/app/AppTopNav";
+import {
+  LoadingState,
+  EmptyState,
+  InlineError,
+} from "@/components/app/AppStates";
+import { getTemplate, resolveTheme } from "@/components/resume/resumeTemplates";
+import { uploadResume } from "@/services/api";
 import {
   listResumes,
   importResume,
@@ -21,7 +25,7 @@ import {
   getResumeVersions,
   downloadResumePdf,
   generateResumePdf,
-} from '@/services/resumeApi';
+} from "@/services/resumeApi";
 import {
   archiveHarnessSession,
   deleteHarnessSession,
@@ -29,29 +33,33 @@ import {
   listHarnessSessions,
   renameHarnessSession,
   restoreArchivedHarnessSession,
-} from '@/services/resumeHarnessApi';
+} from "@/services/resumeHarnessApi";
 
 /* ------------------------------------------------------------ helpers --- */
-const MONO = 'var(--jb-v3-font-mono)';
+const MONO = "var(--jb-v3-font-mono)";
 const MAX_MB = 5;
 
 const fmtBytes = (n) => {
-  if (!n && n !== 0) return '—';
+  if (!n && n !== 0) return "—";
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 };
 
 const fmtDate = (d) => {
-  if (!d) return '—';
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 };
 
 const relTime = (d) => {
-  if (!d) return '—';
+  if (!d) return "—";
   const diff = Date.now() - new Date(d).getTime();
   const m = Math.floor(diff / 60000);
-  if (m < 1) return 'just now';
+  if (m < 1) return "just now";
   if (m < 60) return `${m}m ago`;
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
@@ -61,53 +69,58 @@ const relTime = (d) => {
 };
 
 const METHOD_META = {
-  manual: { label: 'Created', icon: '✎' },
-  imported: { label: 'Imported', icon: '↧' },
-  ai_generated: { label: 'AI-generated', icon: '✦' },
-  duplicate: { label: 'Duplicate', icon: '⧉' },
+  manual: { label: "Created", icon: "✎" },
+  imported: { label: "Imported", icon: "↧" },
+  ai_generated: { label: "AI-generated", icon: "✦" },
+  duplicate: { label: "Duplicate", icon: "⧉" },
 };
 
 const FILTERS = [
-  { key: 'all', label: 'All' },
-  { key: 'ai_generated', label: 'AI-generated' },
-  { key: 'imported', label: 'Imported' },
-  { key: 'archived', label: 'Archived' },
+  { key: "all", label: "All" },
+  { key: "ai_generated", label: "AI-generated" },
+  { key: "imported", label: "Imported" },
+  { key: "archived", label: "Archived" },
 ];
 const SORTS = [
-  { key: 'updated', label: 'Last updated' },
-  { key: 'created', label: 'Date created' },
-  { key: 'name', label: 'Name' },
-  { key: 'ats', label: 'ATS score' },
-  { key: 'used', label: 'Most used' },
+  { key: "updated", label: "Last updated" },
+  { key: "created", label: "Date created" },
+  { key: "name", label: "Name" },
+  { key: "ats", label: "ATS score" },
+  { key: "used", label: "Most used" },
 ];
 
 const thumbThemeFor = (r) =>
-  resolveTheme({ templateId: r.template, accentId: 'emerald', fontId: 'classic', densityId: 'cozy' });
+  resolveTheme({
+    templateId: r.template,
+    accentId: "emerald",
+    fontId: "classic",
+    densityId: "cozy",
+  });
 
 // Map the resume parser's output onto the backend Resume schema fields.
 function mapParsedToSchema(parsed) {
   const exp = Array.isArray(parsed.experience) ? parsed.experience : [];
   return {
-    fullName: parsed.fullName || parsed.name || '',
-    email: parsed.email || '',
-    phone: parsed.phone || '',
-    location: parsed.location || '',
-    linkedin: parsed.linkedin || '',
-    summary: parsed.summary || '',
+    fullName: parsed.fullName || parsed.name || "",
+    email: parsed.email || "",
+    phone: parsed.phone || "",
+    location: parsed.location || "",
+    linkedin: parsed.linkedin || "",
+    summary: parsed.summary || "",
     skills: Array.isArray(parsed.skills) ? parsed.skills : [],
     experience: exp.map((e) => ({
-      title: e.title || e.role || '',
-      company: e.company || '',
-      location: e.location || '',
-      startDate: e.startDate || e.start || '',
-      endDate: e.endDate || e.end || '',
+      title: e.title || e.role || "",
+      company: e.company || "",
+      location: e.location || "",
+      startDate: e.startDate || e.start || "",
+      endDate: e.endDate || e.end || "",
       current: !!e.current,
-      description: e.description || '',
+      description: e.description || "",
       achievements: Array.isArray(e.achievements)
         ? e.achievements
         : Array.isArray(e.bullets)
-        ? e.bullets
-        : [],
+          ? e.bullets
+          : [],
     })),
     education: Array.isArray(parsed.education) ? parsed.education : [],
   };
@@ -119,10 +132,10 @@ export default function ResumeLibrary() {
   const [resumes, setResumes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [view, setView] = useState('grid'); // grid | list
-  const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState('all');
-  const [sort, setSort] = useState('updated');
+  const [view, setView] = useState("grid"); // grid | list
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [sort, setSort] = useState("updated");
   const [actionError, setActionError] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [agentSessions, setAgentSessions] = useState(null);
@@ -169,22 +182,23 @@ export default function ResumeLibrary() {
   const libraryItems = useMemo(() => {
     const saved = resumes.map((resume) => ({
       ...resume,
-      libraryKind: 'resume',
+      libraryKind: "resume",
       creationMethod:
-        resume.source || ['imported', 'ai_rewrite'].includes(resume.creationMethod)
-          ? 'imported'
-          : resume.creationMethod === 'duplicate'
-            ? 'duplicate'
-            : 'manual',
+        resume.source ||
+        ["imported", "ai_rewrite"].includes(resume.creationMethod)
+          ? "imported"
+          : resume.creationMethod === "duplicate"
+            ? "duplicate"
+            : "manual",
     }));
     const generated = (agentSessions || []).map((session) => ({
       ...session,
       id: `session:${session.id}`,
       sessionId: session.id,
-      libraryKind: 'agent',
-      creationMethod: 'ai_generated',
-      status: session.archivedAt ? 'archived' : 'active',
-      template: session.templateKey || 'modern',
+      libraryKind: "agent",
+      creationMethod: "ai_generated",
+      status: session.archivedAt ? "archived" : "active",
+      template: session.templateKey || "modern",
       version: session.revisionCount ?? session.revision ?? 0,
     }));
     return [...generated, ...saved];
@@ -193,25 +207,38 @@ export default function ResumeLibrary() {
   const libraryLoading = loading || agentSessions === null;
 
   const summary = useMemo(() => {
-    const active = libraryItems.filter((r) => r.status !== 'archived');
-    const generated = active.filter((r) => r.libraryKind === 'agent').length;
-    const imported = active.filter((r) => r.creationMethod === 'imported').length;
-    const archived = libraryItems.filter((r) => r.status === 'archived').length;
+    const active = libraryItems.filter((r) => r.status !== "archived");
+    const generated = active.filter((r) => r.libraryKind === "agent").length;
+    const imported = active.filter(
+      (r) => r.creationMethod === "imported",
+    ).length;
+    const archived = libraryItems.filter((r) => r.status === "archived").length;
     return { total: active.length, generated, imported, archived };
   }, [libraryItems]);
 
   const visible = useMemo(() => {
     let list = libraryItems.slice();
-    if (filter === 'archived') list = list.filter((r) => r.status === 'archived');
+    if (filter === "archived")
+      list = list.filter((r) => r.status === "archived");
     else {
-      list = list.filter((r) => r.status !== 'archived');
-      if (filter === 'imported') list = list.filter((r) => r.creationMethod === 'imported' || !!r.source);
-      else if (filter === 'ai_generated') list = list.filter((r) => r.libraryKind === 'agent');
+      list = list.filter((r) => r.status !== "archived");
+      if (filter === "imported")
+        list = list.filter(
+          (r) => r.creationMethod === "imported" || !!r.source,
+        );
+      else if (filter === "ai_generated")
+        list = list.filter((r) => r.libraryKind === "agent");
     }
     const q = query.trim().toLowerCase();
     if (q) {
       list = list.filter((r) =>
-        [r.name, r.targetRole, r.targetCompany, r.source?.originalFilename, (r.tags || []).join(' ')]
+        [
+          r.name,
+          r.targetRole,
+          r.targetCompany,
+          r.source?.originalFilename,
+          (r.tags || []).join(" "),
+        ]
           .filter(Boolean)
           .some((s) => String(s).toLowerCase().includes(q)),
       );
@@ -242,38 +269,45 @@ export default function ResumeLibrary() {
 
   const openEditor = (r) =>
     router.push(
-      r.libraryKind === 'agent'
+      r.libraryKind === "agent"
         ? `/app/resume?session=${encodeURIComponent(r.sessionId)}`
         : `/app/resume?id=${r.id}`,
     );
   const onDuplicate = (r) => withBusy(r.id, () => duplicateResume(r.id));
   const onSetPrimary = (r) => withBusy(r.id, () => setPrimaryResume(r.id));
-  const onArchive = (r) => withBusy(
-    r.id,
-    async () => {
-      if (r.libraryKind === 'agent') {
-        if (r.status === 'archived') await restoreArchivedHarnessSession(r.sessionId);
-        else await archiveHarnessSession(r.sessionId);
-        await loadAgentSessions();
-        return;
-      }
-      if (r.status === 'archived') await unarchiveResume(r.id);
-      else await archiveResume(r.id);
-    },
-    r.libraryKind !== 'agent',
-  );
+  const onArchive = (r) =>
+    withBusy(
+      r.id,
+      async () => {
+        if (r.libraryKind === "agent") {
+          if (r.status === "archived")
+            await restoreArchivedHarnessSession(r.sessionId);
+          else await archiveHarnessSession(r.sessionId);
+          await loadAgentSessions();
+          return;
+        }
+        if (r.status === "archived") await unarchiveResume(r.id);
+        else await archiveResume(r.id);
+      },
+      r.libraryKind !== "agent",
+    );
   const onDownload = (r) =>
     withBusy(
       r.id,
       async () => {
-        if (r.libraryKind === 'agent') {
+        if (r.libraryKind === "agent") {
           const { pdfBase64 } = await getHarnessPdf(r.sessionId);
-          if (!pdfBase64) throw new Error('This résumé does not have a PDF yet.');
-          const bytes = Uint8Array.from(atob(pdfBase64), (char) => char.charCodeAt(0));
-          const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
-          const link = document.createElement('a');
+          if (!pdfBase64)
+            throw new Error("This résumé does not have a PDF yet.");
+          const bytes = Uint8Array.from(atob(pdfBase64), (char) =>
+            char.charCodeAt(0),
+          );
+          const url = URL.createObjectURL(
+            new Blob([bytes], { type: "application/pdf" }),
+          );
+          const link = document.createElement("a");
           link.href = url;
-          link.download = `${r.name || 'resume'}.pdf`;
+          link.download = `${r.name || "resume"}.pdf`;
           document.body.appendChild(link);
           link.click();
           link.remove();
@@ -282,41 +316,45 @@ export default function ResumeLibrary() {
         }
         try {
           const blob = await downloadResumePdf(r.id);
-          window.open(URL.createObjectURL(blob), '_blank');
+          window.open(URL.createObjectURL(blob), "_blank");
         } catch (e) {
           const res = await generateResumePdf(r.id);
-          if (res?.pdfUrl) window.open(res.pdfUrl, '_blank');
+          if (res?.pdfUrl) window.open(res.pdfUrl, "_blank");
           else throw e;
         }
       },
       false,
     );
   const onCreateVersion = (r) =>
-    withBusy(r.id, () => createResumeVersion(r.id, `Snapshot · ${new Date().toLocaleString()}`));
-  const doDelete = (r) => withBusy(
-    r.id,
-    async () => {
-      if (r.libraryKind === 'agent') {
-        await deleteHarnessSession(r.sessionId);
-        await loadAgentSessions();
-      } else {
-        await deleteResume(r.id);
-      }
-    },
-    r.libraryKind !== 'agent',
-  );
-  const doRename = (r, name) => withBusy(
-    r.id,
-    async () => {
-      if (r.libraryKind === 'agent') {
-        await renameHarnessSession(r.sessionId, name);
-        await loadAgentSessions();
-      } else {
-        await renameResume(r.id, name);
-      }
-    },
-    r.libraryKind !== 'agent',
-  );
+    withBusy(r.id, () =>
+      createResumeVersion(r.id, `Snapshot · ${new Date().toLocaleString()}`),
+    );
+  const doDelete = (r) =>
+    withBusy(
+      r.id,
+      async () => {
+        if (r.libraryKind === "agent") {
+          await deleteHarnessSession(r.sessionId);
+          await loadAgentSessions();
+        } else {
+          await deleteResume(r.id);
+        }
+      },
+      r.libraryKind !== "agent",
+    );
+  const doRename = (r, name) =>
+    withBusy(
+      r.id,
+      async () => {
+        if (r.libraryKind === "agent") {
+          await renameHarnessSession(r.sessionId, name);
+          await loadAgentSessions();
+        } else {
+          await renameResume(r.id, name);
+        }
+      },
+      r.libraryKind !== "agent",
+    );
 
   /* ------------------------------------------------------------- ui --- */
   return (
@@ -326,63 +364,151 @@ export default function ResumeLibrary() {
       </Head>
 
       <style jsx global>{`
-        #jbapp ::-webkit-scrollbar { width: 8px; height: 8px; }
-        #jbapp ::-webkit-scrollbar-thumb { background: var(--jb-v3-line); border-radius: 2px; }
-        #jbapp input:focus, #jbapp select:focus { outline: none; border-color: var(--jb-v3-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--jb-v3-accent) 15%, transparent); }
-        #jbapp .jb-card { transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease; }
-        #jbapp .jb-card:hover { transform: translateY(-2px); box-shadow: 0 16px 34px -22px color-mix(in srgb, var(--jb-v3-invert) 45%, transparent); border-color: var(--jb-v3-line-2); }
-        #jbapp .jb-btn { transition: background .16s ease, border-color .16s ease, transform .12s ease; }
-        #jbapp .jb-btn:active { transform: translateY(1px); }
-        #jbapp .jb-menu-item:hover { background: var(--jb-v3-control); }
-        #jbapp .jb-row:hover { background: var(--jb-v3-panel); }
-        @keyframes jbskel { 0%{opacity:.5} 50%{opacity:1} 100%{opacity:.5} }
+        #jbapp ::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        #jbapp ::-webkit-scrollbar-thumb {
+          background: var(--jb-v3-line);
+          border-radius: 2px;
+        }
+        #jbapp input:focus,
+        #jbapp select:focus {
+          outline: none;
+          border-color: var(--jb-v3-accent);
+          box-shadow: 0 0 0 3px
+            color-mix(in srgb, var(--jb-v3-accent) 15%, transparent);
+        }
+        #jbapp .jb-card {
+          transition:
+            transform 0.16s ease,
+            box-shadow 0.16s ease,
+            border-color 0.16s ease;
+        }
+        #jbapp .jb-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 16px 34px -22px
+            color-mix(in srgb, var(--jb-v3-invert) 45%, transparent);
+          border-color: var(--jb-v3-line-2);
+        }
+        #jbapp .jb-btn {
+          transition:
+            background 0.16s ease,
+            border-color 0.16s ease,
+            transform 0.12s ease;
+        }
+        #jbapp .jb-btn:active {
+          transform: translateY(1px);
+        }
+        #jbapp .jb-menu-item:hover {
+          background: var(--jb-v3-control);
+        }
+        #jbapp .jb-row:hover {
+          background: var(--jb-v3-panel);
+        }
+        @keyframes jbskel {
+          0% {
+            opacity: 0.5;
+          }
+          50% {
+            opacity: 1;
+          }
+          100% {
+            opacity: 0.5;
+          }
+        }
       `}</style>
 
       <div
         id="jbapp"
         style={{
-          minHeight: '100vh',
-          background: 'var(--jb-v3-bg)',
-          fontFamily: 'var(--jb-v3-font-display)',
-          color: 'var(--jb-v3-fg)',
+          minHeight: "100vh",
+          background: "var(--jb-v3-bg)",
+          fontFamily: "var(--jb-v3-font-display)",
+          color: "var(--jb-v3-fg)",
         }}
       >
         <AppTopNav />
 
-        <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        <main
+          style={{
+            flex: 1,
+            minWidth: 0,
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
           {/* HEADER */}
           <header
             style={{
-              position: 'relative',
-              
-              
-              padding: '18px 32px 16px',
-              background: 'color-mix(in srgb, var(--jb-v3-bg) 88%, transparent)',
-              backdropFilter: 'blur(10px)',
-              borderBottom: '1px solid var(--jb-v3-line)',
+              position: "relative",
+
+              padding: "18px 32px 16px",
+              background:
+                "color-mix(in srgb, var(--jb-v3-bg) 88%, transparent)",
+              backdropFilter: "blur(10px)",
+              borderBottom: "1px solid var(--jb-v3-line)",
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 20, flexWrap: 'wrap' }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "flex-end",
+                gap: 20,
+                flexWrap: "wrap",
+              }}
+            >
               <div style={{ flex: 1, minWidth: 240 }}>
-                <div style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--jb-v3-fg-3)', marginBottom: 6 }}>
+                <div
+                  style={{
+                    fontFamily: MONO,
+                    fontSize: 11,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    color: "var(--jb-v3-fg-3)",
+                    marginBottom: 6,
+                  }}
+                >
                   Toolkit / Resumes
                 </div>
-                <h1 style={{ fontFamily: 'var(--jb-v3-font-display)', fontWeight: 600, letterSpacing: '-0.04em', fontSize: 34, lineHeight: 1, margin: '0 0 6px' }}>
+                <h1
+                  style={{
+                    fontFamily: "var(--jb-v3-font-display)",
+                    fontWeight: 600,
+                    letterSpacing: "-0.04em",
+                    fontSize: 34,
+                    lineHeight: 1,
+                    margin: "0 0 6px",
+                  }}
+                >
                   My Resumes
                 </h1>
-                <p style={{ margin: 0, fontSize: 13.5, color: 'var(--jb-v3-fg-2)', maxWidth: 560 }}>
-                  Create with the résumé agent or import a file. Conversations, revisions, and PDFs stay with the résumé they produced.
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 13.5,
+                    color: "var(--jb-v3-fg-2)",
+                    maxWidth: 560,
+                  }}
+                >
+                  Create with the résumé agent or import a file. Conversations,
+                  revisions, and PDFs stay with the résumé they produced.
                 </p>
               </div>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button type="button" className="jb-btn" onClick={() => setImportOpen(true)} style={secondaryBtn}>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button
+                  type="button"
+                  className="jb-btn"
+                  onClick={() => setImportOpen(true)}
+                  style={secondaryBtn}
+                >
                   ↧ Import Resume
                 </button>
                 <button
                   type="button"
                   className="jb-btn"
                   aria-label="Create Resume"
-                  onClick={() => router.push('/app/resume')}
+                  onClick={() => router.push("/app/resume")}
                   style={primaryBtn}
                 >
                   + Create Resume
@@ -391,41 +517,127 @@ export default function ResumeLibrary() {
             </div>
           </header>
 
-          <div style={{ padding: '22px 32px 60px', flex: 1 }}>
+          <div style={{ padding: "22px 32px 60px", flex: 1 }}>
             {actionError && <InlineError error={actionError} />}
             {error && (
-              <div role="alert" style={{ padding: '13px 16px', marginBottom: 18, color: 'var(--jb-v3-danger)', background: 'var(--jb-v3-danger-soft)', fontSize: 13 }}>
-                Imported résumés are temporarily unavailable. AI-generated résumés remain available.
-                <button type="button" onClick={load} style={{ ...textBtn, marginLeft: 8, color: 'inherit' }}>Retry</button>
+              <div
+                role="alert"
+                style={{
+                  padding: "13px 16px",
+                  marginBottom: 18,
+                  color: "var(--jb-v3-danger)",
+                  background: "var(--jb-v3-danger-soft)",
+                  fontSize: 13,
+                }}
+              >
+                Imported résumés are temporarily unavailable. AI-generated
+                résumés remain available.
+                <button
+                  type="button"
+                  onClick={load}
+                  style={{ ...textBtn, marginLeft: 8, color: "inherit" }}
+                >
+                  Retry
+                </button>
               </div>
             )}
             {agentSessionsError && (
-              <div role="alert" style={{ padding: '13px 16px', marginBottom: 18, color: 'var(--jb-v3-danger)', background: 'var(--jb-v3-danger-soft)', fontSize: 13 }}>
-                AI-generated résumés are temporarily unavailable. You can still create or import a résumé.
+              <div
+                role="alert"
+                style={{
+                  padding: "13px 16px",
+                  marginBottom: 18,
+                  color: "var(--jb-v3-danger)",
+                  background: "var(--jb-v3-danger-soft)",
+                  fontSize: 13,
+                }}
+              >
+                AI-generated résumés are temporarily unavailable. You can still
+                create or import a résumé.
               </div>
             )}
 
             {/* SUMMARY CARDS */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 22 }}>
-              <SummaryCard label="Total resumes" value={libraryLoading ? '—' : summary.total} hint="in your library" />
-              <SummaryCard label="AI-generated" value={libraryLoading ? '—' : summary.generated} hint="linked to sessions" />
-              <SummaryCard label="Imported" value={libraryLoading ? '—' : summary.imported} hint="uploaded by you" />
-              <SummaryCard label="Archived" value={libraryLoading ? '—' : summary.archived} hint="available to restore" />
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
+                gap: 14,
+                marginBottom: 22,
+              }}
+            >
+              <SummaryCard
+                label="Total resumes"
+                value={libraryLoading ? "—" : summary.total}
+                hint="in your library"
+              />
+              <SummaryCard
+                label="AI-generated"
+                value={libraryLoading ? "—" : summary.generated}
+                hint="linked to sessions"
+              />
+              <SummaryCard
+                label="Imported"
+                value={libraryLoading ? "—" : summary.imported}
+                hint="uploaded by you"
+              />
+              <SummaryCard
+                label="Archived"
+                value={libraryLoading ? "—" : summary.archived}
+                hint="available to restore"
+              />
             </div>
 
             {/* TOOLBAR */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-              <div style={{ position: 'relative', flex: 1, minWidth: 220, maxWidth: 360 }}>
-                <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--jb-v3-fg-3)', fontSize: 14 }}>⌕</span>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                flexWrap: "wrap",
+                marginBottom: 16,
+              }}
+            >
+              <div
+                style={{
+                  position: "relative",
+                  flex: 1,
+                  minWidth: 220,
+                  maxWidth: 360,
+                }}
+              >
+                <span
+                  style={{
+                    position: "absolute",
+                    left: 12,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    color: "var(--jb-v3-fg-3)",
+                    fontSize: 14,
+                  }}
+                >
+                  ⌕
+                </span>
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search name, role, company, filename…"
                   aria-label="Search resumes"
-                  style={{ width: '100%', padding: '9px 12px 9px 32px', borderRadius: 2, border: '1px solid var(--jb-v3-line)', background: 'var(--jb-v3-panel)', fontFamily: 'inherit', fontSize: 13.5, color: 'var(--jb-v3-fg)' }}
+                  style={{
+                    width: "100%",
+                    padding: "9px 12px 9px 32px",
+                    borderRadius: 2,
+                    border: "1px solid var(--jb-v3-line)",
+                    background: "var(--jb-v3-panel)",
+                    fontFamily: "inherit",
+                    fontSize: 13.5,
+                    color: "var(--jb-v3-fg)",
+                  }}
                 />
               </div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1 }}>
+              <div
+                style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: 1 }}
+              >
                 {FILTERS.map((f) => {
                   const on = filter === f.key;
                   return (
@@ -433,7 +645,19 @@ export default function ResumeLibrary() {
                       key={f.key}
                       type="button"
                       onClick={() => setFilter(f.key)}
-                      style={{ padding: '7px 12px', borderRadius: 2, border: `1px solid ${on ? 'var(--jb-v3-accent)' : 'var(--jb-v3-line)'}`, background: on ? 'var(--jb-v3-accent-soft)' : 'var(--jb-v3-panel)', color: on ? 'var(--jb-v3-accent)' : 'var(--jb-v3-fg-2)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+                      style={{
+                        padding: "7px 12px",
+                        borderRadius: 2,
+                        border: `1px solid ${on ? "var(--jb-v3-accent)" : "var(--jb-v3-line)"}`,
+                        background: on
+                          ? "var(--jb-v3-accent-soft)"
+                          : "var(--jb-v3-panel)",
+                        color: on ? "var(--jb-v3-accent)" : "var(--jb-v3-fg-2)",
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
                     >
                       {f.label}
                     </button>
@@ -444,22 +668,48 @@ export default function ResumeLibrary() {
                 value={sort}
                 onChange={(e) => setSort(e.target.value)}
                 aria-label="Sort resumes"
-                style={{ padding: '9px 12px', borderRadius: 2, border: '1px solid var(--jb-v3-line)', background: 'var(--jb-v3-panel)', fontFamily: 'inherit', fontSize: 13, color: 'var(--jb-v3-fg)', cursor: 'pointer' }}
+                style={{
+                  padding: "9px 12px",
+                  borderRadius: 2,
+                  border: "1px solid var(--jb-v3-line)",
+                  background: "var(--jb-v3-panel)",
+                  fontFamily: "inherit",
+                  fontSize: 13,
+                  color: "var(--jb-v3-fg)",
+                  cursor: "pointer",
+                }}
               >
                 {SORTS.map((s) => (
-                  <option key={s.key} value={s.key}>Sort · {s.label}</option>
+                  <option key={s.key} value={s.key}>
+                    Sort · {s.label}
+                  </option>
                 ))}
               </select>
-              <div style={{ display: 'flex', border: '1px solid var(--jb-v3-line)', borderRadius: 2, overflow: 'hidden' }}>
-                {['grid', 'list'].map((v) => (
+              <div
+                style={{
+                  display: "flex",
+                  border: "1px solid var(--jb-v3-line)",
+                  borderRadius: 2,
+                  overflow: "hidden",
+                }}
+              >
+                {["grid", "list"].map((v) => (
                   <button
                     key={v}
                     type="button"
                     onClick={() => setView(v)}
                     aria-label={`${v} view`}
-                    style={{ padding: '8px 12px', border: 'none', cursor: 'pointer', fontSize: 13, background: view === v ? 'var(--jb-v3-fg)' : 'var(--jb-v3-panel)', color: view === v ? '#fff' : 'var(--jb-v3-fg-3)' }}
+                    style={{
+                      padding: "8px 12px",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: 13,
+                      background:
+                        view === v ? "var(--jb-v3-fg)" : "var(--jb-v3-panel)",
+                      color: view === v ? "#fff" : "var(--jb-v3-fg-3)",
+                    }}
                   >
-                    {v === 'grid' ? '▦' : '☰'}
+                    {v === "grid" ? "▦" : "☰"}
                   </button>
                 ))}
               </div>
@@ -467,9 +717,23 @@ export default function ResumeLibrary() {
 
             {/* BODY */}
             {libraryLoading ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(268px,1fr))', gap: 16 }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill,minmax(268px,1fr))",
+                  gap: 16,
+                }}
+              >
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} style={{ height: 250, borderRadius: 2, background: 'var(--jb-v3-line)', animation: 'jbskel 1.2s ease-in-out infinite' }} />
+                  <div
+                    key={i}
+                    style={{
+                      height: 250,
+                      borderRadius: 2,
+                      background: "var(--jb-v3-line)",
+                      animation: "jbskel 1.2s ease-in-out infinite",
+                    }}
+                  />
                 ))}
               </div>
             ) : libraryItems.length === 0 ? (
@@ -478,15 +742,32 @@ export default function ResumeLibrary() {
                 title="No resumes yet"
                 hint="Create one with the résumé agent or import your existing PDF or DOCX."
                 action={
-                  <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-                    <button type="button" className="jb-btn" onClick={() => setImportOpen(true)} style={secondaryBtn}>↧ Import</button>
+                  <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+                    <button
+                      type="button"
+                      className="jb-btn"
+                      onClick={() => setImportOpen(true)}
+                      style={secondaryBtn}
+                    >
+                      ↧ Import
+                    </button>
                   </div>
                 }
               />
             ) : visible.length === 0 ? (
-              <EmptyState icon="⌕" title="No matches" hint="Try a different search or filter." />
-            ) : view === 'grid' ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(268px,1fr))', gap: 16 }}>
+              <EmptyState
+                icon="⌕"
+                title="No matches"
+                hint="Try a different search or filter."
+              />
+            ) : view === "grid" ? (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill,minmax(268px,1fr))",
+                  gap: 16,
+                }}
+              >
                 {visible.map((r) => (
                   <ResumeCard
                     key={r.id}
@@ -525,28 +806,52 @@ export default function ResumeLibrary() {
 
       <AnimatePresence>
         {importOpen && (
-          <ImportModal onClose={() => setImportOpen(false)} onDone={async () => { setImportOpen(false); await load(); }} />
+          <ImportModal
+            onClose={() => setImportOpen(false)}
+            onDone={async () => {
+              setImportOpen(false);
+              await load();
+            }}
+          />
         )}
         {versionsFor && (
-          <VersionsDrawer resume={versionsFor} onClose={() => setVersionsFor(null)} onChanged={load} />
+          <VersionsDrawer
+            resume={versionsFor}
+            onClose={() => setVersionsFor(null)}
+            onChanged={load}
+          />
         )}
         {confirmDelete && (
           <ConfirmDialog
             title={`Delete “${confirmDelete.name}”?`}
-            body={confirmDelete.libraryKind === 'agent'
-              ? 'This permanently removes the AI-generated résumé, its linked session, every revision, and every saved PDF.'
-              : 'This permanently removes the résumé and its version history. Any job applications that used it keep their record.'}
-            confirmLabel={confirmDelete.libraryKind === 'agent' ? 'Delete resume & session' : 'Delete resume'}
+            body={
+              confirmDelete.libraryKind === "agent"
+                ? "This permanently removes the AI-generated résumé, its linked session, every revision, and every saved PDF."
+                : "This permanently removes the résumé and its version history. Any job applications that used it keep their record."
+            }
+            confirmLabel={
+              confirmDelete.libraryKind === "agent"
+                ? "Delete resume & session"
+                : "Delete resume"
+            }
             danger
             onCancel={() => setConfirmDelete(null)}
-            onConfirm={async () => { const r = confirmDelete; setConfirmDelete(null); await doDelete(r); }}
+            onConfirm={async () => {
+              const r = confirmDelete;
+              setConfirmDelete(null);
+              await doDelete(r);
+            }}
           />
         )}
         {renaming && (
           <RenameModal
             resume={renaming}
             onCancel={() => setRenaming(null)}
-            onSave={async (name) => { const r = renaming; setRenaming(null); await doRename(r, name); }}
+            onSave={async (name) => {
+              const r = renaming;
+              setRenaming(null);
+              await doRename(r, name);
+            }}
           />
         )}
       </AnimatePresence>
@@ -556,19 +861,46 @@ export default function ResumeLibrary() {
 
 /* ===================================================== sub-components === */
 function humanizeKey(value) {
-  if (!value) return '';
+  if (!value) return "";
   return String(value)
-    .split('-')
+    .split("-")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
+    .join(" ");
 }
 
 function SummaryCard({ label, value, hint }) {
   return (
-    <div style={{ background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, padding: '16px 18px' }}>
-      <div style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--jb-v3-fg-3)', marginBottom: 8 }}>{label}</div>
-      <div style={{ fontSize: 26, fontWeight: 700, lineHeight: 1, marginBottom: 4 }}>{value}</div>
-      <div style={{ fontSize: 12, color: 'var(--jb-v3-fg-3)' }}>{hint}</div>
+    <div
+      style={{
+        background: "var(--jb-v3-panel)",
+        border: "1px solid var(--jb-v3-line)",
+        borderRadius: 2,
+        padding: "16px 18px",
+      }}
+    >
+      <div
+        style={{
+          fontFamily: MONO,
+          fontSize: 11,
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          color: "var(--jb-v3-fg-3)",
+          marginBottom: 8,
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: 26,
+          fontWeight: 700,
+          lineHeight: 1,
+          marginBottom: 4,
+        }}
+      >
+        {value}
+      </div>
+      <div style={{ fontSize: 12, color: "var(--jb-v3-fg-3)" }}>{hint}</div>
     </div>
   );
 }
@@ -577,8 +909,17 @@ function Thumbnail({ r, h = 132 }) {
   const t = getTemplate(r.template);
   const Thumb = t.Thumb;
   return (
-    <div style={{ height: h, borderRadius: 2, overflow: 'hidden', border: '1px solid var(--jb-v3-line)', background: '#fff', display: 'flex' }}>
-      <div style={{ margin: 'auto', width: '72%' }}>
+    <div
+      style={{
+        height: h,
+        borderRadius: 2,
+        overflow: "hidden",
+        border: "1px solid var(--jb-v3-line)",
+        background: "#fff",
+        display: "flex",
+      }}
+    >
+      <div style={{ margin: "auto", width: "72%" }}>
         <Thumb theme={thumbThemeFor(r)} />
       </div>
     </div>
@@ -589,43 +930,76 @@ function ActionsMenu({ r, actions }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => {
-    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
+    const onDoc = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
   }, []);
-  const isArchived = r.status === 'archived';
-  const items = r.libraryKind === 'agent'
-    ? [
-        { label: 'Open resume', fn: actions.onOpen },
-        { label: 'Rename', fn: actions.onRename },
-        r.hasCurrentPdf ? { label: 'Download PDF', fn: actions.onDownload } : null,
-        { label: isArchived ? 'Restore' : 'Archive', fn: actions.onArchive },
-        { label: 'Delete', fn: actions.onDelete, danger: true },
-      ].filter(Boolean)
-    : [
-        { label: 'Open resume', fn: actions.onOpen },
-        { label: 'Rename', fn: actions.onRename },
-        { label: 'Duplicate', fn: actions.onDuplicate },
-        { label: 'Create version', fn: actions.onCreateVersion },
-        { label: 'Version history', fn: actions.onVersions },
-        { label: r.isPrimary ? 'Primary resume ✓' : 'Set as primary', fn: r.isPrimary ? null : actions.onSetPrimary },
-        { label: 'Download PDF', fn: actions.onDownload },
-        { label: isArchived ? 'Restore' : 'Archive', fn: actions.onArchive },
-        { label: 'Delete', fn: actions.onDelete, danger: true },
-      ];
+  const isArchived = r.status === "archived";
+  const items =
+    r.libraryKind === "agent"
+      ? [
+          { label: "Open resume", fn: actions.onOpen },
+          { label: "Rename", fn: actions.onRename },
+          r.hasCurrentPdf
+            ? { label: "Download PDF", fn: actions.onDownload }
+            : null,
+          { label: isArchived ? "Restore" : "Archive", fn: actions.onArchive },
+          { label: "Delete", fn: actions.onDelete, danger: true },
+        ].filter(Boolean)
+      : [
+          { label: "Open resume", fn: actions.onOpen },
+          { label: "Rename", fn: actions.onRename },
+          { label: "Duplicate", fn: actions.onDuplicate },
+          { label: "Create version", fn: actions.onCreateVersion },
+          { label: "Version history", fn: actions.onVersions },
+          {
+            label: r.isPrimary ? "Primary resume ✓" : "Set as primary",
+            fn: r.isPrimary ? null : actions.onSetPrimary,
+          },
+          { label: "Download PDF", fn: actions.onDownload },
+          { label: isArchived ? "Restore" : "Archive", fn: actions.onArchive },
+          { label: "Delete", fn: actions.onDelete, danger: true },
+        ];
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
+    <div ref={ref} style={{ position: "relative" }}>
       <button
         type="button"
         aria-label="More actions"
-        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
-        style={{ width: 30, height: 30, borderRadius: 2, border: '1px solid var(--jb-v3-line)', background: 'var(--jb-v3-panel)', cursor: 'pointer', color: 'var(--jb-v3-fg-2)', fontSize: 16, lineHeight: 1 }}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((o) => !o);
+        }}
+        style={{
+          width: 30,
+          height: 30,
+          borderRadius: 2,
+          border: "1px solid var(--jb-v3-line)",
+          background: "var(--jb-v3-panel)",
+          cursor: "pointer",
+          color: "var(--jb-v3-fg-2)",
+          fontSize: 16,
+          lineHeight: 1,
+        }}
       >
         ⋯
       </button>
       {open && (
         <div
-          style={{ position: 'absolute', right: 0, top: 36, zIndex: 30, width: 190, background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, boxShadow: '0 20px 44px -20px color-mix(in srgb, var(--jb-v3-invert) 40%, transparent)', padding: 6 }}
+          style={{
+            position: "absolute",
+            right: 0,
+            top: 36,
+            zIndex: 30,
+            width: 190,
+            background: "var(--jb-v3-panel)",
+            border: "1px solid var(--jb-v3-line)",
+            borderRadius: 2,
+            boxShadow:
+              "0 20px 44px -20px color-mix(in srgb, var(--jb-v3-invert) 40%, transparent)",
+            padding: 6,
+          }}
           onClick={(e) => e.stopPropagation()}
         >
           {items.map((it, i) => (
@@ -634,8 +1008,27 @@ function ActionsMenu({ r, actions }) {
               type="button"
               className="jb-menu-item"
               disabled={!it.fn}
-              onClick={() => { setOpen(false); it.fn && it.fn(); }}
-              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 2, border: 'none', background: 'none', cursor: it.fn ? 'pointer' : 'default', fontFamily: 'inherit', fontSize: 13, color: it.danger ? 'var(--jb-v3-danger)' : !it.fn ? 'var(--jb-v3-fg-3)' : 'var(--jb-v3-invert)' }}
+              onClick={() => {
+                setOpen(false);
+                it.fn && it.fn();
+              }}
+              style={{
+                display: "block",
+                width: "100%",
+                textAlign: "left",
+                padding: "8px 10px",
+                borderRadius: 2,
+                border: "none",
+                background: "none",
+                cursor: it.fn ? "pointer" : "default",
+                fontFamily: "inherit",
+                fontSize: 13,
+                color: it.danger
+                  ? "var(--jb-v3-danger)"
+                  : !it.fn
+                    ? "var(--jb-v3-fg-3)"
+                    : "var(--jb-v3-invert)",
+              }}
             >
               {it.label}
             </button>
@@ -650,69 +1043,233 @@ function ResumeCard({ r, busy, ...actions }) {
   const method = METHOD_META[r.creationMethod] || METHOD_META.manual;
   return (
     <motion.div
-      data-testid={r.libraryKind === 'agent' ? `resume-session-${r.sessionId}` : `resume-${r.id}`}
+      data-testid={
+        r.libraryKind === "agent"
+          ? `resume-session-${r.sessionId}`
+          : `resume-${r.id}`
+      }
       layout
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       className="jb-card"
-      style={{ position: 'relative', background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, padding: 14, opacity: busy ? 0.6 : 1 }}
+      style={{
+        position: "relative",
+        background: "var(--jb-v3-panel)",
+        border: "1px solid var(--jb-v3-line)",
+        borderRadius: 2,
+        padding: 14,
+        opacity: busy ? 0.6 : 1,
+      }}
     >
-      <button type="button" aria-label="Open resume" onClick={actions.onOpen} style={{ display: 'block', width: '100%', padding: 0, border: 0, background: 'transparent', cursor: 'pointer' }}>
+      <button
+        type="button"
+        aria-label="Open resume"
+        onClick={actions.onOpen}
+        style={{
+          display: "block",
+          width: "100%",
+          padding: 0,
+          border: 0,
+          background: "transparent",
+          cursor: "pointer",
+        }}
+      >
         <Thumbnail r={r} />
       </button>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginTop: 12 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 8,
+          marginTop: 12,
+        }}
+      >
         <div style={{ minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <span onClick={actions.onOpen} style={{ fontSize: 15, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 170 }}>{r.name}</span>
-            {r.isPrimary && <span title="Primary resume" style={{ fontSize: 11, fontWeight: 700, color: 'var(--jb-v3-accent)', background: 'var(--jb-v3-accent-soft)', padding: '2px 7px', borderRadius: 2 }}>PRIMARY</span>}
+          <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+            <span
+              onClick={actions.onOpen}
+              style={{
+                fontSize: 15,
+                fontWeight: 700,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                maxWidth: 170,
+              }}
+            >
+              {r.name}
+            </span>
+            {r.isPrimary && (
+              <span
+                title="Primary resume"
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "var(--jb-v3-accent)",
+                  background: "var(--jb-v3-accent-soft)",
+                  padding: "2px 7px",
+                  borderRadius: 2,
+                }}
+              >
+                PRIMARY
+              </span>
+            )}
           </div>
-          <div style={{ fontSize: 12.5, color: 'var(--jb-v3-fg-3)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {r.targetRole || 'No target role'}
+          <div
+            style={{
+              fontSize: 12.5,
+              color: "var(--jb-v3-fg-3)",
+              marginTop: 2,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {r.targetRole || "No target role"}
           </div>
         </div>
         <ActionsMenu r={r} actions={actions} />
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
-        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--jb-v3-fg-2)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ color: r.creationMethod === 'ai_generated' ? 'var(--jb-v3-accent)' : 'var(--jb-v3-fg-3)' }}>{method.icon}</span>{method.label}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          flexWrap: "wrap",
+          marginTop: 10,
+        }}
+      >
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            color: "var(--jb-v3-fg-2)",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+          }}
+        >
+          <span
+            style={{
+              color:
+                r.creationMethod === "ai_generated"
+                  ? "var(--jb-v3-accent)"
+                  : "var(--jb-v3-fg-3)",
+            }}
+          >
+            {method.icon}
+          </span>
+          {method.label}
         </span>
-        <span style={{ fontFamily: MONO, fontSize: 11, color: 'var(--jb-v3-fg-3)' }}>
-          {r.libraryKind === 'agent'
-            ? `${r.version} revision${r.version === 1 ? '' : 's'}`
+        <span
+          style={{ fontFamily: MONO, fontSize: 11, color: "var(--jb-v3-fg-3)" }}
+        >
+          {r.libraryKind === "agent"
+            ? `${r.version} revision${r.version === 1 ? "" : "s"}`
             : `v${r.version}`}
         </span>
-        {typeof r.atsScore === 'number' && (
-          <span style={{ fontFamily: MONO, fontSize: 11, color: 'var(--jb-v3-accent)' }}>ATS {r.atsScore}%</span>
+        {typeof r.atsScore === "number" && (
+          <span
+            style={{
+              fontFamily: MONO,
+              fontSize: 11,
+              color: "var(--jb-v3-accent)",
+            }}
+          >
+            ATS {r.atsScore}%
+          </span>
         )}
       </div>
 
-      {r.libraryKind === 'agent' ? (
-        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--jb-v3-line)', fontSize: 11.5, color: 'var(--jb-v3-fg-3)', lineHeight: 1.5 }}>
-          <div>{r.harnessLabel || r.harness || 'Agent'} · {r.modelLabel || r.model || 'Model unavailable'}</div>
-          <div>{humanizeKey(r.templateKey) || 'Default template'} · {r.hasCurrentPdf ? 'PDF saved' : 'No PDF yet'}</div>
+      {r.libraryKind === "agent" ? (
+        <div
+          style={{
+            marginTop: 10,
+            paddingTop: 10,
+            borderTop: "1px dashed var(--jb-v3-line)",
+            fontSize: 11.5,
+            color: "var(--jb-v3-fg-3)",
+            lineHeight: 1.5,
+          }}
+        >
+          <div>{r.modelLabel || r.model || "Model unavailable"}</div>
+          <div>
+            {humanizeKey(r.templateKey) || "Default template"} ·{" "}
+            {r.hasCurrentPdf ? "PDF saved" : "No PDF yet"}
+          </div>
         </div>
       ) : r.source?.originalFilename ? (
-        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--jb-v3-line)', fontSize: 11.5, color: 'var(--jb-v3-fg-3)', lineHeight: 1.5 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', overflow: 'hidden' }}>
+        <div
+          style={{
+            marginTop: 10,
+            paddingTop: 10,
+            borderTop: "1px dashed var(--jb-v3-line)",
+            fontSize: 11.5,
+            color: "var(--jb-v3-fg-3)",
+            lineHeight: 1.5,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+            }}
+          >
             <span aria-hidden>↧</span>
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }} title={r.source.originalFilename}>{r.source.originalFilename}</span>
-            <span style={{ color: 'var(--jb-v3-line-2)' }}>·</span>
-            <span style={{ fontFamily: MONO }}>{(r.source.fileExtension || '').replace('.', '').toUpperCase() || 'FILE'}</span>
-            <span style={{ color: 'var(--jb-v3-line-2)' }}>·</span>
+            <span
+              style={{ overflow: "hidden", textOverflow: "ellipsis" }}
+              title={r.source.originalFilename}
+            >
+              {r.source.originalFilename}
+            </span>
+            <span style={{ color: "var(--jb-v3-line-2)" }}>·</span>
+            <span style={{ fontFamily: MONO }}>
+              {(r.source.fileExtension || "").replace(".", "").toUpperCase() ||
+                "FILE"}
+            </span>
+            <span style={{ color: "var(--jb-v3-line-2)" }}>·</span>
             <span>{fmtBytes(r.source.fileSize)}</span>
           </div>
-          <div style={{ marginTop: 2 }}>Imported {fmtDate(r.source.importedAt)}</div>
+          <div style={{ marginTop: 2 }}>
+            Imported {fmtDate(r.source.importedAt)}
+          </div>
         </div>
       ) : (
-        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--jb-v3-line)', fontSize: 11.5, color: 'var(--jb-v3-fg-3)' }}>
+        <div
+          style={{
+            marginTop: 10,
+            paddingTop: 10,
+            borderTop: "1px dashed var(--jb-v3-line)",
+            fontSize: 11.5,
+            color: "var(--jb-v3-fg-3)",
+          }}
+        >
           Created {fmtDate(r.createdAt)}
         </div>
       )}
 
-      <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11.5, color: 'var(--jb-v3-fg-3)' }}>
+      <div
+        style={{
+          marginTop: 8,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          fontSize: 11.5,
+          color: "var(--jb-v3-fg-3)",
+        }}
+      >
         <span>Edited {relTime(r.updatedAt)}</span>
-        {r.applicationCount > 0 && <span style={{ fontFamily: MONO }}>{r.applicationCount} application{r.applicationCount > 1 ? 's' : ''}</span>}
+        {r.applicationCount > 0 && (
+          <span style={{ fontFamily: MONO }}>
+            {r.applicationCount} application{r.applicationCount > 1 ? "s" : ""}
+          </span>
+        )}
       </div>
     </motion.div>
   );
@@ -720,47 +1277,181 @@ function ResumeCard({ r, busy, ...actions }) {
 
 function ResumeTable({ rows, busyId, ...h }) {
   return (
-    <div style={{ background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, overflow: 'hidden' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '2.4fr 1.4fr 1fr 1.6fr 0.7fr 40px', gap: 12, padding: '11px 18px', borderBottom: '1px solid var(--jb-v3-line)', fontFamily: MONO, fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--jb-v3-fg-3)' }}>
-        <span>Resume</span><span>Source</span><span>History</span><span>Details</span><span>Edited</span><span />
+    <div
+      style={{
+        background: "var(--jb-v3-panel)",
+        border: "1px solid var(--jb-v3-line)",
+        borderRadius: 2,
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "2.4fr 1.4fr 1fr 1.6fr 0.7fr 40px",
+          gap: 12,
+          padding: "11px 18px",
+          borderBottom: "1px solid var(--jb-v3-line)",
+          fontFamily: MONO,
+          fontSize: 11,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          color: "var(--jb-v3-fg-3)",
+        }}
+      >
+        <span>Resume</span>
+        <span>Source</span>
+        <span>History</span>
+        <span>Details</span>
+        <span>Edited</span>
+        <span />
       </div>
       {rows.map((r) => {
         const method = METHOD_META[r.creationMethod] || METHOD_META.manual;
         return (
-          <div data-testid={r.libraryKind === 'agent' ? `resume-session-${r.sessionId}` : `resume-${r.id}`} key={r.id} className="jb-row" style={{ display: 'grid', gridTemplateColumns: '2.4fr 1.4fr 1fr 1.6fr 0.7fr 40px', gap: 12, padding: '13px 18px', borderBottom: '1px solid var(--jb-v3-line)', alignItems: 'center', fontSize: 13, opacity: busyId === r.id ? 0.6 : 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
-              <div style={{ width: 34, height: 44, borderRadius: 2, overflow: 'hidden', border: '1px solid var(--jb-v3-line)', flexShrink: 0 }}>
+          <div
+            data-testid={
+              r.libraryKind === "agent"
+                ? `resume-session-${r.sessionId}`
+                : `resume-${r.id}`
+            }
+            key={r.id}
+            className="jb-row"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "2.4fr 1.4fr 1fr 1.6fr 0.7fr 40px",
+              gap: 12,
+              padding: "13px 18px",
+              borderBottom: "1px solid var(--jb-v3-line)",
+              alignItems: "center",
+              fontSize: 13,
+              opacity: busyId === r.id ? 0.6 : 1,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 11,
+                minWidth: 0,
+              }}
+            >
+              <div
+                style={{
+                  width: 34,
+                  height: 44,
+                  borderRadius: 2,
+                  overflow: "hidden",
+                  border: "1px solid var(--jb-v3-line)",
+                  flexShrink: 0,
+                }}
+              >
                 <Thumbnail r={r} h={44} />
               </div>
               <div style={{ minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span onClick={() => h.onOpen(r)} style={{ fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</span>
-                  {r.isPrimary && <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--jb-v3-accent)', background: 'var(--jb-v3-accent-soft)', padding: '1px 6px', borderRadius: 2 }}>PRIMARY</span>}
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span
+                    onClick={() => h.onOpen(r)}
+                    style={{
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {r.name}
+                  </span>
+                  {r.isPrimary && (
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: "var(--jb-v3-accent)",
+                        background: "var(--jb-v3-accent-soft)",
+                        padding: "1px 6px",
+                        borderRadius: 2,
+                      }}
+                    >
+                      PRIMARY
+                    </span>
+                  )}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--jb-v3-fg-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.targetRole || '—'}</div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "var(--jb-v3-fg-3)",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {r.targetRole || "—"}
+                </div>
               </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: 11.5, color: 'var(--jb-v3-fg-2)' }}>{method.icon} {method.label}</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={{ fontSize: 11.5, color: "var(--jb-v3-fg-2)" }}>
+                {method.icon} {method.label}
+              </span>
             </div>
-            <span style={{ fontFamily: MONO, fontSize: 12, color: 'var(--jb-v3-fg-2)' }}>{r.libraryKind === 'agent' ? `${r.version} revision${r.version === 1 ? '' : 's'}` : `v${r.version}`}{typeof r.atsScore === 'number' ? ` · ATS ${r.atsScore}%` : ''}</span>
-            <div style={{ fontSize: 12, color: 'var(--jb-v3-fg-3)', minWidth: 0 }}>
-              {r.libraryKind === 'agent' ? (
+            <span
+              style={{
+                fontFamily: MONO,
+                fontSize: 12,
+                color: "var(--jb-v3-fg-2)",
+              }}
+            >
+              {r.libraryKind === "agent"
+                ? `${r.version} revision${r.version === 1 ? "" : "s"}`
+                : `v${r.version}`}
+              {typeof r.atsScore === "number" ? ` · ATS ${r.atsScore}%` : ""}
+            </span>
+            <div
+              style={{ fontSize: 12, color: "var(--jb-v3-fg-3)", minWidth: 0 }}
+            >
+              {r.libraryKind === "agent" ? (
                 <>
-                  <div>{r.harnessLabel || r.harness || 'Agent'} · {r.modelLabel || r.model || 'Model unavailable'}</div>
-                  <div>{r.hasCurrentPdf ? 'PDF saved' : 'No PDF yet'}</div>
+                  <div>{r.modelLabel || r.model || "Model unavailable"}</div>
+                  <div>{r.hasCurrentPdf ? "PDF saved" : "No PDF yet"}</div>
                 </>
               ) : r.source?.originalFilename ? (
                 <>
-                  <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={r.source.originalFilename}>{r.source.originalFilename} · {fmtBytes(r.source.fileSize)}</div>
+                  <div
+                    style={{
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                    title={r.source.originalFilename}
+                  >
+                    {r.source.originalFilename} · {fmtBytes(r.source.fileSize)}
+                  </div>
                   <div>{fmtDate(r.source.importedAt)}</div>
                 </>
               ) : (
-                <span style={{ color: 'var(--jb-v3-fg-3)' }}>Created {fmtDate(r.createdAt)}</span>
+                <span style={{ color: "var(--jb-v3-fg-3)" }}>
+                  Created {fmtDate(r.createdAt)}
+                </span>
               )}
             </div>
-            <span style={{ fontSize: 12, color: 'var(--jb-v3-fg-3)' }}>{relTime(r.updatedAt)}</span>
-            <ActionsMenu r={r} actions={{ onOpen: () => h.onOpen(r), onRename: () => h.onRename(r), onDuplicate: () => h.onDuplicate(r), onCreateVersion: () => h.onCreateVersion(r), onVersions: () => h.onVersions(r), onSetPrimary: () => h.onSetPrimary(r), onDownload: () => h.onDownload(r), onArchive: () => h.onArchive(r), onDelete: () => h.onDelete(r) }} />
+            <span style={{ fontSize: 12, color: "var(--jb-v3-fg-3)" }}>
+              {relTime(r.updatedAt)}
+            </span>
+            <ActionsMenu
+              r={r}
+              actions={{
+                onOpen: () => h.onOpen(r),
+                onRename: () => h.onRename(r),
+                onDuplicate: () => h.onDuplicate(r),
+                onCreateVersion: () => h.onCreateVersion(r),
+                onVersions: () => h.onVersions(r),
+                onSetPrimary: () => h.onSetPrimary(r),
+                onDownload: () => h.onDownload(r),
+                onArchive: () => h.onArchive(r),
+                onDelete: () => h.onDelete(r),
+              }}
+            />
           </div>
         );
       })}
@@ -771,51 +1462,57 @@ function ResumeTable({ rows, busyId, ...h }) {
 /* --------------------------------------------------- import modal ------ */
 function ImportModal({ onClose, onDone }) {
   const [file, setFile] = useState(null);
-  const [mode, setMode] = useState('keep_format');
-  const [name, setName] = useState('');
-  const [targetRole, setTargetRole] = useState('');
-  const [step, setStep] = useState('upload'); // upload | mode | processing
+  const [mode, setMode] = useState("keep_format");
+  const [name, setName] = useState("");
+  const [targetRole, setTargetRole] = useState("");
+  const [step, setStep] = useState("upload"); // upload | mode | processing
   const [err, setErr] = useState(null);
   const inputRef = useRef(null);
 
   const pick = (f) => {
     setErr(null);
     if (!f) return;
-    const ext = (f.name.match(/\.[^.]+$/) || [''])[0].toLowerCase();
-    if (!['.pdf', '.docx'].includes(ext)) { setErr(new Error('Unsupported file. Upload a PDF or DOCX.')); return; }
-    if (f.size > MAX_MB * 1024 * 1024) { setErr(new Error(`File too large (max ${MAX_MB}MB).`)); return; }
+    const ext = (f.name.match(/\.[^.]+$/) || [""])[0].toLowerCase();
+    if (![".pdf", ".docx"].includes(ext)) {
+      setErr(new Error("Unsupported file. Upload a PDF or DOCX."));
+      return;
+    }
+    if (f.size > MAX_MB * 1024 * 1024) {
+      setErr(new Error(`File too large (max ${MAX_MB}MB).`));
+      return;
+    }
     setFile(f);
-    setName((n) => n || f.name.replace(/\.[^.]+$/, ''));
-    setStep('mode');
+    setName((n) => n || f.name.replace(/\.[^.]+$/, ""));
+    setStep("mode");
   };
 
   const run = async () => {
     if (!file) return;
-    setStep('processing');
+    setStep("processing");
     setErr(null);
     try {
       const res = await uploadResume(file); // POST /api/resume/parse (heuristic fallback safe)
       const parsed = res?.parsedData || res?.parsed || res || {};
-      const ext = (file.name.match(/\.[^.]+$/) || [''])[0].toLowerCase();
+      const ext = (file.name.match(/\.[^.]+$/) || [""])[0].toLowerCase();
       await importResume({
-        name: name || file.name.replace(/\.[^.]+$/, ''),
+        name: name || file.name.replace(/\.[^.]+$/, ""),
         importMode: mode,
         targetRole: targetRole || undefined,
-        template: 'modern',
+        template: "modern",
         ...mapParsedToSchema(parsed),
         source: {
           originalFilename: file.name,
           fileExtension: ext,
-          mimeType: file.type || '',
+          mimeType: file.type || "",
           fileSize: file.size,
-          parseStatus: parsed._source === 'heuristic' ? 'partial' : 'parsed',
-          parseConfidence: parsed._source === 'heuristic' ? 0.6 : 0.9,
+          parseStatus: parsed._source === "heuristic" ? "partial" : "parsed",
+          parseConfidence: parsed._source === "heuristic" ? 0.6 : 0.9,
         },
       });
       await onDone();
     } catch (e) {
       setErr(e);
-      setStep('mode');
+      setStep("mode");
     }
   };
 
@@ -832,58 +1529,183 @@ function ImportModal({ onClose, onDone }) {
         <div style={{ padding: 22 }}>
           {err && <InlineError error={err} />}
 
-          {step === 'upload' && (
+          {step === "upload" && (
             <div
               onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => { e.preventDefault(); pick(e.dataTransfer.files?.[0]); }}
+              onDrop={(e) => {
+                e.preventDefault();
+                pick(e.dataTransfer.files?.[0]);
+              }}
               onClick={() => inputRef.current?.click()}
-              style={{ border: '2px dashed var(--jb-v3-line-2)', borderRadius: 2, padding: '44px 24px', textAlign: 'center', cursor: 'pointer', background: 'var(--jb-v3-panel)' }}
+              style={{
+                border: "2px dashed var(--jb-v3-line-2)",
+                borderRadius: 2,
+                padding: "44px 24px",
+                textAlign: "center",
+                cursor: "pointer",
+                background: "var(--jb-v3-panel)",
+              }}
             >
               <div style={{ fontSize: 34, marginBottom: 10 }}>↧</div>
-              <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>Drop your resume here</div>
-              <div style={{ fontSize: 13, color: 'var(--jb-v3-fg-3)' }}>or click to browse · PDF or DOCX · max {MAX_MB}MB</div>
-              <input ref={inputRef} type="file" accept=".pdf,.docx" style={{ display: 'none' }} onChange={(e) => pick(e.target.files?.[0])} />
+              <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>
+                Drop your resume here
+              </div>
+              <div style={{ fontSize: 13, color: "var(--jb-v3-fg-3)" }}>
+                or click to browse · PDF or DOCX · max {MAX_MB}MB
+              </div>
+              <input
+                ref={inputRef}
+                type="file"
+                accept=".pdf,.docx"
+                style={{ display: "none" }}
+                onChange={(e) => pick(e.target.files?.[0])}
+              />
             </div>
           )}
 
-          {step === 'mode' && file && (
+          {step === "mode" && file && (
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 2, border: '1px solid var(--jb-v3-line)', background: 'var(--jb-v3-panel)', marginBottom: 18 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 2, background: 'var(--jb-v3-accent-soft)', color: 'var(--jb-v3-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontFamily: MONO, fontSize: 11 }}>
-                  {(file.name.match(/\.([^.]+)$/) || ['', 'FILE'])[1].toUpperCase().slice(0, 4)}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "12px 14px",
+                  borderRadius: 2,
+                  border: "1px solid var(--jb-v3-line)",
+                  background: "var(--jb-v3-panel)",
+                  marginBottom: 18,
+                }}
+              >
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 2,
+                    background: "var(--jb-v3-accent-soft)",
+                    color: "var(--jb-v3-accent)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 700,
+                    fontFamily: MONO,
+                    fontSize: 11,
+                  }}
+                >
+                  {(file.name.match(/\.([^.]+)$/) || ["", "FILE"])[1]
+                    .toUpperCase()
+                    .slice(0, 4)}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--jb-v3-fg-3)' }}>{fmtBytes(file.size)}</div>
+                  <div
+                    style={{
+                      fontSize: 13.5,
+                      fontWeight: 600,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {file.name}
+                  </div>
+                  <div style={{ fontSize: 12, color: "var(--jb-v3-fg-3)" }}>
+                    {fmtBytes(file.size)}
+                  </div>
                 </div>
-                <button type="button" onClick={() => { setFile(null); setStep('upload'); }} style={{ ...secondaryBtn, padding: '6px 12px', fontSize: 12.5 }}>Replace</button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFile(null);
+                    setStep("upload");
+                  }}
+                  style={{
+                    ...secondaryBtn,
+                    padding: "6px 12px",
+                    fontSize: 12.5,
+                  }}
+                >
+                  Replace
+                </button>
               </div>
 
-              <div style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--jb-v3-fg-3)', marginBottom: 10 }}>How should we import it?</div>
-              <div style={{ display: 'grid', gap: 10, marginBottom: 18 }}>
-                <ModeOption active={mode === 'keep_format'} onClick={() => setMode('keep_format')} title="Keep original format" desc="Preserve the wording and structure of your file. We extract it into editable sections without rewriting." icon="⧉" />
-                <ModeOption active={mode === 'ai_rewrite'} onClick={() => setMode('ai_rewrite')} title="Rewrite with AI" desc="Import the content, then improve clarity, impact and ATS fit. AI never invents facts — you review every change." icon="✦" ai />
+              <div
+                style={{
+                  fontFamily: MONO,
+                  fontSize: 11,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: "var(--jb-v3-fg-3)",
+                  marginBottom: 10,
+                }}
+              >
+                How should we import it?
+              </div>
+              <div style={{ display: "grid", gap: 10, marginBottom: 18 }}>
+                <ModeOption
+                  active={mode === "keep_format"}
+                  onClick={() => setMode("keep_format")}
+                  title="Keep original format"
+                  desc="Preserve the wording and structure of your file. We extract it into editable sections without rewriting."
+                  icon="⧉"
+                />
+                <ModeOption
+                  active={mode === "ai_rewrite"}
+                  onClick={() => setMode("ai_rewrite")}
+                  title="Rewrite with AI"
+                  desc="Import the content, then improve clarity, impact and ATS fit. AI never invents facts — you review every change."
+                  icon="✦"
+                  ai
+                />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 12,
+                  marginBottom: 20,
+                }}
+              >
                 <Field label="Resume name">
-                  <input value={name} onChange={(e) => setName(e.target.value)} style={inp} placeholder="e.g. Backend Engineer" />
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    style={inp}
+                    placeholder="e.g. Backend Engineer"
+                  />
                 </Field>
                 <Field label="Target role (optional)">
-                  <input value={targetRole} onChange={(e) => setTargetRole(e.target.value)} style={inp} placeholder="e.g. Senior Backend Engineer" />
+                  <input
+                    value={targetRole}
+                    onChange={(e) => setTargetRole(e.target.value)}
+                    style={inp}
+                    placeholder="e.g. Senior Backend Engineer"
+                  />
                 </Field>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-                <button type="button" onClick={onClose} style={secondaryBtn}>Cancel</button>
-                <button type="button" onClick={run} style={primaryBtn}>Import resume</button>
+              <div
+                style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}
+              >
+                <button type="button" onClick={onClose} style={secondaryBtn}>
+                  Cancel
+                </button>
+                <button type="button" onClick={run} style={primaryBtn}>
+                  Import resume
+                </button>
               </div>
             </div>
           )}
 
-          {step === 'processing' && (
-            <div style={{ padding: '30px 0' }}>
-              <LoadingState label={mode === 'ai_rewrite' ? 'Importing & preparing AI review…' : 'Extracting your resume…'} />
+          {step === "processing" && (
+            <div style={{ padding: "30px 0" }}>
+              <LoadingState
+                label={
+                  mode === "ai_rewrite"
+                    ? "Importing & preparing AI review…"
+                    : "Extracting your resume…"
+                }
+              />
             </div>
           )}
         </div>
@@ -898,22 +1720,60 @@ function ModeOption({ active, onClick, title, desc, icon, ai }) {
       type="button"
       onClick={onClick}
       style={{
-        textAlign: 'left',
-        display: 'flex',
+        textAlign: "left",
+        display: "flex",
         gap: 12,
         padding: 14,
         borderRadius: 2,
-        cursor: 'pointer',
-        background: active && ai ? 'linear-gradient(180deg,var(--jb-v3-ok-soft),var(--jb-v3-accent-soft))' : 'var(--jb-v3-panel)',
-        border: `1.5px solid ${active ? 'var(--jb-v3-accent)' : 'var(--jb-v3-line)'}`,
-        boxShadow: active ? '0 0 0 3px color-mix(in srgb, var(--jb-v3-accent) 12%, transparent)' : 'none',
-        fontFamily: 'inherit',
+        cursor: "pointer",
+        background:
+          active && ai
+            ? "linear-gradient(180deg,var(--jb-v3-ok-soft),var(--jb-v3-accent-soft))"
+            : "var(--jb-v3-panel)",
+        border: `1.5px solid ${active ? "var(--jb-v3-accent)" : "var(--jb-v3-line)"}`,
+        boxShadow: active
+          ? "0 0 0 3px color-mix(in srgb, var(--jb-v3-accent) 12%, transparent)"
+          : "none",
+        fontFamily: "inherit",
       }}
     >
-      <span style={{ width: 30, height: 30, borderRadius: 2, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: ai ? 'var(--jb-v3-accent)' : 'var(--jb-v3-control)', color: ai ? '#fff' : 'var(--jb-v3-fg-2)', fontSize: 15 }}>{icon}</span>
+      <span
+        style={{
+          width: 30,
+          height: 30,
+          borderRadius: 2,
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: ai ? "var(--jb-v3-accent)" : "var(--jb-v3-control)",
+          color: ai ? "#fff" : "var(--jb-v3-fg-2)",
+          fontSize: 15,
+        }}
+      >
+        {icon}
+      </span>
       <span>
-        <span style={{ display: 'block', fontSize: 14, fontWeight: 700, marginBottom: 3 }}>{title}</span>
-        <span style={{ display: 'block', fontSize: 12.5, color: 'var(--jb-v3-fg-2)', lineHeight: 1.5 }}>{desc}</span>
+        <span
+          style={{
+            display: "block",
+            fontSize: 14,
+            fontWeight: 700,
+            marginBottom: 3,
+          }}
+        >
+          {title}
+        </span>
+        <span
+          style={{
+            display: "block",
+            fontSize: 12.5,
+            color: "var(--jb-v3-fg-2)",
+            lineHeight: 1.5,
+          }}
+        >
+          {desc}
+        </span>
       </span>
     </button>
   );
@@ -936,12 +1796,17 @@ function VersionsDrawer({ resume, onClose, onChanged }) {
     }
   }, [resume.id]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const create = async () => {
     setCreating(true);
     try {
-      await createResumeVersion(resume.id, `Snapshot · ${new Date().toLocaleString()}`);
+      await createResumeVersion(
+        resume.id,
+        `Snapshot · ${new Date().toLocaleString()}`,
+      );
       await load();
       onChanged && onChanged();
     } catch (e) {
@@ -958,35 +1823,103 @@ function VersionsDrawer({ resume, onClose, onChanged }) {
         animate={{ x: 0, opacity: 1 }}
         exit={{ x: 40, opacity: 0 }}
         onClick={(e) => e.stopPropagation()}
-        style={{ width: 420, maxWidth: '94vw', height: '100vh', background: 'var(--jb-v3-bg)', borderLeft: '1px solid var(--jb-v3-line)', display: 'flex', flexDirection: 'column' }}
+        style={{
+          width: 420,
+          maxWidth: "94vw",
+          height: "100vh",
+          background: "var(--jb-v3-bg)",
+          borderLeft: "1px solid var(--jb-v3-line)",
+          display: "flex",
+          flexDirection: "column",
+        }}
       >
-        <ModalHead title="Version history" subtitle={resume.name} onClose={onClose} />
-        <div style={{ padding: 20, flex: 1, overflowY: 'auto' }}>
+        <ModalHead
+          title="Version history"
+          subtitle={resume.name}
+          onClose={onClose}
+        />
+        <div style={{ padding: 20, flex: 1, overflowY: "auto" }}>
           {err && <InlineError error={err} />}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <span style={{ fontSize: 13, color: 'var(--jb-v3-fg-2)' }}>Current: <b>v{resume.version}</b></span>
-            <button type="button" onClick={create} disabled={creating} style={{ ...primaryBtn, padding: '8px 14px', fontSize: 13 }}>{creating ? 'Saving…' : '+ Save version'}</button>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 14,
+            }}
+          >
+            <span style={{ fontSize: 13, color: "var(--jb-v3-fg-2)" }}>
+              Current: <b>v{resume.version}</b>
+            </span>
+            <button
+              type="button"
+              onClick={create}
+              disabled={creating}
+              style={{ ...primaryBtn, padding: "8px 14px", fontSize: 13 }}
+            >
+              {creating ? "Saving…" : "+ Save version"}
+            </button>
           </div>
 
           {versions === null ? (
             <LoadingState label="Loading versions…" />
           ) : versions.length === 0 ? (
-            <EmptyState icon="⏱" title="No saved versions yet" hint="Save a version to snapshot the current resume so you can restore it later." />
+            <EmptyState
+              icon="⏱"
+              title="No saved versions yet"
+              hint="Save a version to snapshot the current resume so you can restore it later."
+            />
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {versions.map((v, i) => (
-                <div key={v._id || i} style={{ background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, padding: 14 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                    <span style={{ fontWeight: 700, fontSize: 14 }}>Version {v.version ?? v.versionNumber ?? '—'}</span>
-                    <span style={{ fontFamily: MONO, fontSize: 11, color: 'var(--jb-v3-fg-3)' }}>{fmtDate(v.createdAt)}</span>
+                <div
+                  key={v._id || i}
+                  style={{
+                    background: "var(--jb-v3-panel)",
+                    border: "1px solid var(--jb-v3-line)",
+                    borderRadius: 2,
+                    padding: 14,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: 4,
+                    }}
+                  >
+                    <span style={{ fontWeight: 700, fontSize: 14 }}>
+                      Version {v.version ?? v.versionNumber ?? "—"}
+                    </span>
+                    <span
+                      style={{
+                        fontFamily: MONO,
+                        fontSize: 11,
+                        color: "var(--jb-v3-fg-3)",
+                      }}
+                    >
+                      {fmtDate(v.createdAt)}
+                    </span>
                   </div>
-                  <div style={{ fontSize: 12.5, color: 'var(--jb-v3-fg-2)' }}>{v.description || v.label || 'Snapshot'}</div>
+                  <div style={{ fontSize: 12.5, color: "var(--jb-v3-fg-2)" }}>
+                    {v.description || v.label || "Snapshot"}
+                  </div>
                 </div>
               ))}
             </div>
           )}
-          <p style={{ fontSize: 11.5, color: 'var(--jb-v3-fg-3)', marginTop: 16, lineHeight: 1.5 }}>
-            Versions snapshot this resume so you can restore or compare later. Separate resumes (for different roles) live in the library, not here.
+          <p
+            style={{
+              fontSize: 11.5,
+              color: "var(--jb-v3-fg-3)",
+              marginTop: 16,
+              lineHeight: 1.5,
+            }}
+          >
+            Versions snapshot this resume so you can restore or compare later.
+            Separate resumes (for different roles) live in the library, not
+            here.
           </p>
         </div>
       </motion.div>
@@ -995,14 +1928,24 @@ function VersionsDrawer({ resume, onClose, onChanged }) {
 }
 
 /* ------------------------------------------------------- primitives ---- */
-function Overlay({ children, onClose, align = 'center' }) {
+function Overlay({ children, onClose, align = "center" }) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       onClick={onClose}
-      style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'color-mix(in srgb, var(--jb-v3-invert) 42%, transparent)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: align === 'right' ? 'stretch' : 'center', justifyContent: align === 'right' ? 'flex-end' : 'center', padding: align === 'right' ? 0 : 20 }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 90,
+        background: "color-mix(in srgb, var(--jb-v3-invert) 42%, transparent)",
+        backdropFilter: "blur(2px)",
+        display: "flex",
+        alignItems: align === "right" ? "stretch" : "center",
+        justifyContent: align === "right" ? "flex-end" : "center",
+        padding: align === "right" ? 0 : 20,
+      }}
     >
       {children}
     </motion.div>
@@ -1011,26 +1954,88 @@ function Overlay({ children, onClose, align = 'center' }) {
 
 function ModalHead({ title, subtitle, onClose }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--jb-v3-line)' }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "16px 20px",
+        borderBottom: "1px solid var(--jb-v3-line)",
+      }}
+    >
       <div>
         <div style={{ fontSize: 16, fontWeight: 700 }}>{title}</div>
-        {subtitle && <div style={{ fontSize: 12.5, color: 'var(--jb-v3-fg-3)', marginTop: 1 }}>{subtitle}</div>}
+        {subtitle && (
+          <div
+            style={{ fontSize: 12.5, color: "var(--jb-v3-fg-3)", marginTop: 1 }}
+          >
+            {subtitle}
+          </div>
+        )}
       </div>
-      <button type="button" onClick={onClose} aria-label="Close" style={{ width: 30, height: 30, borderRadius: 2, border: '1px solid var(--jb-v3-line)', background: 'var(--jb-v3-panel)', cursor: 'pointer', fontSize: 15, color: 'var(--jb-v3-fg-2)' }}>✕</button>
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close"
+        style={{
+          width: 30,
+          height: 30,
+          borderRadius: 2,
+          border: "1px solid var(--jb-v3-line)",
+          background: "var(--jb-v3-panel)",
+          cursor: "pointer",
+          fontSize: 15,
+          color: "var(--jb-v3-fg-2)",
+        }}
+      >
+        ✕
+      </button>
     </div>
   );
 }
 
-function ConfirmDialog({ title, body, confirmLabel, danger, onCancel, onConfirm }) {
+function ConfirmDialog({
+  title,
+  body,
+  confirmLabel,
+  danger,
+  onCancel,
+  onConfirm,
+}) {
   return (
     <Overlay onClose={onCancel}>
-      <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.97 }} onClick={(e) => e.stopPropagation()} style={{ ...modalCard, maxWidth: 440 }}>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.97 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.97 }}
+        onClick={(e) => e.stopPropagation()}
+        style={{ ...modalCard, maxWidth: 440 }}
+      >
         <div style={{ padding: 24 }}>
-          <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 8 }}>{title}</div>
-          <p style={{ fontSize: 13.5, color: 'var(--jb-v3-fg-2)', lineHeight: 1.6, margin: '0 0 22px' }}>{body}</p>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-            <button type="button" onClick={onCancel} style={secondaryBtn}>Cancel</button>
-            <button type="button" onClick={onConfirm} style={danger ? dangerBtn : primaryBtn}>{confirmLabel}</button>
+          <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 8 }}>
+            {title}
+          </div>
+          <p
+            style={{
+              fontSize: 13.5,
+              color: "var(--jb-v3-fg-2)",
+              lineHeight: 1.6,
+              margin: "0 0 22px",
+            }}
+          >
+            {body}
+          </p>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            <button type="button" onClick={onCancel} style={secondaryBtn}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onConfirm}
+              style={danger ? dangerBtn : primaryBtn}
+            >
+              {confirmLabel}
+            </button>
           </div>
         </div>
       </motion.div>
@@ -1039,18 +2044,46 @@ function ConfirmDialog({ title, body, confirmLabel, danger, onCancel, onConfirm 
 }
 
 function RenameModal({ resume, onCancel, onSave }) {
-  const [name, setName] = useState(resume.name || '');
+  const [name, setName] = useState(resume.name || "");
   return (
     <Overlay onClose={onCancel}>
-      <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.97 }} onClick={(e) => e.stopPropagation()} style={{ ...modalCard, maxWidth: 420 }}>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.97 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.97 }}
+        onClick={(e) => e.stopPropagation()}
+        style={{ ...modalCard, maxWidth: 420 }}
+      >
         <ModalHead title="Rename resume" onClose={onCancel} />
-        <form onSubmit={(e) => { e.preventDefault(); if (name.trim()) onSave(name.trim()); }} style={{ padding: 22 }}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (name.trim()) onSave(name.trim());
+          }}
+          style={{ padding: 22 }}
+        >
           <Field label="Resume name">
-            <input autoFocus value={name} onChange={(e) => setName(e.target.value)} style={inp} />
+            <input
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              style={inp}
+            />
           </Field>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-            <button type="button" onClick={onCancel} style={secondaryBtn}>Cancel</button>
-            <button type="submit" style={primaryBtn}>Save</button>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: 10,
+              marginTop: 20,
+            }}
+          >
+            <button type="button" onClick={onCancel} style={secondaryBtn}>
+              Cancel
+            </button>
+            <button type="submit" style={primaryBtn}>
+              Save
+            </button>
           </div>
         </form>
       </motion.div>
@@ -1060,17 +2093,83 @@ function RenameModal({ resume, onCancel, onSave }) {
 
 function Field({ label, children }) {
   return (
-    <label style={{ display: 'block' }}>
-      <span style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--jb-v3-fg-2)', marginBottom: 6 }}>{label}</span>
+    <label style={{ display: "block" }}>
+      <span
+        style={{
+          display: "block",
+          fontSize: 12,
+          fontWeight: 600,
+          color: "var(--jb-v3-fg-2)",
+          marginBottom: 6,
+        }}
+      >
+        {label}
+      </span>
       {children}
     </label>
   );
 }
 
 /* --------------------------------------------------------- style tokens */
-const primaryBtn = { display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, color: 'var(--jb-v3-accent-ink)', background: 'var(--jb-v3-accent)', border: 'none', borderRadius: 2, padding: '10px 18px', cursor: 'pointer' };
-const secondaryBtn = { display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'inherit', fontSize: 13.5, fontWeight: 600, color: 'var(--jb-v3-fg)', background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line-2)', borderRadius: 2, padding: '10px 16px', cursor: 'pointer' };
-const dangerBtn = { ...primaryBtn, color: '#fff', background: 'var(--jb-v3-danger)' };
-const textBtn = { fontFamily: 'inherit', fontSize: 12.5, fontWeight: 650, color: 'var(--jb-v3-fg-2)', background: 'transparent', border: 'none', padding: '8px 6px', cursor: 'pointer' };
-const modalCard = { width: 560, maxWidth: '94vw', background: 'var(--jb-v3-bg)', borderRadius: 2, boxShadow: '0 40px 90px -30px color-mix(in srgb, var(--jb-v3-invert) 50%, transparent)', overflow: 'hidden' };
-const inp = { width: '100%', padding: '9px 12px', borderRadius: 2, border: '1px solid var(--jb-v3-line)', background: 'var(--jb-v3-panel)', fontFamily: 'inherit', fontSize: 13.5, color: 'var(--jb-v3-fg)' };
+const primaryBtn = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  fontFamily: "inherit",
+  fontSize: 13.5,
+  fontWeight: 700,
+  color: "var(--jb-v3-accent-ink)",
+  background: "var(--jb-v3-accent)",
+  border: "none",
+  borderRadius: 2,
+  padding: "10px 18px",
+  cursor: "pointer",
+};
+const secondaryBtn = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  fontFamily: "inherit",
+  fontSize: 13.5,
+  fontWeight: 600,
+  color: "var(--jb-v3-fg)",
+  background: "var(--jb-v3-panel)",
+  border: "1px solid var(--jb-v3-line-2)",
+  borderRadius: 2,
+  padding: "10px 16px",
+  cursor: "pointer",
+};
+const dangerBtn = {
+  ...primaryBtn,
+  color: "#fff",
+  background: "var(--jb-v3-danger)",
+};
+const textBtn = {
+  fontFamily: "inherit",
+  fontSize: 12.5,
+  fontWeight: 650,
+  color: "var(--jb-v3-fg-2)",
+  background: "transparent",
+  border: "none",
+  padding: "8px 6px",
+  cursor: "pointer",
+};
+const modalCard = {
+  width: 560,
+  maxWidth: "94vw",
+  background: "var(--jb-v3-bg)",
+  borderRadius: 2,
+  boxShadow:
+    "0 40px 90px -30px color-mix(in srgb, var(--jb-v3-invert) 50%, transparent)",
+  overflow: "hidden",
+};
+const inp = {
+  width: "100%",
+  padding: "9px 12px",
+  borderRadius: 2,
+  border: "1px solid var(--jb-v3-line)",
+  background: "var(--jb-v3-panel)",
+  fontFamily: "inherit",
+  fontSize: 13.5,
+  color: "var(--jb-v3-fg)",
+};

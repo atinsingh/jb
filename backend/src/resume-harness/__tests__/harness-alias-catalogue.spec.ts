@@ -26,6 +26,31 @@ const configAliases = [...CONFIG.matchAll(/^\s*- model_name:\s*(\S+)/gm)].map(
 );
 
 describe('harness alias catalogue', () => {
+  it('registers every Codex-supported GPT-5.6 Luna effort', () => {
+    expect(
+      seededAliases.filter((alias) => alias.startsWith('openai/gpt-5.6-luna/')),
+    ).toEqual([
+      'openai/gpt-5.6-luna/low',
+      'openai/gpt-5.6-luna/medium',
+      'openai/gpt-5.6-luna/high',
+      'openai/gpt-5.6-luna/xhigh',
+      'openai/gpt-5.6-luna/max',
+    ]);
+  });
+
+  it('offers every GPT-5.6 Luna effort to the default FREE tier', () => {
+    const lunaTierLists = [
+      ...SEED.matchAll(
+        /alias:\s*'openai\/gpt-5\.6-luna\/[^']+'[\s\S]*?tiers:\s*\[([^\]]+)\]/g,
+      ),
+    ].map((match) => match[1]);
+
+    expect(lunaTierLists).toHaveLength(5);
+    for (const tiers of lunaTierLists) {
+      expect(tiers).toMatch(/'FREE'/);
+    }
+  });
+
   it('seeds only aliases the proxy actually serves', () => {
     expect(seededAliases.length).toBeGreaterThan(0);
     for (const alias of seededAliases) {

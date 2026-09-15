@@ -71,8 +71,10 @@ describe('SandboxService.isAvailable', () => {
 
       expect(create).toHaveBeenCalledWith(
         expect.objectContaining({
+          name: 'jb-resume-session-1',
           labels: expect.objectContaining({
             app: 'jobocate',
+            namespace: 'jb',
             surface: 'resume-harness',
             session: 'session-1',
             expiresAt: '2026-09-09T16:15:00.000Z',

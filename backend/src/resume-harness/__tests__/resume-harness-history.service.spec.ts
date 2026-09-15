@@ -133,7 +133,9 @@ describe('Resume harness saved sessions and revisions', () => {
     });
     sandbox.readFile
       .mockReset()
-      .mockImplementation(async () => `${source}\n% edit ${sandbox.exec.mock.calls.length}`);
+      .mockImplementation(
+        async () => `${source}\n% edit ${sandbox.exec.mock.calls.length}`,
+      );
     latex.compile.mockResolvedValue({
       ok: true,
       log: '',
@@ -162,9 +164,9 @@ describe('Resume harness saved sessions and revisions', () => {
         {
           provide: ModelAliasService,
           useValue: {
-            resolveForUser: async () => ({
-              alias: 'test',
-              provider: 'test',
+            resolveSelectionForUser: async () => ({
+              alias: 'openai/test/low',
+              provider: 'openai',
               model: 'test',
               effort: 'low',
               label: 'Test',
@@ -176,59 +178,86 @@ describe('Resume harness saved sessions and revisions', () => {
     service = module.get(ResumeHarnessService);
   });
   const start = (input = {}) =>
-    service.startSession('u1', { harness: 'codex', ...input });
+    service.startSession('u1', { model: 'test', effort: 'low', ...input });
   const turn = (id) =>
     service.runTurn('u1', id, { instruction: '  Build my résumé  ' });
 
-  it.each([false, true])('compensates only the new turn PDF after save fails (cleanup fails: %s)', async (cleanupFails) => {
-    const session = await start();
-    await turn(session.id);
-    const originalKey = docs[0].pdfKey;
-    const failure = new Error('Mongo save failed');
-    docs[0].save.mockRejectedValueOnce(failure);
-    if (cleanupFails) storage.delete.mockRejectedValueOnce(new Error('Storage cleanup failed'));
-    await expect(turn(session.id)).rejects.toBe(failure);
-    expect(storage.delete).toHaveBeenCalledTimes(1);
-    expect(storage.delete).toHaveBeenCalledWith(`resume-harness/u1/${session.id}/revisions/2.pdf`);
-    expect(artifacts.get(originalKey)).toEqual(pdf);
-    if (!cleanupFails) expect(artifacts.size).toBe(1);
-  });
+  it.each([false, true])(
+    'compensates only the new turn PDF after save fails (cleanup fails: %s)',
+    async (cleanupFails) => {
+      const session = await start();
+      await turn(session.id);
+      const originalKey = docs[0].pdfKey;
+      const failure = new Error('Mongo save failed');
+      docs[0].save.mockRejectedValueOnce(failure);
+      if (cleanupFails)
+        storage.delete.mockRejectedValueOnce(
+          new Error('Storage cleanup failed'),
+        );
+      await expect(turn(session.id)).rejects.toBe(failure);
+      expect(storage.delete).toHaveBeenCalledTimes(1);
+      expect(storage.delete).toHaveBeenCalledWith(
+        `resume-harness/u1/${session.id}/revisions/2.pdf`,
+      );
+      expect(artifacts.get(originalKey)).toEqual(pdf);
+      if (!cleanupFails) expect(artifacts.size).toBe(1);
+    },
+  );
 
-  it.each(['provision', 'save'])('compensates only the carried copy after %s fails', async (stage) => {
-    const original = await start();
-    await turn(original.id);
-    const originalKey = docs[0].pdfKey;
-    const failure = new Error(`${stage} failed`);
-    const create = model.create.getMockImplementation();
-    model.create.mockImplementationOnce(async (data) => {
-      const document = await create(data);
-      if (stage === 'save') document.save.mockRejectedValueOnce(failure);
-      return document;
-    });
-    if (stage === 'provision') sandbox.provision.mockRejectedValueOnce(failure);
-    await expect(start({ carryFromSessionId: original.id })).rejects.toBe(failure);
-    expect(storage.delete).toHaveBeenCalledTimes(1);
-    expect(storage.delete).toHaveBeenCalledWith(`resume-harness/u1/${docs[1]._id}/revisions/1.pdf`);
-    expect(artifacts.get(originalKey)).toEqual(pdf);
-    expect(artifacts.size).toBe(1);
-    expect(docs[1].status).toBe('failed');
-    expect(docs[1].pdfKey).toBeUndefined();
-    expect(docs[1].turns[0].pdfKey).toBeUndefined();
-  });
+  it.each(['provision', 'save'])(
+    'compensates only the carried copy after %s fails',
+    async (stage) => {
+      const original = await start();
+      await turn(original.id);
+      const originalKey = docs[0].pdfKey;
+      const failure = new Error(`${stage} failed`);
+      const create = model.create.getMockImplementation();
+      model.create.mockImplementationOnce(async (data) => {
+        const document = await create(data);
+        if (stage === 'save') document.save.mockRejectedValueOnce(failure);
+        return document;
+      });
+      if (stage === 'provision')
+        sandbox.provision.mockRejectedValueOnce(failure);
+      await expect(start({ carryFromSessionId: original.id })).rejects.toBe(
+        failure,
+      );
+      expect(storage.delete).toHaveBeenCalledTimes(1);
+      expect(storage.delete).toHaveBeenCalledWith(
+        `resume-harness/u1/${docs[1]._id}/revisions/1.pdf`,
+      );
+      expect(artifacts.get(originalKey)).toEqual(pdf);
+      expect(artifacts.size).toBe(1);
+      expect(docs[1].status).toBe('failed');
+      expect(docs[1].pdfKey).toBeUndefined();
+      expect(docs[1].turns[0].pdfKey).toBeUndefined();
+    },
+  );
 
   it('returns target role and recorded revision count in start, get, list, and carried session views', async () => {
     const session = await start({ targetRole: 'Staff Engineer' });
-    expect(session).toMatchObject({ targetRole: 'Staff Engineer', revisionCount: 0 });
+    expect(session).toMatchObject({
+      targetRole: 'Staff Engineer',
+      revisionCount: 0,
+    });
     await turn(session.id);
     await service.restoreRevision('u1', session.id, 1);
     expect(await service.getSession('u1', session.id)).toMatchObject({
-      targetRole: 'Staff Engineer', revisionCount: 2,
+      targetRole: 'Staff Engineer',
+      revisionCount: 2,
     });
     expect((await service.listSessions('u1'))[0]).toMatchObject({
-      targetRole: 'Staff Engineer', revisionCount: 2,
+      targetRole: 'Staff Engineer',
+      revisionCount: 2,
     });
-    const carried = await start({ carryFromSessionId: session.id, targetRole: 'Platform Engineer' });
-    expect(carried).toMatchObject({ targetRole: 'Platform Engineer', revisionCount: 1 });
+    const carried = await start({
+      carryFromSessionId: session.id,
+      targetRole: 'Platform Engineer',
+    });
+    expect(carried).toMatchObject({
+      targetRole: 'Platform Engineer',
+      revisionCount: 1,
+    });
     expect(carried.revisionCount).toBe(carried.turns.length);
   });
 
@@ -496,7 +525,7 @@ describe('Resume harness saved sessions and revisions', () => {
   it('lists only caller sessions by updated time and validates trimmed names', async () => {
     const first = await start();
     const second = await start();
-    await service.startSession('u2', { harness: 'codex' });
+    await service.startSession('u2', { model: 'test', effort: 'low' });
     docs[0].updatedAt = new Date('2026-01-01');
     docs[1].updatedAt = new Date('2026-02-01');
     expect((await service.listSessions('u1')).map((s) => s.id)).toEqual([
@@ -564,7 +593,8 @@ describe('Resume harness saved sessions and revisions', () => {
       () => service.restoreRevision('u2', session.id, 1),
       () =>
         service.startSession('u2', {
-          harness: 'codex',
+          model: 'test',
+          effort: 'low',
           carryFromSessionId: session.id,
         }),
       () => service.restoreRevision('u1', session.id, 99),

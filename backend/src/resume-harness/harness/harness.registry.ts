@@ -18,6 +18,11 @@ export class HarnessRegistry {
       (a) => [a.id, a as HarnessAdapter],
     ),
   );
+  private readonly providerRoutes = new Map<string, HarnessId>([
+    ['anthropic', 'claude-code'],
+    ['openai', 'codex'],
+    ['bedrock', 'opencode'],
+  ]);
 
   list(): HarnessAdapter[] {
     // HARNESS_IDS fixes display order; the map fixes membership.
@@ -32,6 +37,17 @@ export class HarnessRegistry {
       );
     }
     return adapter;
+  }
+
+  /** Select the private runtime from provider metadata, never from user input. */
+  forProvider(provider: string): HarnessAdapter {
+    const harness = this.providerRoutes.get(provider.toLowerCase());
+    if (!harness) {
+      throw new BadRequestException(
+        `No execution route is configured for model provider "${provider}".`,
+      );
+    }
+    return this.get(harness);
   }
 
   isSupported(id: string): id is HarnessId {

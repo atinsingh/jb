@@ -41,6 +41,10 @@ export class HarnessModelAlias {
   @Prop({ required: true })
   label: string;
 
+  /** Stable label shared by every effort row for the same model. */
+  @Prop()
+  modelLabel?: string;
+
   /** Plan types permitted to select this alias. */
   @Prop({ type: [String], default: [], index: true })
   tiers: string[];

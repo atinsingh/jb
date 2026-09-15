@@ -40,6 +40,28 @@ describe('harness bootstrap', () => {
     ).toEqual([...HARNESS_IDS].sort());
   });
 
+  it('routes OpenAI models through Codex on the server', () => {
+    expect((registry as any).forProvider('openai').id).toBe('codex');
+  });
+
+  it('passes the selected effort into Codex execution', () => {
+    const boot = registry.get('codex').bootstrap({
+      ...bootstrapInput(),
+      alias: {
+        alias: 'openai/gpt-5.6-luna/xhigh',
+        provider: 'openai',
+        model: 'gpt-5.6-luna',
+        effort: 'xhigh',
+        label: 'GPT-5.6 Luna · xhigh',
+      },
+    });
+    const config = boot.files.find(
+      (file) => file.path === '.codex/config.toml',
+    );
+
+    expect(config?.contents).toContain('model_reasoning_effort = "xhigh"');
+  });
+
   describe.each(HARNESS_IDS)('%s', (id: HarnessId) => {
     const adapter = () => registry.get(id);
 
@@ -135,14 +157,26 @@ describe('harness bootstrap', () => {
   it('keeps OpenCode in one auto-approved, plugin-free session across turns', () => {
     const boot = registry.get('opencode').bootstrap(bootstrapInput());
     expect(boot.command).toEqual(
-      expect.arrayContaining(['--continue', '--auto', '--pure', '--format', 'json']),
+      expect.arrayContaining([
+        '--continue',
+        '--auto',
+        '--pure',
+        '--format',
+        'json',
+      ]),
     );
   });
 
   it('separates OpenCode tool activity from its final assistant response', () => {
     const adapter = registry.get('opencode');
     const output = [
-      JSON.stringify({ type: 'text', part: { type: 'text', text: 'I will inspect the candidate facts first.' } }),
+      JSON.stringify({
+        type: 'text',
+        part: {
+          type: 'text',
+          text: 'I will inspect the candidate facts first.',
+        },
+      }),
       JSON.stringify({
         type: 'tool_use',
         part: {
@@ -151,15 +185,23 @@ describe('harness bootstrap', () => {
           state: { status: 'completed', title: 'Read CANDIDATE.md' },
         },
       }),
-      JSON.stringify({ type: 'text', part: { type: 'text', text: 'I tailored the résumé for the cloud role and kept every claim grounded in your profile.' } }),
-      JSON.stringify({ type: 'step_finish', part: { type: 'step-finish', reason: 'stop' } }),
+      JSON.stringify({
+        type: 'text',
+        part: {
+          type: 'text',
+          text: 'I tailored the résumé for the cloud role and kept every claim grounded in your profile.',
+        },
+      }),
+      JSON.stringify({
+        type: 'step_finish',
+        part: { type: 'step-finish', reason: 'stop' },
+      }),
     ].join('\n');
 
     expect(adapter.parseOutput?.(output)).toEqual({
-      response: 'I tailored the résumé for the cloud role and kept every claim grounded in your profile.',
-      activities: [
-        { label: 'Read CANDIDATE.md', status: 'completed' },
-      ],
+      response:
+        'I tailored the résumé for the cloud role and kept every claim grounded in your profile.',
+      activities: [{ label: 'Read CANDIDATE.md', status: 'completed' }],
     });
   });
 });

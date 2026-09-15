@@ -40,6 +40,30 @@ const ALIAS = {
   label: 'Sonnet 4.5 - high effort',
 };
 
+const LUNA_ALIAS = {
+  alias: 'openai/gpt-5.6-luna/high',
+  provider: 'openai',
+  model: 'gpt-5.6-luna',
+  effort: 'high',
+  label: 'GPT-5.6 Luna · high',
+};
+
+const CODEX_ALIAS = {
+  alias: 'openai/gpt-5.1-codex/high',
+  provider: 'openai',
+  model: 'gpt-5.1-codex',
+  effort: 'high',
+  label: 'GPT-5.1 Codex · high',
+};
+
+const OPENCODE_ALIAS = {
+  alias: 'bedrock/qwen3-coder-next/low',
+  provider: 'bedrock',
+  model: 'qwen3-coder-next',
+  effort: 'low',
+  label: 'Qwen3 Coder Next · low',
+};
+
 describe('ResumeHarnessService', () => {
   let service: ResumeHarnessService;
 
@@ -128,7 +152,9 @@ describe('ResumeHarnessService', () => {
 
   const modelAlias: any = {
     resolveForUser: jest.fn(async () => ALIAS),
+    resolveSelectionForUser: jest.fn(async () => LUNA_ALIAS),
     listForUser: jest.fn(async () => [ALIAS]),
+    capabilitiesForUser: jest.fn(async () => []),
   };
 
   const candidateContext: any = {
@@ -153,7 +179,8 @@ describe('ResumeHarnessService', () => {
 
   const jobDescriptions: any = {
     resolve: jest.fn(async () => ({
-      description: 'Platform Engineer\n\nBuild Kubernetes platforms with Terraform.',
+      description:
+        'Platform Engineer\n\nBuild Kubernetes platforms with Terraform.',
       finalUrl: 'https://jobs.example.com/platform-engineer',
     })),
   };
@@ -220,12 +247,64 @@ describe('ResumeHarnessService', () => {
     service = module.get(ResumeHarnessService);
   });
 
-  const start = (harness: any = 'claude-code') =>
-    service.startSession('u1', { harness });
+  const aliasForHarness = (harness: string) =>
+    harness === 'codex'
+      ? CODEX_ALIAS
+      : harness === 'opencode'
+        ? OPENCODE_ALIAS
+        : ALIAS;
+
+  const startWith = (
+    target: ResumeHarnessService,
+    userId: string,
+    harness: string,
+    input: Record<string, unknown> = {},
+  ) => {
+    const selected = aliasForHarness(harness);
+    modelAlias.resolveSelectionForUser.mockResolvedValueOnce(selected);
+    return target.startSession(userId, {
+      model: selected.model,
+      effort: selected.effort,
+      ...input,
+    } as any);
+  };
+
+  const start = (harness: any = 'claude-code', input = {}) =>
+    startWith(service, 'u1', harness, input);
+
+  it('persists Luna selection and routes its sandbox through Codex', async () => {
+    modelAlias.resolveSelectionForUser.mockResolvedValueOnce(LUNA_ALIAS);
+    const session = await service.startSession('u1', {
+      model: 'gpt-5.6-luna',
+      effort: 'high',
+    } as any);
+
+    expect(modelAlias.resolveSelectionForUser).toHaveBeenCalledWith(
+      'u1',
+      'gpt-5.6-luna',
+      'high',
+    );
+    expect(session).toMatchObject({
+      model: 'gpt-5.6-luna',
+      effort: 'high',
+    });
+    expect(session).not.toHaveProperty('harness');
+    expect(session).not.toHaveProperty('provider');
+    expect(session).not.toHaveProperty('alias');
+    expect(store[0]).toMatchObject({
+      harness: 'codex',
+      provider: 'openai',
+      model: 'gpt-5.6-luna',
+      effort: 'high',
+      alias: 'openai/gpt-5.6-luna/high',
+    });
+    expect(sandbox.provision).toHaveBeenCalledWith(
+      expect.objectContaining({ harness: 'codex' }),
+    );
+  });
 
   it('prefers pasted job text and does not fetch the supplied job URL', async () => {
-    const session = await service.startSession('u1', {
-      harness: 'codex',
+    const session = await start('codex', {
       jobUrl: 'https://jobs.example.com/platform-engineer',
       jobDescription: 'Pasted role requirements',
     });
@@ -238,8 +317,7 @@ describe('ResumeHarnessService', () => {
   });
 
   it('extracts job text from a URL without blocking session creation', async () => {
-    const session = await service.startSession('u1', {
-      harness: 'codex',
+    const session = await start('codex', {
       jobUrl: 'https://jobs.example.com/platform-engineer',
     });
 
@@ -260,8 +338,7 @@ describe('ResumeHarnessService', () => {
       warning: 'We could not read that job URL. Paste the description.',
     });
 
-    const session = await service.startSession('u1', {
-      harness: 'codex',
+    const session = await start('codex', {
       jobUrl: 'https://jobs.example.com/protected',
     });
 
@@ -381,9 +458,18 @@ describe('ResumeHarnessService', () => {
       liveBoxes.delete(sandboxId);
     });
 
-    const first = service.startSession('u1', { harness: 'claude-code' });
+    modelAlias.resolveSelectionForUser
+      .mockResolvedValueOnce(ALIAS)
+      .mockResolvedValueOnce(CODEX_ALIAS);
+    const first = service.startSession('u1', {
+      model: ALIAS.model,
+      effort: ALIAS.effort,
+    });
     await firstProvisionEntered;
-    const second = other.startSession('u1', { harness: 'codex' });
+    const second = other.startSession('u1', {
+      model: CODEX_ALIAS.model,
+      effort: CODEX_ALIAS.effort,
+    });
     const results = Promise.allSettled([first, second]);
     await new Promise<void>((resolve) => setImmediate(resolve));
     releaseFirstProvision();
@@ -438,7 +524,7 @@ describe('ResumeHarnessService', () => {
 
   it("does not replace another user's live sandbox", async () => {
     const mine = await start();
-    const theirs = await service.startSession('u2', { harness: 'claude-code' });
+    const theirs = await startWith(service, 'u2', 'claude-code');
 
     expect(sandbox.destroy).not.toHaveBeenCalled();
     expect(mine.status).toBe('active');
@@ -481,7 +567,8 @@ describe('ResumeHarnessService', () => {
       expect(env.JOBOCATE_LITELLM_BASE_URL).toBe('http://litellm:4000');
       expect(env.JOBOCATE_LITELLM_API_KEY).toBe('sk-one-user-key');
     } finally {
-      if (oldUrl === undefined) delete process.env.RESUME_HARNESS_LITELLM_INTERNAL_URL;
+      if (oldUrl === undefined)
+        delete process.env.RESUME_HARNESS_LITELLM_INTERNAL_URL;
       else process.env.RESUME_HARNESS_LITELLM_INTERNAL_URL = oldUrl;
       if (oldKey === undefined) delete process.env.RESUME_HARNESS_LITELLM_KEY;
       else process.env.RESUME_HARNESS_LITELLM_KEY = oldKey;
@@ -490,10 +577,14 @@ describe('ResumeHarnessService', () => {
 
   it('records the tier-resolved model and effort on the session', async () => {
     const session = await start();
-    expect(modelAlias.resolveForUser).toHaveBeenCalledWith('u1', undefined);
+    expect(modelAlias.resolveSelectionForUser).toHaveBeenCalledWith(
+      'u1',
+      ALIAS.model,
+      ALIAS.effort,
+    );
     expect(session.model).toBe(ALIAS.model);
     expect(session.effort).toBe(ALIAS.effort);
-    expect(session.alias).toBe(ALIAS.alias);
+    expect(store[0].alias).toBe(ALIAS.alias);
   });
 
   it('rejects an attempt to change harness on a live session', async () => {
@@ -542,9 +633,25 @@ describe('ResumeHarnessService', () => {
     sandbox.exec.mockResolvedValueOnce({
       exitCode: 0,
       stdout: [
-        JSON.stringify({ type: 'text', part: { type: 'text', text: 'I will inspect the résumé.' } }),
-        JSON.stringify({ type: 'tool_use', part: { type: 'tool', tool: 'read', state: { status: 'completed', title: 'Read resume.tex' } } }),
-        JSON.stringify({ type: 'text', part: { type: 'text', text: 'I can tailor the summary, reorder supported sections, and tighten the layout. Tell me which role you want to emphasize.' } }),
+        JSON.stringify({
+          type: 'text',
+          part: { type: 'text', text: 'I will inspect the résumé.' },
+        }),
+        JSON.stringify({
+          type: 'tool_use',
+          part: {
+            type: 'tool',
+            tool: 'read',
+            state: { status: 'completed', title: 'Read resume.tex' },
+          },
+        }),
+        JSON.stringify({
+          type: 'text',
+          part: {
+            type: 'text',
+            text: 'I can tailor the summary, reorder supported sections, and tighten the layout. Tell me which role you want to emphasize.',
+          },
+        }),
       ].join('\n'),
       stderr: '',
     });
@@ -854,12 +961,13 @@ describe('ResumeHarnessService', () => {
     sandbox.readFile.mockResolvedValueOnce(resumeDoc('carried'));
     await service.runTurn('u1', original.id, { instruction: 'build it' });
 
-    const next = await service.startSession('u1', {
-      harness: 'codex',
+    const next = await start('codex', {
       carryFromSessionId: original.id,
     });
 
-    expect(next.harness).toBe('codex');
+    expect(store.find((item) => String(item._id) === next.id).harness).toBe(
+      'codex',
+    );
     expect(next.latex).toBe(resumeDoc('carried'));
     const seeded = sandbox.provision.mock.calls[1][0].files.find(
       (f: any) => f.path === 'resume.tex',
