@@ -344,6 +344,20 @@ export class PublisherService {
     };
   }
 
+  async unpublishEmployerJob(employerJobId: Types.ObjectId | string): Promise<void> {
+    await this.jobModel.updateOne(
+      { externalId: `jobocate:${employerJobId}` },
+      {
+        $set: {
+          lifecycle: 'removed_at_source',
+          isActive: false,
+          removalReason: 'employer_deleted',
+          lastVerifiedAt: new Date(),
+        },
+      },
+    );
+  }
+
   private canonical(url?: string): string | undefined {
     if (!url) return undefined;
     try {

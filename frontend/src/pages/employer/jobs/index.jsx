@@ -239,7 +239,7 @@ export default function EmployerJobs() {
                         {job.status === 'Draft' ? (
                           <button className="em-blue" onClick={() => publishJob(job.id)} style={{ fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, color: '#fff', background: '#4263EB', border: 'none', borderRadius: 999, padding: '7px 14px', cursor: 'pointer' }}>Publish</button>
                         ) : (
-                          <button className="em-ghost" onClick={() => router.push(`/employer/jobs/${job.id}/edit`)} style={{ fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: '#5A544A', background: 'none', border: '1px solid transparent', borderRadius: 999, padding: '7px 12px', cursor: 'pointer' }}>Manage</button>
+                          <button className="em-ghost" onClick={() => router.push(`/employer/jobs/post?jobId=${job.id}`)} style={{ fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: '#5A544A', background: 'none', border: '1px solid transparent', borderRadius: 999, padding: '7px 12px', cursor: 'pointer' }}>Manage</button>
                         )}
                       </div>
                     </div>

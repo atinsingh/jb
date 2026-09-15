@@ -76,9 +76,9 @@ const fontV3Mono = DM_Mono({
 /*
  * The v3 tokens in tokens.css are scoped to `.jbv3`, so a page that does not
  * carry the class renders every --jb-v3-* reference as an unset value. The
- * candidate app is 36 pages that each own their root element — there is no
- * shared layout component to hang the class on — so it is applied here, once,
- * for the whole /app/* subtree instead of being pasted into 36 files.
+ * candidate and employer apps contain pages that own their root element, so
+ * there is no single layout node to hang the class on. Apply it here once for
+ * both signed-in v3 subtrees instead of pasting it into every route.
  *
  * `display: contents` means the wrapper generates no box: it cannot disturb a
  * page's own flex/grid root or its 100vh sizing, but custom properties still
@@ -88,12 +88,13 @@ const fontV3Mono = DM_Mono({
  * (JOB-13). Nesting the class is harmless — the inner scope resolves to the
  * same values — so they are not special-cased.
  */
-const V3_SUBTREE = '/app';
+const V3_SUBTREES = ['/app', '/employer'];
 
 export default function App({ Component, pageProps }) {
   const router = useRouter();
-  const isAppSurface =
-    router.pathname === V3_SUBTREE || router.pathname.startsWith(`${V3_SUBTREE}/`);
+  const isAppSurface = V3_SUBTREES.some(
+    (subtree) => router.pathname === subtree || router.pathname.startsWith(`${subtree}/`),
+  );
 
   const page = <Component {...pageProps} />;
 

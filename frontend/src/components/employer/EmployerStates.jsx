@@ -19,17 +19,18 @@ const wrap = {
   color: '#6B675E',
 };
 
-export function LoadingState({ label = 'Loading…' }) {
+export function LoadingState({ label = 'Loading…', tone = 'light' }) {
+  const dark = tone === 'dark';
   return (
-    <div style={wrap} role="status" aria-live="polite">
+    <div style={{ ...wrap, color: dark ? 'var(--jb-v3-fg-2)' : wrap.color }} role="status" aria-live="polite">
       <span
         aria-hidden
         style={{
           width: 22,
           height: 22,
           borderRadius: '50%',
-          border: '2px solid #E4DED2',
-          borderTopColor: '#1B1A16',
+          border: `2px solid ${dark ? 'var(--jb-v3-line-2)' : '#E4DED2'}`,
+          borderTopColor: dark ? 'var(--jb-v3-accent)' : '#1B1A16',
           animation: 'employer-spin 0.7s linear infinite',
         }}
       />
@@ -39,14 +40,15 @@ export function LoadingState({ label = 'Loading…' }) {
   );
 }
 
-export function EmptyState({ icon = '○', title, hint, action = null }) {
+export function EmptyState({ icon = '○', title, hint, action = null, tone = 'light' }) {
+  const dark = tone === 'dark';
   return (
-    <div style={wrap}>
+    <div style={{ ...wrap, color: dark ? 'var(--jb-v3-fg-2)' : wrap.color }}>
       <span aria-hidden style={{ fontSize: 26, opacity: 0.5 }}>
         {icon}
       </span>
       {title && (
-        <div style={{ fontSize: 15, fontWeight: 600, color: '#1B1A16' }}>
+        <div style={{ fontSize: 15, fontWeight: 600, color: dark ? 'var(--jb-v3-fg)' : '#1B1A16' }}>
           {title}
         </div>
       )}
@@ -56,18 +58,19 @@ export function EmptyState({ icon = '○', title, hint, action = null }) {
   );
 }
 
-export function ErrorState({ error, onRetry }) {
+export function ErrorState({ error, onRetry, tone = 'light' }) {
+  const dark = tone === 'dark';
   const message =
     (error && (error.message || String(error))) || 'Something went wrong.';
   return (
-    <div style={wrap}>
+    <div style={{ ...wrap, color: dark ? 'var(--jb-v3-fg-2)' : wrap.color }}>
       <span aria-hidden style={{ fontSize: 24 }}>
         ⚠️
       </span>
-      <div style={{ fontSize: 15, fontWeight: 600, color: '#1B1A16' }}>
+      <div style={{ fontSize: 15, fontWeight: 600, color: dark ? 'var(--jb-v3-fg)' : '#1B1A16' }}>
         Couldn’t load this
       </div>
-      <div style={{ fontSize: 13, maxWidth: 360, color: '#9B4A2F' }}>
+      <div style={{ fontSize: 13, maxWidth: 360, color: dark ? '#F2A38B' : '#9B4A2F' }}>
         {message}
       </div>
       {onRetry && (
@@ -78,8 +81,9 @@ export function ErrorState({ error, onRetry }) {
             marginTop: 8,
             padding: '8px 16px',
             borderRadius: 8,
-            border: '1px solid #E4DED2',
-            background: '#fff',
+            border: `1px solid ${dark ? 'var(--jb-v3-line-2)' : '#E4DED2'}`,
+            color: dark ? 'var(--jb-v3-fg)' : '#1B1A16',
+            background: dark ? 'var(--jb-v3-panel)' : '#fff',
             fontSize: 13,
             fontWeight: 600,
             cursor: 'pointer',

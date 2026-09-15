@@ -1,430 +1,398 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import EmployerSidebar from '@/components/employer/EmployerSidebar';
-import { LoadingState, ErrorState, EmptyState } from '@/components/employer/EmployerStates';
-import { appRoute } from '@/components/app/appRoutes';
+import { LoadingState, ErrorState } from '@/components/employer/EmployerStates';
 import {
   employerJobsApi,
   employerPipelineApi,
-  aiRecruiterApi,
   employerInterviewsApi,
+  employerOffersApi,
   employerCompanyApi,
-  employerProfileApi,
 } from '@/services/employerApi';
 
-const FUNNEL_COLORS = ['var(--jb-a-accent-soft)', 'var(--jb-a-accent)', 'var(--jb-a-accent-deep)', 'var(--jb-a-accent-deep)', 'var(--jb-a-accent)'];
+const STAGES = [
+  { key: 'total', label: 'Applicants' },
+  { key: 'screening', label: 'Screened' },
+  { key: 'interview', label: 'Interview' },
+  { key: 'offer', label: 'Offer' },
+  { key: 'hired', label: 'Hired' },
+];
 
-// Format an ISO timestamp into { time, ampm }.
-function clockParts(iso) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return { time: '--:--', ampm: '' };
-  let h = d.getHours();
-  const m = d.getMinutes().toString().padStart(2, '0');
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12 || 12;
-  return { time: `${h}:${m}`, ampm };
+const DAY = 86_400_000;
+
+const number = (value) => (Number.isFinite(Number(value)) ? Number(value) : 0);
+const recordId = (value) => String(value?._id || value || '');
+
+function conversion(current, previous, first) {
+  if (first) return 100;
+  if (!previous) return 0;
+  return Math.round((current / previous) * 100);
 }
 
-function isToday(iso) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return false;
+function activitySeries(applicants) {
   const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const values = Array.from({ length: 30 }, () => 0);
+
+  applicants.forEach((applicant) => {
+    const created = new Date(applicant.createdAt || applicant.appliedAt || applicant.created_at);
+    if (Number.isNaN(created.getTime())) return;
+    const createdDay = new Date(created.getFullYear(), created.getMonth(), created.getDate()).getTime();
+    const daysAgo = Math.floor((today - createdDay) / DAY);
+    if (daysAgo >= 0 && daysAgo < 30) values[29 - daysAgo] += 1;
+  });
+
+  return values;
+}
+
+function chartPoints(values) {
+  const max = Math.max(...values, 1);
+  return values
+    .map((value, index) => {
+      const x = (index / (values.length - 1)) * 100;
+      const y = 88 - (value / max) * 70;
+      return `${x},${y}`;
+    })
+    .join(' ');
+}
+
+function MeterTicks({ value, ceiling }) {
+  const active = Math.max(0, Math.min(16, Math.round((value / Math.max(ceiling, 1)) * 16)));
   return (
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate()
+    <span className="meter" aria-hidden="true">
+      {Array.from({ length: 16 }, (_, index) => (
+        <span key={index} className={index < active ? 'on' : ''} />
+      ))}
+    </span>
   );
 }
 
-const tone = (t) => {
-  if (t === 'indigo') return { dotBg: 'var(--jb-a-tint)', dotBorder: 'var(--jb-a-tint-line)', icon: '•', iconColor: 'var(--jb-a-accent)' };
-  if (t === 'green') return { dotBg: 'var(--jb-a-tint)', dotBorder: 'var(--jb-a-tint-line)', icon: '✓', iconColor: 'var(--jb-a-accent)' };
-  return { dotBg: 'var(--jb-a-control)', dotBorder: 'var(--jb-a-line)', icon: '•', iconColor: 'var(--jb-a-ink-faint)' };
-};
-
 export default function EmployerDashboard() {
-  // Count-up animation matching the dc DCLogic componentDidMount.
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  // Real data only — starts empty, populated from the backend.
-  const [funnelRaw, setFunnelRaw] = useState([]);
-  const [jobsRaw, setJobsRaw] = useState([]);
-  const [ivRaw, setIvRaw] = useState([]);
-  const [firstName, setFirstName] = useState('');
+  const [stats, setStats] = useState({});
+  const [jobs, setJobs] = useState([]);
+  const [interviews, setInterviews] = useState([]);
+  const [offers, setOffers] = useState([]);
+  const [applicants, setApplicants] = useState([]);
   const [companyName, setCompanyName] = useState('');
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      // Core data — a failure here is surfaced as an error state.
-      const [statsRes, jobsRes, autopilot, interviewsRes] = await Promise.all([
+      const [statsRes, jobsRes, interviewsRes, offersRes, applicantsRes] = await Promise.all([
         employerPipelineApi.stats(),
         employerJobsApi.list(),
-        aiRecruiterApi.autopilot().catch(() => null),
-        employerInterviewsApi.list({ status: 'scheduled' }).catch(() => null),
+        employerInterviewsApi.list({ status: 'scheduled' }),
+        employerOffersApi.list(),
+        employerPipelineApi.list(),
       ]);
 
-      const jobsArr = Array.isArray(jobsRes?.jobs) ? jobsRes.jobs : [];
-      const activeJobs = jobsArr.filter(
-        (j) => (j.status || 'active') !== 'closed' && (j.status || 'active') !== 'archived',
+      setStats(statsRes || {});
+      setJobs(Array.isArray(jobsRes?.jobs) ? jobsRes.jobs : []);
+      setInterviews(Array.isArray(interviewsRes?.interviews) ? interviewsRes.interviews : []);
+      setOffers(Array.isArray(offersRes?.offers) ? offersRes.offers : []);
+      setApplicants(
+        Array.isArray(applicantsRes)
+          ? applicantsRes
+          : Array.isArray(applicantsRes?.applicants)
+            ? applicantsRes.applicants
+            : [],
       );
-
-      const stats = statsRes && typeof statsRes.total === 'number' ? statsRes : {};
-
-      setFunnelRaw([
-        { label: 'Applicants', target: stats.total || 0 },
-        { label: 'Screened', target: stats.screening || 0 },
-        { label: 'Interview', target: stats.interview || 0 },
-        { label: 'Offer', target: stats.offer || 0 },
-        { label: 'Hired', target: stats.hired || 0 },
-      ]);
-
-      setJobsRaw(
-        activeJobs.slice(0, 3).map((j) => ({
-          title: j.title || 'Untitled role',
-          meta:
-            [j.location, j.type].filter(Boolean).join(' · ') ||
-            (j.isRemote ? 'Remote' : '—'),
-          newCount: String(j.applicantsCount ?? j.newApplicants ?? 0),
-          note: 'view pipeline',
-        })),
-      );
-
-      const interviews = Array.isArray(interviewsRes?.interviews)
-        ? interviewsRes.interviews
-        : [];
-      setIvRaw(
-        interviews
-          .filter((iv) => iv.scheduledAt && isToday(iv.scheduledAt))
-          .sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt))
-          .map((iv) => {
-            const { time, ampm } = clockParts(iv.scheduledAt);
-            return {
-              time,
-              ampm,
-              name: iv.candidateName || 'Candidate',
-              req: iv.role || iv.jobTitle || '',
-              round: iv.round || iv.stage || 'Interview',
-              type: iv.type || iv.mode || 'Video',
-            };
-          }),
-      );
-
-    } catch (err) {
-      setError(err);
+    } catch (loadError) {
+      setError(loadError);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     load();
-    // Best-effort personalization — cosmetic only, never fabricated.
-    employerProfileApi
-      .get()
-      .then((res) => {
-        const name = res?.user?.name || '';
-        setFirstName(name.split(' ')[0] || '');
-      })
-      .catch(() => {});
     employerCompanyApi
       .get()
-      .then((res) => setCompanyName(res?.company?.name || ''))
+      .then((response) => setCompanyName(response?.company?.name || ''))
       .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [load]);
 
-  // "Thu 21 Aug" — see the note on the candidate dashboard's `today`.
-  const todayLabel = (() => {
-    const d = new Date();
-    const weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
-    const month = d.toLocaleDateString('en-US', { month: 'short' });
-    return `${weekday} ${d.getDate()} ${month}`;
-  })();
+  const openJobs = useMemo(
+    () => jobs.filter((job) => job.status === 'active'),
+    [jobs],
+  );
+  const applicantsByJob = useMemo(
+    () => applicants.reduce((counts, applicant) => {
+      const jobId = recordId(applicant.jobId || applicant.job);
+      if (jobId) counts[jobId] = (counts[jobId] || 0) + 1;
+      return counts;
+    }, {}),
+    [applicants],
+  );
+  const funnel = STAGES.map((stage, index) => {
+    const value = number(stats[stage.key]);
+    const previous = index === 0 ? value : number(stats[STAGES[index - 1].key]);
+    return { ...stage, value, percent: conversion(value, previous, index === 0) };
+  });
+  const activity = activitySeries(applicants);
+  const points = chartPoints(activity);
 
-  const openRoles = jobsRaw.length;
-  const topRole = jobsRaw[0]?.title || '';
-  const screened = funnelRaw.find((f) => f.label === 'Screened')?.target || 0;
-  const applicants = funnelRaw.find((f) => f.label === 'Applicants')?.target || 0;
-
-  /* The hero answers "what decision is open right now", from the pipeline the
-     employer already has. Screening clearance outranks raw applicant volume
-     because a screened candidate is waiting on a human; an unscreened one is
-     still waiting on the funnel. */
-  const hero = (() => {
-    if (screened > 0 && topRole) {
-      return {
-        eyebrow: 'Needs a decision',
-        title: `${screened} candidate${screened === 1 ? '' : 's'} cleared screening for ${topRole}.`,
-        deck: 'Ranked on job-related criteria only, with the reasoning attached to each one.',
-        primary: { label: 'Review shortlist', href: '/employer/screening' },
-        secondary: { label: 'Open the role', href: '/employer/jobs' },
-      };
-    }
-    if (applicants > 0) {
-      return {
-        eyebrow: 'In the pipeline',
-        title: `${applicants} applicant${applicants === 1 ? '' : 's'} across ${openRoles} open role${openRoles === 1 ? '' : 's'}.`,
-        deck: 'Nothing has cleared screening yet. Screening ranks on job-related criteria and shows its reasoning.',
-        primary: { label: 'Open screening', href: '/employer/screening' },
-        secondary: { label: 'See all roles', href: '/employer/jobs' },
-      };
-    }
-    if (openRoles === 0) {
-      return {
-        eyebrow: 'Nothing open',
-        title: 'No roles are live yet.',
-        deck: 'Post one and candidates start arriving ranked, with the reasoning attached.',
-        primary: { label: 'Post a role', href: '/employer/jobs/post' },
-        secondary: null,
-      };
-    }
-    return {
-      eyebrow: 'All quiet',
-      title: `${openRoles} role${openRoles === 1 ? '' : 's'} live, no applicants yet.`,
-      deck: 'Distribution takes a few days to build up. Widening the location or seniority band usually helps first.',
-      primary: { label: 'Check distribution', href: '/employer/distribution' },
-      secondary: { label: 'See all roles', href: '/employer/jobs' },
-    };
-  })();
-
-  // Flex weights taper 5 → 1.4 so the funnel reads as a funnel even when the
-  // real counts are flat or zero. Counts are still the literal numbers.
-  const FUNNEL_FLEX = [5, 4, 3, 2, 1.4];
-  const funnel = funnelRaw.map((f, i) => ({
-    label: f.label,
-    count: String(f.target),
-    color: FUNNEL_COLORS[i] || 'var(--jb-a-accent)',
-    flex: FUNNEL_FLEX[i] ?? 1,
-    conv:
-      i === 0 || !funnelRaw[i - 1]?.target
-        ? ''
-        : `${Math.round((f.target / funnelRaw[i - 1].target) * 100)}% of ${funnelRaw[i - 1].label.toLowerCase()}`,
-  }));
+  const metrics = [
+    { label: 'Open roles', value: openJobs.length, note: 'live', ceiling: 20 },
+    { label: 'Applicants', value: number(stats.total), note: 'total', ceiling: 2000 },
+    { label: 'Interviews', value: interviews.length, note: 'scheduled', ceiling: 50 },
+    { label: 'Offers', value: offers.length, note: 'out', ceiling: 50 },
+  ];
 
   return (
     <>
-      <Head>
-        <title>Hiring · Jobocate for Employers</title>
-      </Head>
-
-      <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--jb-a-stage)', color: 'var(--jb-a-ink)', fontFamily: 'var(--jb-font-sans)' }}>
+      <Head><title>Employer dashboard · Jobocate</title></Head>
+      <div className="employer-dashboard">
         <EmployerSidebar active="dashboard" />
 
-        <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <header
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 16,
-              flexWrap: 'wrap',
-              rowGap: 10,
-              minHeight: 64,
-              padding: '12px clamp(20px, 4vw, 44px)',
-              borderBottom: '1px solid var(--jb-a-line)',
-              background: 'var(--jb-a-header)',
-              flexShrink: 0,
-            }}
-          >
-            <h1 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>
-              {companyName ? `${companyName} · Hiring` : 'Hiring'}
-            </h1>
-            <span style={{ flex: 1 }} />
-            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--jb-a-ink-3)' }}>
-              {todayLabel}
-            </span>
-            <Link
-              href="/employer/jobs/post"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                height: 34,
-                padding: '0 16px',
-                borderRadius: 999,
-                background: 'var(--jb-a-accent)',
-                color: 'var(--jb-a-accent-ink)',
-                fontSize: 13.5,
-                fontWeight: 600,
-                textDecoration: 'none',
-              }}
-            >
-              Post a role
-            </Link>
-          </header>
+        <main>
+          <div className="dot-field" aria-hidden="true" />
+          <div className="content">
+            {loading && <LoadingState label="Loading your pipeline…" tone="dark" />}
+            {!loading && error && <ErrorState error={error} onRetry={load} tone="dark" />}
 
-          <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 'clamp(28px, 4vw, 44px) clamp(20px, 4vw, 44px) 64px' }}>
-            <div style={{ maxWidth: 1180 }}>
-              {loading && <LoadingState label="Loading your pipeline…" />}
-              {!loading && error && <ErrorState error={error} onRetry={load} />}
+            {!loading && !error && (
+              <>
+                <div className="page-heading">
+                  <h1>{companyName || 'Your company'}</h1>
+                  <span>{openJobs.length} live roles</span>
+                </div>
 
-              {!loading && !error && (
-                <>
-                  <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--jb-a-accent)' }}>
-                    {hero.eyebrow}
-                  </span>
-                  <h2
-                    style={{
-                      margin: '16px 0 0',
-                      fontFamily: 'var(--jb-font-display)',
-                      fontWeight: 400,
-                      fontSize: 'var(--jb-a-display-lg)',
-                      lineHeight: 1.02,
-                      letterSpacing: '-0.02em',
-                      maxWidth: '24ch',
-                    }}
-                  >
-                    {hero.title}
-                  </h2>
-                  <p style={{ margin: '18px 0 0', fontSize: 17.5, lineHeight: 1.55, color: 'var(--jb-a-ink-2)', maxWidth: '60ch' }}>
-                    {hero.deck}
-                  </p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 28, flexWrap: 'wrap' }}>
-                    <Link
-                      href={hero.primary.href}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        height: 48,
-                        padding: '0 26px',
-                        borderRadius: 999,
-                        background: 'var(--jb-a-accent)',
-                        color: 'var(--jb-a-accent-ink)',
-                        fontSize: 15.5,
-                        fontWeight: 600,
-                        textDecoration: 'none',
-                      }}
-                    >
-                      {hero.primary.label}
-                    </Link>
-                    {hero.secondary && (
-                      <Link
-                        href={hero.secondary.href}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          height: 48,
-                          padding: '0 26px',
-                          borderRadius: 999,
-                          border: '1.5px solid var(--jb-a-line-btn)',
-                          background: 'var(--jb-a-card)',
-                          color: 'var(--jb-a-ink)',
-                          fontSize: 15.5,
-                          fontWeight: 600,
-                          textDecoration: 'none',
-                        }}
-                      >
-                        {hero.secondary.label}
-                      </Link>
-                    )}
-                  </div>
+                <section className="metrics" aria-label="Hiring metrics">
+                  {metrics.map((metric) => (
+                    <article key={metric.label}>
+                      <span className="label">{metric.label}</span>
+                      <div className="metric-value">
+                        <strong>{metric.value}</strong>
+                        <span>{metric.note}</span>
+                      </div>
+                      <MeterTicks value={metric.value} ceiling={metric.ceiling} />
+                    </article>
+                  ))}
+                </section>
 
-                  {/* ── FUNNEL ─────────────────────────────────────────── */}
-                  <section style={{ marginTop: 56, paddingTop: 26, borderTop: '1px solid var(--jb-a-line-strong)' }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 20 }}>
-                      <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--jb-a-ink-3)' }}>
-                        Pipeline · all roles
-                      </span>
-                      <span style={{ flex: 1 }} />
-                    </div>
-                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                      {funnel.map((f) => (
-                        <div key={f.label} style={{ flex: `${f.flex} 1 130px`, display: 'flex', flexDirection: 'column', gap: 9 }}>
-                          <span aria-hidden="true" style={{ display: 'block', height: 8, borderRadius: 4, background: f.color }} />
-                          <span style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 24, fontWeight: 600 }}>{f.count}</span>
-                            <span style={{ fontSize: 13.5, color: 'var(--jb-a-ink-2)' }}>{f.label}</span>
-                            {f.conv && (
-                              <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, color: 'var(--jb-a-ink-warm)' }}>{f.conv}</span>
-                            )}
+                <div className="data-grid">
+                  <section className="funnel" aria-label="Recruiting funnel">
+                    <h2>Funnel</h2>
+                    <div className="funnel-rows">
+                      {funnel.map((stage) => (
+                        <div className="funnel-row" key={stage.key}>
+                          <span className="stage">{stage.label}</span>
+                          <strong>{stage.value}</strong>
+                          <span className="track" aria-hidden="true">
+                            <span style={{ width: `${stage.percent}%` }} />
                           </span>
+                          <span className="percent">{stage.percent}%</span>
                         </div>
                       ))}
                     </div>
                   </section>
 
-                  {/* ── OPEN ROLES + TODAY'S INTERVIEWS ────────────────── */}
-                  <div className="em-split" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 52, marginTop: 52 }}>
-                    <section style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, paddingBottom: 6 }}>
-                        <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--jb-a-ink-3)' }}>
-                          Open roles
-                        </span>
-                        <span style={{ flex: 1, height: 1, background: 'var(--jb-a-line-soft)' }} />
-                        <Link href="/employer/jobs" style={{ fontSize: 14, color: 'var(--jb-a-accent)', fontWeight: 600, textDecoration: 'none' }}>
-                          All roles →
-                        </Link>
-                      </div>
-                      {jobsRaw.map((j) => (
-                        <div key={j.title} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '16px 0', borderBottom: '1px solid var(--jb-a-line-soft)' }}>
-                          <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                            <span style={{ fontSize: 16, fontWeight: 600 }}>{j.title}</span>
-                            <span style={{ fontSize: 13.5, color: 'var(--jb-a-ink-3)' }}>{j.meta}</span>
-                          </span>
-                          <span style={{ width: 90, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 17, fontWeight: 600 }}>{j.newCount}</span>
-                            <span style={{ fontSize: 12, color: 'var(--jb-a-ink-warm)' }}>applicants</span>
-                          </span>
-                        </div>
-                      ))}
-                      {jobsRaw.length === 0 && (
-                        <EmptyState
-                          title="No open roles"
-                          hint="Post a role and applicants start arriving here."
-                          action={
-                            <Link href="/employer/jobs/post" style={{ color: 'var(--jb-a-accent)', fontWeight: 600, textDecoration: 'none' }}>
-                              Post a role →
-                            </Link>
-                          }
-                        />
-                      )}
-                    </section>
+                  <section className="activity">
+                    <h2>Applications · 30 days</h2>
+                    <svg
+                      viewBox="0 0 100 100"
+                      preserveAspectRatio="none"
+                      role="img"
+                      aria-label="Applications received in the last 30 days"
+                    >
+                      <line x1="0" y1="88" x2="100" y2="88" />
+                      <line x1="0" y1="53" x2="100" y2="53" />
+                      <line x1="0" y1="18" x2="100" y2="18" />
+                      <polyline points={points} />
+                    </svg>
+                    {!activity.some(Boolean) && <p>No application activity yet.</p>}
+                  </section>
+                </div>
 
-                    <section style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, paddingBottom: 6 }}>
-                        <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--jb-a-ink-3)' }}>
-                          Today’s interviews
-                        </span>
-                        <span style={{ flex: 1, height: 1, background: 'var(--jb-a-line-soft)' }} />
-                      </div>
-                      {ivRaw.map((iv, i) => (
-                        <div key={`${iv.time}-${iv.name}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 0', borderBottom: '1px solid var(--jb-a-line-soft)' }}>
-                          <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 13.5, fontWeight: 600, width: 62, color: 'var(--jb-a-ink-warm)' }}>
-                            {iv.time}
-                            {iv.ampm}
-                          </span>
-                          <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <span style={{ fontSize: 15, fontWeight: 600 }}>{iv.name}</span>
-                            <span style={{ fontSize: 13, color: 'var(--jb-a-ink-3)' }}>{iv.req}</span>
-                          </span>
-                          <span style={{ fontSize: 12.5, color: 'var(--jb-a-ink-soft)' }}>{iv.round}</span>
-                        </div>
-                      ))}
-                      {ivRaw.length === 0 && (
-                        <div style={{ padding: '16px 0', fontSize: 13.5, color: 'var(--jb-a-ink-3)' }}>
-                          No interviews scheduled today.
-                        </div>
-                      )}
-                    </section>
+                <section className="roles" aria-label="Open roles">
+                  <div className="section-heading">
+                    <h2>Open roles</h2>
+                    <Link href="/employer/jobs">All roles →</Link>
                   </div>
-                </>
-              )}
-            </div>
+                  {openJobs.slice(0, 4).map((job) => (
+                    <Link
+                      key={job._id || job.id || job.title}
+                      href={job._id || job.id ? `/employer/jobs/${job._id || job.id}/applications` : '/employer/jobs'}
+                      className="role-row"
+                    >
+                      <strong>{job.title || 'Untitled role'}</strong>
+                      <span>{[job.location, job.type].filter(Boolean).join(' · ') || 'Details pending'}</span>
+                      <span>{applicantsByJob[recordId(job._id || job.id)] || 0} applied</span>
+                    </Link>
+                  ))}
+                  {openJobs.length === 0 && (
+                    <div className="empty-row">
+                      <span>No roles are live yet.</span>
+                      <Link href="/employer/jobs/post">Post a role</Link>
+                    </div>
+                  )}
+                </section>
+              </>
+            )}
           </div>
         </main>
       </div>
 
       <style jsx>{`
+        .employer-dashboard {
+          min-height: 100vh;
+          display: flex;
+          background: var(--jb-v3-bg);
+          color: var(--jb-v3-fg);
+          font-family: var(--jb-v3-font-display);
+        }
+        main {
+          position: relative;
+          flex: 1;
+          min-width: 0;
+          overflow: hidden;
+          background: var(--jb-v3-bg);
+        }
+        .dot-field {
+          position: absolute;
+          inset: 0 0 auto;
+          height: min(620px, 72vh);
+          pointer-events: none;
+          opacity: 0.62;
+          background-image: radial-gradient(circle, var(--jb-v3-dot) 0.8px, transparent 0.9px);
+          background-size: 26px 26px;
+          mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,.72) 48%, transparent 100%);
+        }
+        .content {
+          position: relative;
+          z-index: 1;
+          width: min(100%, 1360px);
+          margin: 0 auto;
+          padding: 42px 28px 80px;
+        }
+        .page-heading {
+          display: flex;
+          align-items: baseline;
+          justify-content: space-between;
+          gap: 24px;
+          margin-bottom: 30px;
+        }
+        h1 {
+          margin: 0;
+          font-size: clamp(25px, 3vw, 31px);
+          font-weight: 600;
+          letter-spacing: -0.035em;
+        }
+        .page-heading > span,
+        .label,
+        h2,
+        .percent {
+          font-family: var(--jb-v3-font-mono);
+          text-transform: uppercase;
+          letter-spacing: 0.14em;
+        }
+        .page-heading > span { color: var(--jb-v3-fg-3); font-size: 10px; }
+        .metrics {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          border: 1px solid var(--jb-v3-line);
+          background: color-mix(in srgb, var(--jb-v3-panel) 88%, transparent);
+        }
+        .metrics article {
+          min-width: 0;
+          padding: 22px 22px 20px;
+          border-right: 1px solid var(--jb-v3-line);
+        }
+        .metrics article:last-child { border-right: 0; }
+        .label { display: block; color: var(--jb-v3-fg-3); font-size: 9.5px; }
+        .metric-value { display: flex; align-items: baseline; gap: 8px; margin-top: 11px; }
+        .metric-value strong {
+          font-family: var(--jb-v3-font-mono);
+          font-size: clamp(32px, 4vw, 44px);
+          font-weight: 500;
+          letter-spacing: -0.06em;
+        }
+        .metric-value span { color: var(--jb-v3-fg-3); font: 400 10px/1 var(--jb-v3-font-mono); }
+        .meter { display: flex; gap: 2px; margin-top: 11px; }
+        .meter span { width: 3px; height: 12px; background: var(--jb-v3-tick-off); }
+        .meter span.on { background: var(--jb-v3-tick-on); }
+        .data-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 1.75fr) minmax(280px, 0.95fr);
+          gap: 44px;
+          margin-top: 40px;
+        }
+        h2 {
+          margin: 0 0 12px;
+          color: var(--jb-v3-fg-3);
+          font-size: 9.5px;
+          font-weight: 400;
+        }
+        .funnel-row {
+          display: grid;
+          grid-template-columns: 126px 74px minmax(100px, 1fr) 48px;
+          align-items: center;
+          min-height: 54px;
+          border-top: 1px solid var(--jb-v3-line);
+        }
+        .funnel-row:last-child { border-bottom: 1px solid var(--jb-v3-line); }
+        .stage { color: var(--jb-v3-fg-2); font-size: 12px; text-transform: uppercase; }
+        .funnel-row strong { font: 500 19px/1 var(--jb-v3-font-mono); }
+        .track { height: 5px; background: var(--jb-v3-control); }
+        .track > span { display: block; height: 100%; background: var(--jb-v3-accent); }
+        .percent { color: var(--jb-v3-fg-3); font-size: 9px; text-align: right; }
+        .activity svg {
+          width: 100%;
+          height: 116px;
+          padding: 8px;
+          overflow: visible;
+          border: 1px solid var(--jb-v3-line);
+          background: color-mix(in srgb, var(--jb-v3-panel) 70%, transparent);
+        }
+        .activity line { stroke: var(--jb-v3-line); stroke-width: 0.55; }
+        .activity polyline {
+          fill: none;
+          stroke: var(--jb-v3-accent);
+          stroke-width: 1.2;
+          vector-effect: non-scaling-stroke;
+        }
+        .activity p { margin: 10px 0 0; color: var(--jb-v3-fg-3); font-size: 12px; }
+        .roles { margin-top: 46px; }
+        .section-heading { display: flex; align-items: baseline; border-bottom: 1px solid var(--jb-v3-line); }
+        .section-heading h2 { flex: 1; margin-bottom: 12px; }
+        .section-heading a { color: var(--jb-v3-fg-2); font-size: 12px; text-decoration: none; }
+        .role-row {
+          display: grid;
+          grid-template-columns: minmax(220px, 1fr) minmax(180px, .7fr) 110px;
+          gap: 20px;
+          align-items: center;
+          min-height: 58px;
+          border-bottom: 1px solid var(--jb-v3-line);
+          color: var(--jb-v3-fg);
+          text-decoration: none;
+        }
+        .role-row strong { font-size: 14px; }
+        .role-row span { color: var(--jb-v3-fg-2); font-size: 12px; }
+        .role-row span:last-child { font-family: var(--jb-v3-font-mono); text-align: right; }
+        .empty-row { display: flex; justify-content: space-between; padding: 22px 0; color: var(--jb-v3-fg-2); }
+        .empty-row a { color: var(--jb-v3-accent-faint); }
         @media (max-width: 900px) {
-          .em-split {
-            grid-template-columns: 1fr !important;
-            gap: 40px !important;
-          }
+          .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+          .metrics article:nth-child(2) { border-right: 0; }
+          .metrics article:nth-child(-n + 2) { border-bottom: 1px solid var(--jb-v3-line); }
+          .data-grid { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 620px) {
+          .content { padding: 30px 18px 64px; }
+          .page-heading { align-items: flex-start; flex-direction: column; gap: 8px; }
+          .metrics { grid-template-columns: 1fr; }
+          .metrics article { border-right: 0; border-bottom: 1px solid var(--jb-v3-line); }
+          .metrics article:last-child { border-bottom: 0; }
+          .funnel-row { grid-template-columns: 92px 55px minmax(70px, 1fr) 40px; }
+          .role-row { grid-template-columns: 1fr auto; padding: 14px 0; }
+          .role-row span:first-of-type { grid-column: 1 / -1; grid-row: 2; }
         }
       `}</style>
     </>

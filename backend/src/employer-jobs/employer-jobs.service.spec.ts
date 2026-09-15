@@ -16,9 +16,12 @@ describe('EmployerJobsService (search bridge)', () => {
     save,
   }));
   employerJobModel.findOneAndUpdate = jest.fn();
+  employerJobModel.findOne = jest.fn();
+  employerJobModel.findOneAndDelete = jest.fn();
 
   const publisherService = {
     publishEmployerJob: jest.fn().mockResolvedValue({ jobId: 'j1' }),
+    unpublishEmployerJob: jest.fn().mockResolvedValue(undefined),
   };
 
   beforeEach(async () => {
@@ -76,5 +79,21 @@ describe('EmployerJobsService (search bridge)', () => {
     await expect(
       service.create('owner1', { title: 'Eng' } as any),
     ).resolves.toBe(savedDoc);
+  });
+
+  it('unpublishes the searchable mirror before deleting an owned job', async () => {
+    employerJobModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue(savedDoc),
+    });
+    employerJobModel.findOneAndDelete.mockReturnValue({
+      exec: jest.fn().mockResolvedValue(savedDoc),
+    });
+    await service.remove('owner1', 'job-1');
+
+    expect(publisherService.unpublishEmployerJob).toHaveBeenCalledWith('job-1');
+    expect(employerJobModel.findOneAndDelete).toHaveBeenCalledWith({
+      _id: 'job-1',
+      ownerId: 'owner1',
+    });
   });
 });

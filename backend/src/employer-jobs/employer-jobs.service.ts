@@ -103,6 +103,13 @@ export class EmployerJobsService {
   }
 
   async remove(ownerId: string, id: string): Promise<void> {
+    const ownedJob = await this.employerJobModel
+      .findOne({ _id: id, ownerId })
+      .exec();
+    if (!ownedJob) {
+      throw new NotFoundException('Job not found');
+    }
+    await this.publisherService.unpublishEmployerJob(id);
     const result = await this.employerJobModel
       .findOneAndDelete({ _id: id, ownerId })
       .exec();

@@ -1,539 +1,269 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { appRoute } from '@/components/app/appRoutes';
-import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/router';
 import Logo from '@/components/brand/Logo';
+import useJbTheme from '@/components/theme/useJbTheme';
+import EmployerV3SurfaceStyles from './EmployerV3SurfaceStyles';
 
-/* Build display initials from a name/email. */
-const initialsFrom = (name = '', email = '') => {
-  const src = (name || email || '').trim();
-  if (!src) return 'JB';
-  const parts = src.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return src.slice(0, 2).toUpperCase();
+const PRIMARY = [
+  { id: 'dashboard', label: 'Dashboard', href: '/employer/dashboard', paths: ['/employer/dashboard'] },
+  {
+    id: 'jobs', label: 'Jobs', href: '/employer/jobs',
+    paths: ['/employer/jobs', '/employer/distribution'],
+  },
+  {
+    id: 'candidates', label: 'Candidates', href: '/employer/candidates',
+    paths: [
+      '/employer/candidates', '/employer/screening', '/employer/pipeline',
+      '/employer/talent-pool',
+    ],
+  },
+  {
+    id: 'interviews', label: 'Interviews', href: '/employer/interviews',
+    paths: ['/employer/interviews', '/employer/messages', '/employer/offers'],
+  },
+  {
+    id: 'company', label: 'Company', href: '/employer/company',
+    paths: [
+      '/employer/company', '/employer/usage', '/employer/compliance',
+    ],
+  },
+];
+
+const SECONDARY = {
+  jobs: [
+    { label: 'Jobs', href: '/employer/jobs' },
+    { label: 'Distribution', href: '/employer/distribution' },
+  ],
+  candidates: [
+    { label: 'Candidates', href: '/employer/candidates' },
+    { label: 'Screening', href: '/employer/screening' },
+    { label: 'Pipeline', href: '/employer/pipeline' },
+    { label: 'Talent pool', href: '/employer/talent-pool' },
+  ],
+  interviews: [
+    { label: 'Interviews', href: '/employer/interviews' },
+    { label: 'Messages', href: '/employer/messages' },
+    { label: 'Offers', href: '/employer/offers' },
+  ],
+  company: [
+    { label: 'Company', href: '/employer/company' },
+    { label: 'Usage', href: '/employer/usage' },
+    { label: 'Compliance', href: '/employer/compliance' },
+  ],
 };
 
-/* ---------------------------------------------------------------- glyphs --- */
-const svgProps = {
-  width: 18,
-  height: 18,
-  viewBox: '0 0 24 24',
-  fill: 'none',
-  stroke: 'currentColor',
-  strokeWidth: 1.7,
-  strokeLinecap: 'round',
-  strokeLinejoin: 'round',
-};
+const V3_PAGES = new Set([
+  ...PRIMARY.flatMap((item) => item.paths),
+  '/employer/jobs/post',
+]);
 
-const Glyph = {
-  dashboard: (
-    <svg {...svgProps}>
-      <rect x="3" y="3" width="7.5" height="7.5" rx="1.2" />
-      <rect x="13.5" y="3" width="7.5" height="7.5" rx="1.2" />
-      <rect x="3" y="13.5" width="7.5" height="7.5" rx="1.2" />
-      <rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.2" />
-    </svg>
-  ),
-  jobs: (
-    <svg {...svgProps}>
-      <rect x="3" y="7" width="18" height="13" rx="2" />
-      <path d="M8 7 V5 a2 2 0 0 1 2 -2 h4 a2 2 0 0 1 2 2 v2" />
-      <line x1="3" y1="12" x2="21" y2="12" />
-    </svg>
-  ),
-  candidates: (
-    <svg {...svgProps}>
-      <circle cx="12" cy="8" r="3.5" />
-      <path d="M5.5 20 a6.5 6.5 0 0 1 13 0" />
-    </svg>
-  ),
-  interviews: (
-    <svg {...svgProps}>
-      <rect x="3.5" y="5" width="17" height="15" rx="2" />
-      <line x1="3.5" y1="9.5" x2="20.5" y2="9.5" />
-      <line x1="8" y1="3" x2="8" y2="6" />
-      <line x1="16" y1="3" x2="16" y2="6" />
-      <path d="M9 13.5 l2 2 l4 -4" />
-    </svg>
-  ),
-  offers: (
-    <svg {...svgProps}>
-      <rect x="5" y="3" width="14" height="18" rx="2" />
-      <line x1="8.5" y1="7" x2="15.5" y2="7" />
-      <path d="M9 13 l2 2 l4 -4" />
-    </svg>
-  ),
-  search: (
-    <svg {...svgProps}>
-      <circle cx="10.5" cy="10.5" r="7" />
-      <line x1="15.5" y1="15.5" x2="20.5" y2="20.5" />
-    </svg>
-  ),
-  messages: (
-    <svg {...svgProps}>
-      <path d="M4 5 h16 a1 1 0 0 1 1 1 v8 a1 1 0 0 1 -1 1 H10 l-4 4 v-4 H5 a1 1 0 0 1 -1 -1 V6 a1 1 0 0 1 1 -1 Z" />
-      <circle cx="9" cy="10" r="0.9" />
-      <circle cx="12.5" cy="10" r="0.9" />
-      <circle cx="16" cy="10" r="0.9" />
-    </svg>
-  ),
-  analytics: (
-    <svg {...svgProps}>
-      <line x1="4" y1="20" x2="20" y2="20" />
-      <rect x="6" y="12" width="3" height="8" rx="0.6" />
-      <rect x="11" y="8" width="3" height="12" rx="0.6" />
-      <rect x="16" y="14" width="3" height="6" rx="0.6" />
-    </svg>
-  ),
-  company: (
-    <svg {...svgProps}>
-      <rect x="5" y="3" width="14" height="18" rx="1.5" />
-      <rect x="8" y="7" width="2" height="2" rx="0.4" />
-      <rect x="14" y="7" width="2" height="2" rx="0.4" />
-      <rect x="8" y="11" width="2" height="2" rx="0.4" />
-      <rect x="14" y="11" width="2" height="2" rx="0.4" />
-      <rect x="10.5" y="16" width="3" height="5" rx="0.4" />
-    </svg>
-  ),
-  team: (
-    <svg {...svgProps}>
-      <circle cx="9" cy="8.5" r="3" />
-      <path d="M3.5 19 a5.5 5.5 0 0 1 11 0" />
-      <circle cx="17" cy="7.5" r="2.3" />
-      <path d="M15 13 a4.6 4.6 0 0 1 5.5 4.4" />
-    </svg>
-  ),
-  settings: (
-    <svg {...svgProps}>
-      <circle cx="12" cy="12" r="7.5" />
-      <circle cx="12" cy="12" r="2.6" />
-    </svg>
-  ),
-  sparkle: (
-    <svg {...svgProps}>
-      <path d="M12 3 l1.8 5.2 l5.2 1.8 l-5.2 1.8 l-1.8 5.2 l-1.8 -5.2 l-5.2 -1.8 l5.2 -1.8 Z" />
-      <path d="M18.5 16 l0.7 2 l2 0.7 l-2 0.7 l-0.7 2 l-0.7 -2 l-2 -0.7 l2 -0.7 Z" />
-    </svg>
-  ),
-};
+const matchesPath = (pathname, path) => pathname === path || pathname.startsWith(`${path}/`);
 
-/* --------------------------------------------------------------- data --- */
-// command palette destinations (mirrors the dc Component.destinations())
-const I_TINT = 'var(--jb-a-tint)', I_INK = 'var(--jb-a-accent)';
-const N_TINT = 'var(--jb-a-control)', N_INK = 'var(--jb-a-ink-warm)';
-const G_TINT = 'var(--jb-a-invert-panel)', G_INK = 'var(--jb-a-accent)';
+function findSection(pathname, active) {
+  const exact = PRIMARY.find((item) => item.paths.some((path) => matchesPath(pathname, path)));
+  return exact || PRIMARY.find((item) => item.id === active) || PRIMARY[0];
+}
 
-const DESTINATIONS = [
-  { key: 'post', label: 'Post a job', hint: 'Create a new req', dc: 'Employer Post Job.dc.html', tag: '+', tint: I_TINT, ink: I_INK },
-  { key: 'dashboard', label: 'Dashboard', hint: 'Hiring at a glance', dc: 'Employer Dashboard.dc.html', tag: 'DB', tint: I_TINT, ink: I_INK },
-  { key: 'jobs', label: 'Jobs', hint: 'Your open reqs', dc: 'Employer Jobs.dc.html', tag: 'JB', tint: N_TINT, ink: N_INK },
-  { key: 'candidates', label: 'Candidates', hint: 'Applicant pipeline', dc: 'Employer Candidates.dc.html', tag: 'CN', tint: I_TINT, ink: I_INK },
-  { key: 'interviews', label: 'Interviews', hint: 'Schedule & feedback', dc: 'Employer Interviews.dc.html', tag: 'IV', tint: N_TINT, ink: N_INK },
-  { key: 'offers', label: 'Offers', hint: 'Drafts & accepted', dc: 'Employer Offers.dc.html', tag: 'OF', tint: G_TINT, ink: G_INK },
-  { key: 'search', label: 'Talent Search', hint: 'Source new candidates', dc: 'Employer Talent Search.dc.html', tag: 'TS', tint: N_TINT, ink: N_INK },
-  { key: 'messages', label: 'Messages', hint: 'Candidate conversations', dc: 'Employer Messages.dc.html', tag: 'MS', tint: I_TINT, ink: I_INK },
-  { key: 'analytics', label: 'Analytics', hint: 'Funnel & time-to-hire', dc: 'Employer Analytics.dc.html', tag: 'AN', tint: N_TINT, ink: N_INK },
-  { key: 'company', label: 'Company Profile', hint: 'Your careers page', dc: 'Employer Company Profile.dc.html', tag: 'CO', tint: N_TINT, ink: N_INK },
-  { key: 'team', label: 'Team', hint: 'Recruiters & hiring mgrs', dc: 'Employer Team.dc.html', tag: 'TM', tint: N_TINT, ink: N_INK },
-  { key: 'settings', label: 'Settings', hint: 'Account & billing', dc: 'Employer Settings.dc.html', tag: 'SE', tint: N_TINT, ink: N_INK },
-];
-
-// Notifications come from a real feed once wired; no fabricated entries.
-const NOTIFS = [];
-
-// Nav items carry no fabricated counts/dots — badges are added only when wired
-// to a real API (none yet), never hardcoded.
-const HIRING = [
-  { key: 'dashboard', label: 'Dashboard', dc: 'Employer Dashboard.dc.html', glyph: 'dashboard' },
-  { key: 'jobs', label: 'Jobs', dc: 'Employer Jobs.dc.html', glyph: 'jobs' },
-  { key: 'candidates', label: 'Candidates', dc: 'Employer Candidates.dc.html', glyph: 'candidates' },
-  { key: 'interviews', label: 'Interviews', dc: 'Employer Interviews.dc.html', glyph: 'interviews' },
-  { key: 'offers', label: 'Offers', dc: 'Employer Offers.dc.html', glyph: 'offers' },
-];
-const AI = [
-  { key: 'autopilot', label: 'Autopilot', dc: 'Employer Autopilot.dc.html', glyph: 'sparkle', ai: true },
-  { key: 'copilot', label: 'Copilot', dc: 'Employer Copilot.dc.html', glyph: 'sparkle', ai: true },
-  { key: 'sourcing', label: 'Sourcing Agent', dc: 'Employer Sourcing Agent.dc.html', glyph: 'sparkle', ai: true },
-];
-const ENGAGE = [
-  { key: 'search', label: 'Talent Search', dc: 'Employer Talent Search.dc.html', glyph: 'search' },
-  { key: 'messages', label: 'Messages', dc: 'Employer Messages.dc.html', glyph: 'messages' },
-  { key: 'analytics', label: 'Analytics', dc: 'Employer Analytics.dc.html', glyph: 'analytics' },
-];
-const COMPANY = [
-  { key: 'company', label: 'Company Profile', dc: 'Employer Company Profile.dc.html', glyph: 'company' },
-  { key: 'team', label: 'Team', dc: 'Employer Team.dc.html', glyph: 'team' },
-  { key: 'settings', label: 'Settings', dc: 'Employer Settings.dc.html', glyph: 'settings' },
-];
-
-/* ----------------------------------------------------------- component --- */
 export default function EmployerSidebar({ active = 'dashboard' }) {
-  const auth = useAuth() || {};
-  const user = auth.user || null;
-  const displayName = user?.name || user?.email || 'Your account';
-  const companyName = user?.companyName || user?.company || '';
-  // Don't claim a paid plan we can't verify — only show a plan label if the
-  // user record actually carries one.
-  const planLabel = user?.plan || user?.subscriptionPlan || '';
-  const subLabel = companyName
-    ? (planLabel ? `${companyName} · ${planLabel}` : companyName)
-    : (planLabel || 'Recruiter workspace');
-  const initials = initialsFrom(user?.name, user?.email);
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobile, setMobile] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [paletteOpen, setPaletteOpen] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
-  const [query, setQuery] = useState('');
-
-  // hydrate persisted + viewport state on mount (avoids SSR mismatch)
-  useEffect(() => {
-    try {
-      setCollapsed(localStorage.getItem('jb_employer_sidebar_collapsed') === '1');
-    } catch (e) {
-      /* ignore */
-    }
-    const onResize = () => setMobile(window.innerWidth <= 860);
-    onResize();
-    window.addEventListener('resize', onResize);
-
-    const onKey = (e) => {
-      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
-        e.preventDefault();
-        setPaletteOpen((p) => !p);
-        setQuery('');
-      }
-      if (e.key === 'Escape') {
-        setPaletteOpen(false);
-        setNotifOpen(false);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('resize', onResize);
-      window.removeEventListener('keydown', onKey);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (mobile) setDrawerOpen(false);
-  }, [mobile]);
-
-  const toggleCollapse = useCallback(() => {
-    setCollapsed((c) => {
-      const next = !c;
-      try {
-        localStorage.setItem('jb_employer_sidebar_collapsed', next ? '1' : '0');
-      } catch (e) {
-        /* ignore */
-      }
-      return next;
-    });
-  }, []);
-
-  const wide = mobile || !collapsed;
-  const narrow = !mobile && collapsed;
-
-  const navStyle = (on, ai) => ({
-    position: 'relative',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: wide ? 'flex-start' : 'center',
-    gap: 12,
-    width: wide ? 'auto' : 46,
-    height: wide ? 'auto' : 46,
-    margin: wide ? 0 : '0 auto',
-    padding: wide ? '10px 12px' : 0,
-    borderRadius: 11,
-    fontSize: 14.5,
-    fontWeight: on ? 700 : 500,
-    // The active label used to be white on a dark rail. The rail is light now,
-    // so the active state is carried by the accent instead.
-    color: on ? 'var(--jb-a-accent)' : 'var(--jb-a-ink-2)',
-    background: on ? 'var(--jb-a-tint)' : 'transparent',
-    textDecoration: 'none',
-  });
-
-  const NavItem = ({ it }) => {
-    const on = active === it.key;
-    const ai = !!it.ai;
-    const accent = ai ? 'var(--jb-a-accent)' : 'var(--jb-a-accent)';
-    const showDot = (!!it.dot && narrow) || (!!it.badge && narrow);
-    return (
-      <Link href={appRoute(it.dc)} title={it.label} className="em-nav" style={navStyle(on, ai)}>
-        <span style={{ position: 'absolute', left: -14, top: 9, bottom: 9, width: 3, borderRadius: '0 3px 3px 0', background: on ? accent : 'transparent' }} />
-        <span style={{ flexShrink: 0, display: 'flex', color: on ? (ai ? 'var(--jb-a-accent)' : 'var(--jb-a-accent)') : (ai ? 'var(--jb-a-ink-warm)' : 'var(--jb-a-ink-warm)') }}>{Glyph[it.glyph]}</span>
-        {wide && <span style={{ flex: 1 }}>{it.label}</span>}
-        {it.badge && wide && (
-          <span style={{ flexShrink: 0, fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, color: 'var(--jb-a-card)', background: accent, borderRadius: 999, padding: '2px 7px' }}>{it.badge}</span>
-        )}
-        {showDot && (
-          <span style={{ position: 'absolute', top: 8, right: 8, width: 7, height: 7, borderRadius: '50%', background: accent, border: '1.5px solid var(--jb-a-rail)' }} />
-        )}
-        {it.dot && wide && (
-          <span style={{ flexShrink: 0, width: 7, height: 7, borderRadius: '50%', background: accent }} />
-        )}
-      </Link>
-    );
-  };
-
-  const sectionLabel = (txt, opts = {}) => {
-    const { mt = 6, ai = false } = opts;
-    if (!wide) return <div style={{ height: 1, background: 'var(--jb-a-control)', margin: '14px 8px' }} />;
-    if (ai) {
-      return (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: `${mt}px 10px 10px` }}>
-          <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--jb-a-ink-warm)' }}>{txt}</span>
-          <span style={{ color: 'var(--jb-a-accent)', fontSize: 11 }}>✦</span>
-        </div>
-      );
-    }
-    return (
-      <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--jb-a-ink-warm)', padding: `${mt}px 10px 10px` }}>{txt}</div>
-    );
-  };
-
-  const q = query.trim().toLowerCase();
-  const filtered = q ? DESTINATIONS.filter((d) => (d.label + ' ' + d.hint).toLowerCase().includes(q)) : DESTINATIONS;
-
-  const iconBtn = {
-    width: 28,
-    height: 28,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    border: '1px solid var(--jb-a-line-strong)',
-    background: 'var(--jb-a-rail)',
-    color: 'var(--jb-a-ink-warm)',
-    borderRadius: 8,
-    cursor: 'pointer',
-    fontSize: 13,
-  };
+  const { pathname } = useRouter();
+  const { theme, toggle } = useJbTheme();
+  const section = findSection(pathname, active);
+  const tabs = SECONDARY[section.id] || [];
+  const hasSubnav = tabs.length > 1;
+  const isV3Page = V3_PAGES.has(pathname);
 
   return (
-    <div
-      id="emside-root"
-      style={{
-        width: mobile ? 0 : collapsed ? 74 : 250,
-        height: mobile ? 0 : '100vh',
-        position: mobile ? 'static' : 'sticky',
-        top: 0,
-        alignSelf: 'flex-start',
-        flexShrink: 0,
-        // The rail header overflowed its 250px width and painted over the page
-        // title sitting next to it (a "RECRUITER" chip alongside the wordmark
-        // and three icon buttons measured ~308px; the chip is gone now, since
-        // every screen behind this rail is the recruiter surface). Clip here so
-        // nothing can escape the rail regardless of what the header grows to.
-        overflow: 'hidden',
-        fontFamily: 'var(--jb-font-sans)',
-        zIndex: 30,
-      }}
+    <header
+      id="employer-v3-shell"
+      data-subnav={hasSubnav ? 'true' : 'false'}
+      data-v3-page={isV3Page ? 'true' : 'false'}
     >
-      <style>{`
-        #emside-root a { text-decoration:none; }
-        #emside-root .em-nav:hover { background:var(--jb-a-control) !important; }
-        #empanel::-webkit-scrollbar { width:8px; }
-        #empanel::-webkit-scrollbar-thumb { background:var(--jb-a-line); border-radius:8px; }
-        #empalette input::placeholder { color:var(--jb-a-ink-warm); }
-        #empalette input:focus { outline:none; }
-        .em-pal-row:hover { background:var(--jb-a-control); }
-        .em-notif-row:hover { background:var(--jb-a-control); }
-        .em-postjob:hover { background:var(--jb-a-accent-deep) !important; }
-        @keyframes empop { from { opacity:0; transform:translateY(8px) scale(0.98); } to { opacity:1; transform:translateY(0) scale(1); } }
-        @keyframes emfade { from { opacity:0; } to { opacity:1; } }
+      <EmployerV3SurfaceStyles />
+      <style jsx global>{`
+        div:has(> #employer-v3-shell) {
+          flex-direction: column !important;
+        }
+        #employer-v3-shell + main { width: 100%; }
+        #employer-v3-shell + main > header {
+          top: 56px !important;
+          background: var(--jb-v3-bg) !important;
+          border-color: var(--jb-v3-line) !important;
+        }
+        #employer-v3-shell[data-subnav='true'] + main > header { top: 96px !important; }
+        .employer-v3-scroll::-webkit-scrollbar { display: none; }
+        .employer-v3-primary-link {
+          position: relative;
+          flex: none;
+          padding: 20px 12px 17px;
+          border-bottom: 1px solid transparent;
+          color: var(--jb-v3-fg-3);
+          font: 400 10.5px/1 var(--jb-v3-font-mono);
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          text-decoration: none;
+          transition: color 0.2s ease, border-color 0.2s ease;
+        }
+        .employer-v3-primary-link:hover,
+        .employer-v3-primary-link.current { color: var(--jb-v3-fg); }
+        .employer-v3-primary-link.current { border-bottom-color: var(--jb-v3-accent); }
+        .employer-v3-secondary-link {
+          flex: none;
+          padding: 4px 0;
+          color: var(--jb-v3-fg-3);
+          font-size: 12.5px;
+          text-decoration: none;
+        }
+        .employer-v3-secondary-link[aria-current='page'] { color: var(--jb-v3-fg); }
+        @media (max-width: 720px) {
+          #employer-v3-shell + main > header { top: 92px !important; }
+          #employer-v3-shell[data-subnav='true'] + main > header { top: 132px !important; }
+          .employer-v3-primary-link { padding: 13px 10px 11px; }
+        }
       `}</style>
 
-      {/* MOBILE HAMBURGER */}
-      {mobile && !drawerOpen && (
-        <button onClick={() => setDrawerOpen(true)} title="Menu" style={{ position: 'fixed', top: 14, left: 14, zIndex: 70, width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--jb-a-ink)', color: 'var(--jb-a-card)', border: '1px solid var(--jb-a-line-strong)', borderRadius: 12, cursor: 'pointer', fontSize: 18, boxShadow: 'var(--jb-a-shadow-lift)' }}>☰</button>
-      )}
+      <div className="primary-row">
+        <Link href="/employer/dashboard" aria-label="Jobocate" className="logo">
+          <Logo size={22} />
+        </Link>
 
-      {/* MOBILE SCRIM */}
-      {mobile && drawerOpen && (
-        <div onClick={() => setDrawerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 75, background: 'var(--jb-a-scrim)', animation: 'emfade 0.2s ease' }} />
-      )}
-
-      {/* PANEL */}
-      <div
-        style={{
-          position: mobile ? 'fixed' : 'static',
-          top: 0,
-          left: 0,
-          width: mobile ? 276 : '100%',
-          height: '100vh',
-          zIndex: mobile ? 80 : 1,
-          transform: mobile ? (drawerOpen ? 'translateX(0)' : 'translateX(-110%)') : 'none',
-          transition: 'transform 0.25s ease',
-          boxShadow: mobile ? '0 30px 60px -20px var(--jb-a-scrim)' : 'none',
-          background: 'var(--jb-a-rail)',
-          color: 'var(--jb-a-ink-warm)',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        {/* HEADER */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: narrow ? 'center' : 'space-between', gap: 8, padding: '18px 14px 16px' }}>
-          {wide && (
-            <Link href={appRoute('Employer Dashboard.dc.html')} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 9, overflow: 'hidden' }}>
-              <Logo size={24} accent="var(--jb-a-accent)" />
-            </Link>
-          )}
-          {narrow && (
-            <Link href={appRoute('Employer Dashboard.dc.html')} aria-label="Jobocate home" style={{ display: 'flex' }}>
-              <Logo size={26} mark accent="var(--jb-a-accent)" />
-            </Link>
-          )}
-          <div style={{ display: 'flex', gap: 6 }}>
-            {wide && (
-              <button onClick={() => { setPaletteOpen(true); setQuery(''); setNotifOpen(false); }} title="Search ⌘K" style={{ ...iconBtn, fontSize: 14 }}>⌕</button>
-            )}
-            {wide && (
-              <button onClick={() => setNotifOpen((n) => !n)} title="Notifications" style={{ ...iconBtn, position: 'relative' }}>
-                ◔
-                {NOTIFS.length > 0 && (
-                  <span style={{ position: 'absolute', top: 5, right: 5, width: 6, height: 6, borderRadius: '50%', background: 'var(--jb-a-accent)', border: '1.5px solid var(--jb-a-rail)' }} />
-                )}
-              </button>
-            )}
-            {!mobile && (
-              <button onClick={toggleCollapse} title="Collapse" style={{ ...iconBtn, flexShrink: 0 }}>{collapsed ? '»' : '«'}</button>
-            )}
-            {mobile && (
-              <button onClick={() => setDrawerOpen(false)} title="Close" style={{ ...iconBtn, flexShrink: 0, fontSize: 15 }}>✕</button>
-            )}
-          </div>
-        </div>
-
-        {/* POST A JOB (primary CTA) */}
-        {wide && (
-          <Link href={appRoute('Employer Post Job.dc.html')} className="em-postjob" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, margin: '0 14px 14px', padding: 12, background: 'var(--jb-a-accent)', borderRadius: 11, fontSize: 14.5, fontWeight: 700, color: 'var(--jb-a-card)' }}>
-            <span style={{ fontSize: 17, lineHeight: 1, fontWeight: 400 }}>＋</span> Post a job
-          </Link>
-        )}
-        {narrow && (
-          <>
-            <Link href={appRoute('Employer Post Job.dc.html')} className="em-postjob" title="Post a job" style={{ width: 46, height: 44, margin: '0 auto 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--jb-a-accent)', borderRadius: 11, color: 'var(--jb-a-card)', fontSize: 20, fontWeight: 400 }}>＋</Link>
-            <button onClick={() => { setPaletteOpen(true); setQuery(''); }} title="Search" style={{ width: 46, height: 42, margin: '0 auto 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--jb-a-card)', border: '1px solid var(--jb-a-line)', borderRadius: 10, cursor: 'pointer', color: 'var(--jb-a-ink-warm)', fontSize: 15 }}>⌕</button>
-          </>
-        )}
-
-        {/* NAV (scroll) */}
-        <div id="empanel" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 14px 14px', display: 'flex', flexDirection: 'column' }}>
-          {sectionLabel('Hiring')}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {HIRING.map((it) => <NavItem key={it.key} it={it} />)}
-          </div>
-
-          {sectionLabel('AI', { mt: 22, ai: true })}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {AI.map((it) => <NavItem key={it.key} it={it} />)}
-          </div>
-
-          {sectionLabel('Engage', { mt: 22 })}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {ENGAGE.map((it) => <NavItem key={it.key} it={it} />)}
-          </div>
-
-          {sectionLabel('Company', { mt: 22 })}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {COMPANY.map((it) => <NavItem key={it.key} it={it} />)}
-          </div>
-
-          {wide && (
-            <Link href={appRoute('Employer Upgrade.dc.html')} style={{ marginTop: 22, padding: 16, border: '1px solid var(--jb-a-line-strong)', borderRadius: 14, background: 'linear-gradient(160deg, var(--jb-a-tint), var(--jb-a-ink))', display: 'block' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                <span style={{ color: 'var(--jb-a-accent)', fontSize: 11 }}>✦</span>
-                <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--jb-a-accent)' }}>AI hiring</span>
-              </div>
-              <div style={{ fontSize: 13.5, lineHeight: 1.5, color: 'var(--jb-a-ink-2)', marginBottom: 12 }}>
-                Autopilot, Copilot, and the Sourcing Agent help you screen and reach candidates faster.
-              </div>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: 'var(--jb-a-accent)' }}>See plans <span>→</span></span>
-            </Link>
-          )}
-
-          <div style={{ flex: 1, minHeight: 18 }} />
-
-          {wide ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '12px 10px 4px', marginTop: 8, borderTop: '1px solid var(--jb-a-line-strong)' }}>
-              <Link href={appRoute('Employer Settings.dc.html')} style={{ display: 'flex', alignItems: 'center', gap: 11, flex: 1, minWidth: 0, textDecoration: 'none' }}>
-                <span style={{ width: 36, height: 36, flexShrink: 0, borderRadius: '50%', background: 'var(--jb-a-accent)', color: 'var(--jb-a-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13 }}>{initials}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--jb-a-ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--jb-a-ink-warm)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{subLabel}</div>
-                </div>
+        <nav aria-label="Employer primary" className="primary employer-v3-scroll">
+          {PRIMARY.map((item) => {
+            const current = item.id === section.id;
+            return (
+              <Link
+                key={item.id}
+                href={item.href}
+                aria-current={current ? 'page' : undefined}
+                className={`employer-v3-primary-link${current ? ' current' : ''}`}
+              >
+                {item.label}
               </Link>
-              <button type="button" onClick={() => auth.logout && auth.logout()} title="Log out" aria-label="Log out" style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, border: '1px solid var(--jb-a-line-strong)', background: 'transparent', color: 'var(--jb-a-ink-warm)', cursor: 'pointer' }}>
-                <svg {...svgProps}><path d="M15 12H4" /><path d="M8 8l-4 4 4 4" /><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" /></svg>
-              </button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '12px 0 2px', marginTop: 8, borderTop: '1px solid var(--jb-a-line-strong)' }}>
-              <Link href={appRoute('Employer Settings.dc.html')} title={`${displayName} · ${subLabel}`} style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--jb-a-accent)', color: 'var(--jb-a-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, textDecoration: 'none' }}>{initials}</Link>
-              <button type="button" onClick={() => auth.logout && auth.logout()} title="Log out" aria-label="Log out" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, border: '1px solid var(--jb-a-line-strong)', background: 'transparent', color: 'var(--jb-a-ink-warm)', cursor: 'pointer' }}>
-                <svg {...svgProps}><path d="M15 12H4" /><path d="M8 8l-4 4 4 4" /><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" /></svg>
-              </button>
-            </div>
-          )}
-        </div>
+            );
+          })}
+        </nav>
+
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+          className="theme"
+        >
+          {theme === 'dark' ? 'Dark' : 'Light'}
+        </button>
       </div>
 
-      {/* COMMAND PALETTE */}
-      {paletteOpen && (
-        <div onClick={() => setPaletteOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'var(--jb-a-scrim)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '12vh', animation: 'emfade 0.15s ease' }}>
-          <div id="empalette" onClick={(e) => e.stopPropagation()} style={{ width: 'min(92vw,560px)', background: 'var(--jb-a-card)', border: '1px solid var(--jb-a-line)', borderRadius: 16, boxShadow: 'var(--jb-a-shadow-lift)', overflow: 'hidden', animation: 'empop 0.18s ease' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '16px 18px', borderBottom: '1px solid var(--jb-a-line-strong)' }}>
-              <span style={{ color: 'var(--jb-a-ink-warm)', fontSize: 16 }}>⌕</span>
-              <input value={query} onChange={(e) => setQuery(e.target.value)} autoFocus placeholder="Search screens & actions…" style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontFamily: 'inherit', fontSize: 16, color: 'var(--jb-a-ink)' }} />
-              <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: 'var(--jb-a-ink-warm)', border: '1px solid var(--jb-a-line-strong)', borderRadius: 5, padding: '2px 6px' }}>ESC</span>
-            </div>
-            <div style={{ maxHeight: '50vh', overflowY: 'auto', padding: 8 }}>
-              {filtered.map((r) => (
-                <Link key={r.key} href={appRoute(r.dc)} className="em-pal-row" style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '11px 12px', borderRadius: 10, color: 'var(--jb-a-line)' }}>
-                  <span style={{ width: 32, height: 32, flexShrink: 0, borderRadius: 8, background: r.tint, color: r.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--jb-font-mono)', fontWeight: 600, fontSize: 11 }}>{r.tag}</span>
-                  <span style={{ flex: 1 }}>
-                    <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: 'var(--jb-a-ink)' }}>{r.label}</span>
-                    <span style={{ display: 'block', fontSize: 12, color: 'var(--jb-a-ink-warm)' }}>{r.hint}</span>
-                  </span>
-                  <span style={{ color: 'var(--jb-a-ink-warm)', fontSize: 14 }}>↵</span>
+      {hasSubnav && (
+        <nav aria-label={`Employer ${section.id}`} className="secondary employer-v3-scroll">
+          <div>
+            {tabs.map((tab) => {
+              const current = tab.href && matchesPath(pathname, tab.href);
+              return tab.href ? (
+                <Link
+                  key={tab.label}
+                  href={tab.href}
+                  aria-current={current ? 'page' : undefined}
+                  className="employer-v3-secondary-link"
+                >
+                  {tab.label}
                 </Link>
-              ))}
-              {filtered.length === 0 && (
-                <div style={{ padding: 24, textAlign: 'center', fontSize: 13.5, color: 'var(--jb-a-ink-warm)' }}>No matches for “{query}”.</div>
-              )}
-            </div>
+              ) : (
+                <span key={tab.label} title="Designed in v3; route not available yet">
+                  {tab.label}
+                </span>
+              );
+            })}
           </div>
-        </div>
+        </nav>
       )}
 
-      {/* NOTIFICATIONS */}
-      {notifOpen && (
-        <div onClick={() => setNotifOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 88, animation: 'emfade 0.12s ease' }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ position: 'fixed', left: mobile ? 14 : collapsed ? 84 : 260, top: 84, width: 340, maxWidth: '88vw', background: 'var(--jb-a-card)', border: '1px solid var(--jb-a-line)', borderRadius: 16, boxShadow: 'var(--jb-a-shadow-lift)', overflow: 'hidden', animation: 'empop 0.18s ease' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px 18px', borderBottom: '1px solid var(--jb-a-line-strong)' }}>
-              <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--jb-a-ink)' }}>Notifications</span>
-              <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: 'var(--jb-a-accent)' }}>{NOTIFS.length} new</span>
-            </div>
-            <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-              {NOTIFS.map((n, i) => (
-                <Link key={i} href={appRoute(n.dc)} className="em-notif-row" style={{ display: 'flex', gap: 12, padding: '13px 18px', borderBottom: '1px solid var(--jb-a-control)' }}>
-                  <span style={{ width: 32, height: 32, flexShrink: 0, borderRadius: 8, background: n.tint, color: n.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--jb-font-mono)', fontWeight: 600, fontSize: 11 }}>{n.tag}</span>
-                  <span style={{ flex: 1 }}>
-                    <span style={{ display: 'block', fontSize: 13.5, lineHeight: 1.45, color: 'var(--jb-a-line)' }}>{n.text}</span>
-                    <span style={{ display: 'block', fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: 'var(--jb-a-ink-warm)', marginTop: 3 }}>{n.time}</span>
-                  </span>
-                </Link>
-              ))}
-              {NOTIFS.length === 0 && (
-                <div style={{ padding: '28px 18px', textAlign: 'center', fontSize: 13.5, color: 'var(--jb-a-ink-warm)' }}>You’re all caught up — no notifications yet.</div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      <style jsx>{`
+        #employer-v3-shell {
+          position: sticky;
+          top: 0;
+          z-index: 60;
+          flex: none;
+          width: 100%;
+          color: var(--jb-v3-fg);
+          background: var(--jb-v3-bg);
+          border-bottom: 1px solid var(--jb-v3-line);
+          font-family: var(--jb-v3-font-display);
+        }
+        .primary-row {
+          width: min(100%, 1360px);
+          height: 56px;
+          margin: 0 auto;
+          padding: 0 28px;
+          display: flex;
+          align-items: center;
+          gap: 34px;
+        }
+        .logo {
+          display: flex;
+          flex: none;
+          align-items: center;
+          color: var(--jb-v3-fg);
+          text-decoration: none;
+        }
+        .primary {
+          flex: 1;
+          display: flex;
+          align-items: stretch;
+          gap: 2px;
+          min-width: 0;
+          overflow-x: auto;
+          scrollbar-width: none;
+        }
+        .theme {
+          flex: none;
+          padding: 5px 10px;
+          border: 1px solid var(--jb-v3-line-2);
+          border-radius: 2px;
+          color: var(--jb-v3-fg-2);
+          background: none;
+          font: 400 10px/1 var(--jb-v3-font-mono);
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          cursor: pointer;
+        }
+        .secondary {
+          height: 40px;
+          overflow-x: auto;
+          border-top: 1px solid var(--jb-v3-line);
+          background: var(--jb-v3-sunk);
+          scrollbar-width: none;
+        }
+        .secondary > div {
+          width: min(100%, 1360px);
+          height: 100%;
+          margin: 0 auto;
+          padding: 0 28px;
+          display: flex;
+          align-items: center;
+          gap: 28px;
+        }
+        .secondary span {
+          flex: none;
+          padding: 4px 0;
+          color: var(--jb-v3-fg-3);
+          font-size: 12.5px;
+          text-decoration: none;
+        }
+        .secondary span { opacity: 0.48; }
+        @media (max-width: 720px) {
+          .primary-row {
+            height: 92px;
+            padding: 10px 18px 0;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            grid-template-rows: 32px 40px;
+            gap: 0 16px;
+          }
+          .primary { grid-column: 1 / -1; width: 100%; }
+          .secondary > div { padding: 0 18px; }
+        }
+      `}</style>
+    </header>
   );
 }

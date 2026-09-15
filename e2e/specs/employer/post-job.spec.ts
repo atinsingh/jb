@@ -94,3 +94,123 @@ test.describe('posting a job', () => {
     ).toContainText(jobTitle, { timeout: 25_000 });
   });
 });
+
+test.describe('post-a-job CRUD workspace', () => {
+  test('uses the v3 surface and can edit and delete an existing job', async ({ page }) => {
+    let jobs = [
+      {
+        _id: 'job-crud-1',
+        title: 'Platform Engineer',
+        type: 'Full-time',
+        location: 'Toronto',
+        description: 'Build the hiring platform.',
+        status: 'active',
+        visibility: 'private',
+        salaryMin: 100000,
+        salaryMax: 150000,
+        responsibilities: [],
+        requirements: [],
+        benefits: [],
+        skills: ['TypeScript'],
+      },
+    ];
+    let patchedBody: Record<string, unknown> | null = null;
+    let deletedId = '';
+
+    await page.route('**/api/employer/jobs**', async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      const id = url.pathname.split('/').at(-1);
+
+      if (request.method() === 'GET' && id === 'jobs') {
+        return route.fulfill({ status: 200, json: { jobs, total: jobs.length } });
+      }
+      if (request.method() === 'PATCH' && id === 'job-crud-1') {
+        patchedBody = request.postDataJSON();
+        jobs = jobs.map((job) =>
+          job._id === id ? { ...job, ...(patchedBody as object) } : job,
+        );
+        return route.fulfill({ status: 200, json: { job: jobs[0] } });
+      }
+      if (request.method() === 'DELETE' && id === 'job-crud-1') {
+        deletedId = id;
+        jobs = [];
+        return route.fulfill({ status: 200, json: { message: 'Job deleted successfully' } });
+      }
+      return route.continue();
+    });
+
+    page.on('dialog', (dialog) => dialog.accept());
+    await page.goto('/employer/jobs/post', { waitUntil: 'domcontentloaded' });
+
+    await expect(page.locator('#emapp')).toHaveAttribute('data-v3-page', 'true');
+    await expect(page.getByText('Platform Engineer', { exact: true })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Edit Platform Engineer' }).click();
+    await page.locator('#title').fill('Senior Platform Engineer');
+    await page.locator('#salaryMin').fill('');
+    await page.locator('#salaryMax').fill('');
+    await page.getByRole('button', { name: /requirements/i }).click();
+    await page.getByPlaceholder('Add a skill').fill('Node.js');
+    await page.getByRole('button', { name: 'Add Skills' }).click();
+    await page.getByRole('button', { name: /save changes/i }).click();
+
+    await expect.poll(() => patchedBody?.title).toBe('Senior Platform Engineer');
+    expect(patchedBody).toMatchObject({
+      salaryMin: null,
+      salaryMax: null,
+      status: 'active',
+      visibility: 'private',
+      skills: ['TypeScript', 'Node.js'],
+    });
+    await expect(
+      page.getByLabel('Existing jobs').getByText('Senior Platform Engineer', { exact: true }),
+    ).toBeVisible();
+
+    await page.getByRole('button', { name: 'Delete Senior Platform Engineer' }).click();
+    await expect.poll(() => deletedId).toBe('job-crud-1');
+    await expect(
+      page.getByLabel('Existing jobs').getByText('Senior Platform Engineer', { exact: true }),
+    ).toHaveCount(0);
+  });
+
+  test('creates a new draft from the same workspace', async ({ page }) => {
+    let createdBody: Record<string, unknown> | null = null;
+
+    await page.route('**/api/employer/jobs**', async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      const id = url.pathname.split('/').at(-1);
+
+      if (request.method() === 'GET' && id === 'jobs') {
+        return route.fulfill({ status: 200, json: { jobs: [], total: 0 } });
+      }
+      if (request.method() === 'POST' && id === 'jobs') {
+        createdBody = request.postDataJSON();
+        return route.fulfill({
+          status: 201,
+          json: { job: { _id: 'job-new', ...createdBody } },
+        });
+      }
+      return route.continue();
+    });
+
+    await page.goto('/employer/jobs/post', { waitUntil: 'domcontentloaded' });
+    await page.locator('#title').fill('Data Engineer');
+    await page.locator('#location').fill('Remote');
+    await page.locator('#description').fill('Build reliable data systems.');
+    await page.getByRole('button', { name: /company details/i }).click();
+    await page.locator('#companyName').fill('Jobocate Labs');
+    await page.getByRole('button', { name: /save draft/i }).click();
+
+    await expect.poll(() => createdBody?.title).toBe('Data Engineer');
+    expect(createdBody).toMatchObject({
+      companyName: 'Jobocate Labs',
+      status: 'draft',
+      visibility: 'public',
+    });
+    await expect(
+      page.getByLabel('Existing jobs').getByText('Data Engineer', { exact: true }),
+    ).toBeVisible();
+  });
+});

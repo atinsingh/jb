@@ -296,12 +296,12 @@ export default function EmployerCandidates() {
       {isDetailOpen && selectedCandidate && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', justifyContent: 'flex-end' }}>
           <div onClick={() => setIsDetailOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(27,26,22,0.42)', backdropFilter: 'blur(2px)' }} />
-          <div style={{ position: 'relative', width: '100%', maxWidth: 520, height: '100%', background: '#F7F3EA', borderLeft: '1px solid #E7E0D2', display: 'flex', flexDirection: 'column', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16', animation: 'emslide 0.22s ease' }}>
+          <div style={{ position: 'relative', width: '100%', maxWidth: 520, height: '100%', background: 'var(--jb-v3-panel)', borderLeft: '1px solid var(--jb-v3-line)', display: 'flex', flexDirection: 'column', fontFamily: 'var(--jb-v3-font-display)', color: 'var(--jb-v3-fg)', animation: 'emslide 0.22s ease' }}>
             {/* drawer header */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 24px', background: 'rgba(247,243,234,0.9)', borderBottom: '1px solid #E7E0D2' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 24px', background: 'var(--jb-v3-sunk)', borderBottom: '1px solid var(--jb-v3-line)' }}>
               <span style={{ ...monoLabel, fontSize: 11, letterSpacing: '0.1em' }}>Candidate detail</span>
               <div style={{ flex: 1 }} />
-              <button onClick={() => setIsDetailOpen(false)} aria-label="Close" style={{ width: 30, height: 30, borderRadius: 999, background: '#FFFEFB', border: '1px solid #E1D9C9', color: '#5A544A', cursor: 'pointer', fontSize: 15, lineHeight: 1 }}>✕</button>
+              <button onClick={() => setIsDetailOpen(false)} aria-label="Close" style={{ width: 30, height: 30, borderRadius: 2, background: 'var(--jb-v3-control)', border: '1px solid var(--jb-v3-line-2)', color: 'var(--jb-v3-fg-2)', cursor: 'pointer', fontSize: 15, lineHeight: 1 }}>✕</button>
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
@@ -345,7 +345,7 @@ export default function EmployerCandidates() {
               </div>
             </div>
 
-            <div style={{ flexShrink: 0, borderTop: '1px solid #E7E0D2', padding: '16px 24px', background: '#FBF8F1' }}>
+            <div style={{ flexShrink: 0, borderTop: '1px solid var(--jb-v3-line)', padding: '16px 24px', background: 'var(--jb-v3-sunk)' }}>
               {scheduleError && <InlineError error={scheduleError} />}
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 9 }}>
                 <button onClick={() => setIsDetailOpen(false)} className="em-ghost" style={ghostBtn}>Close</button>

@@ -32,11 +32,11 @@ export class CreateJobDto {
 
   @IsOptional()
   @IsNumber()
-  salaryMin?: number;
+  salaryMin?: number | null;
 
   @IsOptional()
   @IsNumber()
-  salaryMax?: number;
+  salaryMax?: number | null;
 
   @IsOptional()
   @IsEnum(['year', 'hour'])

@@ -14,8 +14,8 @@ const KEY = 'jobocate-marketing-theme';
  * (see AppTopNav), so one hook, one attribute and one storage key means the
  * choice survives crossing between the two surfaces.
  *
- * Still kept apart from next-themes: that provider is global, and the employer
- * and admin surfaces are cream-designed and must not move with this.
+ * Still kept apart from next-themes: v3 owns the candidate and employer
+ * surfaces, while admin remains on its independent application theme.
  *
  * The initial attribute is written by the inline script in _document.js before
  * first paint, so this hook only has to read what is already on <html> — it

@@ -9,6 +9,7 @@ describe('PublisherService.publishEmployerJob', () => {
 
   const jobModel = {
     findOneAndUpdate: jest.fn(),
+    updateOne: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -31,6 +32,23 @@ describe('PublisherService.publishEmployerJob', () => {
 
   const setOf = () => jobModel.findOneAndUpdate.mock.calls[0][1].$set;
   const filterOf = () => jobModel.findOneAndUpdate.mock.calls[0][0];
+
+  it('unpublishes the searchable mirror when an employer deletes its job', async () => {
+    jobModel.updateOne.mockResolvedValue({ modifiedCount: 1 });
+
+    await service.unpublishEmployerJob('e-deleted');
+
+    expect(jobModel.updateOne).toHaveBeenCalledWith(
+      { externalId: 'jobocate:e-deleted' },
+      {
+        $set: expect.objectContaining({
+          lifecycle: 'removed_at_source',
+          isActive: false,
+          removalReason: 'employer_deleted',
+        }),
+      },
+    );
+  });
 
   it('writes UPPERCASE workplaceType REMOTE for a remote employer job (matching engine expects uppercase)', async () => {
     await service.publishEmployerJob({

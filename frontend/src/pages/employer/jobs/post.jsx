@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/router';
 import EmployerSidebar from '@/components/employer/EmployerSidebar';
 import { employerJobsApi } from '@/services/employerApi';
 
@@ -17,6 +17,12 @@ const TYPE_ENUM = {
   Freelance: 'Contract',
 };
 const toTypeEnum = (t) => TYPE_ENUM[t] || 'Full-time';
+const TYPE_LABEL = {
+  'Full-time': 'Full Time',
+  'Part-time': 'Part Time',
+  Contract: 'Contract',
+  Internship: 'Internship',
+};
 
 /* --------------------------------------------------------------- config --- */
 // Form sections for navigation
@@ -67,6 +73,33 @@ const selectStyle = {
 };
 const cardStyle = { background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 16, overflow: 'hidden' };
 
+const emptyForm = () => ({
+  title: '',
+  type: 'Full Time',
+  location: '',
+  companyName: '',
+  companyLogo: '',
+  category: 'Development',
+  salaryMin: '',
+  salaryMax: '',
+  salaryType: 'year',
+  salary: '',
+  experience: '',
+  description: '',
+  responsibilities: [],
+  requirements: [],
+  benefits: [],
+  skills: [],
+  newSkill: '',
+  newResponsibility: '',
+  newRequirement: '',
+  newBenefit: '',
+  educationLevel: "Bachelor's Degree",
+  isRemote: false,
+  applicationDeadline: '',
+  visibility: 'public',
+});
+
 /* ----------------------------------------------------------- ui helpers --- */
 function Field({ label, required, children }) {
   return (
@@ -98,33 +131,15 @@ function PostJob() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [submitSuccess, setSubmitSuccess] = useState('');
+  const [jobs, setJobs] = useState([]);
+  const [jobsLoading, setJobsLoading] = useState(true);
+  const [jobsError, setJobsError] = useState('');
+  const [editingId, setEditingId] = useState(null);
   const [activeSection, setActiveSection] = useState('job-info');
 
   // Initialize form data with all required fields
-  const [formData, setFormData] = useState({
-    title: '',
-    type: 'Full Time',
-    location: '',
-    companyName: '',
-    companyLogo: '',
-    category: 'Development',
-    salaryMin: '',
-    salaryMax: '',
-    salaryType: 'year',
-    salary: '',
-    experience: '',
-    description: '',
-    responsibilities: [],
-    requirements: [],
-    benefits: [],
-    skills: [],
-    newResponsibility: '',
-    newRequirement: '',
-    newBenefit: '',
-    educationLevel: "Bachelor's Degree",
-    isRemote: false,
-    applicationDeadline: '',
-  });
+  const [formData, setFormData] = useState(emptyForm);
 
   // AI drafting: seed-only fields not part of the saved job, plus the
   // generation call's own loading/error state.
@@ -132,6 +147,62 @@ function PostJob() {
   const [aiNotes, setAiNotes] = useState('');
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState('');
+
+  const resetForm = () => {
+    setFormData(emptyForm());
+    setAiSkills('');
+    setAiNotes('');
+    setEditingId(null);
+    setActiveSection('job-info');
+    setSubmitError('');
+    setSubmitSuccess('');
+  };
+
+  const editJob = (job) => {
+    setFormData({
+      ...emptyForm(),
+      title: job.title || '',
+      type: TYPE_LABEL[job.type] || 'Full Time',
+      location: job.location || '',
+      companyName: job.companyName || '',
+      salaryMin: job.salaryMin ?? '',
+      salaryMax: job.salaryMax ?? '',
+      salaryType: job.salaryPeriod || 'year',
+      description: job.description || '',
+      responsibilities: Array.isArray(job.responsibilities) ? job.responsibilities : [],
+      requirements: Array.isArray(job.requirements) ? job.requirements : [],
+      benefits: Array.isArray(job.benefits) ? job.benefits : [],
+      skills: Array.isArray(job.skills) ? job.skills : [],
+      isRemote: !!job.isRemote,
+      visibility: job.visibility || 'public',
+    });
+    setAiSkills('');
+    setAiNotes('');
+    setEditingId(job._id);
+    setActiveSection('job-info');
+    setSubmitError('');
+    setSubmitSuccess('');
+  };
+
+  useEffect(() => {
+    let live = true;
+    employerJobsApi.list()
+      .then((res) => {
+        if (!live) return;
+        const nextJobs = Array.isArray(res?.jobs) ? res.jobs : [];
+        setJobs(nextJobs);
+        const requestedId = router.query?.jobId;
+        const requested = requestedId
+          ? nextJobs.find((job) => job._id === requestedId)
+          : null;
+        if (requested) editJob(requested);
+      })
+      .catch((error) => live && setJobsError(error?.message || 'Could not load jobs.'))
+      .finally(() => live && setJobsLoading(false));
+    return () => { live = false; };
+    // Load once when the route query is ready.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady]);
 
   // Update salary string whenever min, max or type changes - client-side only
   useEffect(() => {
@@ -195,12 +266,13 @@ function PostJob() {
 
   // Build the employer-jobs DTO from the form fields for a given status.
   const buildDto = (status) => ({
+    companyName: formData.companyName.trim(),
     title: formData.title.trim(),
     type: toTypeEnum(formData.type),
     location: formData.location || '',
     isRemote: !!formData.isRemote,
-    salaryMin: formData.salaryMin ? Number(formData.salaryMin) : undefined,
-    salaryMax: formData.salaryMax ? Number(formData.salaryMax) : undefined,
+    salaryMin: formData.salaryMin ? Number(formData.salaryMin) : editingId ? null : undefined,
+    salaryMax: formData.salaryMax ? Number(formData.salaryMax) : editingId ? null : undefined,
     salaryPeriod: formData.salaryType === 'hour' ? 'hour' : 'year',
     description: formData.description || '',
     responsibilities: Array.isArray(formData.responsibilities) ? formData.responsibilities : [],
@@ -208,13 +280,14 @@ function PostJob() {
     benefits: Array.isArray(formData.benefits) ? formData.benefits : [],
     skills: Array.isArray(formData.skills) ? formData.skills : [],
     status,
-    visibility: 'public',
+    visibility: formData.visibility,
   });
 
   // Persist the job with the given status ('active' to publish, 'draft' to save).
   const persist = async (status) => {
     setIsSubmitting(true);
     setSubmitError('');
+    setSubmitSuccess('');
 
     try {
       // Basic required-field validation.
@@ -228,10 +301,18 @@ function PostJob() {
         throw new Error(salaryError);
       }
 
-      await employerJobsApi.create(buildDto(status));
-
-      // Redirect to jobs list after a successful save.
-      router.push('/employer/jobs');
+      const dto = buildDto(status);
+      const response = editingId
+        ? await employerJobsApi.update(editingId, dto)
+        : await employerJobsApi.create(dto);
+      const saved = response?.job;
+      if (saved) {
+        setJobs((current) => editingId
+          ? current.map((job) => (job._id === editingId ? saved : job))
+          : [saved, ...current]);
+        setEditingId(saved._id);
+      }
+      setSubmitSuccess(editingId ? 'Job changes saved.' : 'Job created successfully.');
     } catch (error) {
       console.error('Error saving job:', error);
       setSubmitError(error?.message || 'Failed to save job. Please try again.');
@@ -304,7 +385,23 @@ function PostJob() {
     persist('active');
   };
 
-  const handleSaveDraft = () => persist('draft');
+  const handleSaveDraft = () => {
+    const currentStatus = jobs.find((job) => job._id === editingId)?.status;
+    persist(editingId ? currentStatus || 'draft' : 'draft');
+  };
+
+  const deleteJob = async (job) => {
+    if (!window.confirm(`Delete ${job.title}? This cannot be undone.`)) return;
+    setSubmitError('');
+    setSubmitSuccess('');
+    try {
+      await employerJobsApi.remove(job._id);
+      setJobs((current) => current.filter((item) => item._id !== job._id));
+      if (editingId === job._id) resetForm();
+    } catch (error) {
+      setSubmitError(error?.message || 'Failed to delete job.');
+    }
+  };
 
   /* --- reusable add-list block (responsibilities / requirements / benefits) --- */
   const renderItemList = (title, field, valueField, placeholder) => (
@@ -359,7 +456,7 @@ function PostJob() {
         #emapp .em-ghost:hover { background: #f4efe4 !important; }
       `}</style>
 
-      <div id="emapp" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16' }}>
+      <div id="emapp" data-v3-page="true" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16' }}>
         <EmployerSidebar active="jobs" />
 
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
@@ -368,18 +465,45 @@ function PostJob() {
             <Link href="/employer/jobs" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13.5, fontWeight: 600, color: '#5A544A', textDecoration: 'none' }}>← Back to jobs</Link>
             <span style={{ ...monoLabel, marginBottom: 0, marginLeft: 4 }}>Hiring · Post a job</span>
             <div style={{ flex: 1 }} />
-            <button type="button" onClick={handleSaveDraft} disabled={isSubmitting} className="em-ghost" style={{ ...ghostBtn, opacity: isSubmitting ? 0.6 : 1 }}>Save as draft</button>
-            <button type="submit" form="jobPostForm" disabled={isSubmitting} className="em-blue-btn" style={{ ...blueBtn, opacity: isSubmitting ? 0.6 : 1 }}>{isSubmitting ? 'Publishing…' : 'Publish'}</button>
+            <button type="button" onClick={resetForm} disabled={isSubmitting} className="em-ghost" style={{ ...ghostBtn, opacity: isSubmitting ? 0.6 : 1 }}>New job</button>
+            <button type="button" onClick={handleSaveDraft} disabled={isSubmitting} className="em-ghost" style={{ ...ghostBtn, opacity: isSubmitting ? 0.6 : 1 }}>{editingId ? 'Save changes' : 'Save draft'}</button>
+            <button type="submit" form="jobPostForm" disabled={isSubmitting} className="em-blue-btn" style={{ ...blueBtn, opacity: isSubmitting ? 0.6 : 1 }}>{isSubmitting ? 'Publishing…' : editingId ? 'Save & publish' : 'Publish'}</button>
           </header>
 
           <div style={{ padding: '28px 32px 64px', maxWidth: 820, width: '100%', margin: '0 auto' }}>
             {/* Title */}
             <div style={{ marginBottom: 22 }}>
-              <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 36, lineHeight: 1, margin: '0 0 6px' }}>Post a job</h1>
+              <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 36, lineHeight: 1, margin: '0 0 6px' }}>{editingId ? 'Edit job' : 'Post a job'}</h1>
               <p style={{ fontSize: 14.5, color: '#5A544A', margin: 0 }}>
                 Fill in the details below to post a new role. Fields marked with <span style={{ color: '#C9622E' }}>*</span> are required.
               </p>
             </div>
+
+            <section aria-label="Existing jobs" style={{ ...cardStyle, marginBottom: 20 }}>
+              <div style={{ padding: '14px 18px', borderBottom: '1px solid #F2ECE0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h2 style={{ fontSize: 15, margin: 0 }}>Existing jobs</h2>
+                  <p style={{ fontSize: 12.5, color: '#8A8378', margin: '3px 0 0' }}>Select a role to edit it here, or remove it.</p>
+                </div>
+                <span style={monoLabel}>{jobs.length} roles</span>
+              </div>
+              {jobsLoading ? (
+                <div style={{ padding: 18, fontSize: 13, color: '#8A8378' }}>Loading jobs…</div>
+              ) : jobsError ? (
+                <div role="alert" style={{ padding: 18, fontSize: 13, color: '#C9622E' }}>{jobsError}</div>
+              ) : jobs.length === 0 ? (
+                <div style={{ padding: 18, fontSize: 13, color: '#8A8378' }}>No jobs yet. Create your first role below.</div>
+              ) : jobs.map((job) => (
+                <div key={job._id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', borderBottom: '1px solid #F2ECE0' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700 }}>{job.title}</div>
+                    <div style={{ fontSize: 12, color: '#8A8378', marginTop: 2 }}>{job.status || 'draft'} · {job.location || 'No location'}</div>
+                  </div>
+                  <button type="button" aria-label={`Edit ${job.title}`} onClick={() => editJob(job)} className="em-ghost" style={ghostBtn}>Edit</button>
+                  <button type="button" aria-label={`Delete ${job.title}`} onClick={() => deleteJob(job)} style={{ ...ghostBtn, color: '#B84A3A' }}>Delete</button>
+                </div>
+              ))}
+            </section>
 
             {/* Stepper */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
@@ -406,6 +530,11 @@ function PostJob() {
             {submitError && (
               <div role="alert" style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 10, background: '#FBEDE4', border: '1px solid #F0C9B0', color: '#9B4A2F', fontSize: 13 }}>
                 {submitError}
+              </div>
+            )}
+            {submitSuccess && (
+              <div role="status" style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 10, background: '#EAF6EE', border: '1px solid #CDE9D6', color: '#157A49', fontSize: 13 }}>
+                {submitSuccess}
               </div>
             )}
 
@@ -451,6 +580,13 @@ function PostJob() {
                   <input id="isRemote" name="isRemote" type="checkbox" checked={formData.isRemote} onChange={handleChange} style={{ width: 16, height: 16, accentColor: '#4263EB', cursor: 'pointer' }} />
                   <span style={{ fontSize: 13.5, color: '#3A352C' }}>This is a remote position</span>
                 </label>
+
+                <Field label="Visibility">
+                  <select id="visibility" name="visibility" value={formData.visibility} onChange={handleChange} style={selectStyle}>
+                    <option value="public">Public</option>
+                    <option value="private">Private</option>
+                  </select>
+                </Field>
 
                 <div style={{ background: '#F5F7FF', border: '1px solid #C7D2FB', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -526,6 +662,7 @@ function PostJob() {
               <Section title="Requirements & Benefits" description="List the requirements and benefits for this position." visible={activeSection === 'requirements'}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 24 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                    {renderItemList('Skills', 'skills', 'newSkill', 'Add a skill')}
                     {renderItemList('Responsibilities', 'responsibilities', 'newResponsibility', 'Add a responsibility')}
                     {renderItemList('Requirements', 'requirements', 'newRequirement', 'Add a requirement')}
                   </div>
