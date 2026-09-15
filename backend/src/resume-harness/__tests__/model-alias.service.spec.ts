@@ -74,12 +74,30 @@ describe('ModelAliasService', () => {
     const allowed = await service.listForUser('u1');
 
     // The tier is a query argument, not a compiled-in branch.
-    expect(aliasModel.find).toHaveBeenCalledWith({ isActive: true, tiers: 'ELITE' });
+    expect(aliasModel.find).toHaveBeenCalledWith({
+      isActive: true,
+      tiers: 'ELITE',
+    });
     expect(allowed.map((a) => a.alias)).toEqual([
       ELITE_ALIAS.alias,
       PRO_ALIAS.alias,
     ]);
     expect(allowed[0]).toMatchObject({ effort: 'max', provider: 'anthropic' });
+  });
+
+  it('resolves the same alias catalogue for an explicitly supplied employer model tier', async () => {
+    aliasModel.find.mockReturnValue(findReturning([PRO_ALIAS]));
+
+    const allowed = await service.listForTier('PRO');
+    const resolved = await service.resolveForTier('PRO');
+
+    expect(aliasModel.find).toHaveBeenCalledWith({
+      isActive: true,
+      tiers: 'PRO',
+    });
+    expect(allowed.map((a) => a.alias)).toEqual([PRO_ALIAS.alias]);
+    expect(resolved).toMatchObject({ alias: PRO_ALIAS.alias, tier: 'PRO' });
+    expect(userModel.findById).not.toHaveBeenCalled();
   });
 
   it('falls back to the FREE tier when the user has no plan set', async () => {
@@ -88,7 +106,10 @@ describe('ModelAliasService', () => {
 
     await service.listForUser('u1').catch(() => undefined);
 
-    expect(aliasModel.find).toHaveBeenCalledWith({ isActive: true, tiers: 'FREE' });
+    expect(aliasModel.find).toHaveBeenCalledWith({
+      isActive: true,
+      tiers: 'FREE',
+    });
   });
 
   it('picks the tier default when the caller does not name an alias', async () => {

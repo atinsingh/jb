@@ -21,11 +21,15 @@ export interface EmployerPlan {
   popular: boolean;
   /** false → not purchasable through self-serve checkout (free tier, sales-led enterprise). */
   selfServe: boolean;
+  /** Alias-catalogue tier used for employer-owned ATS model selection. */
+  modelTier: string;
   limits: {
     jobSlotsLimit: number;
     seatsLimit: number;
     aiActionsLimit: number;
     sourcingCreditsLimit: number;
+    /** Actual LiteLLM spend ceiling in USD for the shared employer AI pool. */
+    aiBudgetUsdLimit: number;
   };
 }
 
@@ -38,11 +42,13 @@ export const EMPLOYER_PLANS: EmployerPlan[] = [
     annual: 0,
     popular: false,
     selfServe: false,
+    modelTier: 'FREE',
     limits: {
       jobSlotsLimit: 1,
       seatsLimit: 1,
       aiActionsLimit: 25,
       sourcingCreditsLimit: 10,
+      aiBudgetUsdLimit: 1,
     },
   },
   {
@@ -53,11 +59,13 @@ export const EMPLOYER_PLANS: EmployerPlan[] = [
     annual: 79,
     popular: false,
     selfServe: true,
+    modelTier: 'FREE',
     limits: {
       jobSlotsLimit: 3,
       seatsLimit: 3,
       aiActionsLimit: 200,
       sourcingCreditsLimit: 50,
+      aiBudgetUsdLimit: 10,
     },
   },
   {
@@ -68,11 +76,13 @@ export const EMPLOYER_PLANS: EmployerPlan[] = [
     annual: 249,
     popular: true,
     selfServe: true,
+    modelTier: 'PRO',
     limits: {
       jobSlotsLimit: 5,
       seatsLimit: 6,
       aiActionsLimit: 500,
       sourcingCreditsLimit: 100,
+      aiBudgetUsdLimit: 30,
     },
   },
   {
@@ -83,11 +93,13 @@ export const EMPLOYER_PLANS: EmployerPlan[] = [
     annual: 649,
     popular: false,
     selfServe: true,
+    modelTier: 'PRO',
     limits: {
       jobSlotsLimit: 15,
       seatsLimit: 15,
       aiActionsLimit: 2000,
       sourcingCreditsLimit: 500,
+      aiBudgetUsdLimit: 100,
     },
   },
   {
@@ -100,11 +112,13 @@ export const EMPLOYER_PLANS: EmployerPlan[] = [
     // Sales-led: an enterprise subscription is provisioned by an admin after a
     // contract, never bought from the pricing page.
     selfServe: false,
+    modelTier: 'ELITE',
     limits: {
       jobSlotsLimit: 100,
       seatsLimit: 100,
       aiActionsLimit: 10000,
       sourcingCreditsLimit: 5000,
+      aiBudgetUsdLimit: 500,
     },
   },
 ];

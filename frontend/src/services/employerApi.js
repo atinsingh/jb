@@ -101,6 +101,8 @@ export const employerPipelineApi = {
     apiCall(`/api/employer/applicants/${id}/resume-assessment`, {
       method: 'POST',
     }),
+  assessmentBudget: () =>
+    apiCall('/api/employer/applicants/resume-assessment/budget'),
 };
 
 /* ----------------------------------------------------------- ai recruiter --- */

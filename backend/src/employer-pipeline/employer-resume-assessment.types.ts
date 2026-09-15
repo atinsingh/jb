@@ -10,6 +10,7 @@ export type ResumeAssessmentStatus =
   | 'NO_RESUME'
   | 'NO_JOB_DESCRIPTION'
   | 'BUDGET_EXHAUSTED'
+  | 'CONFIGURATION_ERROR'
   | 'ATS_FAILED'
   | 'DETECTOR_FAILED';
 

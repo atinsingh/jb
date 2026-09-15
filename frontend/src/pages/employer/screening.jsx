@@ -55,6 +55,7 @@ const assessmentStateCopy = {
   NO_RESUME: 'No submitted resume is attached to this applicant.',
   NO_JOB_DESCRIPTION: 'This job needs a description before its resume can be assessed.',
   BUDGET_EXHAUSTED: 'ATS match was not run because the employer AI budget is exhausted.',
+  CONFIGURATION_ERROR: 'ATS match could not start because employer ATS is not configured. Contact support before retrying.',
   ATS_FAILED: 'ATS matching failed during execution. Retry the assessment.',
   DETECTOR_FAILED: 'The local AI-content heuristic failed during execution. Retry the assessment.',
 };
@@ -64,7 +65,35 @@ const signalLabel = (key) =>
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/^./, (character) => character.toUpperCase());
 
-function ResumeAssessmentPanel({ assessment, loading, busy, onRun }) {
+const dollars = (value) => `$${Number(value || 0).toFixed(2)}`;
+
+function AtsBudgetStatus({ budget }) {
+  if (!budget) return null;
+  const hasAmounts = Number.isFinite(Number(budget.limitUsd));
+  const reset = budget.resetAt
+    ? new Date(budget.resetAt).toLocaleDateString([], {
+        month: 'short',
+        day: 'numeric',
+        timeZone: 'UTC',
+      })
+    : null;
+  const copy = budget.status === 'CONFIGURATION_ERROR'
+    ? 'ATS budget is unavailable because employer ATS is not configured.'
+    : budget.status === 'BUDGET_EXHAUSTED'
+      ? `ATS budget is exhausted: ${dollars(budget.remainingUsd)} of ${dollars(budget.limitUsd)} remaining this month.`
+      : hasAmounts
+        ? `ATS budget: ${dollars(budget.remainingUsd)} of ${dollars(budget.limitUsd)} remaining this month${reset ? ` · resets ${reset}` : ''}.`
+        : 'ATS budget is ready.';
+
+  return (
+    <div style={{ fontSize: 11.5, lineHeight: 1.45, color: budget.status === 'READY' ? '#5A544A' : '#9A6A2E', marginTop: 5 }}>
+      <div>{copy}</div>
+      <div>AI-content heuristic is local, deterministic, and does not use this budget.</div>
+    </div>
+  );
+}
+
+function ResumeAssessmentPanel({ assessment, budget, loading, busy, onRun }) {
   if (loading) return <div style={{ fontSize: 13, color: '#8A8378' }}>Loading resume assessment…</div>;
 
   const status = assessment?.status || 'NOT_RUN';
@@ -80,6 +109,7 @@ function ResumeAssessmentPanel({ assessment, loading, busy, onRun }) {
           <div style={{ fontSize: 14, fontWeight: 700 }}>Submitted resume assessment</div>
           {status === 'PARTIAL' && <div style={{ fontSize: 12, color: '#9A6A2E', marginTop: 3 }}>Partial assessment — the available result is shown below.</div>}
           {inputState && <div style={{ fontSize: 12, color: status === 'STALE' ? '#9A6A2E' : '#6F685D', marginTop: 3 }}>{assessmentStateCopy[status]}</div>}
+          <AtsBudgetStatus budget={budget} />
         </div>
         {canRun && (
           <button
@@ -122,9 +152,13 @@ function ResumeAssessmentPanel({ assessment, loading, busy, onRun }) {
               <div style={{ fontSize: 12, lineHeight: 1.45, color: ats?.status === 'ATS_FAILED' ? '#C9622E' : '#6F685D', marginTop: 8 }}>
                 {ats?.status === 'BUDGET_EXHAUSTED'
                   ? assessmentStateCopy.BUDGET_EXHAUSTED
+                  : ats?.status === 'CONFIGURATION_ERROR'
+                    ? assessmentStateCopy.CONFIGURATION_ERROR
+                    : ats?.status === 'NOT_RUN' && ats?.reason === 'EMPLOYER_ATS_RUN_IN_PROGRESS'
+                      ? 'ATS match did not start because another employer assessment is already running.'
                   : ats?.status === 'ATS_FAILED'
                     ? assessmentStateCopy.ATS_FAILED
-                    : 'ATS match has not run because employer ATS access is not configured yet.'}
+                    : 'ATS match has not run.'}
               </div>
             )}
           </section>
@@ -178,13 +212,18 @@ export default function EmployerScreening() {
   const [assessments, setAssessments] = useState({});
   const [assessmentLoading, setAssessmentLoading] = useState({});
   const [assessmentBusy, setAssessmentBusy] = useState({});
+  const [assessmentBudget, setAssessmentBudget] = useState(null);
 
   // Fetch AI screening results for all applicants. No sample fallback.
   const load = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await aiRecruiterApi.screen();
+      const [res, budget] = await Promise.all([
+        aiRecruiterApi.screen(),
+        employerPipelineApi.assessmentBudget(),
+      ]);
+      setAssessmentBudget(budget);
       const ranked = Array.isArray(res?.ranked) ? res.ranked : [];
       setApplicants(
         ranked.map((r, i) => {
@@ -281,6 +320,7 @@ export default function EmployerScreening() {
     try {
       const result = await employerPipelineApi.assessResume(id);
       setAssessments((current) => ({ ...current, [id]: result }));
+      setAssessmentBudget(await employerPipelineApi.assessmentBudget());
     } catch (err) {
       setActionError(err);
       setAssessments((current) => ({
@@ -486,6 +526,7 @@ export default function EmployerScreening() {
                               )}
                               <ResumeAssessmentPanel
                                 assessment={assessments[a.id]}
+                                budget={assessmentBudget}
                                 loading={assessmentLoading[a.id]}
                                 busy={assessmentBusy[a.id]}
                                 onRun={() => runResumeAssessment(a.id)}

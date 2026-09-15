@@ -24,6 +24,11 @@ import { AtsParseabilityService } from './ats-parseability.service';
     AtsSessionService,
     { provide: ResumeMatcherAdapter, useClass: InSandboxResumeMatcherAdapter },
   ],
-  exports: [AtsParseabilityService, AtsMatchService, AtsSessionService],
+  exports: [
+    AtsParseabilityService,
+    AtsMatchService,
+    AtsSessionService,
+    ResumeMatcherAdapter,
+  ],
 })
 export class AtsModule {}

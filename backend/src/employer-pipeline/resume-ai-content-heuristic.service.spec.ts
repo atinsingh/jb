@@ -75,4 +75,52 @@ describe('ResumeAiContentHeuristicService', () => {
       global.fetch = originalFetch;
     }
   });
+
+  it.each([
+    {
+      signal: 'sentenceLengthVariance' as const,
+      text: 'We build systems. We ship products. We solve problems.',
+      value: 0,
+      likelihood: 100,
+    },
+    {
+      signal: 'vocabularyDiversity' as const,
+      text: 'Platform platform platform. Platform platform platform.',
+      value: 0.167,
+      likelihood: 100,
+    },
+    {
+      signal: 'repetitiveSentenceOpeners' as const,
+      text: 'We deliver outcomes. We deliver systems. We deliver value.',
+      value: 0.667,
+      likelihood: 67,
+    },
+    {
+      signal: 'stockPhrases' as const,
+      text: 'Results-driven professional with a proven track record.',
+      value: 2,
+      likelihood: 100,
+    },
+    {
+      signal: 'punctuationBulletSectionRegularity' as const,
+      text: ['EXPERIENCE', '- Built stable systems.', '- Led capable teams.'].join('\n'),
+      value: 0.833,
+      likelihood: 83,
+    },
+    {
+      signal: 'readability' as const,
+      text: 'Teams build reliable products. Leaders guide practical delivery.',
+      value: 33.575,
+      likelihood: 34,
+    },
+  ])('calculates the $signal signal from its isolated fixture', ({
+    signal,
+    text,
+    value,
+    likelihood,
+  }) => {
+    expect(service.analyze(text).signals[signal]).toEqual(
+      expect.objectContaining({ value, likelihood }),
+    );
+  });
 });

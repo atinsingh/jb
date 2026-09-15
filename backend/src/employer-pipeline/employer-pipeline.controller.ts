@@ -60,6 +60,14 @@ export class EmployerPipelineController {
     return this.pipelineService.list(ownerId, jobId, stage);
   }
 
+  @Get('resume-assessment/budget')
+  @ApiOperation({ summary: 'Get the employer ATS budget status' })
+  @ApiResponse({ status: 200, description: 'ATS budget status retrieved' })
+  async assessmentBudget(@Request() req) {
+    const ownerId = req.user._id.toString();
+    return this.resumeAssessmentService.budgetStatus(ownerId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get an applicant by ID' })
   @ApiParam({ name: 'id', description: 'Applicant ID' })

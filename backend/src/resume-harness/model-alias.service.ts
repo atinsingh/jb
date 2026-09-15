@@ -49,6 +49,11 @@ export class ModelAliasService {
   /** Every alias the caller's tier permits, best first. */
   async listForUser(userId: string): Promise<ResolvedModelAlias[]> {
     const tier = await this.tierFor(userId);
+    return this.listForTier(tier);
+  }
+
+  /** Resolve aliases for an already-authoritative tier, such as employer billing. */
+  async listForTier(tier: string): Promise<ResolvedModelAlias[]> {
     const docs = await this.aliasModel
       .find({ isActive: true, tiers: tier })
       .sort({ rank: 1, alias: 1 })
@@ -70,7 +75,15 @@ export class ModelAliasService {
     requestedAlias?: string,
   ): Promise<ResolvedModelAlias> {
     const tier = await this.tierFor(userId);
-    const allowed = await this.listForUser(userId);
+    return this.resolveForTier(tier, requestedAlias);
+  }
+
+  /** Pick an allowed alias without looking up a candidate User document. */
+  async resolveForTier(
+    tier: string,
+    requestedAlias?: string,
+  ): Promise<ResolvedModelAlias> {
+    const allowed = await this.listForTier(tier);
 
     if (!allowed.length) {
       throw new ForbiddenException(

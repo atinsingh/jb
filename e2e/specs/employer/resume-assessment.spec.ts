@@ -3,9 +3,9 @@ import { test, expect, storage } from '../../fixtures/test';
 test.describe('Employer screening resume assessment', () => {
   test.use({ storageState: storage.employer });
 
-  test('shows independent ATS and directional signals without changing fit', async ({
-    page,
-  }) => {
+  const applicantId = '64b000000000000000000003';
+
+  async function mockScreening(page) {
     await page.route('**/api/employer/ai/screen', (route) =>
       route.fulfill({
         status: 200,
@@ -13,7 +13,7 @@ test.describe('Employer screening resume assessment', () => {
         body: JSON.stringify({
           ranked: [
             {
-              applicantId: '64b000000000000000000003',
+              applicantId,
               name: 'Ada Lovelace',
               title: 'Backend engineer',
               score: 88,
@@ -23,18 +23,43 @@ test.describe('Employer screening resume assessment', () => {
         }),
       }),
     );
-    await page.route('**/api/employer/applicants/64b000000000000000000003', (route) =>
+    await page.route(`**/api/employer/applicants/${applicantId}`, (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          _id: '64b000000000000000000003',
+          _id: applicantId,
           resumeAssessment: { status: 'NOT_RUN' },
         }),
       }),
     );
+  }
+
+  async function mockBudget(page, overrides = {}) {
+    await page.route('**/api/employer/applicants/resume-assessment/budget', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'READY',
+          spentUsd: 0.25,
+          limitUsd: 1,
+          remainingUsd: 0.75,
+          period: 'monthly',
+          resetAt: '2026-10-01T00:00:00.000Z',
+          ...overrides,
+        }),
+      }),
+    );
+  }
+
+  test('shows independent ATS and directional signals without changing fit', async ({
+    page,
+  }) => {
+    await mockScreening(page);
+    await mockBudget(page);
     await page.route(
-      '**/api/employer/applicants/64b000000000000000000003/resume-assessment',
+      `**/api/employer/applicants/${applicantId}/resume-assessment`,
       (route) =>
         route.fulfill({
           status: 201,
@@ -68,6 +93,9 @@ test.describe('Employer screening resume assessment', () => {
     await page.goto('/employer/screening');
     await page.getByText('Ada Lovelace').click();
     await expect(page.getByText('Assessment has not run.')).toBeVisible();
+    await expect(page.getByText(/\$0\.75 of \$1\.00 remaining/i)).toBeVisible();
+    await expect(page.getByText(/resets Oct 1/i)).toBeVisible();
+    await expect(page.getByText(/does not use this budget/i)).toBeVisible();
     await page.getByRole('button', { name: 'Run resume assessment' }).click();
 
     await expect(page.getByText('ATS semantic match')).toBeVisible();
@@ -83,5 +111,92 @@ test.describe('Employer screening resume assessment', () => {
     // Existing recruiter fit semantics remain independent and unchanged.
     await expect(page.getByText('STRONG FIT', { exact: true })).toBeVisible();
     await expect(page.getByText('88', { exact: true })).toBeVisible();
+  });
+
+  test('treats the 70-point ATS boundary as improve before submitting', async ({
+    page,
+  }) => {
+    await mockScreening(page);
+    await mockBudget(page);
+    await page.route(
+      `**/api/employer/applicants/${applicantId}/resume-assessment`,
+      (route) =>
+        route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            status: 'COMPLETE',
+            ats: { status: 'COMPLETE', semanticMatch: 70 },
+            aiContent: {
+              status: 'COMPLETE',
+              composite: 25,
+              signals: {},
+              detectorVersion: 'jobocate-heuristic-v1',
+              weightingVersion: 'weights-v1',
+            },
+          }),
+        }),
+    );
+
+    await page.goto('/employer/screening');
+    await page.getByText('Ada Lovelace').click();
+    await page.getByRole('button', { name: 'Run resume assessment' }).click();
+
+    await expect(page.getByText('70/100')).toBeVisible();
+    await expect(page.getByText('Improve before submitting')).toBeVisible();
+  });
+
+  test('shows the free heuristic when the employer ATS budget is exhausted', async ({
+    page,
+  }) => {
+    await mockScreening(page);
+    await mockBudget(page, {
+      status: 'BUDGET_EXHAUSTED',
+      spentUsd: 1,
+      remainingUsd: 0,
+      reason: 'EMPLOYER_BUDGET_EXHAUSTED',
+    });
+    await page.route(
+      `**/api/employer/applicants/${applicantId}/resume-assessment`,
+      (route) =>
+        route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            status: 'PARTIAL',
+            ats: {
+              status: 'BUDGET_EXHAUSTED',
+              reason: 'EMPLOYER_BUDGET_EXHAUSTED',
+              spentUsd: 1,
+              limitUsd: 1,
+              remainingUsd: 0,
+              period: 'monthly',
+            },
+            aiContent: {
+              status: 'COMPLETE',
+              composite: 63,
+              detectorVersion: 'jobocate-heuristic-v1',
+              weightingVersion: 'weights-v1',
+              signals: {
+                stockPhrases: {
+                  value: 1,
+                  likelihood: 100,
+                  explanation: 'Matches come only from the versioned Jobocate stock-phrase list.',
+                },
+              },
+            },
+          }),
+        }),
+    );
+
+    await page.goto('/employer/screening');
+    await page.getByText('Ada Lovelace').click();
+    await expect(page.getByText(/ATS budget is exhausted/i)).toBeVisible();
+    await page.getByRole('button', { name: 'Run resume assessment' }).click();
+
+    await expect(page.getByText('Partial assessment')).toBeVisible();
+    await expect(page.getByText('63/100')).toBeVisible();
+    await expect(page.getByText(/does not use this budget/i)).toBeVisible();
+    await expect(page.getByText(/ATS match was not run because/i)).toBeVisible();
   });
 });

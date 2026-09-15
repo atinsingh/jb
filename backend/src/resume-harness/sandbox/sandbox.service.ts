@@ -9,7 +9,7 @@ import { HarnessContextFile, HarnessId } from '../harness/harness.types';
 
 export interface ProvisionInput {
   sessionId: string;
-  harness: HarnessId;
+  harness: HarnessId | 'ats';
   env: Record<string, string>;
   files: HarnessContextFile[];
 }
@@ -69,13 +69,14 @@ export class SandboxService {
 
   async provision(input: ProvisionInput): Promise<{ sandboxId: string }> {
     const sandboxId = await this.client.create({
-      name: `resume-${input.sessionId}`,
+      name: `jb-resume-${input.sessionId}`,
       image: this.image,
       env: input.env,
       workdir: SANDBOX_WORKDIR,
       ttlSeconds: this.ttlSeconds,
       labels: {
         app: 'jobocate',
+        namespace: 'jb',
         surface: 'resume-harness',
         harness: input.harness,
         session: input.sessionId,

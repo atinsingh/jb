@@ -41,6 +41,11 @@ describe('EmployerResumeAssessmentService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    applicantModel.findOne.mockReset();
+    applicantModel.updateOne.mockReset();
+    artifactModel.findOne.mockReset();
+    employerJobModel.findOne.mockReset();
+    gateway.assess.mockReset();
     applicantModel.findOne.mockReturnValue(query(linkedApplicant()));
     applicantModel.updateOne.mockReturnValue(
       query({ acknowledged: true, modifiedCount: 1 }),
@@ -50,6 +55,8 @@ describe('EmployerResumeAssessmentService', () => {
         _id: ARTIFACT,
         applicationId: APPLICATION,
         userId: new Types.ObjectId('64b000000000000000000009'),
+        version: 7,
+        metadata: { sha256: 'resume-hash-v7' },
         content: JSON.stringify({
           summary: 'Reliable backend engineer.',
           skills: ['TypeScript', 'MongoDB'],
@@ -108,6 +115,28 @@ describe('EmployerResumeAssessmentService', () => {
       { $set: { resumeAssessment: expect.objectContaining({ status: 'NO_RESUME' }) } },
     );
     expect(JSON.stringify(applicantModel.updateOne.mock.calls)).not.toContain('aiScore');
+  });
+
+  it('rejects an artifact whose immutable version or hash no longer matches the submitted snapshot', async () => {
+    artifactModel.findOne.mockReturnValue(
+      query({
+        _id: ARTIFACT,
+        applicationId: APPLICATION,
+        version: 6,
+        metadata: { sha256: 'different-resume-hash' },
+        content: JSON.stringify({ summary: 'Different resume.' }),
+      }),
+    );
+
+    const result = await service.assess(String(OWNER), String(APPLICANT));
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'NO_RESUME',
+        reason: 'SUBMITTED_RESUME_ARTIFACT_MISMATCH',
+      }),
+    );
+    expect(gateway.assess).not.toHaveBeenCalled();
   });
 
   it('hashes the exact employer-owned job snapshot and returns the heuristic when ATS is budget-blocked', async () => {
@@ -210,7 +239,13 @@ describe('EmployerResumeAssessmentService', () => {
       }),
     );
     artifactModel.findOne.mockReturnValue(
-      query({ _id: ARTIFACT, applicationId: APPLICATION, content: '{}' }),
+      query({
+        _id: ARTIFACT,
+        applicationId: APPLICATION,
+        version: 7,
+        metadata: { sha256: 'resume-hash-v7' },
+        content: '{}',
+      }),
     );
     employerJobModel.findOne.mockReturnValue(
       query({
@@ -228,6 +263,30 @@ describe('EmployerResumeAssessmentService', () => {
     expect(duplicate).toEqual(expect.objectContaining({ status: 'RUNNING' }));
     expect(gateway.assess).not.toHaveBeenCalled();
     expect(applicantModel.updateOne).not.toHaveBeenCalled();
+  });
+
+  it('loses the atomic start race without dispatching a duplicate assessment', async () => {
+    const winner = {
+      ...linkedApplicant(),
+      resumeAssessment: {
+        status: 'RUNNING',
+        runId: 'winning-run',
+        pairKey:
+          '8df66ac1432e54fadd1a96d19f53a4cbb5500b030a84a3491b630caea5e0fb93',
+      },
+    };
+    applicantModel.findOne
+      .mockReturnValueOnce(query(linkedApplicant()))
+      .mockReturnValueOnce(query(winner));
+    applicantModel.updateOne.mockReturnValueOnce(
+      query({ acknowledged: true, modifiedCount: 0 }),
+    );
+
+    const result = await service.assess(String(OWNER), String(APPLICANT));
+
+    expect(result).toEqual(winner.resumeAssessment);
+    expect(gateway.assess).not.toHaveBeenCalled();
+    expect(applicantModel.updateOne).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the prior pair attributable when refreshing changed inputs', async () => {

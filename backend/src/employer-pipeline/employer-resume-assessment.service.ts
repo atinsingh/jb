@@ -21,6 +21,7 @@ import {
   PersistedResumeAssessment,
   ResumeAssessmentStatus,
 } from './employer-resume-assessment.types';
+import { EmployerAtsRuntimeService } from './employer-ats-runtime.service';
 
 @Injectable()
 export class EmployerResumeAssessmentService {
@@ -33,7 +34,15 @@ export class EmployerResumeAssessmentService {
     private readonly employerJobModel: Model<EmployerJobDocument>,
     private readonly heuristic: ResumeAiContentHeuristicService,
     private readonly atsGateway: EmployerAtsAssessmentGateway,
+    private readonly atsRuntime?: EmployerAtsRuntimeService,
   ) {}
+
+  async budgetStatus(ownerId: string) {
+    return this.atsRuntime?.budgetStatus(ownerId) || {
+      status: 'CONFIGURATION_ERROR',
+      reason: 'EMPLOYER_ATS_CONFIGURATION_ERROR',
+    };
+  }
 
   async assess(
     ownerIdValue: string,
@@ -83,6 +92,19 @@ export class EmployerResumeAssessmentService {
         ...base,
         status: 'NO_RESUME',
         reason: 'SUBMITTED_RESUME_ARTIFACT_NOT_FOUND',
+        applicationId: String(applicant.applicationId),
+        ats: { status: 'NOT_RUN', reason: 'NO_RESUME', harness: 'ats' },
+        aiContent: { status: 'NOT_RUN', reason: 'NO_RESUME' },
+      });
+    }
+    if (
+      artifact.version !== submittedResume.version ||
+      artifact.metadata?.sha256 !== submittedResume.hash
+    ) {
+      return this.persistTerminalInputState(applicantId, ownerId, {
+        ...base,
+        status: 'NO_RESUME',
+        reason: 'SUBMITTED_RESUME_ARTIFACT_MISMATCH',
         applicationId: String(applicant.applicationId),
         ats: { status: 'NOT_RUN', reason: 'NO_RESUME', harness: 'ats' },
         aiContent: { status: 'NOT_RUN', reason: 'NO_RESUME' },
@@ -160,9 +182,27 @@ export class EmployerResumeAssessmentService {
         },
       };
     }
-    await this.applicantModel
-      .updateOne({ _id: applicantId, ownerId }, startUpdate)
+    const start: any = await this.applicantModel
+      .updateOne(
+        {
+          _id: applicantId,
+          ownerId,
+          $or: [
+            { 'resumeAssessment.status': { $ne: 'RUNNING' } },
+            { 'resumeAssessment.pairKey': { $ne: pairKey } },
+          ],
+        },
+        startUpdate,
+      )
       .exec();
+    if (start?.modifiedCount === 0) {
+      const latest: any = await this.applicantModel
+        .findOne({ _id: applicantId, ownerId })
+        .lean()
+        .exec();
+      if (latest?.resumeAssessment) return latest.resumeAssessment;
+      throw new NotFoundException('Applicant not found');
+    }
 
     const resumeText = this.artifactText(artifact.content);
     let aiContent: PersistedResumeAssessment['aiContent'];
@@ -179,8 +219,10 @@ export class EmployerResumeAssessmentService {
     try {
       ats = await this.atsGateway.assess({
         ownerId: ownerIdValue,
+        runId,
         applicationId,
         resumeArtifactId: String(submittedResume.artifactId),
+        resumeVersion: submittedResume.version,
         resumeHash: submittedResume.hash,
         resumeContent: resumeText,
         jobId: String(job._id),
@@ -336,6 +378,7 @@ export class EmployerResumeAssessmentService {
     if (atsStatus === 'COMPLETE' || aiStatus === 'COMPLETE') return 'PARTIAL';
     if (aiStatus === 'DETECTOR_FAILED') return 'DETECTOR_FAILED';
     if (atsStatus === 'BUDGET_EXHAUSTED') return 'BUDGET_EXHAUSTED';
+    if (atsStatus === 'CONFIGURATION_ERROR') return 'CONFIGURATION_ERROR';
     if (atsStatus === 'ATS_FAILED') return 'ATS_FAILED';
     return 'NOT_RUN';
   }
