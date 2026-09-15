@@ -9,7 +9,7 @@
  * This is intentionally NOT part of any test suite: it spends real money and
  * needs Docker, the proxy and provider credentials.
  *
- *   npx ts-node -T src/scripts/verify-harness-e2e.ts [harness] [alias]
+ *   npx ts-node -T src/scripts/verify-harness-e2e.ts [model] [effort]
  */
 import '../load-env';
 import { NestFactory } from '@nestjs/core';
@@ -18,8 +18,8 @@ import { ResumeHarnessService } from '../resume-harness/resume-harness.service';
 import { getModelToken } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 
-const HARNESS = (process.argv[2] || 'opencode') as any;
-const ALIAS = process.argv[3] || 'bedrock/nova-micro/low';
+const REQUESTED_MODEL = process.argv[2];
+const REQUESTED_EFFORT = process.argv[3];
 
 async function main() {
   const app = await NestFactory.createApplicationContext(AppModule, {
@@ -39,14 +39,20 @@ async function main() {
   const options = await service.options(userId);
   console.log(
     `tier=${options.tier} sandbox=${options.sandboxAvailable} models=${options.models
-      .map((m: any) => m.alias)
+      .map((m: any) => `${m.model} (${m.efforts.join(', ')})`)
       .join(', ')}`,
   );
 
-  console.log(`\n--- starting ${HARNESS} on ${ALIAS} ---`);
+  const selected = REQUESTED_MODEL
+    ? options.models.find((model: any) => model.model === REQUESTED_MODEL)
+    : options.models[0];
+  if (!selected) throw new Error('no permitted model is available to verify');
+  const effort = REQUESTED_EFFORT || selected.efforts[0];
+
+  console.log(`\n--- starting ${selected.model} at ${effort} effort ---`);
   const session = await service.startSession(userId, {
-    harness: HARNESS,
-    alias: ALIAS,
+    model: selected.model,
+    effort,
   });
   console.log(
     `session ${session.id} | sandbox ${session.sandboxId} | ${session.model} @ ${session.effort}`,
