@@ -121,7 +121,7 @@ services:
     networks:
       - jobocate-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/health/liveliness"]
+      test: ["CMD", "python", "-c", "import http.client; c=http.client.HTTPConnection('127.0.0.1',4000,timeout=5); c.request('GET','/health/liveliness'); assert c.getresponse().status == 200"]
       interval: 30s
       timeout: 10s
       retries: 3
