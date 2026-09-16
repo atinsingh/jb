@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Logo from '@/components/brand/Logo';
 import useJbTheme from '@/components/theme/useJbTheme';
+import { useAuth } from '@/context/AuthContext';
 import EmployerV3SurfaceStyles from './EmployerV3SurfaceStyles';
 
 const PRIMARY = [
@@ -69,10 +71,24 @@ function findSection(pathname, active) {
 export default function EmployerSidebar({ active = 'dashboard' }) {
   const { pathname } = useRouter();
   const { theme, toggle } = useJbTheme();
+  const { user, logout } = useAuth();
+  const [loggingOut, setLoggingOut] = useState(false);
   const section = findSection(pathname, active);
   const tabs = SECONDARY[section.id] || [];
   const hasSubnav = tabs.length > 1;
-  const isV3Page = V3_PAGES.has(pathname);
+  const isV3Page =
+    V3_PAGES.has(pathname) ||
+    PRIMARY.some((item) => item.paths.some((path) => matchesPath(pathname, path)));
+
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await logout();
+    } catch {
+      setLoggingOut(false);
+    }
+  };
 
   return (
     <header
@@ -144,14 +160,27 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
           })}
         </nav>
 
-        <button
-          type="button"
-          onClick={toggle}
-          aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-          className="theme"
-        >
-          {theme === 'dark' ? 'Dark' : 'Light'}
-        </button>
+        <div className="actions">
+          <button
+            type="button"
+            onClick={toggle}
+            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            className="theme"
+          >
+            {theme === 'dark' ? 'Dark' : 'Light'}
+          </button>
+          {user && (
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={loggingOut}
+              aria-label="Log out"
+              className="theme"
+            >
+              Log out
+            </button>
+          )}
+        </div>
       </div>
 
       {hasSubnav && (
@@ -215,6 +244,12 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
           overflow-x: auto;
           scrollbar-width: none;
         }
+        .actions {
+          flex: none;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
         .theme {
           flex: none;
           padding: 5px 10px;
@@ -226,6 +261,10 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
           letter-spacing: 0.12em;
           text-transform: uppercase;
           cursor: pointer;
+        }
+        .theme:disabled {
+          cursor: default;
+          opacity: 0.6;
         }
         .secondary {
           height: 40px;

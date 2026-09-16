@@ -27,7 +27,8 @@ test.describe('Settings logout', () => {
     await signIn(page, candidate);
     await page.goto('/app/settings', { waitUntil: 'domcontentloaded' });
 
-    const logout = page.getByRole('button', { name: 'Log out', exact: true });
+    const session = page.getByText('Sign out of Jobocate on this device.');
+    const logout = session.locator('xpath=../..').getByRole('button', { name: 'Log out', exact: true });
     await expect(logout).toBeVisible();
 
     let releaseFailure!: () => void;

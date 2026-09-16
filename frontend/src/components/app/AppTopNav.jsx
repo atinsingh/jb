@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Logo from '@/components/brand/Logo';
 import useJbTheme from '@/components/theme/useJbTheme';
+import { useAuth } from '@/context/AuthContext';
 
 /**
  * The candidate app shell, ported from "Jobocate Candidate v3.dc.html".
@@ -116,11 +118,23 @@ const MONO = {
 export default function AppTopNav() {
   const { pathname } = useRouter();
   const { theme, toggle } = useJbTheme();
+  const { user, logout } = useAuth();
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const here = locate(pathname);
   const activeGroup = here?.group;
   const activeLeaf = here?.leaf;
   const tabs = activeGroup?.leaves || [];
+
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await logout();
+    } catch {
+      setLoggingOut(false);
+    }
+  };
 
   return (
     <header
@@ -171,24 +185,47 @@ export default function AppTopNav() {
           })}
         </nav>
 
-        <button
-          type="button"
-          onClick={toggle}
-          style={{
-            ...MONO,
-            flex: 'none',
-            background: 'none',
-            border: '1px solid var(--jb-v3-line-2)',
-            borderRadius: 2,
-            padding: '5px 10px',
-            fontSize: 10,
-            letterSpacing: '0.12em',
-            color: 'var(--jb-v3-fg-2)',
-            cursor: 'pointer',
-          }}
-        >
-          {theme === 'light' ? 'Light' : 'Dark'}
-        </button>
+        <div style={{ flex: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            type="button"
+            onClick={toggle}
+            style={{
+              ...MONO,
+              background: 'none',
+              border: '1px solid var(--jb-v3-line-2)',
+              borderRadius: 2,
+              padding: '5px 10px',
+              fontSize: 10,
+              letterSpacing: '0.12em',
+              color: 'var(--jb-v3-fg-2)',
+              cursor: 'pointer',
+            }}
+          >
+            {theme === 'light' ? 'Light' : 'Dark'}
+          </button>
+          {user && (
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={loggingOut}
+              aria-label="Log out"
+              style={{
+                ...MONO,
+                background: 'none',
+                border: '1px solid var(--jb-v3-line-2)',
+                borderRadius: 2,
+                padding: '5px 10px',
+                fontSize: 10,
+                letterSpacing: '0.12em',
+                color: 'var(--jb-v3-fg-2)',
+                cursor: loggingOut ? 'default' : 'pointer',
+                opacity: loggingOut ? 0.6 : 1,
+              }}
+            >
+              Log out
+            </button>
+          )}
+        </div>
       </div>
 
       {tabs.length > 1 && (
