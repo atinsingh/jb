@@ -19,8 +19,8 @@ import styles from '@/components/auth/v3/AuthV3.module.css';
  * them separately would have meant building this screen twice, since the
  * Supabase rebuild replaces every form handler anyway.
  *
- * The `?as=employer` variant is preserved: it swaps copy only. Both audiences
- * share one accent, so there is no second colour to maintain.
+ * The `?as=employer` variant preselects the employer workspace; visitors can
+ * also switch workspaces directly on the form.
  */
 export default function AppLogin() {
   const router = useRouter();
@@ -32,8 +32,13 @@ export default function AppLogin() {
   const [submitting, setSubmitting] = useState(false);
 
   const asEmployer = router.query.as === 'employer';
+  const [role, setRole] = useState('ROLE_CANDIDATE');
 
-  const copy = asEmployer
+  useEffect(() => {
+    if (router.isReady) setRole(asEmployer ? 'ROLE_EMPLOYER' : 'ROLE_CANDIDATE');
+  }, [router.isReady, asEmployer]);
+
+  const copy = role === 'ROLE_EMPLOYER'
     ? {
         heading: 'Log in to keep hiring on autopilot.',
         lede: 'Your candidates, interviews and AI recruiter are where you left them.',
@@ -80,7 +85,7 @@ export default function AppLogin() {
     setSubmitting(true);
     try {
       const result = await login(email, password, {
-        role: asEmployer ? 'ROLE_EMPLOYER' : 'ROLE_CANDIDATE',
+        role,
       });
       const requested = router.query.redirect;
       router.replace(
@@ -99,7 +104,7 @@ export default function AppLogin() {
     try {
       await loginWithProvider(provider, {
         redirectTo: typeof router.query.redirect === 'string' ? router.query.redirect : undefined,
-        role: asEmployer ? 'ROLE_EMPLOYER' : 'ROLE_CANDIDATE',
+        role,
       });
     } catch (err) {
       setError(err?.message || 'Could not reach that provider. Please try again.');
@@ -156,6 +161,32 @@ export default function AppLogin() {
                 </div>
 
                 <form onSubmit={handleSubmit} noValidate>
+                  <div className={styles.roleGrid} role="radiogroup" aria-label="Account type">
+                    {[
+                      ['ROLE_CANDIDATE', 'Candidate', 'Find work and manage applications.'],
+                      ['ROLE_EMPLOYER', 'Employer', 'Hire and manage applicants.'],
+                    ].map(([value, label, description]) => {
+                      const selected = role === value;
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          onClick={() => setRole(value)}
+                          className={`${styles.roleCell} ${selected ? styles.roleCellOn : ''}`}
+                        >
+                          <span
+                            className={`${styles.roleTick} ${selected ? styles.roleTickOn : ''}`}
+                            aria-hidden="true"
+                          />
+                          <span className={styles.roleName}>{label}</span>
+                          <span className={styles.roleDesc}>{description}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
                   <div className={styles.fieldBlock}>
                     <label htmlFor="email" className={styles.label}>
                       Email
