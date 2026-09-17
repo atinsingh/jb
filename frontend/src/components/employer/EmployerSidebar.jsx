@@ -73,6 +73,7 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
   const { theme, toggle } = useJbTheme();
   const { user, logout } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [sectionNavOpen, setSectionNavOpen] = useState(false);
   const section = findSection(pathname, active);
   const tabs = SECONDARY[section.id] || [];
   const hasSubnav = tabs.length > 1;
@@ -101,13 +102,23 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
         div:has(> #employer-v3-shell) {
           flex-direction: column !important;
         }
+        div:has(> #employer-v3-shell[data-subnav='true']) {
+          display: grid !important;
+          grid-template-columns: 184px minmax(0, 1fr);
+        }
+        div:has(> #employer-v3-shell[data-subnav='true']) > #employer-v3-shell {
+          grid-column: 1 / -1;
+        }
+        div:has(> #employer-v3-shell[data-subnav='true']) > main {
+          grid-column: 2;
+          min-width: 0;
+        }
         #employer-v3-shell + main { width: 100%; }
         #employer-v3-shell + main > header {
           top: 56px !important;
           background: var(--jb-v3-bg) !important;
           border-color: var(--jb-v3-line) !important;
         }
-        #employer-v3-shell[data-subnav='true'] + main > header { top: 96px !important; }
         .employer-v3-scroll::-webkit-scrollbar { display: none; }
         .employer-v3-primary-link {
           position: relative;
@@ -125,16 +136,21 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
         .employer-v3-primary-link.current { color: var(--jb-v3-fg); }
         .employer-v3-primary-link.current { border-bottom-color: var(--jb-v3-accent); }
         .employer-v3-secondary-link {
-          flex: none;
-          padding: 4px 0;
+          display: block;
+          padding: 10px 12px;
           color: var(--jb-v3-fg-3);
           font-size: 12.5px;
           text-decoration: none;
         }
-        .employer-v3-secondary-link[aria-current='page'] { color: var(--jb-v3-fg); }
+        .employer-v3-secondary-link[aria-current='page'] {
+          color: var(--jb-v3-fg);
+          background: var(--jb-v3-panel);
+          border-left: 2px solid var(--jb-v3-accent);
+          padding-left: 10px;
+        }
         @media (max-width: 720px) {
+          div:has(> #employer-v3-shell[data-subnav='true']) { display: flex !important; }
           #employer-v3-shell + main > header { top: 92px !important; }
-          #employer-v3-shell[data-subnav='true'] + main > header { top: 132px !important; }
           .employer-v3-primary-link { padding: 13px 10px 11px; }
         }
       `}</style>
@@ -161,6 +177,17 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
         </nav>
 
         <div className="actions">
+          {hasSubnav && (
+            <button
+              type="button"
+              className="section-nav-toggle"
+              aria-label={sectionNavOpen ? 'Close section navigation' : 'Open section navigation'}
+              aria-expanded={sectionNavOpen}
+              onClick={() => setSectionNavOpen((open) => !open)}
+            >
+              ☰
+            </button>
+          )}
           <button
             type="button"
             onClick={toggle}
@@ -184,7 +211,7 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
       </div>
 
       {hasSubnav && (
-        <nav aria-label={`Employer ${section.id}`} className="secondary employer-v3-scroll">
+        <nav aria-label={`Employer ${section.id}`} className={`secondary employer-v3-scroll${sectionNavOpen ? ' is-open' : ''}`}>
           <div>
             {tabs.map((tab) => {
               const current = tab.href && matchesPath(pathname, tab.href);
@@ -194,6 +221,7 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
                   href={tab.href}
                   aria-current={current ? 'page' : undefined}
                   className="employer-v3-secondary-link"
+                  onClick={() => setSectionNavOpen(false)}
                 >
                   {tab.label}
                 </Link>
@@ -266,25 +294,27 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
           cursor: default;
           opacity: 0.6;
         }
+        .section-nav-toggle { display: none; }
         .secondary {
-          height: 40px;
-          overflow-x: auto;
-          border-top: 1px solid var(--jb-v3-line);
+          position: fixed;
+          top: 56px;
+          bottom: 0;
+          left: 0;
+          z-index: 61;
+          width: 184px;
+          overflow-y: auto;
+          border-right: 1px solid var(--jb-v3-line);
           background: var(--jb-v3-sunk);
-          scrollbar-width: none;
         }
         .secondary > div {
-          width: min(100%, 1360px);
-          height: 100%;
-          margin: 0 auto;
-          padding: 0 28px;
+          padding: 20px 12px;
           display: flex;
-          align-items: center;
-          gap: 28px;
+          flex-direction: column;
+          gap: 4px;
         }
         .secondary span {
-          flex: none;
-          padding: 4px 0;
+          display: block;
+          padding: 10px 12px;
           color: var(--jb-v3-fg-3);
           font-size: 12.5px;
           text-decoration: none;
@@ -300,7 +330,16 @@ export default function EmployerSidebar({ active = 'dashboard' }) {
             gap: 0 16px;
           }
           .primary { grid-column: 1 / -1; width: 100%; }
-          .secondary > div { padding: 0 18px; }
+          .section-nav-toggle {
+            display: block;
+            padding: 5px 9px;
+            border: 1px solid var(--jb-v3-line-2);
+            color: var(--jb-v3-fg);
+            background: none;
+            cursor: pointer;
+          }
+          .secondary { display: none; top: 92px; width: min(240px, calc(100vw - 48px)); }
+          .secondary.is-open { display: block; }
         }
       `}</style>
     </header>

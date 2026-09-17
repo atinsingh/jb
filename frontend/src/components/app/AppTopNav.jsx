@@ -10,21 +10,16 @@ import { useAuth } from '@/context/AuthContext';
 /**
  * The candidate app shell, ported from "Jobocate Candidate v3.dc.html".
  *
- * THE DESIGN HAS NO SIDEBAR. The logged-in candidate surface navigates from a
- * two-level sticky top bar, and the 587-line AppSidebar this replaces was a
- * carry-over from the previous direction, not something v3 ever specified.
- *
- *   row 1 (56px, --bg, hairline under)
+ *   top bar (56px, --bg, hairline under)
  *     wordmark | GROUP GROUP GROUP ... | theme toggle
  *     Groups are DM Mono 10.5px / .14em / uppercase. The active group is
  *     bright ink with a 1px accent rule sitting on the bar's bottom edge;
  *     the rest are dim with a transparent rule, so nothing shifts on change.
  *
- *   row 2 (40px, --sunk, hairline over) — only when the group has >1 leaf
- *     the leaves of the active group, 12.5px sans, 20px gap.
+ *   left panel — only when the group has >1 leaf; it holds the active
+ *     group's leaves and collapses behind a button on narrow screens.
  *
- * Both rows are centred in a 1360px column with 28px side padding, which is
- * the container every v3 screen uses.
+ * The top bar stays in the existing 1360px column with 28px side padding.
  *
  * Source: lines 66-88 of the artboard.
  */
@@ -120,6 +115,7 @@ export default function AppTopNav() {
   const { theme, toggle } = useJbTheme();
   const { user, logout } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [sectionNavOpen, setSectionNavOpen] = useState(false);
 
   const here = locate(pathname);
   const activeGroup = here?.group;
@@ -138,6 +134,8 @@ export default function AppTopNav() {
 
   return (
     <header
+      className="app-v3-header"
+      data-subnav={tabs.length > 1 ? 'true' : 'false'}
       style={{
         position: 'sticky',
         top: 0,
@@ -146,7 +144,7 @@ export default function AppTopNav() {
         borderBottom: '1px solid var(--jb-v3-line)',
       }}
     >
-      <div style={{ ...SHELL, height: 56, display: 'flex', alignItems: 'center', gap: 34 }}>
+      <div className="app-v3-primary-row" style={{ ...SHELL, height: 56, display: 'flex', alignItems: 'center', gap: 34 }}>
         <Link
           href="/app/dashboard"
           aria-label="Jobocate"
@@ -157,6 +155,7 @@ export default function AppTopNav() {
 
         <nav
           aria-label="Sections"
+          className="app-v3-sections"
           style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 2 }}
         >
           {NAV_GROUPS.map((group) => {
@@ -186,6 +185,17 @@ export default function AppTopNav() {
         </nav>
 
         <div style={{ flex: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
+          {tabs.length > 1 && (
+            <button
+              type="button"
+              className="app-v3-nav-toggle"
+              aria-label={sectionNavOpen ? 'Close section navigation' : 'Open section navigation'}
+              aria-expanded={sectionNavOpen}
+              onClick={() => setSectionNavOpen((open) => !open)}
+            >
+              ☰
+            </button>
+          )}
           <button
             type="button"
             onClick={toggle}
@@ -229,13 +239,10 @@ export default function AppTopNav() {
       </div>
 
       {tabs.length > 1 && (
-        <div
-          style={{
-            borderTop: '1px solid var(--jb-v3-line)',
-            background: 'var(--jb-v3-sunk)',
-          }}
+        <nav
+          aria-label={`${activeGroup.label} navigation`}
+          className={`app-v3-side-nav${sectionNavOpen ? ' is-open' : ''}`}
         >
-          <div style={{ ...SHELL, height: 40, display: 'flex', alignItems: 'center', gap: 20 }}>
             {tabs.map((leaf) => {
               const on = leaf.id === activeLeaf?.id;
               if (!leaf.href) {
@@ -243,7 +250,7 @@ export default function AppTopNav() {
                   <span
                     key={leaf.id}
                     title="Designed in v3, not built yet"
-                    style={{ fontSize: 12.5, color: 'var(--jb-v3-fg-3)', opacity: 0.5 }}
+                    className="app-v3-side-link is-disabled"
                   >
                     {leaf.label}
                   </span>
@@ -254,20 +261,71 @@ export default function AppTopNav() {
                   key={leaf.id}
                   href={leaf.href}
                   aria-current={on ? 'page' : undefined}
-                  style={{
-                    padding: '4px 0',
-                    fontSize: 12.5,
-                    color: on ? 'var(--jb-v3-fg)' : 'var(--jb-v3-fg-3)',
-                    transition: 'color .2s ease',
-                  }}
+                  className="app-v3-side-link"
+                  onClick={() => setSectionNavOpen(false)}
                 >
                   {leaf.label}
                 </Link>
               );
             })}
-          </div>
-        </div>
+        </nav>
       )}
+      <style jsx global>{`
+        div:has(> .app-v3-header[data-subnav='true']) {
+          display: grid;
+          grid-template-columns: 184px minmax(0, 1fr);
+        }
+        div:has(> .app-v3-header[data-subnav='true']) > .app-v3-header { grid-column: 1 / -1; }
+        div:has(> .app-v3-header[data-subnav='true']) > :not(.app-v3-header) {
+          grid-column: 2;
+          min-width: 0;
+        }
+        .app-v3-side-nav {
+          position: fixed;
+          top: 56px;
+          bottom: 0;
+          left: 0;
+          z-index: 31;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          width: 184px;
+          padding: 20px 12px;
+          overflow-y: auto;
+          background: var(--jb-v3-sunk);
+          border-right: 1px solid var(--jb-v3-line);
+        }
+        .app-v3-side-link {
+          display: block;
+          padding: 10px 12px;
+          color: var(--jb-v3-fg-3);
+          font-size: 12.5px;
+          text-decoration: none;
+        }
+        .app-v3-side-link[aria-current='page'] {
+          color: var(--jb-v3-fg);
+          background: var(--jb-v3-panel);
+          border-left: 2px solid var(--jb-v3-accent);
+          padding-left: 10px;
+        }
+        .app-v3-side-link.is-disabled { opacity: 0.5; }
+        .app-v3-nav-toggle { display: none; }
+        @media (max-width: 720px) {
+          div:has(> .app-v3-header[data-subnav='true']) { display: block; }
+          .app-v3-primary-row { gap: 8px !important; padding: 0 12px !important; }
+          .app-v3-sections { min-width: 0; overflow-x: auto; white-space: nowrap; }
+          .app-v3-nav-toggle {
+            display: block;
+            padding: 5px 9px;
+            border: 1px solid var(--jb-v3-line-2);
+            color: var(--jb-v3-fg);
+            background: none;
+            cursor: pointer;
+          }
+          .app-v3-side-nav { display: none; width: min(240px, calc(100vw - 48px)); }
+          .app-v3-side-nav.is-open { display: flex; }
+        }
+      `}</style>
     </header>
   );
 }

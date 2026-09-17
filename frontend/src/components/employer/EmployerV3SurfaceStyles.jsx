@@ -18,7 +18,7 @@ export default function EmployerV3SurfaceStyles() {
         background: linear-gradient(to bottom, transparent, var(--jb-v3-bg) 640px) !important;
       }
       div:has(> #employer-v3-shell[data-v3-page='true']) > main > header {
-        top: 96px !important;
+        top: 56px !important;
         color: var(--jb-v3-fg-2) !important;
         background: color-mix(in srgb, var(--jb-v3-bg) 90%, transparent) !important;
         border-color: var(--jb-v3-line) !important;
@@ -83,7 +83,7 @@ export default function EmployerV3SurfaceStyles() {
       }
       @media (max-width: 720px) {
         div:has(> #employer-v3-shell[data-v3-page='true']) > main > header {
-          top: 132px !important;
+          top: 92px !important;
         }
         div:has(> #employer-v3-shell[data-v3-page='true']) main .em-card > div {
           flex-direction: column !important;
