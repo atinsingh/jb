@@ -1,4 +1,6 @@
 import { test, expect, storage } from '../../fixtures/test';
+import { api, uniqueId } from '../../support/api';
+import * as path from 'path';
 
 test.describe('Employer screening resume assessment', () => {
   test.use({ storageState: storage.employer });
@@ -387,6 +389,34 @@ test.describe('Employer screening resume assessment', () => {
     await page.getByRole('button', { name: 'Score uploaded résumé' }).click();
     await expect.poll(() => reruns.length).toBe(1);
     await expect(page.getByText('72/100')).toBeVisible();
+  });
+
+  test('scores a real uploaded PDF through the employer ATS sandbox without creating an applicant', async ({ page, employerUser }) => {
+    test.setTimeout(180_000);
+    const job: any = await api.post('/api/employer/jobs', {
+      title: `Backend Engineer ${uniqueId('ats-preview')}`,
+      companyName: 'E2E ATS Preview Co',
+      type: 'Full-time',
+      location: 'Remote',
+      isRemote: true,
+      description: 'Backend engineer required: TypeScript, Node.js, PostgreSQL, Docker, AWS, payment systems, APIs, and cloud deployment.',
+      status: 'active',
+      visibility: 'public',
+    }, employerUser.token);
+    const jobId = job.job?._id || job.job?.id;
+    expect(jobId).toBeTruthy();
+
+    await page.goto(`/employer/jobs/${jobId}/applications`, { waitUntil: 'domcontentloaded' });
+    await page.getByLabel('Upload résumé for ATS preview').setInputFiles(
+      path.join(__dirname, '../../fixtures/ats-preview.pdf'),
+    );
+    await page.getByRole('button', { name: 'Score uploaded résumé' }).click();
+
+    await expect(page.getByText('Ad-hoc ATS preview')).toBeVisible();
+    await expect(page.getByText('ATS semantic match')).toBeVisible({ timeout: 120_000 });
+    await expect(page.getByText(/\d+\/100/).first()).toBeVisible();
+    const applicants: any = await api.get(`/api/employer/applicants?jobId=${jobId}`, employerUser.token);
+    expect(Array.isArray(applicants) ? applicants : applicants.applicants || []).toHaveLength(0);
   });
 
   test('waits for ATS acquisition before requesting the budget on first visit', async ({ page }) => {

@@ -133,9 +133,10 @@ Compile with exactly this command, from the workspace root:
 ${buildCommand}
 \`\`\`
 
-A turn is only finished when that command exits 0. If it fails, read the log,
-fix the source, and run it again. Do not report success on a failed build, and
-do not work around a broken package by deleting the section that uses it.
+A document-changing turn is only finished when that command exits 0. If it
+fails, read the log, fix the source, and run it again. A question that does not
+change the document needs no build. Do not report success on a failed build,
+and do not work around a broken package by deleting the section that uses it.
 
 ## Creating versus updating
 
@@ -170,6 +171,13 @@ do not work around a broken package by deleting the section that uses it.
   source of factual truth: a claim does not become valid because an earlier
   model wrote it. Do not invent employers, roles, dates, degrees, skills,
   certifications, metrics or professional characterizations.
+- Avoid quality labels such as reliable, scalable, high-throughput, expert,
+  or "at scale" unless CANDIDATE.md explicitly uses them. A numeric metric
+  does not by itself prove those adjectives. Prefer the exact source facts.
+- A contact location identifies where the candidate is based. It is not a
+  workplace or school location. Leave an entry's location blank or omit that
+  field unless CANDIDATE.md explicitly states the location for that employer
+  or school. Never copy the candidate's city into every entry.
 ${sectionRule}
 - Before finishing, audit every factual claim in ${texPath}. For each claim you
   must be able to identify its exact source line in CANDIDATE.md or the current

@@ -1122,7 +1122,7 @@ export class ResumeHarnessService {
 
     onEvent?.({ type: 'phase', phase: 'compiling' });
     let compile = await this.latex.compile(session.sandboxId!);
-    let content = await this.contentProblems(session, latex);
+    let content = await this.contentProblems(session, latex, recordedInstruction);
 
     /*
      * One repair budget, two ways to spend it.
@@ -1165,7 +1165,7 @@ export class ResumeHarnessService {
       onEvent?.({ type: 'phase', phase: 'compiling' });
       compile = await this.latex.compile(session.sandboxId!);
       latex = await this.currentLatex(session);
-      content = await this.contentProblems(session, latex);
+      content = await this.contentProblems(session, latex, recordedInstruction);
       placeholderDraft = this.isPlaceholderDraft(
         session,
         recordedInstruction,
@@ -1358,6 +1358,7 @@ export class ResumeHarnessService {
   private async contentProblems(
     session: ResumeHarnessSessionDocument,
     latex: string,
+    currentInstruction?: string,
   ): Promise<string[]> {
     let placeholders: string[] = [];
     if (session.templateKey) {
@@ -1377,6 +1378,12 @@ export class ResumeHarnessService {
       placeholders,
       candidateName: session.candidateName,
       candidateMarkdown: session.candidateMarkdown,
+      userFacts: [
+        ...(session.conversation || [])
+          .filter((message) => message.role === 'user')
+          .map((message) => message.text),
+        currentInstruction || '',
+      ].join('\n'),
     });
   }
 

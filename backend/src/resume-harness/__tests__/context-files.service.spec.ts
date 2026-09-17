@@ -116,6 +116,8 @@ describe('ContextFilesService — candidate facts', () => {
       /existing[\s\S]*not a[\s\S]*source of factual truth/i,
     );
     expect(agents).toMatch(/exact source line/i);
+    expect(agents).toMatch(/contact location[\s\S]*workplace or school location/i);
+    expect(agents).toMatch(/reliable[\s\S]*scalable[\s\S]*source/i);
   });
 
   it('requires a labeled placeholder draft when the profile has identity but no career facts', () => {

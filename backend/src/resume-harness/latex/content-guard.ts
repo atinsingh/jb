@@ -27,6 +27,8 @@ export interface ContentGuardInput {
   candidateName?: string;
   /** Exact factual source written to the sandbox for this session. */
   candidateMarkdown?: string;
+  /** Candidate-supplied facts from the current and earlier instructions. */
+  userFacts?: string;
 }
 
 /** Whether the factual source contains at least one career-content category. */
@@ -93,7 +95,7 @@ function prose(latex: string): string {
  * repair turn.
  */
 export function findContentProblems(input: ContentGuardInput): string[] {
-  const { latex, placeholders = [], candidateName, candidateMarkdown } = input;
+  const { latex, placeholders = [], candidateName, candidateMarkdown, userFacts = '' } = input;
   const problems: string[] = [];
 
   const beginCount = latex.match(/\\begin\{document\}/g)?.length || 0;
@@ -196,6 +198,32 @@ export function findContentProblems(input: ContentGuardInput): string[] {
       problems.push(
         'the resume has a Summary section but CANDIDATE.md contains no career evidence to summarize',
       );
+    }
+
+    // The classic template's fourth entry argument is a workplace or school
+    // location. A candidate's contact city cannot substantiate either one.
+    // Compare it with the matching source category before publishing a PDF.
+    for (const entry of latex.matchAll(/\\resentry\{([^{}]*)\}\{([^{}]*)\}\{([^{}]*)\}\{([^{}]*)\}/g)) {
+      const location = entry[4].trim();
+      if (!location) continue;
+      const before = latex.slice(0, entry.index);
+      const heading = [...before.matchAll(/\\(?:ressection|section\*?)\{([^}]+)\}/g)]
+        .at(-1)?.[1]?.trim();
+      if (!heading || !/^(Experience|Education)$/i.test(heading)) continue;
+      const sourceStart = new RegExp(`^##\\s+${escapeRegExp(heading)}\\s*$`, 'im').exec(candidateMarkdown);
+      const source = sourceStart
+        ? candidateMarkdown.slice(
+            sourceStart.index + sourceStart[0].length,
+            candidateMarkdown.indexOf('\n## ', sourceStart.index + sourceStart[0].length) === -1
+              ? undefined
+              : candidateMarkdown.indexOf('\n## ', sourceStart.index + sourceStart[0].length),
+          )
+        : '';
+      const instructionSupportsEntry = userFacts.toLowerCase().includes(location.toLowerCase()) &&
+        userFacts.toLowerCase().includes(entry[2].toLowerCase());
+      if (!source.toLowerCase().includes(location.toLowerCase()) && !instructionSupportsEntry) {
+        problems.push(`${heading} entry location "${location}" has no source in CANDIDATE.md; remove the location`);
+      }
     }
   }
 

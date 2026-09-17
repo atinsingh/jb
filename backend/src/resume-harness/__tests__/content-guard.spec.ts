@@ -216,4 +216,36 @@ Toronto
 
     expect(problems.join(' ')).toMatch(/no career facts/i);
   });
+
+  it('rejects a work or school location copied from the candidate contact details', () => {
+    const candidateMarkdown = `# Candidate facts\n\n## Identity\n- Name: Jordan Reyes\n- Location: Example City\n\n## Experience\n### Backend Engineer, Example Payments (2022-2025)\n- Built a payment service.\n\n## Education\n- BSc Computer Science, Example University, 2021.\n`;
+    const latex = String.raw`\documentclass{article}
+\begin{document}
+Jordan Reyes
+\ressection{Experience}
+\resentry{Backend Engineer}{Example Payments}{2022--2025}{Example City}
+Built a payment service.
+\ressection{Education}
+\resentry{BSc Computer Science}{Example University}{2021}{Example City}
+\end{document}`;
+
+    const problems = findContentProblems({ latex, candidateName: 'Jordan Reyes', candidateMarkdown });
+
+    expect(problems.join(' ')).toMatch(/Experience entry location.*Example City.*no source/i);
+    expect(problems.join(' ')).toMatch(/Education entry location.*Example City.*no source/i);
+    expect(findContentProblems({
+      latex,
+      candidateName: 'Jordan Reyes',
+      candidateMarkdown: candidateMarkdown.replace(
+        '## Education',
+        '- Location: Example City\n\n## Education\n- Location: Example City',
+      ),
+    })).toEqual([]);
+    expect(findContentProblems({
+      latex,
+      candidateName: 'Jordan Reyes',
+      candidateMarkdown,
+      userFacts: 'I worked at Example Payments in Example City and studied at Example University in Example City.',
+    })).toEqual([]);
+  });
 });
