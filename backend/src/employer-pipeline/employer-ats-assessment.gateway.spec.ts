@@ -1,3 +1,4 @@
+import { AtsSandboxReleasedException } from '../ats/resume-matcher.adapter';
 import { EmployerAtsGateway } from './employer-ats-assessment.gateway';
 
 const input = {
@@ -17,6 +18,7 @@ describe('EmployerAtsGateway', () => {
   const runtime = {
     prepare: jest.fn(),
     finish: jest.fn(),
+    wasReleasedDuring: jest.fn(),
   };
   const matcher = { analyze: jest.fn() };
   let gateway: EmployerAtsGateway;
@@ -51,6 +53,7 @@ describe('EmployerAtsGateway', () => {
       costUsd: 0.04,
       requestIds: ['chatcmpl-1'],
     });
+    runtime.wasReleasedDuring.mockResolvedValue(false);
     gateway = new EmployerAtsGateway(runtime as any, matcher as any);
   });
 
@@ -124,6 +127,17 @@ describe('EmployerAtsGateway', () => {
     expect(JSON.stringify(result)).not.toContain('secret proxy failure body');
   });
 
+  it('reports focus loss during provisioning as interrupted', async () => {
+    runtime.prepare.mockRejectedValue(new AtsSandboxReleasedException());
+
+    await expect(gateway.assess(input)).resolves.toEqual({
+      status: 'ATS_INTERRUPTED',
+      reason: 'EMPLOYER_ATS_SANDBOX_RELEASED',
+      harness: 'ats',
+      sourceRunId: input.runId,
+    });
+  });
+
   it('reconciles actual spend after provider failure without returning a complete ATS result', async () => {
     matcher.analyze.mockRejectedValue(new Error('provider payload must stay private'));
     runtime.finish.mockResolvedValue({
@@ -146,6 +160,27 @@ describe('EmployerAtsGateway', () => {
       costUsd: 0.02,
       requestIds: ['chatcmpl-failed'],
     });
+  });
+
+  it('returns a typed interrupted state when the sandbox was released during matching', async () => {
+    matcher.analyze.mockRejectedValue(new AtsSandboxReleasedException());
+    runtime.finish.mockResolvedValue({
+      costUsd: 0,
+      requestIds: [],
+    });
+
+    const result = await gateway.assess(input);
+
+    expect(runtime.finish).toHaveBeenCalledWith(expect.any(Object), {
+      succeeded: false,
+    });
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'ATS_INTERRUPTED',
+        reason: 'EMPLOYER_ATS_SANDBOX_RELEASED',
+        sourceRunId: 'assessment-1',
+      }),
+    );
   });
 
   it('does not finalize the same run twice when accounting persistence fails', async () => {

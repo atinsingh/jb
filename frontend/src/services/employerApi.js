@@ -42,6 +42,8 @@ const qs = (params = {}) => {
   return s ? `?${s}` : '';
 };
 
+let atsReleaseToken = null;
+
 /* ------------------------------------------------------------------ jobs --- */
 export const employerJobsApi = {
   // GET /api/employer/jobs -> { message, jobs, total }
@@ -103,6 +105,60 @@ export const employerPipelineApi = {
     }),
   assessmentBudget: () =>
     apiCall('/api/employer/applicants/resume-assessment/budget'),
+  acquireAtsSandbox: async (leaseId) => {
+    atsReleaseToken = await getAccessToken();
+    return apiCall('/api/employer/applicants/resume-assessment/acquire', {
+      method: 'POST',
+      body: JSON.stringify({ leaseId }),
+    });
+  },
+  savedAtsPreview: (jobId) =>
+    apiCall(`/api/employer/applicants/resume-assessment/preview${qs({ jobId })}`),
+  releaseAtsSandboxKeepalive: async (leaseId) => {
+    try {
+      const token = atsReleaseToken || await getAccessToken();
+      if (!token) return;
+      const send = async (attempt = 0) => {
+        try {
+          const response = await fetch(`${API_URL}/api/employer/applicants/resume-assessment/release`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ leaseId }),
+            keepalive: true,
+          });
+          if (response.ok || (response.status >= 400 && response.status < 500)) return;
+        } catch {
+          // The backend may be restarting; retry while this tab is open.
+        }
+        if (attempt < 24) {
+          setTimeout(() => { void send(attempt + 1); }, Math.min(1000 * (attempt + 1), 10000));
+        }
+      };
+      await send();
+    } catch {
+      // Closing the tab cannot guarantee delivery; the sandbox reaper is the backstop.
+    }
+  },
+  previewAts: async (jobId, file, options = {}) => {
+    const token = await getAccessToken();
+    const form = new FormData();
+    if (file) form.append('resume', file);
+    const headers = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(
+      `${API_URL}/api/employer/applicants/resume-assessment/preview?jobId=${encodeURIComponent(jobId)}`,
+      { method: 'POST', headers, body: form, signal: options.signal },
+    );
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Request failed' }));
+      const message = Array.isArray(error.message)
+        ? error.message.join(', ')
+        : error.message || 'Request failed';
+      throw new Error(message);
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : {};
+  },
 };
 
 /* ----------------------------------------------------------- ai recruiter --- */

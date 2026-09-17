@@ -5,6 +5,8 @@ import Head from 'next/head';
 import Link from 'next/link';
 import EmployerSidebar from '@/components/employer/EmployerSidebar';
 import { LoadingState, ErrorState, EmptyState, InlineError } from '@/components/employer/EmployerStates';
+import ResumeAssessmentPanel from '@/components/employer/ResumeAssessmentPanel';
+import useEmployerAtsSandboxRelease from '@/components/employer/useEmployerAtsSandboxRelease';
 import { appRoute } from '@/components/app/appRoutes';
 import { aiRecruiterApi, employerPipelineApi } from '@/services/employerApi';
 
@@ -48,157 +50,6 @@ function initialsFor(name = '') {
   return (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase();
 }
 
-const assessmentStateCopy = {
-  NOT_RUN: 'Assessment has not run.',
-  RUNNING: 'Resume assessment is running…',
-  STALE: 'Assessment is stale because the submitted resume or job description changed.',
-  NO_RESUME: 'No submitted resume is attached to this applicant.',
-  NO_JOB_DESCRIPTION: 'This job needs a description before its resume can be assessed.',
-  BUDGET_EXHAUSTED: 'ATS match was not run because the employer AI budget is exhausted.',
-  CONFIGURATION_ERROR: 'ATS match could not start because employer ATS is not configured. Contact support before retrying.',
-  ATS_FAILED: 'ATS matching failed during execution. Retry the assessment.',
-  DETECTOR_FAILED: 'The local AI-content heuristic failed during execution. Retry the assessment.',
-};
-
-const signalLabel = (key) =>
-  String(key)
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .replace(/^./, (character) => character.toUpperCase());
-
-const dollars = (value) => `$${Number(value || 0).toFixed(2)}`;
-
-function AtsBudgetStatus({ budget }) {
-  if (!budget) return null;
-  const hasAmounts = Number.isFinite(Number(budget.limitUsd));
-  const reset = budget.resetAt
-    ? new Date(budget.resetAt).toLocaleDateString([], {
-        month: 'short',
-        day: 'numeric',
-        timeZone: 'UTC',
-      })
-    : null;
-  const copy = budget.status === 'CONFIGURATION_ERROR'
-    ? 'ATS budget is unavailable because employer ATS is not configured.'
-    : budget.status === 'BUDGET_EXHAUSTED'
-      ? `ATS budget is exhausted: ${dollars(budget.remainingUsd)} of ${dollars(budget.limitUsd)} remaining this month.`
-      : hasAmounts
-        ? `ATS budget: ${dollars(budget.remainingUsd)} of ${dollars(budget.limitUsd)} remaining this month${reset ? ` · resets ${reset}` : ''}.`
-        : 'ATS budget is ready.';
-
-  return (
-    <div style={{ fontSize: 11.5, lineHeight: 1.45, color: budget.status === 'READY' ? '#5A544A' : '#9A6A2E', marginTop: 5 }}>
-      <div>{copy}</div>
-      <div>AI-content heuristic is local, deterministic, and does not use this budget.</div>
-    </div>
-  );
-}
-
-function ResumeAssessmentPanel({ assessment, budget, loading, busy, onRun }) {
-  if (loading) return <div style={{ fontSize: 13, color: '#8A8378' }}>Loading resume assessment…</div>;
-
-  const status = assessment?.status || 'NOT_RUN';
-  const inputState = ['NOT_RUN', 'RUNNING', 'STALE', 'NO_RESUME', 'NO_JOB_DESCRIPTION'].includes(status);
-  const ats = assessment?.ats;
-  const aiContent = assessment?.aiContent;
-  const canRun = status !== 'RUNNING';
-
-  return (
-    <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #F2ECE0' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 700 }}>Submitted resume assessment</div>
-          {status === 'PARTIAL' && <div style={{ fontSize: 12, color: '#9A6A2E', marginTop: 3 }}>Partial assessment — the available result is shown below.</div>}
-          {inputState && <div style={{ fontSize: 12, color: status === 'STALE' ? '#9A6A2E' : '#6F685D', marginTop: 3 }}>{assessmentStateCopy[status]}</div>}
-          <AtsBudgetStatus budget={budget} />
-        </div>
-        {canRun && (
-          <button
-            onClick={onRun}
-            disabled={busy}
-            style={{ fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, color: '#fff', background: '#4263EB', border: 'none', borderRadius: 999, padding: '8px 14px', cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}
-          >
-            {busy ? 'Assessing…' : 'Run resume assessment'}
-          </button>
-        )}
-      </div>
-
-      {!inputState && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 12 }}>
-          <section style={{ border: '1px solid #E6DECF', borderRadius: 10, padding: 13 }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
-              <strong style={{ fontSize: 13 }}>ATS semantic match</strong>
-              {ats?.status === 'COMPLETE' && (
-                <span style={{ fontFamily: MONO, fontSize: 18, color: '#4263EB' }}>{ats.semanticMatch}/100</span>
-              )}
-            </div>
-            {ats?.status === 'COMPLETE' ? (
-              <>
-                <div style={{ fontSize: 12, fontWeight: 700, color: ats.semanticMatch > 70 ? '#157A49' : '#9A6A2E', marginTop: 4 }}>
-                  {ats.semanticMatch > 70 ? 'Good to submit' : 'Improve before submitting'}
-                </div>
-                {Object.keys(ats.subScores || {}).length > 0 && (
-                  <div style={{ marginTop: 10 }}>
-                    {Object.entries(ats.subScores).map(([key, value]) => (
-                      <div key={key} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginTop: 4 }}>
-                        <span style={{ color: '#6F685D' }}>{signalLabel(key)}</span><span style={{ fontFamily: MONO }}>{value}/100</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {(ats.gaps || []).length > 0 && <div style={{ fontSize: 12, marginTop: 10 }}><b>Missing keywords:</b> {ats.gaps.join(', ')}</div>}
-                {(ats.suggestions || []).length > 0 && <div style={{ fontSize: 12, marginTop: 7 }}><b>Recommendations:</b> {ats.suggestions.join(' ')}</div>}
-              </>
-            ) : (
-              <div style={{ fontSize: 12, lineHeight: 1.45, color: ats?.status === 'ATS_FAILED' ? '#C9622E' : '#6F685D', marginTop: 8 }}>
-                {ats?.status === 'BUDGET_EXHAUSTED'
-                  ? assessmentStateCopy.BUDGET_EXHAUSTED
-                  : ats?.status === 'CONFIGURATION_ERROR'
-                    ? assessmentStateCopy.CONFIGURATION_ERROR
-                    : ats?.status === 'NOT_RUN' && ats?.reason === 'EMPLOYER_ATS_RUN_IN_PROGRESS'
-                      ? 'ATS match did not start because another employer assessment is already running.'
-                  : ats?.status === 'ATS_FAILED'
-                    ? assessmentStateCopy.ATS_FAILED
-                    : 'ATS match has not run.'}
-              </div>
-            )}
-          </section>
-
-          <section style={{ border: '1px solid #E6DECF', borderRadius: 10, padding: 13 }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
-              <strong style={{ fontSize: 13 }}>AI-content likelihood (directional)</strong>
-              {aiContent?.status === 'COMPLETE' && (
-                <span style={{ fontFamily: MONO, fontSize: 18, color: '#9A6A2E' }}>{aiContent.composite}/100</span>
-              )}
-            </div>
-            <div style={{ fontSize: 11.5, lineHeight: 1.45, color: '#8A5A25', background: '#FBF1E2', borderRadius: 7, padding: '7px 9px', marginTop: 8 }}>
-              Directional evidence only. This heuristic can produce false positives and false negatives and never changes fit, ranking, stage, or hiring actions.
-            </div>
-            {aiContent?.status === 'COMPLETE' ? (
-              <div style={{ marginTop: 9 }}>
-                {Object.entries(aiContent.signals || {}).map(([key, signal]) => (
-                  <div key={key} style={{ padding: '7px 0', borderTop: '1px solid #F2ECE0', fontSize: 12 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                      <span style={{ fontWeight: 600 }}>{signalLabel(key)}</span>
-                      <span style={{ fontFamily: MONO }}>{signal.likelihood}/100</span>
-                    </div>
-                    <div style={{ color: '#777064', marginTop: 2 }}>{signal.explanation}</div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div style={{ fontSize: 12, color: aiContent?.status === 'DETECTOR_FAILED' ? '#C9622E' : '#6F685D', marginTop: 8 }}>
-                {aiContent?.status === 'DETECTOR_FAILED'
-                  ? assessmentStateCopy.DETECTOR_FAILED
-                  : 'AI-content likelihood has not run.'}
-              </div>
-            )}
-          </section>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function EmployerScreening() {
   const [open, setOpen] = useState(null);
   const [weights, setWeights] = useState({ skills: 35, exp: 30, answers: 20, culture: 15 });
@@ -213,6 +64,7 @@ export default function EmployerScreening() {
   const [assessmentLoading, setAssessmentLoading] = useState({});
   const [assessmentBusy, setAssessmentBusy] = useState({});
   const [assessmentBudget, setAssessmentBudget] = useState(null);
+  const { status: sandboxStatus } = useEmployerAtsSandboxRelease();
 
   // Fetch AI screening results for all applicants. No sample fallback.
   const load = async () => {
@@ -310,7 +162,7 @@ export default function EmployerScreening() {
   };
 
   const runResumeAssessment = async (id) => {
-    if (!id || /^r\d+$/.test(id) || assessmentBusy[id]) return;
+    if (!id || /^r\d+$/.test(id) || assessmentBusy[id] || sandboxStatus !== 'ready') return;
     setAssessmentBusy((current) => ({ ...current, [id]: true }));
     setAssessments((current) => ({
       ...current,
@@ -528,7 +380,7 @@ export default function EmployerScreening() {
                                 assessment={assessments[a.id]}
                                 budget={assessmentBudget}
                                 loading={assessmentLoading[a.id]}
-                                busy={assessmentBusy[a.id]}
+                                busy={assessmentBusy[a.id] || sandboxStatus !== 'ready'}
                                 onRun={() => runResumeAssessment(a.id)}
                               />
                               <div style={{ display: 'flex', gap: 9 }}>

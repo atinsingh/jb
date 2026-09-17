@@ -19,9 +19,8 @@ import {
 
 const ALIASES = [
   // --- Amazon Bedrock ---
-  // LiteLLM talks to Bedrock with IAM. On this account that path can tool-call
-  // Nova, not Claude (Anthropic use-case form 404). Do not seed Claude-on-
-  // Bedrock aliases until a live proxy call returns a tool id.
+  // LiteLLM talks to Bedrock with IAM. Verified Claude aliases stay
+  // `anthropic/…` so Claude Code is the harness.
   //
   // Deliberately NOT a default for any tier. Nova is the right tool for
   // verifying auth, alias resolution and harness tagging without spending
@@ -98,7 +97,7 @@ const ALIASES = [
   // session on them cannot produce a résumé. Re-seeding deactivates any
   // leftover rows below.
 
-  // --- Anthropic Console ---
+  // --- Anthropic (Claude Code harness; LiteLLM → Bedrock IAM) ---
   {
     alias: 'anthropic/claude-haiku-4-5/low',
     provider: 'anthropic',
@@ -106,112 +105,30 @@ const ALIASES = [
     effort: 'low',
     label: 'Haiku 4.5 · fast',
     tiers: ['FREE', 'PRO', 'ELITE'],
-    // The FREE default. Bedrock Haiku 4.5 is not callable on this account
-    // (Anthropic use-case form). Console Haiku is.
-    defaultForTiers: ['FREE'],
+    defaultForTiers: ['FREE', 'PRO', 'ELITE'],
     rank: 40,
   },
   {
-    alias: 'anthropic/claude-sonnet-4-5/low',
+    alias: 'anthropic/claude-sonnet-4-6/low',
     provider: 'anthropic',
-    model: 'claude-sonnet-4-5',
+    model: 'claude-sonnet-4-6',
     effort: 'low',
-    label: 'Sonnet 4.5 · fast',
-    tiers: ['PRO', 'ELITE'],
-    rank: 30,
+    label: 'Sonnet 4.6 · fast',
+    modelLabel: 'claude-sonnet-4-6',
+    tiers: ['FREE', 'PRO', 'ELITE'],
+    defaultForTiers: [],
+    rank: 19,
   },
   {
-    alias: 'anthropic/claude-sonnet-4-5/high',
+    alias: 'anthropic/claude-sonnet-4-6/high',
     provider: 'anthropic',
-    model: 'claude-sonnet-4-5',
+    model: 'claude-sonnet-4-6',
     effort: 'high',
-    label: 'Sonnet 4.5 · thorough',
-    tiers: ['PRO', 'ELITE'],
-    defaultForTiers: ['PRO'],
-    rank: 20,
-  },
-  {
-    alias: 'openai/gpt-5.1-codex/high',
-    provider: 'openai',
-    model: 'gpt-5.1-codex',
-    effort: 'high',
-    label: 'GPT-5.1 Codex · thorough',
-    tiers: ['PRO', 'ELITE'],
-    rank: 20,
-  },
-  {
-    alias: 'openai/gpt-5.6-luna/low',
-    provider: 'openai',
-    model: 'gpt-5.6-luna',
-    effort: 'low',
-    label: 'GPT-5.6 Luna · low',
-    modelLabel: 'GPT-5.6 Luna',
+    label: 'Sonnet 4.6 · thorough',
+    modelLabel: 'claude-sonnet-4-6',
     tiers: ['FREE', 'PRO', 'ELITE'],
     defaultForTiers: [],
-    rank: 12,
-  },
-  {
-    alias: 'openai/gpt-5.6-luna/medium',
-    provider: 'openai',
-    model: 'gpt-5.6-luna',
-    effort: 'medium',
-    label: 'GPT-5.6 Luna · medium',
-    modelLabel: 'GPT-5.6 Luna',
-    tiers: ['FREE', 'PRO', 'ELITE'],
-    defaultForTiers: [],
-    rank: 13,
-  },
-  {
-    alias: 'openai/gpt-5.6-luna/high',
-    provider: 'openai',
-    model: 'gpt-5.6-luna',
-    effort: 'high',
-    label: 'GPT-5.6 Luna · high',
-    modelLabel: 'GPT-5.6 Luna',
-    tiers: ['FREE', 'PRO', 'ELITE'],
-    defaultForTiers: [],
-    rank: 14,
-  },
-  {
-    alias: 'openai/gpt-5.6-luna/xhigh',
-    provider: 'openai',
-    model: 'gpt-5.6-luna',
-    effort: 'xhigh',
-    label: 'GPT-5.6 Luna · xhigh',
-    modelLabel: 'GPT-5.6 Luna',
-    tiers: ['FREE', 'PRO', 'ELITE'],
-    defaultForTiers: [],
-    rank: 15,
-  },
-  {
-    alias: 'openai/gpt-5.6-luna/max',
-    provider: 'openai',
-    model: 'gpt-5.6-luna',
-    effort: 'max',
-    label: 'GPT-5.6 Luna · max',
-    modelLabel: 'GPT-5.6 Luna',
-    tiers: ['FREE', 'PRO', 'ELITE'],
-    defaultForTiers: [],
-    rank: 16,
-  },
-  {
-    alias: 'anthropic/claude-opus-4-5/high',
-    provider: 'anthropic',
-    model: 'claude-opus-4-5',
-    effort: 'high',
-    label: 'Opus 4.5 · thorough',
-    tiers: ['ELITE'],
-    rank: 10,
-  },
-  {
-    alias: 'anthropic/claude-opus-4-5/max',
-    provider: 'anthropic',
-    model: 'claude-opus-4-5',
-    effort: 'max',
-    label: 'Opus 4.5 · maximum',
-    tiers: ['ELITE'],
-    defaultForTiers: ['ELITE'],
-    rank: 5,
+    rank: 18,
   },
 ];
 

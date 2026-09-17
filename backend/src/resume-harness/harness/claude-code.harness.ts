@@ -14,7 +14,7 @@ import {
  * Claude Code speaks the Anthropic Messages wire format and takes its endpoint
  * and credential from `ANTHROPIC_BASE_URL` / `ANTHROPIC_AUTH_TOKEN`, so routing
  * it through the proxy needs no wrapper — the proxy exposes an Anthropic-shaped
- * route and forwards under the operator's Console key.
+ * route and forwards to Bedrock with IAM.
  *
  * The credential handed in is a LiteLLM virtual key, which is metered per
  * request. The Claude Pro/Max login path is a Consumer Terms product and is not

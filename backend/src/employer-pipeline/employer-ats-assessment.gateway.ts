@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { ResumeMatcherAdapter } from '../ats/resume-matcher.adapter';
+import {
+  AtsSandboxReleasedException,
+  ResumeMatcherAdapter,
+} from '../ats/resume-matcher.adapter';
 import {
   EmployerAtsRuntimeService,
   PreparedEmployerAtsRun,
@@ -11,7 +14,8 @@ export type AtsAssessmentStatus =
   | 'COMPLETE'
   | 'BUDGET_EXHAUSTED'
   | 'CONFIGURATION_ERROR'
-  | 'ATS_FAILED';
+  | 'ATS_FAILED'
+  | 'ATS_INTERRUPTED';
 
 export interface EmployerAtsAssessmentInput {
   ownerId: string;
@@ -78,10 +82,11 @@ export class EmployerAtsGateway implements EmployerAtsAssessmentGateway {
     let prepared;
     try {
       prepared = await this.runtime.prepare(input.ownerId, input.runId);
-    } catch {
+    } catch (error) {
+      const released = error instanceof AtsSandboxReleasedException;
       return {
-        status: 'CONFIGURATION_ERROR',
-        reason: 'EMPLOYER_ATS_CONFIGURATION_ERROR',
+        status: released ? 'ATS_INTERRUPTED' : 'CONFIGURATION_ERROR',
+        reason: released ? 'EMPLOYER_ATS_SANDBOX_RELEASED' : 'EMPLOYER_ATS_CONFIGURATION_ERROR',
         harness: 'ats',
         sourceRunId: input.runId,
       };
@@ -108,16 +113,21 @@ export class EmployerAtsGateway implements EmployerAtsAssessmentGateway {
         sourceRevision: input.resumeVersion,
         alias: run.alias,
       });
-    } catch {
+    } catch (error) {
       let usage = { costUsd: 0, requestIds: [] as string[] };
       try {
         usage = await this.runtime.finish(run, { succeeded: false });
       } catch {
         // The runtime releases its lock in finally; do not make a second charge attempt.
       }
+      const released =
+        error instanceof AtsSandboxReleasedException ||
+        (await this.runtime.wasReleasedDuring(run.ownerId, run.runId));
       return {
-        status: 'ATS_FAILED',
-        reason: 'EMPLOYER_ATS_EXECUTION_FAILED',
+        status: released ? 'ATS_INTERRUPTED' : 'ATS_FAILED',
+        reason: released
+          ? 'EMPLOYER_ATS_SANDBOX_RELEASED'
+          : 'EMPLOYER_ATS_EXECUTION_FAILED',
         modelAlias: run.alias,
         effort: run.effort,
         harness: 'ats',

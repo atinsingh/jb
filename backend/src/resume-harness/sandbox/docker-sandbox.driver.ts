@@ -93,6 +93,8 @@ export class DockerSandboxDriver implements SandboxDriver {
       'no-new-privileges',
       '--cap-drop',
       'ALL',
+      // The image's API healthcheck does not apply to this sleeping sandbox.
+      '--no-healthcheck',
       // Bound the blast radius of a runaway agent loop. Ceiling, not a
       // reservation — idle is a sleep. 512m is tight for latexmk; OOM is a
       // failed compile, not a second container.

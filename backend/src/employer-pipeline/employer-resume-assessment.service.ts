@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { createHash, randomUUID } from 'crypto';
 import { Model, Types } from 'mongoose';
@@ -22,6 +22,11 @@ import {
   ResumeAssessmentStatus,
 } from './employer-resume-assessment.types';
 import { EmployerAtsRuntimeService } from './employer-ats-runtime.service';
+import { ResumeParserService } from '../resume/resume-parser.service';
+import {
+  EmployerAtsPreview,
+  EmployerAtsPreviewDocument,
+} from './schemas/employer-ats-preview.schema';
 
 @Injectable()
 export class EmployerResumeAssessmentService {
@@ -34,6 +39,9 @@ export class EmployerResumeAssessmentService {
     private readonly employerJobModel: Model<EmployerJobDocument>,
     private readonly heuristic: ResumeAiContentHeuristicService,
     private readonly atsGateway: EmployerAtsAssessmentGateway,
+    private readonly parser: ResumeParserService,
+    @InjectModel(EmployerAtsPreview.name)
+    private readonly previewModel: Model<EmployerAtsPreviewDocument>,
     private readonly atsRuntime?: EmployerAtsRuntimeService,
   ) {}
 
@@ -42,6 +50,195 @@ export class EmployerResumeAssessmentService {
       status: 'CONFIGURATION_ERROR',
       reason: 'EMPLOYER_ATS_CONFIGURATION_ERROR',
     };
+  }
+
+  async acquireSandbox(ownerId: string, leaseId: string) {
+    return this.atsRuntime?.acquireSandbox(ownerId, leaseId) || { ready: false };
+  }
+
+  async releaseSandbox(ownerId: string, leaseId: string) {
+    return this.atsRuntime?.releaseSandbox(ownerId, leaseId) || { released: false };
+  }
+
+  async getSavedPreview(ownerIdValue: string, jobIdValue: string) {
+    const ownerId = this.asObjectId(ownerIdValue);
+    const jobId = this.asObjectId(jobIdValue);
+    await this.previewJob(ownerId, jobId);
+    const saved: any = await this.previewModel
+      .findOne({ ownerId, jobId })
+      .lean()
+      .exec();
+    if (!saved) return { saved: false };
+    return {
+      saved: true,
+      fileName: saved.fileName,
+      assessment: saved.assessment || { status: 'NOT_RUN' },
+    };
+  }
+
+  async rerunSavedPreview(ownerIdValue: string, jobIdValue: string) {
+    const ownerId = this.asObjectId(ownerIdValue);
+    const jobId = this.asObjectId(jobIdValue);
+    const job = await this.previewJob(ownerId, jobId);
+    const saved: any = await this.previewModel
+      .findOne({ ownerId, jobId })
+      .lean()
+      .exec();
+    if (!saved?.resumeText) throw new NotFoundException('No saved résumé preview');
+    return this.scorePreview(ownerIdValue, job, saved.resumeText, saved.resumeHash);
+  }
+
+  async previewFromUpload(
+    ownerIdValue: string,
+    jobIdValue: string,
+    file: Express.Multer.File,
+  ): Promise<PersistedResumeAssessment & { preview: true }> {
+    if (!file) {
+      throw new BadRequestException('No résumé file uploaded');
+    }
+    try {
+      this.parser.validateFile(file);
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Invalid résumé file',
+      );
+    }
+
+    const ownerId = this.asObjectId(ownerIdValue);
+    const jobId = this.asObjectId(jobIdValue);
+    const job = await this.previewJob(ownerId, jobId);
+
+    let resumeText = '';
+    try {
+      resumeText = String((await this.parser.extractText(file)) || '').trim();
+    } catch {
+      throw new BadRequestException('Failed to extract text from résumé');
+    }
+    if (!resumeText) {
+      throw new BadRequestException('Could not extract text from that résumé');
+    }
+
+    const resumeHash = this.sha256(resumeText);
+    await this.previewModel
+      .updateOne(
+        { ownerId, jobId },
+        {
+          $set: {
+            ownerId,
+            jobId,
+            fileName: file.originalname,
+            resumeText,
+            resumeHash,
+            assessment: null,
+          },
+        },
+        { upsert: true },
+      )
+      .exec();
+    return this.scorePreview(ownerIdValue, job, resumeText, resumeHash);
+  }
+
+  private async previewJob(ownerId: Types.ObjectId | string, jobId: Types.ObjectId | string) {
+    const job: any = await this.employerJobModel
+      .findOne({ _id: jobId, ownerId })
+      .lean()
+      .exec();
+    if (!job) throw new NotFoundException('Job not found');
+    return job;
+  }
+
+  private async scorePreview(
+    ownerIdValue: string,
+    job: any,
+    resumeText: string,
+    resumeHash: string,
+  ): Promise<PersistedResumeAssessment & { preview: true }> {
+    const runId = randomUUID();
+    const base = {
+      runId,
+      actor: { ownerId: String(ownerIdValue), ownerType: 'employer' as const },
+      preview: true as const,
+    };
+    const jobDescription = this.normalizeJobDescription(job);
+    if (!jobDescription) {
+      const result = {
+        ...base,
+        status: 'NO_JOB_DESCRIPTION' as const,
+        reason: 'EMPLOYER_JOB_DESCRIPTION_REQUIRED',
+        job: { jobId: String(job._id), descriptionHash: '', descriptionVersion: 1 },
+        ats: { status: 'NOT_RUN' as const, reason: 'NO_JOB_DESCRIPTION', harness: 'ats' as const },
+        aiContent: { status: 'NOT_RUN' as const, reason: 'NO_JOB_DESCRIPTION' },
+      };
+      await this.savePreviewResult(ownerIdValue, job._id, resumeHash, result);
+      return result;
+    }
+    const descriptionHash = this.sha256(jobDescription);
+    let aiContent: PersistedResumeAssessment['aiContent'];
+    try {
+      aiContent = { status: 'COMPLETE', ...this.heuristic.analyze(resumeText) };
+    } catch {
+      aiContent = {
+        status: 'DETECTOR_FAILED',
+        reason: 'LOCAL_HEURISTIC_EXECUTION_FAILED',
+      };
+    }
+
+    let ats: PersistedResumeAssessment['ats'];
+    try {
+      ats = await this.atsGateway.assess({
+        ownerId: ownerIdValue,
+        runId,
+        applicationId: 'preview',
+        resumeArtifactId: 'upload',
+        resumeVersion: 0,
+        resumeHash,
+        resumeContent: resumeText,
+        jobId: String(job._id),
+        jobDescription,
+        jobDescriptionHash: descriptionHash,
+      });
+    } catch {
+      ats = {
+        status: 'ATS_FAILED',
+        reason: 'EMPLOYER_ATS_EXECUTION_FAILED',
+        harness: 'ats',
+      };
+    }
+
+    const result = {
+      ...base,
+      pairKey: this.sha256(`${resumeHash}:${descriptionHash}`),
+      checkedAt: new Date(),
+      submittedResume: {
+        artifactId: 'upload',
+        version: 0,
+        hash: resumeHash,
+      },
+      job: {
+        jobId: String(job._id),
+        descriptionHash,
+        descriptionVersion: 1,
+      },
+      status: this.combinedStatus(ats.status, aiContent.status),
+      ats,
+      aiContent,
+    };
+    await this.savePreviewResult(ownerIdValue, job._id, resumeHash, result);
+    return result;
+  }
+
+  private async savePreviewResult(
+    ownerIdValue: string,
+    jobId: Types.ObjectId,
+    resumeHash: string,
+    assessment: PersistedResumeAssessment & { preview: true },
+  ) {
+    await this.previewModel
+      .updateOne(
+        { ownerId: this.asObjectId(ownerIdValue), jobId, resumeHash },
+        { $set: { assessment } },
+      )
+      .exec();
   }
 
   async assess(
@@ -379,6 +576,7 @@ export class EmployerResumeAssessmentService {
     if (aiStatus === 'DETECTOR_FAILED') return 'DETECTOR_FAILED';
     if (atsStatus === 'BUDGET_EXHAUSTED') return 'BUDGET_EXHAUSTED';
     if (atsStatus === 'CONFIGURATION_ERROR') return 'CONFIGURATION_ERROR';
+    if (atsStatus === 'ATS_INTERRUPTED') return 'ATS_INTERRUPTED';
     if (atsStatus === 'ATS_FAILED') return 'ATS_FAILED';
     return 'NOT_RUN';
   }

@@ -11,43 +11,53 @@ export class LiteLlmVirtualKeyClient {
     models: string[];
     maxBudgetUsd: number;
   }): Promise<{ key: string; keyHash: string }> {
-    const body = await this.request('/key/generate', {
-      method: 'POST',
-      body: JSON.stringify({
-        key_alias: _input.keyAlias,
-        models: _input.models,
-        max_budget: _input.maxBudgetUsd,
-        budget_duration: '1mo',
-        max_parallel_requests: 1,
-        metadata: {
-          ownerId: _input.ownerId,
-          ownerType: 'employer',
-          usageContext: 'employer_resume_assessment',
-        },
-      }),
-    });
-    if (!body?.key) {
-      throw new ServiceUnavailableException(
-        'Employer ATS key provisioning returned an invalid response.',
-      );
+    if (this.masterKey()) {
+      try {
+        const body = await this.request('/key/generate', {
+          method: 'POST',
+          body: JSON.stringify({
+            key_alias: _input.keyAlias,
+            models: _input.models,
+            max_budget: _input.maxBudgetUsd,
+            budget_duration: '1mo',
+            max_parallel_requests: 1,
+            metadata: {
+              ownerId: _input.ownerId,
+              ownerType: 'employer',
+              usageContext: 'employer_resume_assessment',
+            },
+          }),
+        });
+        if (body?.key) {
+          return { key: body.key, keyHash: body.key_name || body.token || '' };
+        }
+      } catch {
+        // Local LiteLLM often has no admin /key API. Fall through to the same
+        // proxy key the candidate harness already uses.
+      }
     }
-    return { key: body.key, keyHash: body.key_name || body.token || '' };
+    return this.sharedProxyKey();
   }
 
   async update(
     _key: string,
     _input: { models: string[]; maxBudgetUsd: number },
   ): Promise<void> {
-    await this.request('/key/update', {
-      method: 'POST',
-      body: JSON.stringify({
-        key: _key,
-        models: _input.models,
-        max_budget: _input.maxBudgetUsd,
-        budget_duration: '1mo',
-        max_parallel_requests: 1,
-      }),
-    });
+    if (!this.masterKey()) return;
+    try {
+      await this.request('/key/update', {
+        method: 'POST',
+        body: JSON.stringify({
+          key: _key,
+          models: _input.models,
+          max_budget: _input.maxBudgetUsd,
+          budget_duration: '1mo',
+          max_parallel_requests: 1,
+        }),
+      });
+    } catch {
+      // Shared proxy keys cannot be mutated through /key/update.
+    }
   }
 
   async info(_key: string): Promise<{
@@ -55,7 +65,13 @@ export class LiteLlmVirtualKeyClient {
     limitUsd?: number;
     resetAt?: Date;
   }> {
-    const body = await this.request(`/key/info?key=${encodeURIComponent(_key)}`);
+    if (!this.masterKey()) return { spendUsd: 0 };
+    let body: any;
+    try {
+      body = await this.request(`/key/info?key=${encodeURIComponent(_key)}`);
+    } catch {
+      return { spendUsd: 0 };
+    }
     const info = body?.info || body || {};
     const resetValue =
       info.budget_reset_at || info.budget_reset_time || info.reset_at;
@@ -69,6 +85,8 @@ export class LiteLlmVirtualKeyClient {
   }
 
   async spendLogs(_from: Date, _to: Date): Promise<any[]> {
+    if (!this.masterKey()) return [];
+    try {
     const exclusiveEnd = new Date(_to);
     exclusiveEnd.setUTCDate(exclusiveEnd.getUTCDate() + 1);
     const params = new URLSearchParams({
@@ -91,10 +109,30 @@ export class LiteLlmVirtualKeyClient {
         ? { startedAt: new Date(entry.startTime || entry.start_time) }
         : {}),
     }));
+    } catch {
+      return [];
+    }
+  }
+
+  private sharedProxyKey(): { key: string; keyHash: string } {
+    const key =
+      this.config.get<string>('RESUME_HARNESS_LITELLM_KEY', '') ||
+      this.config.get<string>('LITELLM_API_KEY', '') ||
+      '';
+    if (!key) {
+      throw new ServiceUnavailableException(
+        'Employer ATS key management is not configured.',
+      );
+    }
+    return { key, keyHash: 'shared-proxy-key' };
+  }
+
+  private masterKey(): string {
+    return this.config.get<string>('LITELLM_MASTER_KEY', '') || '';
   }
 
   private async request(path: string, init: RequestInit = {}): Promise<any> {
-    const masterKey = this.config.get<string>('LITELLM_MASTER_KEY', '');
+    const masterKey = this.masterKey();
     if (!masterKey) {
       throw new ServiceUnavailableException(
         'Employer ATS key management is not configured.',

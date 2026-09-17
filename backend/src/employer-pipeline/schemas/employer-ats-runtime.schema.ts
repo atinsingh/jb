@@ -43,6 +43,9 @@ export class EmployerAtsRuntime {
   sandboxId?: string;
 
   @Prop()
+  sandboxLeaseId?: string;
+
+  @Prop()
   provisioningToken?: string;
 
   @Prop()
@@ -59,6 +62,9 @@ export class EmployerAtsRuntime {
 
   @Prop()
   runLockUntil?: Date;
+
+  @Prop()
+  interruptedRunId?: string;
 }
 
 export const EmployerAtsRuntimeSchema =

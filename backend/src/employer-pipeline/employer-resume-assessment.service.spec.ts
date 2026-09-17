@@ -22,8 +22,17 @@ describe('EmployerResumeAssessmentService', () => {
   };
   const artifactModel = { findOne: jest.fn() };
   const employerJobModel = { findOne: jest.fn() };
+  let savedPreview: any;
+  const previewModel = {
+    findOne: jest.fn(() => query(savedPreview)),
+    updateOne: jest.fn((_filter: any, update: any) => {
+      savedPreview = { ...(savedPreview || {}), ...(update.$set || {}) };
+      return query({ acknowledged: true, modifiedCount: 1 });
+    }),
+  };
   const gateway = { assess: jest.fn() };
   const heuristic = new ResumeAiContentHeuristicService();
+  let parser: { validateFile: jest.Mock; extractText: jest.Mock };
   let service: EmployerResumeAssessmentService;
 
   const linkedApplicant = () => ({
@@ -41,6 +50,7 @@ describe('EmployerResumeAssessmentService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    savedPreview = null;
     applicantModel.findOne.mockReset();
     applicantModel.updateOne.mockReset();
     artifactModel.findOne.mockReset();
@@ -78,12 +88,20 @@ describe('EmployerResumeAssessmentService', () => {
       reason: 'EMPLOYER_BUDGET_EXHAUSTED',
       harness: 'ats',
     });
+    parser = {
+      validateFile: jest.fn(),
+      extractText: jest.fn().mockResolvedValue(
+        'Reliable backend engineer.\nTypeScript\nMongoDB',
+      ),
+    };
     service = new EmployerResumeAssessmentService(
       applicantModel as any,
       artifactModel as any,
       employerJobModel as any,
       heuristic,
       gateway as any,
+      parser as any,
+      previewModel as any,
     );
   });
 
@@ -321,5 +339,107 @@ describe('EmployerResumeAssessmentService', () => {
         },
       }),
     );
+  });
+
+  it('previews an uploaded resume against a job without writing an applicant', async () => {
+    gateway.assess.mockResolvedValue({
+      status: 'COMPLETE',
+      semanticMatch: 71,
+      subScores: { skills: 74 },
+      gaps: ['Kubernetes'],
+      harness: 'ats',
+    });
+    const file = {
+      originalname: 'ada.pdf',
+      mimetype: 'application/pdf',
+      size: 1200,
+      buffer: Buffer.from('%PDF-preview'),
+    } as Express.Multer.File;
+
+    const result = await service.previewFromUpload(
+      String(OWNER),
+      String(JOB),
+      file,
+    );
+
+    expect(applicantModel.updateOne).not.toHaveBeenCalled();
+    expect(applicantModel.findOne).not.toHaveBeenCalled();
+    expect(parser.validateFile).toHaveBeenCalledWith(file);
+    expect(gateway.assess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ownerId: String(OWNER),
+        applicationId: 'preview',
+        resumeArtifactId: 'upload',
+        resumeContent: expect.stringContaining('backend engineer'),
+        jobId: String(JOB),
+      }),
+    );
+    expect(result.preview).toBe(true);
+    expect(result.applicationId).toBeUndefined();
+    expect(result.status).toBe('COMPLETE');
+    expect(result.ats).toEqual(
+      expect.objectContaining({ status: 'COMPLETE', semanticMatch: 71 }),
+    );
+    expect(result.aiContent.status).toBe('COMPLETE');
+  });
+
+  it('restores an uploaded preview and reruns it without extracting the file again', async () => {
+    const file = {
+      originalname: 'ada.pdf',
+      mimetype: 'application/pdf',
+      buffer: Buffer.from('%PDF-preview'),
+    } as Express.Multer.File;
+
+    await service.previewFromUpload(String(OWNER), String(JOB), file);
+    const restored = await (service as any).getSavedPreview(String(OWNER), String(JOB));
+    expect(restored).toEqual(expect.objectContaining({
+      saved: true,
+      fileName: 'ada.pdf',
+      assessment: expect.objectContaining({ preview: true, status: 'PARTIAL' }),
+    }));
+    expect(JSON.stringify(restored)).not.toContain('Reliable backend engineer');
+
+    parser.extractText.mockClear();
+    const rerun = await (service as any).rerunSavedPreview(String(OWNER), String(JOB));
+    expect(rerun).toEqual(expect.objectContaining({ preview: true, status: 'PARTIAL' }));
+    expect(parser.extractText).not.toHaveBeenCalled();
+    expect(gateway.assess).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the heuristic result when ATS matching is interrupted by sandbox release', async () => {
+    gateway.assess.mockResolvedValue({
+      status: 'ATS_INTERRUPTED',
+      reason: 'EMPLOYER_ATS_SANDBOX_RELEASED',
+      harness: 'ats',
+    });
+    const file = {
+      originalname: 'ada.pdf',
+      mimetype: 'application/pdf',
+      size: 1200,
+      buffer: Buffer.from('%PDF-preview'),
+    } as Express.Multer.File;
+
+    const result = await service.previewFromUpload(
+      String(OWNER),
+      String(JOB),
+      file,
+    );
+
+    expect(result.status).toBe('PARTIAL');
+    expect(result.ats.status).toBe('ATS_INTERRUPTED');
+    expect(result.aiContent.status).toBe('COMPLETE');
+  });
+
+  it('returns 404 for an upload preview against a job the employer does not own', async () => {
+    employerJobModel.findOne.mockReturnValue(query(null));
+
+    await expect(
+      service.previewFromUpload(String(OWNER), String(JOB), {
+        originalname: 'ada.pdf',
+        buffer: Buffer.from('x'),
+      } as Express.Multer.File),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(gateway.assess).not.toHaveBeenCalled();
+    expect(applicantModel.updateOne).not.toHaveBeenCalled();
   });
 });

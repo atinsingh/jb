@@ -10,9 +10,9 @@
 #    identical prices. Per-harness reporting comes from the `harness` request
 #    tag instead (see `tag_filters` below and LITELLM_TAG_HEADER in the backend).
 #
-# 2. Every credential here is a metered platform key. Anthropic Console and
-#    OpenAI Platform keys only — Claude Pro/Max and ChatGPT Plus/Pro logins are
-#    Consumer Terms products and must never be configured on this proxy.
+# 2. Credentials on this proxy are Bedrock IAM only. Anthropic Console and
+#    OpenAI Platform keys are not configured here. Claude Pro/Max and ChatGPT
+#    Plus/Pro logins are Consumer Terms products and must never appear either.
 #
 # Adding an alias is an entry here plus a row in `harness_model_aliases`
 # (which tiers may select it). Neither is a deploy.
@@ -22,41 +22,35 @@
 
 model_list:
   # ----------------------------------------------------------- anthropic ---
+  # Haiku and Sonnet 4.6 are the verified Claude routes. Alias names stay
+  # anthropic/… so Claude Code is the harness; the wire call uses Bedrock IAM.
   - model_name: anthropic/claude-haiku-4-5/low
     litellm_params:
-      model: anthropic/claude-haiku-4-5
-      api_key: os.environ/ANTHROPIC_API_KEY
+      model: bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0
+      aws_region_name: os.environ/AWS_REGION
+      aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
+      aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
       thinking: { type: disabled }
 
-  - model_name: anthropic/claude-sonnet-4-5/low
+  - model_name: anthropic/claude-sonnet-4-6/low
     litellm_params:
-      model: anthropic/claude-sonnet-4-5
-      api_key: os.environ/ANTHROPIC_API_KEY
+      model: bedrock/us.anthropic.claude-sonnet-4-6
+      aws_region_name: os.environ/AWS_REGION
+      aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
+      aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
       thinking: { type: disabled }
 
-  - model_name: anthropic/claude-sonnet-4-5/high
+  - model_name: anthropic/claude-sonnet-4-6/high
     litellm_params:
-      model: anthropic/claude-sonnet-4-5
-      api_key: os.environ/ANTHROPIC_API_KEY
+      model: bedrock/us.anthropic.claude-sonnet-4-6
+      aws_region_name: os.environ/AWS_REGION
+      aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
+      aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
       thinking: { type: enabled, budget_tokens: 8000 }
 
-  - model_name: anthropic/claude-opus-4-5/high
-    litellm_params:
-      model: anthropic/claude-opus-4-5
-      api_key: os.environ/ANTHROPIC_API_KEY
-      thinking: { type: enabled, budget_tokens: 12000 }
-
-  - model_name: anthropic/claude-opus-4-5/max
-    litellm_params:
-      model: anthropic/claude-opus-4-5
-      api_key: os.environ/ANTHROPIC_API_KEY
-      thinking: { type: enabled, budget_tokens: 32000 }
-
   # ------------------------------------------------------------- bedrock ---
-  # Amazon Bedrock, authenticated with a Bedrock API key (a bearer token) via
-  # AWS_BEARER_TOKEN_BEDROCK — no IAM keypair, no STS dance. It is a metered
-  # platform credential, so it satisfies the same constraint as the Console and
-  # Platform keys: no subscription login is involved anywhere.
+  # Amazon Bedrock via IAM (aws_access_key_id / aws_secret_access_key). A
+  # Bedrock API key cannot drive this LiteLLM build's Converse+tools path.
   #
   # Two things to know before editing this block:
   #
@@ -66,15 +60,14 @@ model_list:
   #    that exact model is enabled in that exact region. Run
   #    `npm run harness:bedrock-check` (backend) to print what THIS key can call
   #    and reconcile this list against its output rather than guessing.
-  #  * Bedrock serves Anthropic models, not OpenAI ones. That is fine and is the
-  #    design working: aliases are namespaced per provider+model+effort, and the
-  #    harness is independent of the provider. Codex and OpenCode drive a
-  #    Bedrock-backed Claude alias through the OpenAI-compatible route without
-  #    knowing or caring.
-  # Every id below was entitled on this account (`harness:bedrock-check`) AND
-  # returned a Converse `toolUse` with a `toolUseId` (the harness path). Listing
-  # is not enough: Sonnet 5 / Opus 5 403, Haiku 4.5 404s on the use-case form,
-  # Llama streams without usable writes. Re-probe after account/region changes.
+  #  * Bedrock now also serves OpenAI GPT-5.6 Sol/Terra/Luna. Aliases stay
+  #    namespaced per provider+model+effort; Codex talks to LiteLLM, LiteLLM
+  #    talks to Bedrock with IAM. Do not point those aliases at api.openai.com.
+  # Nova / Qwen ids below were entitled on this account (`harness:bedrock-check`)
+  # AND returned a Converse `toolUse` with a `toolUseId`. Haiku and Sonnet 4.6
+  # are offered after Claude Code file-writing checks. Opus remains unoffered.
+  # Llama streams without usable writes.
+  # Re-probe after account/region changes.
   #
   # WHY IAM CREDENTIALS AND NOT THE BEDROCK API KEY
   #
@@ -102,11 +95,7 @@ model_list:
   # If a future LiteLLM lets the Converse handler tolerate bearer auth, this can
   # go back to AWS_BEARER_TOKEN_BEDROCK and drop the IAM pair entirely.
   #
-  # Anthropic on Bedrock is not listed. The IAM principal LiteLLM uses gets
-  # `Model use case details have not been submitted` (404) on every Claude
-  # profile, including ones a Bedrock API key can Converse. Until that form is
-  # filed for the IAM user, a Bedrock Claude alias is a session that 404s —
-  # the Llama failure mode. Claude stays on the Anthropic Console aliases.
+  # The Claude aliases above use these IAM credentials.
 
   # Amazon Nova — the cheap end of Bedrock.
   #
@@ -160,59 +149,53 @@ model_list:
       aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
       aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
 
-  # Meta Llama is deliberately not served. Bedrock refuses tool use on the
-  # streaming Converse route, and even with LiteLLM fake_stream the models dump
-  # empty writes (or JSON-as-text) instead of a filled resume.tex. Offering them
-  # is offering a session that cannot produce a résumé.
-
-  # -------------------------------------------------------------- openai ---
-  - model_name: openai/gpt-5.1-codex/low
-    litellm_params:
-      model: openai/gpt-5.1-codex
-      api_key: os.environ/OPENAI_API_KEY
-      reasoning_effort: low
-
-  - model_name: openai/gpt-5.1-codex/high
-    litellm_params:
-      model: openai/gpt-5.1-codex
-      api_key: os.environ/OPENAI_API_KEY
-      reasoning_effort: high
-
-  - model_name: openai/gpt-5.1-codex-max/high
-    litellm_params:
-      model: openai/gpt-5.1-codex-max
-      api_key: os.environ/OPENAI_API_KEY
-      reasoning_effort: high
-
+  # GPT-5.6 Luna on Bedrock (US cross-region). The alias name stays
+  # openai/… so the seed `provider: openai` still routes the session through
+  # Codex. The wire call is IAM → converse/us.openai.gpt-5.6-luna, not OPENAI_API_KEY.
   - model_name: openai/gpt-5.6-luna/low
     litellm_params:
-      model: openai/gpt-5.6-luna
-      api_key: os.environ/OPENAI_API_KEY
+      model: bedrock/converse/us.openai.gpt-5.6-luna
+      aws_region_name: os.environ/AWS_REGION
+      aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
+      aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
       reasoning_effort: low
 
   - model_name: openai/gpt-5.6-luna/medium
     litellm_params:
-      model: openai/gpt-5.6-luna
-      api_key: os.environ/OPENAI_API_KEY
+      model: bedrock/converse/us.openai.gpt-5.6-luna
+      aws_region_name: os.environ/AWS_REGION
+      aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
+      aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
       reasoning_effort: medium
 
   - model_name: openai/gpt-5.6-luna/high
     litellm_params:
-      model: openai/gpt-5.6-luna
-      api_key: os.environ/OPENAI_API_KEY
+      model: bedrock/converse/us.openai.gpt-5.6-luna
+      aws_region_name: os.environ/AWS_REGION
+      aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
+      aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
       reasoning_effort: high
 
   - model_name: openai/gpt-5.6-luna/xhigh
     litellm_params:
-      model: openai/gpt-5.6-luna
-      api_key: os.environ/OPENAI_API_KEY
+      model: bedrock/converse/us.openai.gpt-5.6-luna
+      aws_region_name: os.environ/AWS_REGION
+      aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
+      aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
       reasoning_effort: xhigh
 
   - model_name: openai/gpt-5.6-luna/max
     litellm_params:
-      model: openai/gpt-5.6-luna
-      api_key: os.environ/OPENAI_API_KEY
+      model: bedrock/converse/us.openai.gpt-5.6-luna
+      aws_region_name: os.environ/AWS_REGION
+      aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
+      aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
       reasoning_effort: max
+
+  # Meta Llama is deliberately not served. Bedrock refuses tool use on the
+  # streaming Converse route, and even with LiteLLM fake_stream the models dump
+  # empty writes (or JSON-as-text) instead of a filled resume.tex. Offering them
+  # is offering a session that cannot produce a résumé.
 
 litellm_settings:
   # Per-request tags arrive in the `x-litellm-tags` header and are written to

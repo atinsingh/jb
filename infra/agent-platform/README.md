@@ -12,10 +12,9 @@ API returns 503 from `POST /api/resume-harness/sessions`.
 ## Bring it up
 
 ```bash
-# Keys are metered platform keys. Anthropic Console + OpenAI Platform only —
-# a Claude Pro/Max or ChatGPT Plus/Pro login must never be configured here.
-export ANTHROPIC_API_KEY=sk-ant-api03-...
-export OPENAI_API_KEY=sk-proj-...
+# Keys for LiteLLM are AWS IAM in `.env.local`. Anthropic Console and OpenAI
+# Platform keys are not configured on the proxy. A Claude Pro/Max or ChatGPT
+# Plus/Pro login must never be configured here.
 export LITELLM_MASTER_KEY=sk-litellm-master-...
 
 docker build -f infra/agent-platform/harness.Dockerfile \

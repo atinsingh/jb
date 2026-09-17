@@ -45,7 +45,9 @@ export class EmployerAtsSecretCodec {
   private key(): Buffer {
     const secret =
       this.config.get<string>('AI_VIRTUAL_KEY_ENCRYPTION_KEY', '') ||
-      this.config.get<string>('LITELLM_MASTER_KEY', '');
+      this.config.get<string>('LITELLM_MASTER_KEY', '') ||
+      this.config.get<string>('RESUME_HARNESS_LITELLM_KEY', '') ||
+      this.config.get<string>('LITELLM_API_KEY', '');
     if (!secret) {
       throw new ServiceUnavailableException(
         'Employer ATS credential encryption is not configured.',
