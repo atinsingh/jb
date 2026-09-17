@@ -28,6 +28,7 @@ describe('EmployerAtsRuntimeService', () => {
   const sandbox = {
     provision: jest.fn(),
     exec: jest.fn(),
+    destroy: jest.fn(),
   };
   const secrets = {
     encrypt: jest.fn((value: string) => `encrypted:${value}`),
@@ -45,6 +46,7 @@ describe('EmployerAtsRuntimeService', () => {
     keyAlias: `jobocate-employer-${OWNER}`,
     encryptedKey: 'encrypted:sk-employer-only',
     keyHash: 'hash',
+    sandboxLeaseId: 'page-lease-1',
     ...overrides,
   });
 
@@ -81,6 +83,7 @@ describe('EmployerAtsRuntimeService', () => {
     keys.spendLogs.mockResolvedValue([]);
     sandbox.exec.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' });
     sandbox.provision.mockResolvedValue({ sandboxId: 'employer-box-1' });
+    sandbox.destroy.mockResolvedValue(undefined);
     service = new EmployerAtsRuntimeService(
       runtimeModel as any,
       usageModel as any,
@@ -123,7 +126,7 @@ describe('EmployerAtsRuntimeService', () => {
       expect.objectContaining({ status: 'RUNNING', reason: 'EMPLOYER_ATS_RUN_IN_PROGRESS' }),
     );
     expect(keys.info).not.toHaveBeenCalled();
-    expect(sandbox.exec).not.toHaveBeenCalled();
+    expect(sandbox.destroy).not.toHaveBeenCalled();
   });
 
   it('blocks provider dispatch at the authoritative LiteLLM limit while preserving budget details', async () => {
@@ -165,6 +168,24 @@ describe('EmployerAtsRuntimeService', () => {
       }),
     );
     expect(JSON.stringify(sandbox.provision.mock.calls)).not.toContain('candidate');
+  });
+
+  it('prewarms an employer sandbox without starting an assessment run', async () => {
+    runtimeModel.findOne.mockReturnValue(q(account({ sandboxId: undefined })));
+    runtimeModel.findOneAndUpdate.mockReturnValue(q(account({ sandboxId: undefined })));
+
+    const result = await (service as any).acquireSandbox(OWNER, 'page-lease-1');
+
+    expect(result).toEqual({ ready: true, sandboxId: 'employer-box-1' });
+    expect(sandbox.provision).toHaveBeenCalledTimes(1);
+    expect(runtimeModel.updateOne.mock.calls).not.toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining([
+          expect.anything(),
+          expect.objectContaining({ $set: expect.objectContaining({ activeRunId: expect.anything() }) }),
+        ]),
+      ]),
+    );
   });
 
   it('creates one encrypted employer virtual key when the owner has no account key', async () => {
@@ -345,6 +366,130 @@ describe('EmployerAtsRuntimeService', () => {
         $set: { spendUsd: 0.3 },
         $unset: { activeRunId: 1, runLockUntil: 1 },
       },
+    );
+  });
+
+  it('destroys the employer sandbox and forgets its id on release', async () => {
+    await service.releaseSandbox(OWNER, 'page-lease-1');
+
+    expect(sandbox.destroy).toHaveBeenCalledWith('employer-box-1');
+    expect(runtimeModel.updateOne).toHaveBeenCalledWith(
+      {
+        ownerId: new Types.ObjectId(OWNER),
+        ownerType: 'employer',
+        sandboxLeaseId: 'page-lease-1',
+      },
+      expect.objectContaining({
+        $unset: expect.objectContaining({
+          sandboxId: 1,
+          sandboxLeaseId: 1,
+          sandboxProvisioningToken: 1,
+          sandboxProvisioningUntil: 1,
+          activeRunId: 1,
+          runLockUntil: 1,
+        }),
+      }),
+    );
+  });
+
+  it('does not let an old page release the current page sandbox', async () => {
+    runtimeModel.findOne.mockReturnValue(
+      q(account({ sandboxId: 'employer-box-1', sandboxLeaseId: 'new-page' })),
+    );
+
+    const result = await (service as any).releaseSandbox(OWNER, 'old-page');
+
+    expect(result).toEqual({ released: false });
+    expect(sandbox.destroy).not.toHaveBeenCalled();
+  });
+
+  it('records the active run as interrupted when the client releases the sandbox', async () => {
+    runtimeModel.findOne.mockReturnValue(
+      q(account({ sandboxId: 'employer-box-1', activeRunId: 'run-live' })),
+    );
+
+    await service.releaseSandbox(OWNER, 'page-lease-1');
+
+    expect(runtimeModel.updateOne).toHaveBeenCalledWith(
+      {
+        ownerId: new Types.ObjectId(OWNER),
+        ownerType: 'employer',
+        sandboxLeaseId: 'page-lease-1',
+      },
+      expect.objectContaining({
+        $set: expect.objectContaining({ interruptedRunId: 'run-live' }),
+        $unset: expect.objectContaining({
+          activeRunId: 1,
+          runLockUntil: 1,
+        }),
+      }),
+    );
+  });
+
+  it('reclaims a leftover lock when the previous sandbox is already gone', async () => {
+    runtimeModel.findOneAndUpdate
+      .mockReturnValueOnce(q(null))
+      .mockReturnValueOnce(q(account({ sandboxId: 'employer-box-1' })));
+    runtimeModel.findOne.mockReturnValue(
+      q(
+        account({
+          sandboxId: undefined,
+          activeRunId: 'run-stale',
+          interruptedRunId: 'run-stale',
+        }),
+      ),
+    );
+
+    const result = await service.prepare(OWNER, 'run-retry');
+
+    expect(result).toEqual(expect.objectContaining({ status: 'READY' }));
+    expect(runtimeModel.updateOne).toHaveBeenCalledWith(
+      {
+        ownerId: new Types.ObjectId(OWNER),
+        ownerType: 'employer',
+        activeRunId: 'run-stale',
+      },
+      { $unset: { activeRunId: 1, runLockUntil: 1 } },
+    );
+    expect(keys.info).toHaveBeenCalled();
+  });
+
+  it('reclaims a locked run and replaces its stopped sandbox', async () => {
+    const stale = account({
+      sandboxId: 'employer-box-1',
+      activeRunId: 'run-stale',
+      runLockUntil: new Date(Date.now() + 60_000),
+    });
+    runtimeModel.findOne.mockReturnValue(q(stale));
+    runtimeModel.findOneAndUpdate
+      .mockReturnValueOnce(q(null))
+      .mockReturnValueOnce(q(stale))
+      .mockReturnValueOnce(q(stale));
+    sandbox.exec.mockResolvedValue({
+      exitCode: 1,
+      stdout: '',
+      stderr: 'Error response from daemon: container employer-box-1 is not running',
+    });
+
+    const result = await service.prepare(OWNER, 'run-retry');
+
+    expect(result).toEqual(expect.objectContaining({ status: 'READY' }));
+    expect(sandbox.destroy).toHaveBeenCalledWith('employer-box-1');
+    expect(sandbox.destroy.mock.invocationCallOrder[0]).toBeLessThan(
+      sandbox.provision.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('reports whether a live run was interrupted by a client sandbox release', async () => {
+    runtimeModel.findOne.mockReturnValue(
+      q(account({ interruptedRunId: 'run-live' })),
+    );
+
+    await expect(service.wasReleasedDuring(OWNER, 'run-live')).resolves.toBe(
+      true,
+    );
+    await expect(service.wasReleasedDuring(OWNER, 'other-run')).resolves.toBe(
+      false,
     );
   });
 });

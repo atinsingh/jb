@@ -23,6 +23,7 @@ import {
 } from './employer-ats-assessment.gateway';
 import { AtsModule } from '../ats/ats.module';
 import { ResumeHarnessModule } from '../resume-harness/resume-harness.module';
+import { ResumeModule } from '../resume/resume.module';
 import { EmployerBillingModule } from '../employer-billing/employer-billing.module';
 import {
   EmployerAtsRuntime,
@@ -32,18 +33,24 @@ import { LLMUsage, LLMUsageSchema } from '../llm/schemas/llm-usage.schema';
 import { EmployerAtsRuntimeService } from './employer-ats-runtime.service';
 import { LiteLlmVirtualKeyClient } from './litellm-virtual-key.client';
 import { EmployerAtsSecretCodec } from './employer-ats-secret.codec';
+import {
+  EmployerAtsPreview,
+  EmployerAtsPreviewSchema,
+} from './schemas/employer-ats-preview.schema';
 
 @Module({
   imports: [
     ConfigModule,
     AtsModule,
     ResumeHarnessModule,
+    ResumeModule,
     EmployerBillingModule,
     MongooseModule.forFeature([
       { name: EmployerApplicant.name, schema: EmployerApplicantSchema },
       { name: ApplicationArtifact.name, schema: ApplicationArtifactSchema },
       { name: EmployerJob.name, schema: EmployerJobSchema },
       { name: EmployerAtsRuntime.name, schema: EmployerAtsRuntimeSchema },
+      { name: EmployerAtsPreview.name, schema: EmployerAtsPreviewSchema },
       { name: LLMUsage.name, schema: LLMUsageSchema },
     ]),
   ],

@@ -242,23 +242,23 @@ describe('ModelAliasService', () => {
     expect(resolved.alias).toBe(PRO_ALIAS.alias);
   });
 
-  it('does not offer Bedrock Claude ids this account cannot invoke', async () => {
-    const dead = {
-      alias: 'bedrock/claude-sonnet-5/high',
-      provider: 'bedrock',
-      model: 'claude-sonnet-5',
+  it('offers seeded Claude aliases, including Bedrock-backed rows', async () => {
+    const claude = {
+      alias: 'anthropic/claude-sonnet-4-5/high',
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-5',
       effort: 'high',
-      label: 'Sonnet 5 · thorough (Bedrock)',
+      label: 'Sonnet 4.5 · thorough',
       tiers: ['PRO', 'ELITE'],
       defaultForTiers: ['PRO'],
       isActive: true,
       rank: 1,
     };
     signedInAs('PRO');
-    aliasModel.find.mockReturnValue(findReturning([dead, PRO_ALIAS]));
+    aliasModel.find.mockReturnValue(findReturning([claude]));
 
     const allowed = await service.listForUser('u1');
-    expect(allowed.map((a) => a.alias)).toEqual([PRO_ALIAS.alias]);
+    expect(allowed.map((a) => a.alias)).toEqual([claude.alias]);
   });
 
   it('contains no hardcoded model id, effort level or tier->model mapping', () => {

@@ -106,13 +106,12 @@ services:
     restart: unless-stopped
     ports:
       - "4000:4000"
-    # Provider keys come from the repo-wide env file. They are read via env_file
-    # rather than `${VAR}` substitution because compose only auto-reads `.env`
-    # for substitution, never `.env.local` — every key would have resolved to an
-    # empty string, and LiteLLM would have failed at first call, not at boot.
+    # AWS IAM (and LiteLLM master/virtual keys) come from the repo-wide env
+    # file. They are read via env_file rather than `${VAR}` substitution because
+    # compose only auto-reads `.env` for substitution, never `.env.local`.
     #
-    # Metered platform keys only. A Claude Pro/Max or ChatGPT Plus/Pro login is
-    # a Consumer Terms product and must never be configured here.
+    # The proxy itself has no Anthropic Console or OpenAI Platform rows. A
+    # Claude Pro/Max or ChatGPT Plus/Pro login must never be configured here.
     env_file:
       - ./.env.local
     volumes:

@@ -36,6 +36,13 @@ test.describe('Employer screening resume assessment', () => {
   }
 
   async function mockBudget(page, overrides = {}) {
+    await page.route('**/api/employer/applicants/resume-assessment/acquire', (route) =>
+      route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ ready: true }),
+      }),
+    );
     await page.route('**/api/employer/applicants/resume-assessment/budget', (route) =>
       route.fulfill({
         status: 200,
@@ -198,5 +205,323 @@ test.describe('Employer screening resume assessment', () => {
     await expect(page.getByText('63/100')).toBeVisible();
     await expect(page.getByText(/does not use this budget/i)).toBeVisible();
     await expect(page.getByText(/ATS match was not run because/i)).toBeVisible();
+  });
+
+  test('job applications can score an uploaded resume without an applicant', async ({
+    page,
+  }) => {
+    const jobId = '64b0000000000000000000aa';
+    await page.route(`**/api/employer/jobs/${jobId}`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ job: { _id: jobId, title: 'Backend Engineer' } }),
+      }),
+    );
+    await mockBudget(page);
+    await page.route('**/api/employer/applicants?**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      }),
+    );
+    await page.route(
+      `**/api/employer/applicants/resume-assessment/preview?**`,
+      async (route) => {
+        if (route.request().method() === 'GET') {
+          await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ saved: false }) });
+          return;
+        }
+        expect(route.request().method()).toBe('POST');
+        const contentType = route.request().headers()['content-type'] || '';
+        expect(contentType).toContain('multipart/form-data');
+        await route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            preview: true,
+            status: 'COMPLETE',
+            ats: {
+              status: 'COMPLETE',
+              semanticMatch: 71,
+              subScores: { skills: 74, experience: 68 },
+              gaps: ['Kubernetes'],
+              suggestions: ['Add measurable platform outcomes.'],
+            },
+            aiContent: {
+              status: 'COMPLETE',
+              composite: 42,
+              detectorVersion: 'jobocate-heuristic-v1',
+              weightingVersion: 'weights-v1',
+              signals: {},
+            },
+          }),
+        });
+      },
+    );
+
+    await page.goto(`/employer/jobs/${jobId}/applications`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await page
+      .getByLabel('Upload résumé for ATS preview')
+      .setInputFiles({
+        name: 'ada.pdf',
+        mimeType: 'application/pdf',
+        buffer: Buffer.from('%PDF-preview'),
+      });
+    await page.getByRole('button', { name: 'Score uploaded résumé' }).click();
+
+    await expect(page.getByText('Ad-hoc ATS preview')).toBeVisible();
+    await expect(page.getByText('71/100')).toBeVisible();
+    await expect(page.getByText('Good to submit')).toBeVisible();
+    await expect(page.getByText('Ada Lovelace')).toHaveCount(0);
+  });
+
+  test('keeps the uploaded preview and reacquires its sandbox when the applications tab returns', async ({
+    page, guards,
+  }) => {
+    guards.allowFailures('/resume-assessment/release');
+    guards.allowConsoleErrors();
+    const jobId = '64b0000000000000000000aa';
+    const acquires: string[] = [];
+    const releases: string[] = [];
+    const reruns: string[] = [];
+    await page.route(`**/api/employer/jobs/${jobId}`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ job: { _id: jobId, title: 'Backend Engineer' } }),
+      }),
+    );
+    await mockBudget(page);
+    await page.route('**/api/employer/applicants?**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      }),
+    );
+    await page.route(
+      '**/api/employer/applicants/resume-assessment/acquire',
+      (route) => {
+        acquires.push(route.request().method());
+        return route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify({ ready: true }),
+        });
+      },
+    );
+    await page.route(
+      '**/api/employer/applicants/resume-assessment/preview?**',
+      (route) => {
+        if (route.request().method() === 'POST') reruns.push('POST');
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(
+            route.request().method() === 'GET'
+              ? {
+                  saved: true,
+                  fileName: 'ada.pdf',
+                  assessment: {
+                    preview: true,
+                    status: 'COMPLETE',
+                    ats: { status: 'COMPLETE', semanticMatch: 71 },
+                    aiContent: { status: 'COMPLETE', composite: 42, signals: {} },
+                  },
+                }
+              : {
+                  preview: true,
+                  status: 'COMPLETE',
+                  ats: { status: 'COMPLETE', semanticMatch: 72 },
+                  aiContent: { status: 'COMPLETE', composite: 42, signals: {} },
+                },
+          ),
+        });
+      },
+    );
+    await page.route(
+      '**/api/employer/applicants/resume-assessment/release',
+      (route) => {
+        releases.push(route.request().method());
+        return route.fulfill({
+          status: releases.length === 1 ? 503 : 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ released: true }),
+        });
+      },
+    );
+
+    await page.goto(`/employer/jobs/${jobId}/applications`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await expect(page.getByRole('heading', { name: 'Backend Engineer' })).toBeVisible();
+    await expect.poll(() => acquires.length).toBe(1);
+    await expect(page.getByText('ada.pdf')).toBeVisible();
+    await expect(page.getByText('71/100')).toBeVisible();
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        value: 'hidden',
+      });
+      document.dispatchEvent(new Event('visibilitychange'));
+      window.dispatchEvent(new Event('pagehide'));
+    });
+
+    await expect.poll(() => releases.length).toBe(2);
+    expect(releases[0]).toBe('POST');
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        value: 'visible',
+      });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await expect.poll(() => acquires.length).toBe(2);
+    await expect(page.getByText('71/100')).toBeVisible();
+    await page.getByRole('button', { name: 'Score uploaded résumé' }).click();
+    await expect.poll(() => reruns.length).toBe(1);
+    await expect(page.getByText('72/100')).toBeVisible();
+  });
+
+  test('explains that ATS matching stopped because the scoring sandbox was released', async ({
+    page,
+  }) => {
+    const jobId = '64b0000000000000000000aa';
+    await page.route(`**/api/employer/jobs/${jobId}`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ job: { _id: jobId, title: 'Backend Engineer' } }),
+      }),
+    );
+    await mockBudget(page);
+    await page.route('**/api/employer/applicants?**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      }),
+    );
+    await page.route(
+      `**/api/employer/applicants/resume-assessment/preview?**`,
+      (route) =>
+        route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            preview: true,
+            status: 'PARTIAL',
+            ats: {
+              status: 'ATS_INTERRUPTED',
+              reason: 'EMPLOYER_ATS_SANDBOX_RELEASED',
+              harness: 'ats',
+            },
+            aiContent: {
+              status: 'COMPLETE',
+              composite: 32,
+              detectorVersion: 'jobocate-heuristic-v1',
+              weightingVersion: 'weights-v1',
+              signals: {},
+            },
+          }),
+        }),
+    );
+
+    await page.goto(`/employer/jobs/${jobId}/applications`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await page
+      .getByLabel('Upload résumé for ATS preview')
+      .setInputFiles({
+        name: 'ada.pdf',
+        mimeType: 'application/pdf',
+        buffer: Buffer.from('%PDF-preview'),
+      });
+    await page.getByRole('button', { name: 'Score uploaded résumé' }).click();
+
+    await expect(
+      page.getByText(/scoring container was shut down/i),
+    ).toBeVisible();
+    await expect(
+      page.getByText('ATS matching failed during execution. Retry the assessment.'),
+    ).toHaveCount(0);
+  });
+
+  test('releases the employer ATS sandbox when focus is lost during scoring', async ({
+    page,
+  }) => {
+    const jobId = '64b0000000000000000000aa';
+    const releases: string[] = [];
+    await page.route(`**/api/employer/jobs/${jobId}`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ job: { _id: jobId, title: 'Backend Engineer' } }),
+      }),
+    );
+    await mockBudget(page);
+    await page.route('**/api/employer/applicants?**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      }),
+    );
+    await page.route(
+      '**/api/employer/applicants/resume-assessment/release',
+      (route) => {
+        releases.push(route.request().method());
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ released: true }),
+        });
+      },
+    );
+    await page.route(
+      `**/api/employer/applicants/resume-assessment/preview?**`,
+      async (route) => {
+        if (route.request().method() === 'GET') {
+          await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ saved: false }) });
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        await route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            preview: true,
+            status: 'COMPLETE',
+            ats: { status: 'COMPLETE', semanticMatch: 71 },
+            aiContent: { status: 'COMPLETE', composite: 42, signals: {} },
+          }),
+        });
+      },
+    );
+
+    await page.goto(`/employer/jobs/${jobId}/applications`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await page
+      .getByLabel('Upload résumé for ATS preview')
+      .setInputFiles({
+        name: 'ada.pdf',
+        mimeType: 'application/pdf',
+        buffer: Buffer.from('%PDF-preview'),
+      });
+    await page.getByRole('button', { name: 'Score uploaded résumé' }).click();
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        value: 'hidden',
+      });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    await expect.poll(() => releases.length).toBe(1);
   });
 });

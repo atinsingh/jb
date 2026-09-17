@@ -33,6 +33,38 @@ test.describe('Employer v3 workspace shell', () => {
     await expectNoHorizontalOverflow(page, 'employer dashboard');
   });
 
+  test('job applications uses the v3 surface instead of the legacy cream layout', async ({ page }) => {
+    const jobId = '64b0000000000000000000aa';
+    await page.route(`**/api/employer/jobs/${jobId}`, (route) =>
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ job: { _id: jobId, title: 'Backend Engineer' } }),
+      }),
+    );
+    await page.route('**/api/employer/applicants/resume-assessment/budget', (route) =>
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'READY', limitUsd: 1, remainingUsd: 1 }),
+      }),
+    );
+    await page.route(`**/api/employer/applicants?**`, (route) =>
+      route.fulfill({ contentType: 'application/json', body: JSON.stringify([]) }),
+    );
+
+    await page.goto(`/employer/jobs/${jobId}/applications`, { waitUntil: 'domcontentloaded' });
+
+    await expect(page.getByRole('navigation', { name: 'Employer primary' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Backend Engineer' })).toBeVisible();
+    const colors = await page.locator('#emapp').evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { backgroundColor: style.backgroundColor, color: style.color };
+    });
+    expect(colors, 'job applications should use the dark v3 palette').toEqual({
+      backgroundColor: 'rgb(11, 11, 12)',
+      color: 'rgb(245, 245, 244)',
+    });
+  });
+
   test('jobs route exposes its contextual navigation inside the shared shell', async ({ page }) => {
     await page.goto('/employer/jobs', { waitUntil: 'domcontentloaded' });
 

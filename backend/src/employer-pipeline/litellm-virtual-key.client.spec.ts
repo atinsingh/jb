@@ -138,4 +138,54 @@ describe('LiteLlmVirtualKeyClient', () => {
       expect.any(Object),
     );
   });
+
+  it('uses the harness LiteLLM key when virtual-key provisioning is not configured', async () => {
+    config.get.mockImplementation((key: string, fallback?: string) => {
+      if (key === 'LITELLM_BASE_URL') return 'http://litellm.test:4000';
+      if (key === 'LITELLM_MASTER_KEY') return '';
+      if (key === 'RESUME_HARNESS_LITELLM_KEY') return 'sk-harness-shared';
+      return fallback;
+    });
+    client = new LiteLlmVirtualKeyClient(config as any);
+
+    const generated = await client.generate({
+      ownerId: 'employer-1',
+      keyAlias: 'jobocate-employer-employer-1',
+      models: ['bedrock/nova-2-lite/low'],
+      maxBudgetUsd: 1,
+    });
+    const spend = await client.info(generated.key);
+    await client.update(generated.key, {
+      models: ['bedrock/nova-2-lite/low'],
+      maxBudgetUsd: 1,
+    });
+
+    expect(generated).toEqual({
+      key: 'sk-harness-shared',
+      keyHash: 'shared-proxy-key',
+    });
+    expect(spend).toEqual({ spendUsd: 0 });
+    expect(await client.spendLogs(new Date(), new Date())).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the harness LiteLLM key when /key/generate is unavailable', async () => {
+    config.get.mockImplementation((key: string, fallback?: string) => {
+      if (key === 'LITELLM_BASE_URL') return 'http://litellm.test:4000';
+      if (key === 'LITELLM_MASTER_KEY') return 'sk-master-test';
+      if (key === 'RESUME_HARNESS_LITELLM_KEY') return 'sk-harness-shared';
+      return fallback;
+    });
+    fetchMock.mockResolvedValue({ ok: false, status: 401, json: async () => ({}) });
+    client = new LiteLlmVirtualKeyClient(config as any);
+
+    const generated = await client.generate({
+      ownerId: 'employer-1',
+      keyAlias: 'jobocate-employer-employer-1',
+      models: ['bedrock/nova-2-lite/low'],
+      maxBudgetUsd: 1,
+    });
+
+    expect(generated.key).toBe('sk-harness-shared');
+  });
 });

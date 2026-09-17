@@ -1,49 +1,34 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 import EmployerSidebar from '@/components/employer/EmployerSidebar';
 import { LoadingState, ErrorState, EmptyState, InlineError } from '@/components/employer/EmployerStates';
-import { employerPipelineApi } from '@/services/employerApi';
+import ResumeAssessmentPanel from '@/components/employer/ResumeAssessmentPanel';
+import useEmployerAtsSandboxRelease from '@/components/employer/useEmployerAtsSandboxRelease';
+import { employerJobsApi, employerPipelineApi } from '@/services/employerApi';
 
 const STAGES = ['applied', 'screening', 'interview', 'offer', 'hired', 'rejected'];
-
-// The stage a candidate advances to when moved forward.
 const NEXT_STAGE = {
   applied: 'screening',
   screening: 'interview',
   interview: 'offer',
   offer: 'hired',
 };
-
-// Cream-language stage palette.
 const STAGE_META = {
-  applied: { label: 'Applied', color: '#4263EB', bg: '#EDF0FE', border: '#C7D2FB' },
-  screening: { label: 'Screening', color: '#1F2D6B', bg: '#EDF0FE', border: '#C7D2FB' },
-  interview: { label: 'Interview', color: '#9A6A2E', bg: '#FBF1E2', border: '#EAD9BE' },
-  offer: { label: 'Offer', color: '#4263EB', bg: '#EDF0FE', border: '#C7D2FB' },
-  hired: { label: 'Hired', color: '#157A49', bg: '#EAF6EE', border: '#CDE9D6' },
-  rejected: { label: 'Rejected', color: '#C9622E', bg: '#FBEDE4', border: '#EAD0C4' },
-};
-
-const monoLabel = { fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9A9286' };
-const selectStyle = {
-  fontFamily: 'var(--jb-font-sans)', fontSize: 13, color: '#3A352C', background: '#FFFEFB', border: '1px solid #D9D0BE',
-  borderRadius: 999, padding: '9px 30px 9px 14px', cursor: 'pointer', appearance: 'none',
-  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238A8378' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
-  backgroundRepeat: 'no-repeat', backgroundPosition: 'right 11px center',
+  applied: { label: 'Applied' },
+  screening: { label: 'Screening' },
+  interview: { label: 'Interview' },
+  offer: { label: 'Offer' },
+  hired: { label: 'Hired' },
+  rejected: { label: 'Rejected' },
 };
 
 const StageBadge = ({ stage }) => {
-  const meta = STAGE_META[stage] || { label: stage, color: '#8A8378', bg: '#F2ECE0', border: '#E6DECF' };
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 600, color: meta.color, background: meta.bg, border: `1px solid ${meta.border}`, padding: '3px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>
-      <span style={{ width: 6, height: 6, borderRadius: '50%', background: meta.color }} />
-      {meta.label}
-    </span>
-  );
+  const meta = STAGE_META[stage] || { label: stage };
+  return <span className={`stage stage-${stage || 'unknown'}`}>{meta.label}</span>;
 };
 
 const initialsOf = (name) =>
@@ -51,7 +36,7 @@ const initialsOf = (name) =>
     .split(' ')
     .filter(Boolean)
     .slice(0, 2)
-    .map((p) => p[0])
+    .map((part) => part[0])
     .join('')
     .toUpperCase() || '?';
 
@@ -59,6 +44,7 @@ export default function JobApplications() {
   const router = useRouter();
   const { id: jobId } = router.query;
 
+  const [job, setJob] = useState(null);
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -67,15 +53,47 @@ export default function JobApplications() {
   const [stageFilter, setStageFilter] = useState('All');
   const [actionError, setActionError] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
+  const [assessment, setAssessment] = useState({ status: 'NOT_RUN' });
+  const [assessmentBudget, setAssessmentBudget] = useState(null);
+  const [assessmentLoading, setAssessmentLoading] = useState(false);
+  const [preview, setPreview] = useState({ status: 'NOT_RUN' });
+  const [previewFile, setPreviewFile] = useState(null);
+  const [savedFileName, setSavedFileName] = useState(null);
+  const [previewBusy, setPreviewBusy] = useState(false);
+  const [assessmentBusy, setAssessmentBusy] = useState(false);
+  const previewAbort = useRef(null);
+  const { status: sandboxStatus, error: sandboxError } = useEmployerAtsSandboxRelease(() => {
+    previewAbort.current?.abort();
+    previewAbort.current = null;
+  });
+
+  useEffect(() => {
+    if (!jobId || sandboxStatus !== 'ready') return undefined;
+    let cancelled = false;
+    employerPipelineApi.savedAtsPreview(jobId)
+      .then((saved) => {
+        if (cancelled || !saved?.saved) return;
+        setSavedFileName(saved.fileName);
+        setPreview(saved.assessment || { status: 'NOT_RUN' });
+      })
+      .catch((err) => { if (!cancelled) setActionError(err); });
+    return () => { cancelled = true; };
+  }, [jobId, sandboxStatus]);
 
   const load = useCallback(async () => {
     if (!jobId) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await employerPipelineApi.list({ jobId });
-      const list = Array.isArray(res) ? res : res?.applicants || [];
+      const [jobRes, listRes, budget] = await Promise.all([
+        employerJobsApi.get(jobId).catch(() => null),
+        employerPipelineApi.list({ jobId }),
+        employerPipelineApi.assessmentBudget().catch(() => null),
+      ]);
+      const list = Array.isArray(listRes) ? listRes : listRes?.applicants || [];
+      setJob(jobRes?.job || jobRes || null);
       setApplications(list);
+      setAssessmentBudget(budget);
       setSelectedId((prev) => prev ?? (list[0]?._id || null));
     } catch (err) {
       setError(err);
@@ -85,20 +103,42 @@ export default function JobApplications() {
   }, [jobId]);
 
   useEffect(() => {
-    // Wait for the router to hydrate the dynamic [id] param before fetching.
     if (router.isReady) load();
   }, [router.isReady, load]);
+
+  useEffect(() => {
+    if (!selectedId) {
+      setAssessment({ status: 'NOT_RUN' });
+      return undefined;
+    }
+    let cancelled = false;
+    setAssessmentLoading(true);
+    employerPipelineApi
+      .get(selectedId)
+      .then((applicant) => {
+        if (!cancelled) setAssessment(applicant?.resumeAssessment || { status: 'NOT_RUN' });
+      })
+      .catch(() => {
+        if (!cancelled) setAssessment({ status: 'NOT_RUN' });
+      })
+      .finally(() => {
+        if (!cancelled) setAssessmentLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId]);
 
   const filteredApplications = applications.filter((app) => {
     const name = (app.candidateName || '').toLowerCase();
     const email = (app.candidateEmail || '').toLowerCase();
-    const q = searchTerm.toLowerCase();
-    const matchesSearch = name.includes(q) || email.includes(q);
+    const query = searchTerm.toLowerCase();
+    const matchesSearch = name.includes(query) || email.includes(query);
     const matchesStage = stageFilter === 'All' || app.stage === stageFilter;
     return matchesSearch && matchesStage;
   });
 
-  const selectedApplication = applications.find((a) => a._id === selectedId) || null;
+  const selectedApplication = applications.find((item) => item._id === selectedId) || null;
 
   const changeStage = async (id, stage) => {
     setUpdatingId(id);
@@ -106,7 +146,7 @@ export default function JobApplications() {
     try {
       const updated = await employerPipelineApi.updateStage(id, stage);
       const newStage = updated?.stage || stage;
-      setApplications((prev) => prev.map((a) => (a._id === id ? { ...a, stage: newStage } : a)));
+      setApplications((prev) => prev.map((item) => (item._id === id ? { ...item, stage: newStage } : item)));
     } catch (err) {
       setActionError(err);
     } finally {
@@ -114,208 +154,327 @@ export default function JobApplications() {
     }
   };
 
+  const runResumeAssessment = async () => {
+    if (!selectedId || assessmentBusy || sandboxStatus !== 'ready') return;
+    setAssessmentBusy(true);
+    setAssessment((current) => ({ ...(current || {}), status: 'RUNNING' }));
+    setActionError(null);
+    try {
+      const result = await employerPipelineApi.assessResume(selectedId);
+      setAssessment(result);
+      setAssessmentBudget(await employerPipelineApi.assessmentBudget().catch(() => assessmentBudget));
+    } catch (err) {
+      setActionError(err);
+      setAssessment({ status: 'ATS_FAILED', ats: { status: 'ATS_FAILED' }, aiContent: { status: 'NOT_RUN' } });
+    } finally {
+      setAssessmentBusy(false);
+    }
+  };
+
+  const runAtsPreview = async () => {
+    if (!jobId || (!previewFile && !savedFileName) || previewBusy || sandboxStatus !== 'ready') return;
+    const file = previewFile;
+    const abort = new AbortController();
+    previewAbort.current = abort;
+    setPreviewBusy(true);
+    setPreview({ status: 'RUNNING' });
+    setActionError(null);
+    try {
+      const result = await employerPipelineApi.previewAts(jobId, file, { signal: abort.signal });
+      setPreview(result);
+      if (file) {
+        setSavedFileName(file.name);
+        setPreviewFile(null);
+      }
+      setAssessmentBudget(await employerPipelineApi.assessmentBudget().catch(() => assessmentBudget));
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        setActionError(err);
+        setPreview({ status: 'ATS_FAILED', ats: { status: 'ATS_FAILED' }, aiContent: { status: 'NOT_RUN' } });
+      }
+    } finally {
+      if (previewAbort.current === abort) previewAbort.current = null;
+      setPreviewBusy(false);
+    }
+  };
+
+  const jobTitle = job?.title || 'Applications';
+
   return (
     <>
       <Head>
-        <title>Applications · Jobocate for Employers</title>
+        <title>{jobTitle} · Applications · Jobocate</title>
       </Head>
 
-      <style jsx global>{`
-        #emapp ::-webkit-scrollbar { width: 8px; }
-        #emapp ::-webkit-scrollbar-thumb { background: #e1d9c9; border-radius: 8px; }
-        #emapp input:focus, #emapp select:focus { outline: none; border-color: #4263eb; box-shadow: 0 0 0 3px rgba(66,99,235,0.14); }
-        #emapp .em-blue:hover { background: #364fc7 !important; }
-        #emapp .em-ghost:hover { background: #f4efe4 !important; }
-        #emapp .em-appli:hover { background: #FBF9F4; }
-      `}</style>
-
-      <div id="emapp" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16' }}>
-        <EmployerSidebar active="candidates" />
-
-        <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          {/* HEADER */}
-          <header style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: 14, padding: '14px 32px', background: 'rgba(247,243,234,0.85)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #E7E0D2' }}>
-            <Link href="/employer/jobs" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13.5, fontWeight: 600, color: '#5A544A', textDecoration: 'none' }}>← Back to jobs</Link>
-            <span style={{ ...monoLabel, marginLeft: 4 }}>Hiring · Applications</span>
-            <div style={{ flex: 1 }} />
-            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, color: '#8A8378' }}>{loading ? '…' : `${applications.length} total`}</span>
-          </header>
-
-          <div style={{ padding: '28px 32px 64px', maxWidth: 1080, width: '100%', margin: '0 auto' }}>
-            {/* Title */}
-            <div style={{ marginBottom: 22 }}>
-              <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 36, lineHeight: 1, margin: '0 0 6px' }}>Applications</h1>
-              <p style={{ fontSize: 14.5, color: '#5A544A', margin: 0 }}>
-                {loading ? 'Loading applicants…' : `${applications.length} applicant${applications.length === 1 ? '' : 's'} in this pipeline`}
-              </p>
+      <div id="emapp" className="applications-page">
+        <EmployerSidebar active="jobs" />
+        <main>
+          <div className="dot-fade" aria-hidden="true" />
+          <div className="content">
+            <div className="heading">
+              <div>
+                <Link href="/employer/jobs">Jobs</Link>
+                <h1>{jobTitle}</h1>
+                <p>
+                  {loading
+                    ? 'Loading applicants…'
+                    : `${applications.length} applicant${applications.length === 1 ? '' : 's'} in this pipeline`}
+                </p>
+              </div>
+              <strong>{loading ? '…' : `${applications.length} total`}</strong>
             </div>
 
-            {loading ? (
-              <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 16 }}><LoadingState label="Loading applications…" /></div>
-            ) : error ? (
-              <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 16 }}><ErrorState error={error} onRetry={load} /></div>
-            ) : applications.length === 0 ? (
-              <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 16 }}>
-                <EmptyState icon="○" title="No applications yet" hint="Applications for this job will appear here as candidates apply." />
-              </div>
-            ) : (
-              <>
-                {/* Toolbar */}
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: '#FFFEFB', border: '1px solid #D9D0BE', borderRadius: 999, padding: '9px 15px', flex: 1, minWidth: 220 }}>
-                    <span style={{ color: '#A79E8F', fontSize: 13 }}>⌕</span>
-                    <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search by name or email…" style={{ flex: 1, border: 'none', background: 'none', fontFamily: 'inherit', fontSize: 13.5, color: '#1B1A16' }} />
+            {loading && <LoadingState label="Loading applications…" tone="dark" />}
+            {!loading && error && <ErrorState error={error} onRetry={load} tone="dark" />}
+            {!loading && !error && (
+              <section className="preview-card" aria-label="Ad-hoc ATS preview">
+                <InlineError error={actionError} />
+                {sandboxStatus === 'starting' && <p role="status">Preparing ATS scoring container…</p>}
+                {sandboxStatus === 'paused' && <p role="status">ATS scoring is paused while this tab is hidden.</p>}
+                {sandboxStatus === 'error' && <InlineError error={sandboxError} />}
+                <div className="preview-head">
+                  <div>
+                    <h2>Ad-hoc ATS preview</h2>
+                    <p>Upload a PDF or DOCX to score it against this job. This does not create an applicant or application.</p>
                   </div>
-                  <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value)} style={selectStyle}>
-                    <option value="All">All stages</option>
-                    {STAGES.map((s) => <option key={s} value={s}>{STAGE_META[s].label}</option>)}
-                  </select>
+                  <button
+                    type="button"
+                    className="primary"
+                    disabled={(!previewFile && !savedFileName) || previewBusy || sandboxStatus !== 'ready'}
+                    onClick={runAtsPreview}
+                  >
+                    {previewBusy ? 'Scoring…' : 'Score uploaded résumé'}
+                  </button>
+                </div>
+                <label className="upload">
+                  <span>Résumé file</span>
+                  <input
+                    type="file"
+                    accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    aria-label="Upload résumé for ATS preview"
+                    onChange={(event) => setPreviewFile(event.target.files?.[0] || null)}
+                  />
+                </label>
+                {savedFileName && <p>Saved résumé: {savedFileName}. You can score it again without uploading.</p>}
+                <ResumeAssessmentPanel
+                  title="Preview result"
+                  assessment={preview}
+                  budget={assessmentBudget}
+                  busy={previewBusy}
+                />
+              </section>
+            )}
+            {!loading && !error && applications.length === 0 && (
+              <EmptyState
+                tone="dark"
+                title="No applications yet"
+                hint="Nobody has applied yet. You can still score a résumé against this job with the upload above."
+                action={(
+                  <Link href="/employer/screening" className="ghost-link">Open screening</Link>
+                )}
+              />
+            )}
+
+            {!loading && !error && applications.length > 0 && (
+              <>
+                <div className="toolbar">
+                  <label className="search">
+                    <span>Search</span>
+                    <input
+                      value={searchTerm}
+                      onChange={(event) => setSearchTerm(event.target.value)}
+                      placeholder="Name or email"
+                    />
+                  </label>
+                  <label className="search">
+                    <span>Stage</span>
+                    <select value={stageFilter} onChange={(event) => setStageFilter(event.target.value)}>
+                      <option value="All">All stages</option>
+                      {STAGES.map((stage) => (
+                        <option key={stage} value={stage}>{STAGE_META[stage].label}</option>
+                      ))}
+                    </select>
+                  </label>
                 </div>
 
-                <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                  {/* LEFT: applicant list */}
-                  <div style={{ flex: '1 1 340px', minWidth: 300, background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 16, overflow: 'hidden' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', background: '#FBF9F4', borderBottom: '1px solid #F2ECE0' }}>
-                      <span style={monoLabel}>Applicants</span>
-                      <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#A79E8F' }}>{filteredApplications.length}</span>
-                    </div>
+                <div className="split">
+                  <section className="list" aria-label="Applicants">
                     {filteredApplications.length === 0 ? (
-                      <div style={{ padding: 28, textAlign: 'center', fontSize: 13.5, color: '#8A8378' }}>No applications match your filters.</div>
-                    ) : (
-                      <div>
-                        {filteredApplications.map((application, i, arr) => {
-                          const on = selectedId === application._id;
-                          const divider = i < arr.length - 1 ? '#F2ECE0' : 'transparent';
-                          return (
-                            <button
-                              key={application._id}
-                              onClick={() => setSelectedId(application._id)}
-                              className="em-appli"
-                              style={{
-                                display: 'block', width: '100%', textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer',
-                                padding: '14px 18px', borderBottom: `1px solid ${divider}`, borderLeft: `3px solid ${on ? '#4263EB' : 'transparent'}`,
-                                background: on ? '#FBF9F4' : 'transparent',
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                                <span style={{ width: 38, height: 38, flexShrink: 0, borderRadius: '50%', background: '#EDF0FE', color: '#4263EB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13 }}>{initialsOf(application.candidateName)}</span>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontSize: 14, fontWeight: 700, color: '#1B1A16', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{application.candidateName || 'Candidate'}</div>
-                                  {application.candidateHeadline && (
-                                    <div style={{ fontSize: 12.5, color: '#8A8378', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{application.candidateHeadline}</div>
-                                  )}
-                                </div>
-                                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                                  <StageBadge stage={application.stage} />
-                                  {application.appliedAt && (
-                                    <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#A79E8F', marginTop: 5 }}>{new Date(application.appliedAt).toLocaleDateString()}</div>
-                                  )}
-                                </div>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
+                      <p className="empty-filter">No applications match your filters.</p>
+                    ) : filteredApplications.map((application) => {
+                      const on = selectedId === application._id;
+                      return (
+                        <button
+                          key={application._id}
+                          type="button"
+                          className={on ? 'row on' : 'row'}
+                          onClick={() => setSelectedId(application._id)}
+                        >
+                          <span className="avatar" aria-hidden>{initialsOf(application.candidateName)}</span>
+                          <span className="who">
+                            <strong>{application.candidateName || 'Candidate'}</strong>
+                            {application.candidateHeadline && <em>{application.candidateHeadline}</em>}
+                          </span>
+                          <StageBadge stage={application.stage} />
+                        </button>
+                      );
+                    })}
+                  </section>
 
-                  {/* RIGHT: applicant detail */}
-                  <div style={{ flex: '2 1 480px', minWidth: 320, background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 16, padding: 24 }}>
+                  <section className="detail" aria-label="Applicant detail">
                     {selectedApplication ? (
                       <>
-                        <InlineError error={actionError} />
-                        <div style={{ borderBottom: '1px solid #F2ECE0', paddingBottom: 20, marginBottom: 20 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                            <span style={{ width: 52, height: 52, flexShrink: 0, borderRadius: '50%', background: '#EDF0FE', color: '#4263EB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 18 }}>{initialsOf(selectedApplication.candidateName)}</span>
-                            <div style={{ minWidth: 0 }}>
-                              <h2 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 28, lineHeight: 1.05, margin: 0 }}>{selectedApplication.candidateName || 'Candidate'}</h2>
-                              {selectedApplication.candidateHeadline && (
-                                <p style={{ fontSize: 14, color: '#5A544A', margin: '3px 0 0' }}>{selectedApplication.candidateHeadline}</p>
-                              )}
-                            </div>
-                            <div style={{ marginLeft: 'auto', flexShrink: 0 }}><StageBadge stage={selectedApplication.stage} /></div>
+                        <div className="identity">
+                          <span className="avatar lg" aria-hidden>{initialsOf(selectedApplication.candidateName)}</span>
+                          <div>
+                            <h2>{selectedApplication.candidateName || 'Candidate'}</h2>
+                            {selectedApplication.candidateHeadline && <p>{selectedApplication.candidateHeadline}</p>}
                           </div>
-
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginTop: 20 }}>
-                            {selectedApplication.candidateEmail && (
-                              <div>
-                                <div style={{ ...monoLabel, marginBottom: 5 }}>Email address</div>
-                                <a href={`mailto:${selectedApplication.candidateEmail}`} style={{ fontSize: 13.5, color: '#4263EB', textDecoration: 'none', wordBreak: 'break-all' }}>{selectedApplication.candidateEmail}</a>
-                              </div>
-                            )}
-                            {selectedApplication.candidateLocation && (
-                              <div>
-                                <div style={{ ...monoLabel, marginBottom: 5 }}>Location</div>
-                                <div style={{ fontSize: 13.5, color: '#3A352C' }}>{selectedApplication.candidateLocation}</div>
-                              </div>
-                            )}
-                            {selectedApplication.appliedAt && (
-                              <div>
-                                <div style={{ ...monoLabel, marginBottom: 5 }}>Applied on</div>
-                                <div style={{ fontSize: 13.5, color: '#3A352C' }}>{new Date(selectedApplication.appliedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
-                              </div>
-                            )}
-                            {selectedApplication.aiScore ? (
-                              <div>
-                                <div style={{ ...monoLabel, marginBottom: 5 }}>AI match score</div>
-                                <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 16, fontWeight: 600, color: '#157A49' }}>{selectedApplication.aiScore}%</div>
-                              </div>
-                            ) : null}
-                          </div>
+                          <StageBadge stage={selectedApplication.stage} />
                         </div>
 
-                        {selectedApplication.skills && selectedApplication.skills.length > 0 && (
-                          <div style={{ marginBottom: 22 }}>
-                            <div style={{ ...monoLabel, marginBottom: 10 }}>Skills</div>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
-                              {selectedApplication.skills.map((skill) => (
-                                <span key={skill} style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, color: '#46413A', background: '#F2ECE0', border: '1px solid #E6DECF', padding: '3px 9px', borderRadius: 999 }}>{skill}</span>
-                              ))}
+                        <dl>
+                          {selectedApplication.candidateEmail && (
+                            <div>
+                              <dt>Email</dt>
+                              <dd><a href={`mailto:${selectedApplication.candidateEmail}`}>{selectedApplication.candidateEmail}</a></dd>
                             </div>
-                            {selectedApplication.yearsExperience ? (
-                              <div style={{ marginTop: 16 }}>
-                                <div style={{ ...monoLabel, marginBottom: 5 }}>Experience</div>
-                                <div style={{ fontSize: 13.5, color: '#3A352C' }}>{selectedApplication.yearsExperience} year{selectedApplication.yearsExperience === 1 ? '' : 's'}</div>
-                              </div>
-                            ) : null}
+                          )}
+                          {selectedApplication.candidateLocation && (
+                            <div>
+                              <dt>Location</dt>
+                              <dd>{selectedApplication.candidateLocation}</dd>
+                            </div>
+                          )}
+                          {selectedApplication.appliedAt && (
+                            <div>
+                              <dt>Applied</dt>
+                              <dd>{new Date(selectedApplication.appliedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</dd>
+                            </div>
+                          )}
+                          {selectedApplication.aiScore ? (
+                            <div>
+                              <dt>Fit score</dt>
+                              <dd>{selectedApplication.aiScore}</dd>
+                            </div>
+                          ) : null}
+                        </dl>
+
+                        {selectedApplication.skills?.length > 0 && (
+                          <div className="skills">
+                            {selectedApplication.skills.map((skill) => (
+                              <span key={skill}>{skill}</span>
+                            ))}
                           </div>
                         )}
 
+                        <ResumeAssessmentPanel
+                          assessment={assessment}
+                          budget={assessmentBudget}
+                          loading={assessmentLoading}
+                          busy={assessmentBusy}
+                          onRun={runResumeAssessment}
+                        />
+
                         {selectedApplication.stage !== 'rejected' && selectedApplication.stage !== 'hired' && (
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 9, paddingTop: 4 }}>
+                          <div className="actions">
                             <button
                               type="button"
                               disabled={updatingId === selectedApplication._id}
                               onClick={() => changeStage(selectedApplication._id, 'rejected')}
-                              className="em-ghost"
-                              style={{ fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: '#C9622E', background: '#FFFEFB', border: '1px solid #EAD0C4', borderRadius: 999, padding: '9px 16px', cursor: 'pointer', opacity: updatingId === selectedApplication._id ? 0.5 : 1 }}
+                              className="ghost"
                             >
-                              ✕ Reject
+                              Reject
                             </button>
                             {NEXT_STAGE[selectedApplication.stage] && (
                               <button
                                 type="button"
                                 disabled={updatingId === selectedApplication._id}
                                 onClick={() => changeStage(selectedApplication._id, NEXT_STAGE[selectedApplication.stage])}
-                                className="em-blue"
-                                style={{ fontFamily: 'inherit', fontSize: 13, fontWeight: 700, color: '#fff', background: '#4263EB', border: 'none', borderRadius: 999, padding: '9px 16px', cursor: 'pointer', opacity: updatingId === selectedApplication._id ? 0.6 : 1 }}
+                                className="primary"
                               >
-                                ✓ Move to {STAGE_META[NEXT_STAGE[selectedApplication.stage]].label}
+                                Move to {STAGE_META[NEXT_STAGE[selectedApplication.stage]].label}
                               </button>
                             )}
                           </div>
                         )}
                       </>
                     ) : (
-                      <EmptyState icon="○" title="No application selected" hint="Select an application from the list to view details." />
+                      <EmptyState tone="dark" title="No application selected" hint="Select an applicant to view details and run ATS match." />
                     )}
-                  </div>
+                  </section>
                 </div>
               </>
             )}
           </div>
         </main>
       </div>
+
+      <style jsx>{`
+        .applications-page { min-height: 100vh; display: flex; background: var(--jb-v3-bg); color: var(--jb-v3-fg); }
+        main { position: relative; flex: 1; min-width: 0; }
+        .dot-fade { position: absolute; inset: 0 0 auto; height: 520px; pointer-events: none; background-image: radial-gradient(circle, var(--jb-v3-dot) .8px, transparent .9px); background-size: 26px 26px; mask-image: linear-gradient(#000, transparent); }
+        .content { position: relative; width: min(100%, 1160px); margin: 0 auto; padding: 44px 28px 80px; }
+        .heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 32px; }
+        .heading a, .heading > strong { font-family: var(--jb-v3-font-mono); text-transform: uppercase; letter-spacing: .12em; font-size: 10px; color: var(--jb-v3-fg-3); text-decoration: none; }
+        h1 { margin: 7px 0 8px; font-size: clamp(30px, 4vw, 44px); font-weight: 500; }
+        .heading p { margin: 0; color: var(--jb-v3-fg-2); font-size: 14px; max-width: 62ch; }
+        .heading > strong { font-weight: 400; }
+        .preview-card { border: 1px solid var(--jb-v3-line); background: var(--jb-v3-panel); padding: 22px; margin-bottom: 18px; }
+        .preview-head { display: flex; align-items: start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+        .preview-card h2 { margin: 0 0 6px; font-size: 18px; font-weight: 600; }
+        .preview-card p { margin: 0; color: var(--jb-v3-fg-2); font-size: 13.5px; max-width: 62ch; }
+        .upload { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+        .upload span { font-family: var(--jb-v3-font-mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--jb-v3-fg-3); }
+        .upload input { color: var(--jb-v3-fg); font: inherit; font-size: 13px; }
+        .toolbar { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
+        .search { display: flex; flex-direction: column; gap: 6px; min-width: 180px; }
+        .search span { font-family: var(--jb-v3-font-mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--jb-v3-fg-3); }
+        .search input, .search select {
+          min-width: 220px; color: var(--jb-v3-fg); background: var(--jb-v3-control);
+          border: 1px solid var(--jb-v3-line-2); border-radius: 2px; padding: 10px 12px; font: inherit; font-size: 13px;
+        }
+        .split { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: 18px; align-items: start; }
+        .list, .detail { border: 1px solid var(--jb-v3-line); background: var(--jb-v3-panel); }
+        .row {
+          width: 100%; display: grid; grid-template-columns: 36px 1fr auto; gap: 12px; align-items: center;
+          padding: 14px 16px; border: 0; border-bottom: 1px solid var(--jb-v3-line); background: transparent;
+          color: inherit; font: inherit; text-align: left; cursor: pointer;
+        }
+        .row:last-child { border-bottom: 0; }
+        .row.on, .row:hover { background: var(--jb-v3-accent-soft); }
+        .avatar {
+          width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid var(--jb-v3-line-2);
+          font-family: var(--jb-v3-font-mono); font-size: 11px; color: var(--jb-v3-fg-2);
+        }
+        .avatar.lg { width: 48px; height: 48px; font-size: 14px; }
+        .who { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+        .who strong { font-size: 14px; font-weight: 600; }
+        .who em { font-style: normal; font-size: 12px; color: var(--jb-v3-fg-3); }
+        .stage { font-family: var(--jb-v3-font-mono); font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: var(--jb-v3-fg-3); }
+        .identity { display: grid; grid-template-columns: 48px 1fr auto; gap: 14px; align-items: center; padding: 22px 22px 0; }
+        h2 { margin: 0; font-size: 28px; font-weight: 500; }
+        .identity p { margin: 4px 0 0; color: var(--jb-v3-fg-2); font-size: 14px; }
+        dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin: 22px; padding-top: 18px; border-top: 1px solid var(--jb-v3-line); }
+        dt { font-family: var(--jb-v3-font-mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--jb-v3-fg-3); margin-bottom: 5px; }
+        dd { margin: 0; font-size: 13.5px; }
+        dd a { color: var(--jb-v3-accent); text-decoration: none; }
+        .skills { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 22px 8px; }
+        .skills span { font-family: var(--jb-v3-font-mono); font-size: 10px; letter-spacing: .06em; color: var(--jb-v3-fg-2); border: 1px solid var(--jb-v3-line); padding: 4px 8px; }
+        .detail :global(.resume-assessment) { margin: 0 22px; }
+        .actions { display: flex; justify-content: flex-end; gap: 8px; padding: 18px 22px 22px; }
+        .ghost, .primary, .ghost-link {
+          font: inherit; font-size: 12.5px; font-weight: 600; border-radius: 2px; padding: 9px 14px; cursor: pointer;
+        }
+        .ghost { color: var(--jb-v3-fg-2); background: transparent; border: 1px solid var(--jb-v3-line-2); }
+        .primary { color: #fff; background: var(--jb-v3-accent); border: none; }
+        .ghost-link { display: inline-block; margin-top: 12px; color: var(--jb-v3-fg); border: 1px solid var(--jb-v3-line-2); text-decoration: none; }
+        .empty-filter { padding: 28px 16px; color: var(--jb-v3-fg-3); font-size: 13.5px; }
+        @media (max-width: 860px) {
+          .content { padding: 32px 18px 64px; }
+          .split { grid-template-columns: 1fr; }
+        }
+      `}</style>
     </>
   );
 }
