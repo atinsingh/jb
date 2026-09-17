@@ -11,12 +11,26 @@ async function signIn(page: any, user: TestUser, path: string) {
 test.describe.configure({ mode: 'serial' });
 
 test.describe('One account with candidate and employer workspaces', () => {
+  test('login lets the visitor select the employer workspace without a special URL', async ({
+    page,
+  }) => {
+    await page.goto('/app/login', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('radio', { name: 'Candidate' })).toBeChecked();
+    await page.getByRole('radio', { name: 'Employer' }).click();
+    await expect(page.getByRole('radio', { name: 'Employer' })).toBeChecked();
+  });
+
   test('the same email can enter employer mode and later return to candidate mode', async ({
     page,
   }) => {
     const user = await createUser('ROLE_CANDIDATE', 'dual-workspace');
 
-    await signIn(page, user, '/app/login?as=employer');
+    await page.goto('/app/login', { waitUntil: 'domcontentloaded' });
+    await page.getByRole('radio', { name: 'Employer' }).click();
+    await expect(page.getByRole('radio', { name: 'Employer' })).toBeChecked();
+    await page.fill('input[name="email"]', user.email);
+    await page.fill('input[name="password"]', user.password);
+    await page.locator('form').getByRole('button', { name: /^log in$/i }).click();
     await expect(page).toHaveURL(/\/employer\/dashboard$/);
 
     const employerToken = await login(user.email, user.password);
@@ -33,6 +47,8 @@ test.describe('One account with candidate and employer workspaces', () => {
     await accountCard.getByRole('button', { name: 'Log out', exact: true }).click();
     await expect(page).toHaveURL(/\/app\/login$/);
 
+    await page.goto('/app/login', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('radio', { name: 'Candidate' })).toBeChecked();
     await signIn(page, user, '/app/login');
     await expect(page).toHaveURL(/\/app\/dashboard$/);
 
@@ -61,9 +77,14 @@ test.describe('One account with candidate and employer workspaces', () => {
       }),
     );
 
-    await signIn(page, user, '/app/login?as=employer');
+    await page.goto('/app/login', { waitUntil: 'domcontentloaded' });
+    await page.getByRole('radio', { name: 'Employer' }).click();
+    await page.fill('input[name="email"]', user.email);
+    await page.fill('input[name="password"]', user.password);
+    await page.locator('form').getByRole('button', { name: /^log in$/i }).click();
 
-    await expect(page).toHaveURL(/\/app\/login\?as=employer$/);
+    await expect(page).toHaveURL(/\/app\/login$/);
+    await expect(page.getByRole('radio', { name: 'Employer' })).toBeChecked();
     await expect(
       page.getByRole('alert').filter({ hasText: /workspace unavailable/i }),
     ).toBeVisible();
