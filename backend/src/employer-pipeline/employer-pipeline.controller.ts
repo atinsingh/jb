@@ -8,6 +8,9 @@ import {
   Param,
   Query,
   Body,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -16,7 +19,12 @@ import {
   ApiBearerAuth,
   ApiParam,
   ApiQuery,
+  ApiConsumes,
+  ApiBody,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import { extname } from 'path';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -25,6 +33,19 @@ import { CreateApplicantDto } from './dto/create-applicant.dto';
 import { UpdateStageDto } from './dto/update-stage.dto';
 import { AddNoteDto } from './dto/add-note.dto';
 import { EmployerResumeAssessmentService } from './employer-resume-assessment.service';
+
+const resumePreviewFilter = (
+  _req: any,
+  file: Express.Multer.File,
+  cb: (error: Error | null, acceptFile: boolean) => void,
+) => {
+  const ext = extname(file.originalname).toLowerCase();
+  if (ext === '.pdf' || ext === '.docx') {
+    cb(null, true);
+    return;
+  }
+  cb(new BadRequestException('Invalid file type. Only PDF and DOCX allowed.'), false);
+};
 
 @ApiTags('employer-applicants')
 @ApiBearerAuth('JWT-auth')
@@ -66,6 +87,71 @@ export class EmployerPipelineController {
   async assessmentBudget(@Request() req) {
     const ownerId = req.user._id.toString();
     return this.resumeAssessmentService.budgetStatus(ownerId);
+  }
+
+  @Post('resume-assessment/acquire')
+  @ApiOperation({ summary: 'Prepare the employer ATS sandbox for this page' })
+  async acquireAssessmentSandbox(@Body() body: { leaseId?: string }, @Request() req) {
+    if (!body?.leaseId || typeof body.leaseId !== 'string') {
+      throw new BadRequestException('leaseId is required');
+    }
+    return this.resumeAssessmentService.acquireSandbox(req.user._id.toString(), body.leaseId);
+  }
+
+  @Post('resume-assessment/release')
+  @ApiOperation({
+    summary: 'Destroy the employer ATS sandbox when the recruiter leaves the page',
+  })
+  @ApiResponse({ status: 201, description: 'Sandbox released' })
+  async releaseAssessmentSandbox(@Body() body: { leaseId?: string }, @Request() req) {
+    if (!body?.leaseId || typeof body.leaseId !== 'string') {
+      throw new BadRequestException('leaseId is required');
+    }
+    const ownerId = req.user._id.toString();
+    return this.resumeAssessmentService.releaseSandbox(ownerId, body.leaseId);
+  }
+
+  @Get('resume-assessment/preview')
+  @ApiOperation({ summary: 'Restore the last uploaded ATS preview for a job' })
+  async savedPreview(@Query('jobId') jobId: string, @Request() req) {
+    if (!jobId) throw new BadRequestException('jobId is required');
+    return this.resumeAssessmentService.getSavedPreview(req.user._id.toString(), jobId);
+  }
+
+  @Post('resume-assessment/preview')
+  @UseInterceptors(
+    FileInterceptor('resume', {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: resumePreviewFilter,
+    }),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary:
+      'Score an uploaded résumé against a job without creating an applicant',
+  })
+  @ApiQuery({ name: 'jobId', required: true, description: 'Employer job ID' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        resume: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiResponse({ status: 201, description: 'Ad-hoc ATS preview completed' })
+  @ApiResponse({ status: 404, description: 'Job not found' })
+  async previewResume(
+    @Query('jobId') jobId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req,
+  ) {
+    if (!jobId) throw new BadRequestException('jobId is required');
+    const ownerId = req.user._id.toString();
+    return file
+      ? this.resumeAssessmentService.previewFromUpload(ownerId, jobId, file)
+      : this.resumeAssessmentService.rerunSavedPreview(ownerId, jobId);
   }
 
   @Get(':id')

@@ -12,6 +12,7 @@ export type ResumeAssessmentStatus =
   | 'BUDGET_EXHAUSTED'
   | 'CONFIGURATION_ERROR'
   | 'ATS_FAILED'
+  | 'ATS_INTERRUPTED'
   | 'DETECTOR_FAILED';
 
 export interface PersistedResumeAssessment {

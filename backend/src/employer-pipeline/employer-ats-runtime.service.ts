@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { createHash, randomUUID } from 'crypto';
 import { Model, Types } from 'mongoose';
+import { AtsSandboxReleasedException } from '../ats/resume-matcher.adapter';
 import { EmployerBillingService } from '../employer-billing/employer-billing.service';
 import { getEmployerPlan } from '../employer-billing/employer-plans';
 import { LLMUsage, LLMUsageDocument } from '../llm/schemas/llm-usage.schema';
@@ -42,6 +43,7 @@ export interface PreparedEmployerAtsRun extends EmployerAtsBudgetStatus {
 @Injectable()
 export class EmployerAtsRuntimeService {
   private static readonly LOCK_MS = 15 * 60 * 1000;
+  private readonly sandboxLifecycle = new Map<string, Promise<void>>();
 
   constructor(
     @InjectModel(EmployerAtsRuntime.name)
@@ -62,23 +64,46 @@ export class EmployerAtsRuntimeService {
     const ownerId = this.objectId(ownerIdValue);
     const configured = await this.ensureAccount(ownerIdValue, ownerId);
     const lockUntil = new Date(Date.now() + EmployerAtsRuntimeService.LOCK_MS);
-    const claimed: any = await this.runtimeModel
-      .findOneAndUpdate(
-        {
-          ownerId,
-          ownerType: 'employer',
-          $or: [
-            { activeRunId: runId },
-            { activeRunId: { $exists: false } },
-            { activeRunId: '' },
-            { runLockUntil: { $lt: new Date() } },
-          ],
-        },
-        { $set: { activeRunId: runId, runLockUntil: lockUntil } },
-        { new: true },
-      )
-      .lean()
-      .exec();
+    const claim = () =>
+      this.runtimeModel
+        .findOneAndUpdate(
+          {
+            ownerId,
+            ownerType: 'employer',
+            $or: [
+              { activeRunId: runId },
+              { activeRunId: { $exists: false } },
+              { activeRunId: '' },
+              { runLockUntil: { $lt: new Date() } },
+            ],
+          },
+          { $set: { activeRunId: runId, runLockUntil: lockUntil } },
+          { new: true },
+        )
+        .lean()
+        .exec();
+    let claimed: any = await claim();
+    if (!claimed) {
+      const existing: any = await this.runtimeModel
+        .findOne({ ownerId, ownerType: 'employer' })
+        .lean()
+        .exec();
+      let leftover =
+        existing?.activeRunId &&
+        (!existing.sandboxId ||
+          existing.interruptedRunId === existing.activeRunId);
+      if (!leftover && existing?.activeRunId && existing.sandboxId) {
+        try {
+          leftover = !(await this.sandboxIsRunning(existing.sandboxId));
+        } catch {
+          // An inconclusive Docker probe must not take a live run's lock.
+        }
+      }
+      if (leftover) {
+        await this.release(ownerId, existing.activeRunId);
+        claimed = await claim();
+      }
+    }
     if (!claimed) {
       return {
         status: 'RUNNING',
@@ -108,12 +133,21 @@ export class EmployerAtsRuntimeService {
 
     let sandboxId: string;
     try {
-      sandboxId = await this.ensureSandbox(
-        ownerIdValue,
-        ownerId,
-        configured.account,
-        virtualKey,
-      );
+      sandboxId = await this.withSandboxLifecycle(ownerIdValue, async () => {
+        const current: any = await this.runtimeModel
+          .findOne({ ownerId, ownerType: 'employer' })
+          .lean()
+          .exec();
+        if (current?.interruptedRunId === runId) {
+          throw new AtsSandboxReleasedException();
+        }
+        return this.ensureSandbox(
+          ownerIdValue,
+          ownerId,
+          configured.account,
+          virtualKey,
+        );
+      });
     } catch (error) {
       await this.release(ownerId, runId);
       throw error;
@@ -242,6 +276,84 @@ export class EmployerAtsRuntimeService {
         reason: 'EMPLOYER_ATS_CONFIGURATION_ERROR',
       };
     }
+  }
+
+  async acquireSandbox(
+    ownerIdValue: string,
+    leaseId: string,
+  ): Promise<{ ready: true; sandboxId: string }> {
+    return this.withSandboxLifecycle(ownerIdValue, async () => {
+      const ownerId = this.objectId(ownerIdValue);
+      const configured = await this.ensureAccount(ownerIdValue, ownerId);
+      const virtualKey = this.secrets.decrypt(configured.account.encryptedKey);
+      await this.runtimeModel
+        .updateOne(
+          { ownerId, ownerType: 'employer' },
+          { $set: { sandboxLeaseId: leaseId } },
+        )
+        .exec();
+      const sandboxId = await this.ensureSandbox(
+        ownerIdValue,
+        ownerId,
+        configured.account,
+        virtualKey,
+      );
+      return { ready: true, sandboxId };
+    });
+  }
+
+  async releaseSandbox(
+    ownerIdValue: string,
+    leaseId: string,
+  ): Promise<{ released: boolean }> {
+    return this.withSandboxLifecycle(ownerIdValue, async () => {
+      const ownerId = this.objectId(ownerIdValue);
+      const account: any = await this.runtimeModel
+        .findOne({ ownerId, ownerType: 'employer' })
+        .lean()
+        .exec();
+      if (!account || account.sandboxLeaseId !== leaseId) {
+        return { released: false };
+      }
+      if (account.sandboxId) {
+        try {
+          await this.sandbox.destroy(account.sandboxId);
+        } catch {
+          // A missing container is the desired end state.
+        }
+      }
+      await this.runtimeModel
+        .updateOne(
+          { ownerId, ownerType: 'employer', sandboxLeaseId: leaseId },
+          {
+            ...(account.activeRunId
+              ? { $set: { interruptedRunId: account.activeRunId } }
+              : {}),
+            $unset: {
+              sandboxId: 1,
+              sandboxLeaseId: 1,
+              sandboxProvisioningToken: 1,
+              sandboxProvisioningUntil: 1,
+              activeRunId: 1,
+              runLockUntil: 1,
+            },
+          },
+        )
+        .exec();
+      return { released: true };
+    });
+  }
+
+  async wasReleasedDuring(
+    ownerIdValue: string,
+    runId: string,
+  ): Promise<boolean> {
+    const ownerId = this.objectId(ownerIdValue);
+    const account: any = await this.runtimeModel
+      .findOne({ ownerId, ownerType: 'employer' })
+      .lean()
+      .exec();
+    return Boolean(runId) && account?.interruptedRunId === runId;
   }
 
   private async ensureAccount(
@@ -394,15 +506,10 @@ export class EmployerAtsRuntimeService {
     account: any,
     virtualKey: string,
   ): Promise<string> {
+    let stoppedSandboxId: string | undefined;
     if (account.sandboxId) {
-      try {
-        const ping = await this.sandbox.exec(account.sandboxId, ['true'], {
-          timeoutSeconds: 10,
-        });
-        if (ping.exitCode === 0) return account.sandboxId;
-      } catch {
-        // Reaped or externally removed; claim a replacement below.
-      }
+      if (await this.sandboxIsRunning(account.sandboxId)) return account.sandboxId;
+      stoppedSandboxId = account.sandboxId;
     }
 
     const token = randomUUID();
@@ -435,6 +542,7 @@ export class EmployerAtsRuntimeService {
       'http://localhost:4000'
     ).replace(/\/v1\/?$/, '');
     try {
+      if (stoppedSandboxId) await this.sandbox.destroy(stoppedSandboxId);
       const provisioned = await this.sandbox.provision({
         sessionId: `employer-${ownerIdValue}`,
         harness: 'ats',
@@ -444,7 +552,7 @@ export class EmployerAtsRuntimeService {
         },
         files: [],
       });
-      await this.runtimeModel
+      const bound = await this.runtimeModel
         .updateOne(
           {
             ownerId,
@@ -460,6 +568,10 @@ export class EmployerAtsRuntimeService {
           },
         )
         .exec();
+      if (!bound.matchedCount && !bound.modifiedCount) {
+        await this.sandbox.destroy(provisioned.sandboxId);
+        throw new Error('Employer ATS sandbox was released during provisioning');
+      }
       return provisioned.sandboxId;
     } catch (error) {
       await this.runtimeModel
@@ -478,6 +590,45 @@ export class EmployerAtsRuntimeService {
         )
         .exec();
       throw error;
+    }
+  }
+
+  private async sandboxIsRunning(sandboxId: string): Promise<boolean> {
+    try {
+      const ping = await this.sandbox.exec(sandboxId, ['true'], {
+        timeoutSeconds: 10,
+      });
+      if (ping.exitCode === 0) return true;
+      if (this.sandboxIsGone(`${ping.stderr} ${ping.stdout}`)) return false;
+    } catch (error) {
+      if (this.sandboxIsGone(error instanceof Error ? error.message : '')) {
+        return false;
+      }
+    }
+    throw new Error('Employer ATS sandbox state could not be verified');
+  }
+
+  private sandboxIsGone(message: string): boolean {
+    return /no such container|is not running|cannot find the container/i.test(message);
+  }
+
+  private async withSandboxLifecycle<T>(
+    ownerId: string,
+    task: () => Promise<T>,
+  ): Promise<T> {
+    const previous = this.sandboxLifecycle.get(ownerId) || Promise.resolve();
+    let unlock!: () => void;
+    const gate = new Promise<void>((resolve) => { unlock = resolve; });
+    const tail = previous.then(() => gate);
+    this.sandboxLifecycle.set(ownerId, tail);
+    await previous;
+    try {
+      return await task();
+    } finally {
+      unlock();
+      if (this.sandboxLifecycle.get(ownerId) === tail) {
+        this.sandboxLifecycle.delete(ownerId);
+      }
     }
   }
 

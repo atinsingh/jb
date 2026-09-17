@@ -62,6 +62,97 @@ describe('harness bootstrap', () => {
     expect(config?.contents).toContain('model_reasoning_effort = "xhigh"');
   });
 
+  it('uses the Responses wire API current Codex still accepts', () => {
+    const boot = registry.get('codex').bootstrap({
+      ...bootstrapInput(),
+      alias: {
+        alias: 'openai/gpt-5.6-luna/high',
+        provider: 'openai',
+        model: 'gpt-5.6-luna',
+        effort: 'high',
+        label: 'GPT-5.6 Luna · high',
+      },
+    });
+    const config = boot.files.find(
+      (file) => file.path === '.codex/config.toml',
+    );
+
+    expect(config?.contents).toContain('wire_api = "responses"');
+    expect(config?.contents).not.toContain('wire_api = "chat"');
+  });
+
+  it('streams Codex tool and thinking events as JSONL activities', () => {
+    const adapter = registry.get('codex');
+    const boot = adapter.bootstrap(bootstrapInput());
+    expect(boot.command).toEqual(
+      expect.arrayContaining(['codex', 'exec', '--json']),
+    );
+
+    expect(
+      adapter.parseOutput?.(
+        [
+          JSON.stringify({
+            type: 'item.started',
+            item: {
+              id: 'item_think',
+              type: 'reasoning',
+              summary: [{ text: 'Planning the résumé edits.' }],
+            },
+          }),
+          JSON.stringify({
+            type: 'item.started',
+            item: {
+              id: 'item_cmd',
+              type: 'command_execution',
+              command: 'cat CANDIDATE.md',
+            },
+          }),
+          JSON.stringify({
+            type: 'item.completed',
+            item: {
+              id: 'item_cmd',
+              type: 'command_execution',
+              command: 'cat CANDIDATE.md',
+              status: 'completed',
+            },
+          }),
+          JSON.stringify({
+            type: 'item.completed',
+            item: {
+              id: 'item_msg',
+              type: 'agent_message',
+              text: 'Updated resume.tex from the candidate facts.',
+            },
+          }),
+          JSON.stringify({
+            type: 'error',
+            message:
+              'openai.gpt-5.6-luna is not available for this account.',
+          }),
+        ].join('\n'),
+      ),
+    ).toEqual({
+      response: 'Updated resume.tex from the candidate facts.',
+      activities: [
+        {
+          id: 'item_think',
+          label: 'Planning the résumé edits.',
+          status: 'running',
+        },
+        {
+          id: 'item_cmd',
+          label: 'cat CANDIDATE.md',
+          status: 'completed',
+        },
+        {
+          id: 'codex-error',
+          label: 'openai.gpt-5.6-luna is not available for this account.',
+          status: 'error',
+        },
+      ],
+    });
+  });
+
   describe.each(HARNESS_IDS)('%s', (id: HarnessId) => {
     const adapter = () => registry.get(id);
 

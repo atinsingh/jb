@@ -2,6 +2,7 @@ import {
   HarnessAdapter,
   HarnessBootstrap,
   HarnessBootstrapInput,
+  HarnessOutput,
   LITELLM_TAG_HEADER,
   PROMPT_PLACEHOLDER,
   ResolvedModelAlias,
@@ -51,6 +52,9 @@ export class CodexHarness implements HarnessAdapter {
       command: [
         'codex',
         'exec',
+        // JSONL is what the résumé screen streams as tool/thinking activity.
+        // Without it Codex is silent until the process exits.
+        '--json',
         // The workspace is not a git repo; without this Codex refuses to run.
         '--skip-git-repo-check',
         PROMPT_PLACEHOLDER,
@@ -61,6 +65,113 @@ export class CodexHarness implements HarnessAdapter {
 
   turnCommand(bootstrap: HarnessBootstrap, prompt: string): string[] {
     return fillPrompt(bootstrap.command, prompt);
+  }
+
+  parseOutput(stdout: string): HarnessOutput {
+    const text: string[] = [];
+    const activities = new Map<string, HarnessOutput['activities'][number]>();
+
+    for (const line of stdout.split(/\r?\n/)) {
+      if (!line.trim()) continue;
+      try {
+        const event = JSON.parse(line);
+        this.ingestEvent(event, text, activities);
+      } catch {
+        // Codex may print a diagnostic on stdout. It is not assistant text.
+      }
+    }
+
+    return {
+      response: text.at(-1),
+      activities: [...activities.values()],
+    };
+  }
+
+  private ingestEvent(
+    event: any,
+    text: string[],
+    activities: Map<string, HarnessOutput['activities'][number]>,
+  ): void {
+    const errorMessage = this.errorMessage(event);
+    if (errorMessage) {
+      activities.set('codex-error', {
+        id: 'codex-error',
+        label: errorMessage.slice(0, 240),
+        status: 'error',
+      });
+      return;
+    }
+
+    const item = event?.item;
+    if (!item || typeof item !== 'object') return;
+    if (item.type === 'agent_message') {
+      const message = String(item.text || '').trim();
+      if (message) text.push(message);
+      return;
+    }
+
+    const id = String(item.id || event.type || activities.size);
+    const label = this.itemLabel(item);
+    if (!label) return;
+
+    const status = this.itemStatus(event?.type, item.status);
+    activities.set(id, { id, label: label.slice(0, 240), status });
+  }
+
+  private errorMessage(event: any): string | undefined {
+    if (event?.type === 'error') {
+      const message = String(event.message || event.error || '').trim();
+      return message || undefined;
+    }
+    if (event?.type === 'turn.failed') {
+      const message = String(
+        event.error?.message || event.message || '',
+      ).trim();
+      return message || 'Codex turn failed.';
+    }
+    return undefined;
+  }
+
+  private itemStatus(
+    eventType: unknown,
+    itemStatus: unknown,
+  ): HarnessOutput['activities'][number]['status'] {
+    if (itemStatus === 'failed' || eventType === 'item.failed') return 'error';
+    if (itemStatus === 'completed' || eventType === 'item.completed') {
+      return 'completed';
+    }
+    if (eventType === 'item.started' || eventType === 'item.updated') {
+      return 'running';
+    }
+    if (['pending', 'running', 'completed', 'error'].includes(String(itemStatus))) {
+      return itemStatus as HarnessOutput['activities'][number]['status'];
+    }
+    return 'running';
+  }
+
+  private itemLabel(item: any): string | undefined {
+    if (item.type === 'reasoning') {
+      const summary = Array.isArray(item.summary)
+        ? item.summary.map((part: any) => part?.text).find(Boolean)
+        : undefined;
+      return String(summary || item.text || 'Thinking').trim();
+    }
+    if (item.type === 'command_execution') {
+      return String(item.command || 'shell').trim();
+    }
+    if (item.type === 'mcp_tool_call' || item.type === 'tool_call') {
+      return String(item.tool || item.name || item.title || 'tool').trim();
+    }
+    if (item.type === 'file_change' || item.type === 'patch') {
+      const path =
+        item.changes?.[0]?.path || item.path || item.file || 'files';
+      return `Edit ${path}`;
+    }
+    if (item.type === 'web_search') {
+      return String(item.query || 'Search').trim();
+    }
+    const fallback = String(item.title || item.text || '').trim();
+    return fallback || undefined;
   }
 
   private configToml(baseUrl: string, alias: ResolvedModelAlias): string {
@@ -83,7 +194,7 @@ export class CodexHarness implements HarnessAdapter {
       'name = "LiteLLM"',
       `base_url = "${apiBase}"`,
       'env_key = "OPENAI_API_KEY"',
-      'wire_api = "chat"',
+      'wire_api = "responses"',
       '',
       '[model_providers.litellm.http_headers]',
       `"${LITELLM_TAG_HEADER}" = "${harnessTag(this.id)}"`,
