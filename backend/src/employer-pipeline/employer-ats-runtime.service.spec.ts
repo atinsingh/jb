@@ -10,6 +10,7 @@ const q = (value: any) => ({
 describe('EmployerAtsRuntimeService', () => {
   const runtimeModel = {
     updateOne: jest.fn(),
+    find: jest.fn(),
     findOne: jest.fn(),
     findOneAndUpdate: jest.fn(),
   };
@@ -186,6 +187,81 @@ describe('EmployerAtsRuntimeService', () => {
         ]),
       ]),
     );
+  });
+
+  it('serializes budget lookup with first-visit sandbox acquisition for the same employer', async () => {
+    let startProvisioning!: () => void;
+    let completeProvisioning!: () => void;
+    const started = new Promise<void>((resolve) => { startProvisioning = resolve; });
+    const provisioned = new Promise<void>((resolve) => { completeProvisioning = resolve; });
+    let provisioning = false;
+    const configured = {
+      account: account({ sandboxId: 'employer-box-1' }),
+      alias: { alias: 'bedrock/nova-2-lite/low', provider: 'bedrock', effort: 'low' },
+      maxBudgetUsd: 1,
+    };
+    const ensureAccount = jest.spyOn(service as any, 'ensureAccount').mockImplementation(async () => {
+      if (provisioning) throw new Error('Employer ATS key provisioning is in progress');
+      provisioning = true;
+      startProvisioning();
+      await provisioned;
+      provisioning = false;
+      return configured;
+    });
+
+    const acquire = service.acquireSandbox(OWNER, 'page-lease-1');
+    await started;
+    const budget = service.budgetStatus(OWNER);
+    completeProvisioning();
+
+    await expect(acquire).resolves.toEqual({ ready: true, sandboxId: 'employer-box-1' });
+    await expect(budget).resolves.toEqual(expect.objectContaining({ status: 'READY' }));
+    expect(ensureAccount).toHaveBeenCalledTimes(2);
+  });
+
+  it('reaps an idle ATS sandbox but leaves an active assessment running', async () => {
+    const now = new Date('2026-09-17T18:00:00Z');
+    const idle = account({ sandboxId: 'idle-box', updatedAt: new Date('2026-09-17T17:40:00Z') });
+    const active = account({ sandboxId: 'active-box', activeRunId: 'run-1', updatedAt: new Date('2026-09-17T17:40:00Z') });
+    runtimeModel.find.mockReturnValue(q([idle, active]));
+    runtimeModel.findOne
+      .mockReturnValueOnce(q(idle))
+      .mockReturnValueOnce(q(active));
+
+    await expect(service.reapIdleSandboxes(now)).resolves.toBe(1);
+
+    expect(sandbox.destroy).toHaveBeenCalledTimes(1);
+    expect(sandbox.destroy).toHaveBeenCalledWith('idle-box');
+    expect(runtimeModel.updateOne).toHaveBeenCalledWith(
+      { ownerId: idle.ownerId, ownerType: 'employer', sandboxId: 'idle-box' },
+      { $unset: { sandboxId: 1, sandboxLeaseId: 1 } },
+    );
+  });
+
+  it('keeps a newly provisioned sandbox when its page releases during startup', async () => {
+    let provisionStarted!: () => void;
+    const started = new Promise<void>((resolve) => { provisionStarted = resolve; });
+    let finishProvision!: (value: { sandboxId: string }) => void;
+    let currentSandboxId: string | undefined;
+    sandbox.provision.mockImplementationOnce(() => new Promise((resolve) => {
+      finishProvision = (value) => {
+        currentSandboxId = value.sandboxId;
+        resolve(value);
+      };
+      provisionStarted();
+    }));
+    runtimeModel.findOne.mockImplementation(() => q(account({ sandboxId: currentSandboxId })));
+    runtimeModel.findOneAndUpdate.mockReturnValue(q(account({ sandboxId: undefined })));
+
+    const acquiring = service.acquireSandbox(OWNER, 'page-lease-1');
+    await started;
+    const releasing = service.releaseSandbox(OWNER, 'page-lease-1');
+    finishProvision({ sandboxId: 'employer-box-1' });
+
+    await expect(acquiring).resolves.toEqual({ ready: true, sandboxId: 'employer-box-1' });
+    await expect(releasing).resolves.toEqual({ released: true });
+    expect(sandbox.provision).toHaveBeenCalledTimes(1);
+    expect(sandbox.destroy).not.toHaveBeenCalled();
   });
 
   it('creates one encrypted employer virtual key when the owner has no account key', async () => {
@@ -369,26 +445,20 @@ describe('EmployerAtsRuntimeService', () => {
     );
   });
 
-  it('destroys the employer sandbox and forgets its id on release', async () => {
+  it('releases a page lease while retaining its warm sandbox for the next preview', async () => {
     await service.releaseSandbox(OWNER, 'page-lease-1');
+    const next = await service.prepare(OWNER, 'next-preview');
 
-    expect(sandbox.destroy).toHaveBeenCalledWith('employer-box-1');
+    expect(next).toEqual(expect.objectContaining({ status: 'READY', sandboxId: 'employer-box-1' }));
+    expect(sandbox.destroy).not.toHaveBeenCalled();
+    expect(sandbox.provision).not.toHaveBeenCalled();
     expect(runtimeModel.updateOne).toHaveBeenCalledWith(
       {
         ownerId: new Types.ObjectId(OWNER),
         ownerType: 'employer',
         sandboxLeaseId: 'page-lease-1',
       },
-      expect.objectContaining({
-        $unset: expect.objectContaining({
-          sandboxId: 1,
-          sandboxLeaseId: 1,
-          sandboxProvisioningToken: 1,
-          sandboxProvisioningUntil: 1,
-          activeRunId: 1,
-          runLockUntil: 1,
-        }),
-      }),
+      { $unset: { sandboxLeaseId: 1 } },
     );
   });
 
@@ -403,26 +473,21 @@ describe('EmployerAtsRuntimeService', () => {
     expect(sandbox.destroy).not.toHaveBeenCalled();
   });
 
-  it('records the active run as interrupted when the client releases the sandbox', async () => {
+  it('keeps an active preview running when its page lease is released', async () => {
     runtimeModel.findOne.mockReturnValue(
       q(account({ sandboxId: 'employer-box-1', activeRunId: 'run-live' })),
     );
 
     await service.releaseSandbox(OWNER, 'page-lease-1');
 
+    expect(sandbox.destroy).not.toHaveBeenCalled();
     expect(runtimeModel.updateOne).toHaveBeenCalledWith(
       {
         ownerId: new Types.ObjectId(OWNER),
         ownerType: 'employer',
         sandboxLeaseId: 'page-lease-1',
       },
-      expect.objectContaining({
-        $set: expect.objectContaining({ interruptedRunId: 'run-live' }),
-        $unset: expect.objectContaining({
-          activeRunId: 1,
-          runLockUntil: 1,
-        }),
-      }),
+      { $unset: { sandboxLeaseId: 1 } },
     );
   });
 

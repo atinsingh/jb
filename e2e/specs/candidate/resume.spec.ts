@@ -470,6 +470,137 @@ async function stubHarnessApi(page: Page) {
 test.describe("résumé session operation integrity", () => {
   test.describe.configure({ mode: "default" });
 
+  test("accepts a final SSE result with CRLF and no trailing blank line", async ({ page }) => {
+    await stubHarnessApi(page);
+    await page.route("**/api/resume-harness/sessions/*/turns/stream", (route: Route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: `data: ${JSON.stringify({ type: "result", session: {
+          ...SESSION,
+          conversation: [
+            { role: "user", text: "Explain my résumé" },
+            { role: "assistant", text: "Here is your résumé summary." },
+          ],
+        } })}`.replace(/\n/g, "\r\n"),
+      }),
+    );
+    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.getByTestId("start-session").click();
+    await page.getByTestId("instruction").fill("Explain my résumé");
+    await page.getByTestId("send-instruction").click();
+    await expect(page.getByTestId("turn-summary")).toContainText("Here is your résumé summary.");
+  });
+
+  test("shows the same saved agent actions after the stream ends and on reload", async ({ page }) => {
+    await stubHarnessApi(page);
+    let savedSession: any = SESSION;
+    await page.route(`**/api/resume-harness/sessions/${SESSION.id}`, (route: Route) =>
+      route.fulfill({ json: savedSession }),
+    );
+    await page.route("**/api/resume-harness/sessions/*/turns/stream", (route: Route) => {
+      const instruction = route.request().postDataJSON().instruction;
+      const session = {
+        ...SESSION,
+        conversation: [
+          { role: "user", text: instruction },
+          { role: "assistant", text: "I updated the résumé.", activities: [
+            { id: "think-1", kind: "reasoning", label: "Checking candidate facts", status: "completed" },
+            { id: "tool-1", kind: "tool", label: "Edit file", status: "completed" },
+          ] },
+        ],
+      };
+      savedSession = session;
+      return route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: [
+          `data: ${JSON.stringify({ type: "phase", phase: "writing" })}\n\n`,
+          `data: ${JSON.stringify({ type: "token", text: "I updated" })}\n\n`,
+          `data: ${JSON.stringify({ type: "activity", activity: { id: "tool-1", kind: "tool", label: "Edit file", status: "running" } })}\n\n`,
+          `data: ${JSON.stringify({ type: "result", session })}\n\n`,
+        ].join(""),
+      });
+    });
+    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.getByTestId("start-session").click();
+    await page.getByTestId("instruction").fill("Update my résumé");
+    await page.getByTestId("send-instruction").click();
+    await expect(page.getByTestId("turn-summary")).toContainText("I updated the résumé.");
+    await expect(page.getByTestId("saved-activity-log")).toContainText("Edit file");
+    await expect(page.getByRole("region", { name: "Thinking" })).toContainText("Checking candidate facts");
+    await expect(page.getByRole("region", { name: "Actions" })).toContainText("Edit file");
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.getByTestId("saved-activity-log")).toContainText("Edit file");
+    await expect(page.getByRole("region", { name: "Thinking" })).toContainText("Checking candidate facts");
+  });
+
+  test("renders assistant Markdown while leaving unsafe HTML and links inert", async ({ page }) => {
+    await stubHarnessApi(page);
+    await page.route("**/api/resume-harness/sessions/*/turns/stream", (route: Route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: sse({
+          ...SESSION,
+          conversation: [
+            { role: "user", text: "What can you do?" },
+            { role: "assistant", text: "## Options\n\n- **Tailor** a summary\n- Use `resume.tex`\n\n[Guide](https://example.com/guide) [unsafe](javascript:alert(1)) <script>window.__unsafe = true</script>" },
+          ],
+        }),
+      }),
+    );
+    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.getByTestId("start-session").click();
+    await page.getByTestId("instruction").fill("What can you do?");
+    await page.getByTestId("send-instruction").click();
+    const answer = page.getByTestId("turn-summary");
+    await expect(answer.locator("h2")).toHaveText("Options");
+    await expect(answer.locator("li")).toHaveCount(2);
+    await expect(answer.locator("strong")).toHaveText("Tailor");
+    await expect(answer.locator("code")).toHaveText("resume.tex");
+    await expect(answer.getByRole("link", { name: "Guide" })).toHaveAttribute("href", "https://example.com/guide");
+    await expect(answer.getByRole("link", { name: "unsafe" })).toHaveCount(0);
+    await expect(answer.locator("script")).toHaveCount(0);
+  });
+
+  test("restores the saved first response when its final stream event is lost", async ({ page }) => {
+    await stubHarnessApi(page);
+    const instruction = "Build my résumé.";
+    await page.route("**/api/resume-harness/sessions/*/turns/stream", (route: Route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: 'data: {"type":"phase","phase":"writing"}\n\n',
+      }),
+    );
+    await page.route(`**/api/resume-harness/sessions/${SESSION.id}`, (route: Route) =>
+      route.fulfill({
+        json: {
+          ...SESSION,
+          revision: 1,
+          revisionCount: 1,
+          latex: V1,
+          compiled: true,
+          hasCurrentPdf: true,
+          turns: [{ revision: 1, instruction, latex: V1, compiled: true, kind: "instruction" }],
+          conversation: [
+            { role: "user", text: instruction, createdAt: SESSION.updatedAt },
+            { role: "assistant", text: "Created resume.tex.", revision: 1, createdAt: SESSION.updatedAt },
+          ],
+        },
+      }),
+    );
+
+    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.getByTestId("start-session").click();
+    await page.getByTestId("instruction").fill(instruction);
+    await page.getByTestId("send-instruction").click();
+
+    await expect(page.getByTestId("session-revision")).toHaveText("1");
+    await expect(page.getByText("Created resume.tex.")).toBeVisible();
+  });
+
   test("revision history shows the original instruction alongside its summary", async ({
     page,
   }) => {
@@ -694,7 +825,7 @@ test.describe("résumé session history", () => {
     ).toContainText("AI-generated");
   });
 
-  test("hidden and pagehide send one authenticated lifecycle end and never delete", async ({
+  test("hiding or leaving the page keeps the active résumé session available", async ({
     page,
   }) => {
     await stubHarnessApi(page);
@@ -718,15 +849,14 @@ test.describe("résumé session history", () => {
       document.dispatchEvent(new Event("visibilitychange"));
       window.dispatchEvent(new Event("pagehide"));
     });
-    await expect.poll(() => ends.length).toBe(1);
-    expect(ends[0].method()).toBe("POST");
-    expect(ends[0].headers().authorization).toMatch(/^Bearer /);
     await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
     await page.goto("/app/resume-library", { waitUntil: "domcontentloaded" });
     await expect(
       page.getByTestId(`resume-session-${SESSION.id}`),
     ).toBeVisible();
-    expect(ends).toHaveLength(1);
+    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await expect(page.getByTestId("session-bar")).toBeVisible();
+    expect(ends).toHaveLength(0);
     expect(deletes).toHaveLength(0);
   });
 });
@@ -804,7 +934,7 @@ test.describe("LaTeX résumé — agent harness", () => {
     await page.getByTestId("send-instruction").click();
 
     await page.getByTestId("run-ats").click();
-    await expect(page.getByTestId("ats-score")).toHaveText("79");
+    await expect(page.getByTestId("ats-score")).toContainText("79/100");
     await expect(page.getByTestId("ats-gaps")).toContainText("Kubernetes");
     await expect(page.getByTestId("ats-suggestions")).toContainText(
       "Add Kubernetes to a factual project bullet.",

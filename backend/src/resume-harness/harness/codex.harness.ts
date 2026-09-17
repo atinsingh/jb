@@ -3,6 +3,7 @@ import {
   HarnessBootstrap,
   HarnessBootstrapInput,
   HarnessOutput,
+  HarnessStreamEvent,
   LITELLM_TAG_HEADER,
   PROMPT_PLACEHOLDER,
   ResolvedModelAlias,
@@ -57,6 +58,9 @@ export class CodexHarness implements HarnessAdapter {
         '--json',
         // The workspace is not a git repo; without this Codex refuses to run.
         '--skip-git-repo-check',
+        // Docker is the isolation boundary. Codex's nested workspace sandbox
+        // cannot run its shell tools under the container's restricted kernel.
+        '--dangerously-bypass-approvals-and-sandbox',
         PROMPT_PLACEHOLDER,
       ],
       proxyHeaders: harnessProxyHeaders(this.id),
@@ -67,14 +71,46 @@ export class CodexHarness implements HarnessAdapter {
     return fillPrompt(bootstrap.command, prompt);
   }
 
+  parseStreamEvent(line: string): HarnessStreamEvent[] {
+    let event: any;
+    try { event = JSON.parse(line); } catch { return []; }
+    if (this.isRetryNotice(event)) return [];
+    const error = this.errorMessage(event);
+    if (error) return [{ type: 'error', message: error.slice(0, 240) }];
+    const item = event?.item;
+    if (!item || typeof item !== 'object') return [];
+    if (item.type === 'agent_message') {
+      const text = String(item.text || '');
+      return text && event.type === 'item.completed' ? [{ type: 'token', text }] : [];
+    }
+    const label = this.itemLabel(item);
+    if (!label) return [];
+    return [{
+      type: 'activity',
+      activity: {
+        id: String(item.id || event.type || 'item'),
+        kind: item.type === 'reasoning' ? 'reasoning' : 'tool',
+        label: label.slice(0, 240),
+        status: this.itemStatus(event.type, item.status),
+      },
+    }];
+  }
+
   parseOutput(stdout: string): HarnessOutput {
     const text: string[] = [];
     const activities = new Map<string, HarnessOutput['activities'][number]>();
+    let error: string | undefined;
 
     for (const line of stdout.split(/\r?\n/)) {
       if (!line.trim()) continue;
       try {
         const event = JSON.parse(line);
+        if (event?.type === 'turn.completed') {
+          error = undefined;
+          activities.delete('codex-error');
+          continue;
+        }
+        if (this.errorMessage(event)) error = this.errorMessage(event);
         this.ingestEvent(event, text, activities);
       } catch {
         // Codex may print a diagnostic on stdout. It is not assistant text.
@@ -84,6 +120,7 @@ export class CodexHarness implements HarnessAdapter {
     return {
       response: text.at(-1),
       activities: [...activities.values()],
+      ...(error ? { error } : {}),
     };
   }
 
@@ -94,6 +131,7 @@ export class CodexHarness implements HarnessAdapter {
   ): void {
     const errorMessage = this.errorMessage(event);
     if (errorMessage) {
+      if (this.isRetryNotice(event)) return;
       activities.set('codex-error', {
         id: 'codex-error',
         label: errorMessage.slice(0, 240),
@@ -115,7 +153,12 @@ export class CodexHarness implements HarnessAdapter {
     if (!label) return;
 
     const status = this.itemStatus(event?.type, item.status);
-    activities.set(id, { id, label: label.slice(0, 240), status });
+    activities.set(id, {
+      id,
+      kind: item.type === 'reasoning' ? 'reasoning' : 'tool',
+      label: label.slice(0, 240),
+      status,
+    });
   }
 
   private errorMessage(event: any): string | undefined {
@@ -130,6 +173,10 @@ export class CodexHarness implements HarnessAdapter {
       return message || 'Codex turn failed.';
     }
     return undefined;
+  }
+
+  private isRetryNotice(event: any): boolean {
+    return event?.type === 'error' && /^Reconnecting\.\.\.\s+\d+\/\d+/.test(String(event.message || ''));
   }
 
   private itemStatus(
@@ -157,21 +204,21 @@ export class CodexHarness implements HarnessAdapter {
       return String(summary || item.text || 'Thinking').trim();
     }
     if (item.type === 'command_execution') {
-      return String(item.command || 'shell').trim();
+      const command = String(item.command || '').trim().split(/\s+/)[0];
+      return /^(cat|ls|pwd|find|grep|rg|latexmk|git)$/i.test(command)
+        ? `Run ${command}`
+        : 'Run shell command';
     }
     if (item.type === 'mcp_tool_call' || item.type === 'tool_call') {
       return String(item.tool || item.name || item.title || 'tool').trim();
     }
     if (item.type === 'file_change' || item.type === 'patch') {
-      const path =
-        item.changes?.[0]?.path || item.path || item.file || 'files';
-      return `Edit ${path}`;
+      return 'Edit file';
     }
     if (item.type === 'web_search') {
       return String(item.query || 'Search').trim();
     }
-    const fallback = String(item.title || item.text || '').trim();
-    return fallback || undefined;
+    return undefined;
   }
 
   private configToml(baseUrl: string, alias: ResolvedModelAlias): string {

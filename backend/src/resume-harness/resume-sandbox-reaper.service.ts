@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Model, Types } from 'mongoose';
 import { SandboxService } from './sandbox/sandbox.service';
+import { ResumeHarnessService } from './resume-harness.service';
 import {
   ResumeHarnessSession,
   ResumeHarnessSessionDocument,
@@ -16,6 +17,7 @@ export class ResumeSandboxReaperService {
     @InjectModel(ResumeHarnessSession.name)
     private readonly sessionModel: Model<ResumeHarnessSessionDocument>,
     private readonly sandbox: SandboxService,
+    private readonly harness: ResumeHarnessService,
   ) {}
 
   @Cron(CronExpression.EVERY_MINUTE, {
@@ -25,6 +27,7 @@ export class ResumeSandboxReaperService {
   async handleSweep(): Promise<void> {
     try {
       await this.sweepExpiredSandboxes();
+      await this.harness.reapIdleSessions();
     } catch (error: any) {
       this.logger.warn(
         `Resume sandbox sweep failed: ${error?.message ?? String(error)}`,

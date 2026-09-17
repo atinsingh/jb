@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Types, Schema as MongooseSchema } from 'mongoose';
-import { HARNESS_IDS, HarnessId } from '../harness/harness.types';
+import { HARNESS_IDS, HarnessActivity, HarnessId } from '../harness/harness.types';
 
 export type ResumeHarnessSessionDocument =
   HydratedDocument<ResumeHarnessSession>;
@@ -75,6 +75,12 @@ export class ResumeHarnessMessage {
   /** Present only when this message produced a stored document revision. */
   @Prop()
   revision?: number;
+
+  @Prop({
+    type: [{ id: String, kind: String, label: String, status: String }],
+    default: [],
+  })
+  activities?: HarnessActivity[];
 
   @Prop({ default: () => new Date() })
   createdAt: Date;

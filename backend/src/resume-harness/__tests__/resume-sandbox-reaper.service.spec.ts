@@ -53,6 +53,7 @@ describe('ResumeSandboxReaperService', () => {
     const reaper = new ResumeSandboxReaperService(
       sessionModel as any,
       sandbox as any,
+      { reapIdleSessions: jest.fn() } as any,
     );
 
     await reaper.sweepExpiredSandboxes();
@@ -80,7 +81,7 @@ describe('ResumeSandboxReaperService', () => {
       sweepExpired: jest.fn(async () => {
         throw new Error('docker unavailable');
       }),
-    } as any);
+    } as any, { reapIdleSessions: jest.fn() } as any);
 
     await expect(reaper.handleSweep()).resolves.toBeUndefined();
   });

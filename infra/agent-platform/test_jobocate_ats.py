@@ -15,15 +15,23 @@ class FakeRouter:
 class AtsTransportTest(unittest.TestCase):
     def test_analyze_puts_the_shared_proxy_key_on_the_in_memory_router(self):
         router = FakeRouter()
+        started = set()
+
+        async def independent_model_call(name):
+            started.add(name)
+            while len(started) < 2:
+                await asyncio.sleep(0)
+            return {}
+
         llm = types.ModuleType("app.llm")
         llm.get_router = lambda: (router, None)
 
         ats = types.ModuleType("app.services.ats")
         ats.compute_ats_score = lambda **kwargs: {"overall_score": 100}
         improver = types.ModuleType("app.services.improver")
-        improver.extract_job_keywords = lambda _jd: asyncio.sleep(0, result={})
+        improver.extract_job_keywords = lambda _jd: independent_model_call("job")
         parser = types.ModuleType("app.services.parser")
-        parser.parse_resume_to_json = lambda _resume: asyncio.sleep(0, result={})
+        parser.parse_resume_to_json = lambda _resume: independent_model_call("resume")
         refiner = types.ModuleType("app.services.refiner")
         refiner.analyze_keyword_gaps = lambda *_args: types.SimpleNamespace(
             non_injectable_keywords=[], injectable_keywords=[]
@@ -48,7 +56,10 @@ class AtsTransportTest(unittest.TestCase):
             spec = importlib.util.spec_from_file_location("jobocate_ats_tested", path)
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
-            asyncio.run(module.analyze({"latex": "resume", "jobDescription": "job"}))
+            asyncio.run(asyncio.wait_for(
+                module.analyze({"latex": "resume", "jobDescription": "job"}),
+                timeout=1,
+            ))
         finally:
             if old_key is None:
                 os.environ.pop("JOBOCATE_LITELLM_API_KEY", None)
@@ -64,6 +75,7 @@ class AtsTransportTest(unittest.TestCase):
             router.model_list[0]["litellm_params"]["api_key"],
             "sk-shared-user-key",
         )
+        self.assertEqual(started, {"resume", "job"})
 
 
 if __name__ == "__main__":

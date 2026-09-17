@@ -12,7 +12,7 @@ const assessmentStateCopy = {
   BUDGET_EXHAUSTED: 'ATS match was not run because the employer AI budget is exhausted.',
   CONFIGURATION_ERROR: 'ATS match could not start because employer ATS is not configured. Contact support before retrying.',
   ATS_FAILED: 'ATS matching failed during execution. Retry the assessment.',
-  ATS_INTERRUPTED: 'ATS matching stopped because this tab lost focus and the scoring container was shut down. Keep this page visible and retry.',
+  ATS_INTERRUPTED: 'ATS matching stopped because its scoring container became unavailable. Retry the assessment.',
   DETECTOR_FAILED: 'The local AI-content heuristic failed during execution. Retry the assessment.',
 };
 

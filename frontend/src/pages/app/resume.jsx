@@ -4,11 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import AppTopNav from "@/components/app/AppTopNav";
 import { ErrorState } from "@/components/app/AppStates";
 import {
   endHarnessSession,
-  endHarnessSessionKeepalive,
   getHarnessPdf,
   getHarnessOptions,
   getHarnessSession,
@@ -163,34 +164,12 @@ export default function AppResume() {
   const [messages, setMessages] = useState([]);
   const [liveActivities, setLiveActivities] = useState([]);
   const [livePhase, setLivePhase] = useState(null);
+  const [liveText, setLiveText] = useState("");
   const transcriptRef = useRef(null);
 
   useEffect(() => {
-    const release = (unmounting = false) => {
-      const current = sessionRef.current;
-      if (
-        current?.status !== "active" ||
-        lifecycleEnded.current.has(current.id)
-      )
-        return;
-      lifecycleEnded.current.add(current.id);
-      void endHarnessSessionKeepalive(current.id);
-      if (!unmounting)
-        setSession((value) =>
-          value?.id === current.id ? { ...value, status: "ended" } : value,
-        );
-    };
-    const pagehide = () => release();
-    const visibilitychange = () => {
-      if (document.visibilityState === "hidden") release();
-    };
-    window.addEventListener("pagehide", pagehide);
-    document.addEventListener("visibilitychange", visibilitychange);
     return () => {
-      window.removeEventListener("pagehide", pagehide);
-      document.removeEventListener("visibilitychange", visibilitychange);
       pdfRequestRef.current += 1;
-      release(true);
     };
   }, []);
 
@@ -464,30 +443,65 @@ export default function AppResume() {
     setPhase("working");
     setInstruction("");
     setLiveActivities([]);
+    setLiveText("");
     setLivePhase("writing");
     setMessages((m) => [...m, { role: "you", text }]);
+
+    let receivedResult = false;
+    let streamedError = null;
+    const recoverSavedTurn = async () => {
+      const saved = await getHarnessSession(session.id);
+      const newConversation = saved.conversation?.slice(session.conversation?.length || 0) || [];
+      if (
+        !newConversation.some((entry) => entry.role === "user" && entry.text === text) ||
+        !newConversation.some((entry) => entry.role === "assistant")
+      ) return false;
+      const current = acceptSession(saved);
+      setMessages(sessionMessages(current));
+      await loadPdf(current);
+      setError(null);
+      return true;
+    };
 
     try {
       await streamHarnessTurn(session.id, { instruction: text }, (event) => {
         if (event.type === "phase") setLivePhase(event.phase);
+        else if (event.type === "token") {
+          setLiveText((current) => (current + event.text).slice(-12000));
+        }
         else if (event.type === "activity") {
           setLiveActivities((current) =>
             upsertActivity(current, event.activity),
           );
         } else if (event.type === "result") {
+          receivedResult = true;
           const s = acceptSession(event.session);
           if (s.pdfBase64) setPdfBase64(s.pdfBase64);
           setMessages(sessionMessages(s));
         } else if (event.type === "error") {
           const err = new Error(event.message);
           err.status = event.status;
+          streamedError = err;
           setError(err);
         }
       });
+      if (!receivedResult && !(await recoverSavedTurn())) {
+        throw streamedError || new Error(
+          "The response ended before the saved turn was available. Reload to check this session.",
+        );
+      }
     } catch (e) {
+      if (!receivedResult) {
+        try {
+          if (await recoverSavedTurn()) return;
+        } catch {
+          // Keep the original stream failure visible when recovery is unavailable.
+        }
+      }
       setError(e);
     } finally {
       setLiveActivities([]);
+      setLiveText("");
       setLivePhase(null);
       setPhase("ready");
     }
@@ -523,6 +537,7 @@ export default function AppResume() {
     setError(null);
     setPhase("working");
     setLiveActivities([]);
+    setLiveText("");
     setLivePhase("relayout");
     setMessages((m) => [
       ...m,
@@ -536,6 +551,9 @@ export default function AppResume() {
 
     const handle = (event) => {
       if (event.type === "phase") setLivePhase(event.phase);
+      else if (event.type === "token") {
+        setLiveText((current) => (current + event.text).slice(-12000));
+      }
       else if (event.type === "activity") {
         setLiveActivities((current) => upsertActivity(current, event.activity));
       } else if (event.type === "result") {
@@ -550,6 +568,7 @@ export default function AppResume() {
             text: s.summary || "Re-applied the résumé to the new look.",
             compiled: s.compiled,
             revision: s.revision,
+            activities: s.conversation?.at(-1)?.activities || [],
           },
         ]);
       } else if (event.type === "error") {
@@ -576,6 +595,7 @@ export default function AppResume() {
       setError(e);
     } finally {
       setLiveActivities([]);
+      setLiveText("");
       setLivePhase(null);
       setPhase("ready");
     }
@@ -844,6 +864,7 @@ export default function AppResume() {
               messages,
               liveActivities,
               livePhase,
+              liveText,
               transcriptRef,
               instruction,
               setInstruction,
@@ -898,6 +919,7 @@ function sessionMessages(session) {
         text: message.text,
         revision: message.revision,
         compiled: turn?.compiled,
+        activities: message.activities || [],
       };
     });
   }
@@ -1556,6 +1578,10 @@ function Workspace(p) {
               <Bubble key={i} message={m} />
             ))}
 
+            {p.liveText && (
+              <Bubble message={{ role: "agent", text: p.liveText }} />
+            )}
+
             {p.livePhase && (
               <div
                 data-testid="live-status"
@@ -1598,33 +1624,7 @@ function Workspace(p) {
                       overflow: "auto",
                     }}
                   >
-                    {p.liveActivities.map((activity) => (
-                      <div
-                        key={activity.id || activity.label}
-                        style={{
-                          display: "flex",
-                          gap: 8,
-                          alignItems: "baseline",
-                        }}
-                      >
-                        <span
-                          aria-hidden="true"
-                          style={{
-                            color:
-                              activity.status === "error"
-                                ? "#b45b4c"
-                                : T.accent,
-                          }}
-                        >
-                          {activity.status === "completed"
-                            ? "✓"
-                            : activity.status === "error"
-                              ? "×"
-                              : "·"}
-                        </span>
-                        <span>{activity.label}</span>
-                      </div>
-                    ))}
+                    <ActivitySections activities={p.liveActivities} />
                   </div>
                 )}
               </div>
@@ -2057,7 +2057,33 @@ function Bubble({ message }) {
           animation: "jbRise .2s ease",
         }}
       >
-        {message.text}
+        {you ? message.text : (
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            skipHtml
+            components={{
+              p: ({ children }) => <p style={{ margin: "0 0 8px" }}>{children}</p>,
+              h1: ({ children }) => <h1 style={{ fontSize: 17, margin: "0 0 8px" }}>{children}</h1>,
+              h2: ({ children }) => <h2 style={{ fontSize: 15, margin: "0 0 8px" }}>{children}</h2>,
+              ul: ({ children }) => <ul style={{ margin: "0 0 8px", paddingLeft: 20 }}>{children}</ul>,
+              ol: ({ children }) => <ol style={{ margin: "0 0 8px", paddingLeft: 20 }}>{children}</ol>,
+              pre: ({ children }) => <pre style={{ overflowX: "auto", margin: "0 0 8px" }}>{children}</pre>,
+              a: ({ href, children }) => href
+                ? <a href={href} rel="noopener noreferrer">{children}</a>
+                : <span>{children}</span>,
+            }}
+          >
+            {message.text || ""}
+          </ReactMarkdown>
+        )}
+        {!you && message.activities?.length > 0 && (
+          <div
+            data-testid="saved-activity-log"
+            style={{ marginTop: 8, paddingTop: 7, borderTop: `1px solid ${T.line}`, color: T.fg3, fontSize: 11.5 }}
+          >
+            <ActivitySections activities={message.activities} />
+          </div>
+        )}
         {!you && message.revision != null && (
           <div
             style={{
@@ -2074,6 +2100,24 @@ function Bubble({ message }) {
       </div>
     </div>
   );
+}
+
+function ActivitySections({ activities }) {
+  const groups = [
+    ["Thinking", activities.filter((activity) => activity.kind === "reasoning")],
+    ["Actions", activities.filter((activity) => activity.kind !== "reasoning")],
+  ];
+  return groups.map(([name, entries]) => entries.length > 0 && (
+    <section key={name} aria-label={name} style={{ marginTop: 4 }}>
+      <div style={{ fontWeight: 600, marginBottom: 3 }}>{name}</div>
+      {entries.map((activity) => (
+        <div key={activity.id || activity.label} style={{ display: "flex", gap: 8 }}>
+          <span aria-hidden="true">{activity.status === "completed" ? "✓" : activity.status === "error" ? "×" : "·"}</span>
+          <span>{activity.label}</span>
+        </div>
+      ))}
+    </section>
+  ));
 }
 
 function ProfileFacts({ profile }) {

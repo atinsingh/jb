@@ -2,6 +2,8 @@ import {
   HarnessAdapter,
   HarnessBootstrap,
   HarnessBootstrapInput,
+  HarnessOutput,
+  HarnessStreamEvent,
   PROMPT_PLACEHOLDER,
   fillPrompt,
   harnessProxyHeaders,
@@ -62,10 +64,11 @@ export class ClaudeCodeHarness implements HarnessAdapter {
         '--print',
         // The sandbox is the isolation boundary, so the harness is free to edit
         // inside it without a human approving each write.
-        '--permission-mode',
-        'acceptEdits',
+        '--dangerously-skip-permissions',
         '--output-format',
-        'text',
+        'stream-json',
+        '--include-partial-messages',
+        '--verbose',
         PROMPT_PLACEHOLDER,
       ],
       proxyHeaders: harnessProxyHeaders(this.id),
@@ -74,6 +77,69 @@ export class ClaudeCodeHarness implements HarnessAdapter {
 
   turnCommand(bootstrap: HarnessBootstrap, prompt: string): string[] {
     return fillPrompt(bootstrap.command, prompt);
+  }
+
+  parseStreamEvent(line: string): HarnessStreamEvent[] {
+    let record: any;
+    try { record = JSON.parse(line); } catch { return []; }
+    if (record?.type === 'stream_event') {
+      const event = record.event;
+      if (event?.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+        const text = String(event.delta.text || '');
+        return text ? [{ type: 'token', text }] : [];
+      }
+      if (event?.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
+        const tool = event.content_block;
+        return [{
+          type: 'activity',
+          activity: { id: String(tool.id || 'tool'), kind: 'tool', label: String(tool.name || 'Tool').slice(0, 80), status: 'running' },
+        }];
+      }
+    }
+    if (record?.type === 'user' && Array.isArray(record.message?.content)) {
+      return record.message.content
+        .filter((part: any) => part?.type === 'tool_result' && part.tool_use_id)
+        .map((part: any) => ({
+          type: 'activity' as const,
+          activity: { id: String(part.tool_use_id), kind: 'tool' as const, label: 'Tool', status: part.is_error ? 'error' as const : 'completed' as const },
+        }));
+    }
+    if (record?.type === 'result' && record.is_error) {
+      return [{ type: 'error', message: String(record.result || record.error || 'Claude Code failed.').slice(0, 240) }];
+    }
+    return [];
+  }
+
+  parseOutput(stdout: string): HarnessOutput {
+    let response: string | undefined;
+    let error: string | undefined;
+    const activities = new Map<string, HarnessOutput['activities'][number]>();
+    for (const line of stdout.split(/\r?\n/)) {
+      if (!line.trim()) continue;
+      let record: any;
+      try { record = JSON.parse(line); } catch { continue; }
+      if (record?.type === 'assistant' && Array.isArray(record.message?.content)) {
+        const text = record.message.content
+          .filter((part: any) => part?.type === 'text')
+          .map((part: any) => String(part.text || ''))
+          .join('');
+        if (text.trim()) response = text.trim();
+      }
+      if (record?.type === 'result') {
+        if (record.is_error) error = String(record.result || record.error || 'Claude Code failed.');
+        else if (record.result) response = String(record.result).trim();
+      }
+      for (const event of this.parseStreamEvent(line)) {
+        if (event.type !== 'activity') continue;
+        const existing = activities.get(event.activity.id || 'tool');
+        activities.set(event.activity.id || 'tool', {
+          ...existing,
+          ...event.activity,
+          label: event.activity.label === 'Tool' && existing?.label ? existing.label : event.activity.label,
+        });
+      }
+    }
+    return { response, activities: [...activities.values()], ...(error ? { error } : {}) };
   }
 
   /** Exposed for logging/assertion; identical to what the header carries. */

@@ -74,7 +74,6 @@ export default function JobApplications() {
       .then((saved) => {
         if (cancelled || !saved?.saved) return;
         setSavedFileName(saved.fileName);
-        setPreview(saved.assessment || { status: 'NOT_RUN' });
       })
       .catch((err) => { if (!cancelled) setActionError(err); });
     return () => { cancelled = true; };
@@ -85,15 +84,13 @@ export default function JobApplications() {
     setLoading(true);
     setError(null);
     try {
-      const [jobRes, listRes, budget] = await Promise.all([
+      const [jobRes, listRes] = await Promise.all([
         employerJobsApi.get(jobId).catch(() => null),
         employerPipelineApi.list({ jobId }),
-        employerPipelineApi.assessmentBudget().catch(() => null),
       ]);
       const list = Array.isArray(listRes) ? listRes : listRes?.applicants || [];
       setJob(jobRes?.job || jobRes || null);
       setApplications(list);
-      setAssessmentBudget(budget);
       setSelectedId((prev) => prev ?? (list[0]?._id || null));
     } catch (err) {
       setError(err);
@@ -105,6 +102,15 @@ export default function JobApplications() {
   useEffect(() => {
     if (router.isReady) load();
   }, [router.isReady, load]);
+
+  useEffect(() => {
+    if (sandboxStatus !== 'ready') return undefined;
+    let cancelled = false;
+    employerPipelineApi.assessmentBudget()
+      .then((budget) => { if (!cancelled) setAssessmentBudget(budget); })
+      .catch(() => { if (!cancelled) setAssessmentBudget(null); });
+    return () => { cancelled = true; };
+  }, [sandboxStatus]);
 
   useEffect(() => {
     if (!selectedId) {

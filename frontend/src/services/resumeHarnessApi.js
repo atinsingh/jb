@@ -135,6 +135,20 @@ const streamPost = async (path, payload, onEvent) => {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  const dispatch = (frame) => {
+    const data = frame.split(/\r?\n/)
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).trimStart())
+      .join("\n");
+    if (!data) return;
+    let event;
+    try {
+      event = JSON.parse(data);
+    } catch {
+      return;
+    }
+    onEvent(event);
+  };
 
   for (;;) {
     const { done, value } = await reader.read();
@@ -143,18 +157,12 @@ const streamPost = async (path, payload, onEvent) => {
 
     // SSE frames are separated by a blank line; a partial frame stays in the
     // buffer until its terminator arrives.
-    const frames = buffer.split("\n\n");
+    const frames = buffer.split(/\r?\n\r?\n/);
     buffer = frames.pop() ?? "";
-    for (const frame of frames) {
-      const line = frame.split("\n").find((l) => l.startsWith("data: "));
-      if (!line) continue;
-      try {
-        onEvent(JSON.parse(line.slice(6)));
-      } catch {
-        // A malformed frame is not worth aborting a turn over.
-      }
-    }
+    for (const frame of frames) dispatch(frame);
   }
+  buffer += decoder.decode();
+  if (buffer.trim()) dispatch(buffer);
 };
 
 export const streamHarnessTurn = (id, payload, onEvent) =>

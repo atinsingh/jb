@@ -85,7 +85,7 @@ describe('harness bootstrap', () => {
     const adapter = registry.get('codex');
     const boot = adapter.bootstrap(bootstrapInput());
     expect(boot.command).toEqual(
-      expect.arrayContaining(['codex', 'exec', '--json']),
+      expect.arrayContaining(['codex', 'exec', '--json', '--dangerously-bypass-approvals-and-sandbox']),
     );
 
     expect(
@@ -136,12 +136,14 @@ describe('harness bootstrap', () => {
       activities: [
         {
           id: 'item_think',
+          kind: 'reasoning',
           label: 'Planning the résumé edits.',
           status: 'running',
         },
         {
           id: 'item_cmd',
-          label: 'cat CANDIDATE.md',
+          kind: 'tool',
+          label: 'Run cat',
           status: 'completed',
         },
         {
@@ -150,7 +152,62 @@ describe('harness bootstrap', () => {
           status: 'error',
         },
       ],
+      error: 'openai.gpt-5.6-luna is not available for this account.',
     });
+  });
+
+  it('does not turn a recovered Codex retry into a failed turn', () => {
+    const adapter = registry.get('codex');
+    const retry = JSON.stringify({ type: 'error', message: 'Reconnecting... 1/5' });
+    expect(adapter.parseStreamEvent?.(retry)).toEqual([]);
+    expect(adapter.parseOutput?.([
+      retry,
+      JSON.stringify({ type: 'item.completed', item: { id: 'answer', type: 'agent_message', text: 'Done.' } }),
+      JSON.stringify({ type: 'turn.completed', usage: {} }),
+    ].join('\n'))?.error).toBeUndefined();
+  });
+
+  it('uses structured Claude output and normalizes live text and tool lifecycle', () => {
+    const adapter = registry.get('claude-code');
+    const boot = adapter.bootstrap(bootstrapInput());
+    expect(boot.command).toEqual(expect.arrayContaining([
+      '--output-format', 'stream-json', '--include-partial-messages',
+    ]));
+    expect(adapter.parseStreamEvent?.(JSON.stringify({
+      type: 'stream_event',
+      event: { type: 'content_block_start', content_block: { type: 'tool_use', id: 'tool-1', name: 'Read' } },
+    }))).toEqual([{ type: 'activity', activity: { id: 'tool-1', kind: 'tool', label: 'Read', status: 'running' } }]);
+    expect(adapter.parseStreamEvent?.(JSON.stringify({
+      type: 'stream_event', event: { type: 'content_block_delta', delta: { type: 'text_delta', text: 'I can help.' } },
+    }))).toEqual([{ type: 'token', text: 'I can help.' }]);
+    expect(adapter.parseStreamEvent?.(JSON.stringify({
+      type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'tool-1', is_error: false }] },
+    }))).toEqual([{ type: 'activity', activity: { id: 'tool-1', kind: 'tool', label: 'Tool', status: 'completed' } }]);
+    expect(adapter.parseOutput?.(JSON.stringify({ type: 'result', result: 'I can help.', is_error: false })))
+      .toEqual({ response: 'I can help.', activities: [] });
+  });
+
+  it('normalizes Codex message, reasoning, tool, and failure events', () => {
+    const adapter = registry.get('codex');
+    expect(adapter.parseStreamEvent?.(JSON.stringify({
+      type: 'item.started', item: { id: 'cmd-1', type: 'command_execution', command: 'cat CANDIDATE.md' },
+    }))).toEqual([{ type: 'activity', activity: { id: 'cmd-1', kind: 'tool', label: 'Run cat', status: 'running' } }]);
+    expect(adapter.parseStreamEvent?.(JSON.stringify({
+      type: 'item.completed', item: { id: 'msg-1', type: 'agent_message', text: 'Done.' },
+    }))).toEqual([{ type: 'token', text: 'Done.' }]);
+    expect(adapter.parseStreamEvent?.(JSON.stringify({
+      type: 'turn.failed', error: { message: 'Provider unavailable' },
+    }))).toEqual([{ type: 'error', message: 'Provider unavailable' }]);
+  });
+
+  it('normalizes OpenCode text and tool events through the same contract', () => {
+    const adapter = registry.get('opencode');
+    expect(adapter.parseStreamEvent?.(JSON.stringify({
+      type: 'text', part: { type: 'text', text: 'Checking the résumé.' },
+    }))).toEqual([{ type: 'token', text: 'Checking the résumé.' }]);
+    expect(adapter.parseStreamEvent?.(JSON.stringify({
+      type: 'tool_use', part: { type: 'tool', callID: 'read-1', tool: 'read', state: { status: 'running', title: 'Read CANDIDATE.md' } },
+    }))).toEqual([{ type: 'activity', activity: { id: 'read-1', kind: 'tool', label: 'Read', status: 'running' } }]);
   });
 
   describe.each(HARNESS_IDS)('%s', (id: HarnessId) => {

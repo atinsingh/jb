@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { createHash, randomUUID } from 'crypto';
 import { Model, Types } from 'mongoose';
 import { AtsSandboxReleasedException } from '../ats/resume-matcher.adapter';
@@ -43,6 +44,8 @@ export interface PreparedEmployerAtsRun extends EmployerAtsBudgetStatus {
 @Injectable()
 export class EmployerAtsRuntimeService {
   private static readonly LOCK_MS = 15 * 60 * 1000;
+  private static readonly IDLE_MS = 15 * 60 * 1000;
+  private readonly logger = new Logger(EmployerAtsRuntimeService.name);
   private readonly sandboxLifecycle = new Map<string, Promise<void>>();
 
   constructor(
@@ -258,18 +261,20 @@ export class EmployerAtsRuntimeService {
 
   async budgetStatus(ownerIdValue: string): Promise<EmployerAtsBudgetStatus> {
     try {
-      const ownerId = this.objectId(ownerIdValue);
-      const configured = await this.ensureAccount(ownerIdValue, ownerId);
-      const virtualKey = this.secrets.decrypt(configured.account.encryptedKey);
-      const info = await this.keys.info(virtualKey);
-      const limitUsd = info.limitUsd ?? configured.maxBudgetUsd;
-      const view = this.budgetView(limitUsd, info.spendUsd, info.resetAt);
-      const exhausted = info.spendUsd >= limitUsd;
-      return {
-        status: exhausted ? 'BUDGET_EXHAUSTED' : 'READY',
-        ...(exhausted ? { reason: 'EMPLOYER_BUDGET_EXHAUSTED' } : {}),
-        ...view,
-      };
+      return await this.withSandboxLifecycle(ownerIdValue, async () => {
+        const ownerId = this.objectId(ownerIdValue);
+        const configured = await this.ensureAccount(ownerIdValue, ownerId);
+        const virtualKey = this.secrets.decrypt(configured.account.encryptedKey);
+        const info = await this.keys.info(virtualKey);
+        const limitUsd = info.limitUsd ?? configured.maxBudgetUsd;
+        const view = this.budgetView(limitUsd, info.spendUsd, info.resetAt);
+        const exhausted = info.spendUsd >= limitUsd;
+        return {
+          status: exhausted ? 'BUDGET_EXHAUSTED' : 'READY',
+          ...(exhausted ? { reason: 'EMPLOYER_BUDGET_EXHAUSTED' } : {}),
+          ...view,
+        };
+      });
     } catch {
       return {
         status: 'CONFIGURATION_ERROR',
@@ -315,33 +320,68 @@ export class EmployerAtsRuntimeService {
       if (!account || account.sandboxLeaseId !== leaseId) {
         return { released: false };
       }
-      if (account.sandboxId) {
-        try {
-          await this.sandbox.destroy(account.sandboxId);
-        } catch {
-          // A missing container is the desired end state.
-        }
-      }
-      await this.runtimeModel
+      const released = await this.runtimeModel
         .updateOne(
           { ownerId, ownerType: 'employer', sandboxLeaseId: leaseId },
-          {
-            ...(account.activeRunId
-              ? { $set: { interruptedRunId: account.activeRunId } }
-              : {}),
-            $unset: {
-              sandboxId: 1,
-              sandboxLeaseId: 1,
-              sandboxProvisioningToken: 1,
-              sandboxProvisioningUntil: 1,
-              activeRunId: 1,
-              runLockUntil: 1,
-            },
-          },
+          { $unset: { sandboxLeaseId: 1 } },
         )
         .exec();
-      return { released: true };
+      return { released: Boolean(released.matchedCount ?? released.modifiedCount) };
     });
+  }
+
+  @Cron(CronExpression.EVERY_MINUTE, {
+    name: 'employer-ats-idle-reaper',
+    timeZone: 'UTC',
+  })
+  async handleIdleSweep(): Promise<void> {
+    try {
+      await this.reapIdleSandboxes();
+    } catch (error: any) {
+      this.logger.warn(`Employer ATS idle sweep failed: ${error?.message ?? String(error)}`);
+    }
+  }
+
+  async reapIdleSandboxes(now = new Date()): Promise<number> {
+    const cutoff = new Date(now.getTime() - EmployerAtsRuntimeService.IDLE_MS);
+    const candidates: any[] = await this.runtimeModel
+      .find({
+        ownerType: 'employer',
+        sandboxId: { $exists: true },
+        updatedAt: { $lt: cutoff },
+      })
+      .lean()
+      .exec();
+    let reaped = 0;
+    for (const candidate of candidates) {
+      try {
+        await this.withSandboxLifecycle(String(candidate.ownerId), async () => {
+          const current: any = await this.runtimeModel
+            .findOne({ ownerId: candidate.ownerId, ownerType: 'employer' })
+            .lean()
+            .exec();
+          if (
+            !current ||
+            current.sandboxId !== candidate.sandboxId ||
+            current.activeRunId ||
+            current.sandboxProvisioningToken ||
+            !current.updatedAt ||
+            new Date(current.updatedAt).getTime() >= cutoff.getTime()
+          ) return;
+          await this.sandbox.destroy(current.sandboxId);
+          await this.runtimeModel
+            .updateOne(
+              { ownerId: current.ownerId, ownerType: 'employer', sandboxId: current.sandboxId },
+              { $unset: { sandboxId: 1, sandboxLeaseId: 1 } },
+            )
+            .exec();
+          reaped += 1;
+        });
+      } catch (error: any) {
+        this.logger.warn(`Employer ATS idle sandbox cleanup failed: ${error?.message ?? String(error)}`);
+      }
+    }
+    return reaped;
   }
 
   async wasReleasedDuring(

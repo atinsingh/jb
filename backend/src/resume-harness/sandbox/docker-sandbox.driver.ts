@@ -136,22 +136,37 @@ export class DockerSandboxDriver implements SandboxDriver {
     id: string,
     files: { path: string; contents: string }[],
   ): Promise<void> {
+    if (!files.length) return;
     for (const file of files) {
-      const dir = file.path.includes('/')
-        ? file.path.slice(0, file.path.lastIndexOf('/'))
-        : '';
-      if (dir) {
-        await this.run(['exec', id, 'mkdir', '-p', `${this.workdir}/${dir}`]);
+      if (
+        !file.path ||
+        file.path.startsWith('/') ||
+        file.path.includes('\\') ||
+        file.path.includes(':') ||
+        file.path.split('/').some((part) => !part || part === '.' || part === '..')
+      ) {
+        throw new Error(`Invalid sandbox file path: ${file.path}`);
       }
-      // Content over stdin, path as an argv element: nothing in either is
-      // exposed to a shell.
-      const res = await this.run(
-        ['exec', '-i', id, 'tee', `${this.workdir}/${file.path}`],
-        file.contents,
-      );
-      if (res.code !== 0) {
-        throw new Error(`writing ${file.path} failed: ${res.stderr.trim()}`);
-      }
+    }
+
+    // One exec for the whole context avoids a Docker round trip per file.
+    // The script and base directory are fixed argv; file names and content
+    // travel as JSON over stdin and are never interpreted by a shell.
+    const script = [
+      'import json, pathlib, sys',
+      'base = pathlib.Path(sys.argv[1]).resolve()',
+      'for item in json.load(sys.stdin):',
+      '    target = (base / item["path"]).resolve()',
+      '    if not target.is_relative_to(base): raise ValueError("invalid path")',
+      '    target.parent.mkdir(parents=True, exist_ok=True)',
+      '    target.write_text(item["contents"], encoding="utf-8")',
+    ].join('\n');
+    const res = await this.run(
+      ['exec', '-i', id, 'python3', '-c', script, this.workdir],
+      JSON.stringify(files),
+    );
+    if (res.code !== 0) {
+      throw new Error(`writing sandbox context failed: ${res.stderr.trim()}`);
     }
   }
 
@@ -286,7 +301,7 @@ export class DockerSandboxDriver implements SandboxDriver {
 }
 
 /** Spawns the real `docker` binary. */
-const defaultDockerRunner: DockerRunner = (
+export const defaultDockerRunner: DockerRunner = (
   argv,
   stdin,
   timeoutMs = 900_000,
@@ -298,10 +313,11 @@ const defaultDockerRunner: DockerRunner = (
       argv,
       { timeout: timeoutMs, maxBuffer: 32 * 1024 * 1024 },
       (err, stdout, stderr) => {
+        const timedOut = Boolean((err as any)?.killed || (err as any)?.code === 'ETIMEDOUT');
         resolve({
-          code: err ? ((err as any).code ?? 1) : 0,
+          code: timedOut ? 124 : err ? (typeof (err as any).code === 'number' ? (err as any).code : 1) : 0,
           stdout: stdout ?? '',
-          stderr: stderr ?? '',
+          stderr: timedOut ? `Docker command timed out after ${Math.round(timeoutMs / 1000)} seconds.` : stderr ?? '',
         });
       },
     );
@@ -311,7 +327,6 @@ const defaultDockerRunner: DockerRunner = (
       child.stdout?.on('data', (d) => onChunk(String(d)));
       child.stderr?.on('data', (d) => onChunk(String(d)));
     }
-    if (stdin !== undefined) {
-      child.stdin?.end(stdin);
-    }
+    if (stdin === undefined) child.stdin?.end();
+    else child.stdin?.end(stdin);
   });

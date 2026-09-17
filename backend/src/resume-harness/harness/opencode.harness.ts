@@ -3,6 +3,7 @@ import {
   HarnessBootstrap,
   HarnessBootstrapInput,
   HarnessOutput,
+  HarnessStreamEvent,
   LITELLM_TAG_HEADER,
   PROMPT_PLACEHOLDER,
   ResolvedModelAlias,
@@ -75,6 +76,32 @@ export class OpenCodeHarness implements HarnessAdapter {
 
   turnCommand(bootstrap: HarnessBootstrap, prompt: string): string[] {
     return fillPrompt(bootstrap.command, prompt);
+  }
+
+  parseStreamEvent(line: string): HarnessStreamEvent[] {
+    let event: any;
+    try { event = JSON.parse(line); } catch { return []; }
+    const part = event?.part;
+    if (event?.type === 'text' && part?.type === 'text' && part.text) {
+      return [{ type: 'token', text: String(part.text) }];
+    }
+    if (event?.type === 'tool_use' && part?.type === 'tool') {
+      return [{
+        type: 'activity',
+        activity: {
+          id: String(part.callID || part.id || part.tool || 'tool'),
+          kind: 'tool',
+          label: this.toolLabel(part.tool),
+          status: ['pending', 'running', 'completed', 'error'].includes(part.state?.status)
+            ? part.state.status
+            : 'running',
+        },
+      }];
+    }
+    if (event?.type === 'error') {
+      return [{ type: 'error', message: String(event.error?.message || event.message || 'OpenCode failed.') }];
+    }
+    return [];
   }
 
   parseOutput(stdout: string): HarnessOutput {

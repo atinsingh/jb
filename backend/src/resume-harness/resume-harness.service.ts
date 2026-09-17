@@ -37,6 +37,7 @@ import {
 } from './latex/latex.service';
 import { findContentProblems, hasCareerEvidence } from './latex/content-guard';
 import {
+  HarnessActivity,
   HarnessContextFile,
   HarnessId,
   ResolvedModelAlias,
@@ -520,6 +521,8 @@ export class ResumeHarnessService {
     }
     this.assertRunnable(session);
 
+    await this.claimActiveSandbox(session);
+
     return this.executeTurn(
       session,
       this.turnPrompt(session, input.instruction),
@@ -591,6 +594,7 @@ export class ResumeHarnessService {
   ): Promise<TurnResult> {
     const session = await this.mustFind(userId, sessionId);
     this.assertRunnable(session);
+    await this.claimActiveSandbox(session);
 
     const before = {
       templateKey: session.templateKey,
@@ -730,6 +734,7 @@ export class ResumeHarnessService {
     // being reverted away from.
     if (session.status === 'active') {
       this.assertRunnable(session);
+      await this.claimActiveSandbox(session);
       const look = snapshot.templateKey
         ? await this.templates.resolve(snapshot.templateKey, undefined, {
             templateKey: snapshot.templateKey,
@@ -791,6 +796,80 @@ export class ResumeHarnessService {
     return this.withSessionMutationLock(userId, sessionId, () =>
       this.endSessionLocked(userId, sessionId),
     );
+  }
+
+  /** End candidate boxes after fifteen minutes without a session mutation. */
+  async reapIdleSessions(now = new Date()): Promise<number> {
+    const cutoff = new Date(now.getTime() - 15 * 60 * 1000);
+    const candidates = await this.sessionModel
+      .find({ status: 'active', updatedAt: { $lt: cutoff } })
+      .exec();
+    let reaped = 0;
+    for (const candidate of candidates) {
+      if (!candidate.sandboxId) continue;
+      const userId = String(candidate.userId);
+      const sessionId = String(candidate._id);
+      try {
+        await this.withSessionMutationLock(userId, sessionId, async () => {
+          const current = await this.mustFind(userId, sessionId);
+          if (
+            current.status !== 'active' ||
+            current.sandboxId !== candidate.sandboxId ||
+            !current.updatedAt ||
+            current.updatedAt >= cutoff
+          ) return;
+          // The state change and a turn's activity claim compete in MongoDB.
+          // Whichever wins determines whether this container can be removed.
+          const claimed = await this.sessionModel.updateOne(
+            {
+              _id: sessionId,
+              userId,
+              status: 'active',
+              sandboxId: current.sandboxId,
+              updatedAt: { $lt: cutoff },
+            },
+            { $set: { status: 'ended', endedAt: now } },
+          ).exec();
+          if (!claimed.matchedCount && !claimed.modifiedCount) return;
+          try {
+            await this.sandbox.destroy(current.sandboxId);
+            await this.sessionModel.updateOne(
+              { _id: sessionId, userId, sandboxId: current.sandboxId },
+              { $unset: { sandboxId: 1 } },
+            ).exec();
+          } catch (error) {
+            await this.sessionModel.updateOne(
+              { _id: sessionId, userId, sandboxId: current.sandboxId, status: 'ended' },
+              { $set: { status: 'active' }, $unset: { endedAt: 1 } },
+            ).exec();
+            throw error;
+          }
+          reaped += 1;
+        });
+      } catch (error) {
+        this.logger.warn(
+          `Idle résumé sandbox cleanup failed for ${sessionId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+    return reaped;
+  }
+
+  private async claimActiveSandbox(session: ResumeHarnessSessionDocument): Promise<void> {
+    const now = new Date();
+    const claimed = await this.sessionModel.updateOne(
+      {
+        _id: session._id,
+        userId: session.userId,
+        status: 'active',
+        sandboxId: session.sandboxId,
+      },
+      { $set: { updatedAt: now } },
+    ).exec();
+    if (!claimed.matchedCount && !claimed.modifiedCount) {
+      throw new ConflictException('This session ended while the request was starting.');
+    }
+    session.updatedAt = now;
   }
 
   private async endSessionLocked(
@@ -993,13 +1072,32 @@ export class ResumeHarnessService {
     });
 
     const beforeLatex = session.latex || '';
+    const activityHistory = new Map<string, HarnessActivity>();
+    const forwardEvent = (event: { type: string; [k: string]: unknown }) => {
+      if (event.type !== 'activity') return onEvent?.(event);
+      const value = event.activity as HarnessActivity | undefined;
+      if (!value?.label) return;
+      const id = String(value.id || value.label).slice(0, 100);
+      const previous = activityHistory.get(id);
+      const activity: HarnessActivity = {
+        id,
+        kind: value.kind === 'reasoning' ? 'reasoning' : 'tool',
+        label: value.label === 'Tool' && previous?.label
+          ? previous.label
+          : String(value.label).replace(/[\x00-\x1f\x7f]/g, ' ').slice(0, 160),
+        status: value.status || 'running',
+      };
+      activityHistory.set(id, activity);
+      if (activityHistory.size > 40) activityHistory.delete(activityHistory.keys().next().value!);
+      onEvent?.({ type: 'activity', activity });
+    };
     onEvent?.({ type: 'phase', phase: 'writing' });
     let summary = await this.invoke(
       adapter,
       boot,
       session.sandboxId!,
       prompt,
-      onEvent,
+      onEvent ? forwardEvent : undefined,
     );
 
     let latex = await this.currentLatex(session);
@@ -1013,7 +1111,7 @@ export class ResumeHarnessService {
       if (!session.name && kind === 'instruction') {
         session.name = recordedInstruction.trim().slice(0, 200) || undefined;
       }
-      this.recordConversation(session, recordedInstruction, summary);
+      this.recordConversation(session, recordedInstruction, summary, undefined, [...activityHistory.values()]);
       await (session as any).save();
       return {
         ...this.view(session),
@@ -1061,7 +1159,7 @@ export class ResumeHarnessService {
         boot,
         session.sandboxId!,
         prompt,
-        onEvent,
+        onEvent ? forwardEvent : undefined,
       );
       if (!summary) summary = repairSummary;
       onEvent?.({ type: 'phase', phase: 'compiling' });
@@ -1082,7 +1180,7 @@ export class ResumeHarnessService {
     if (latex === beforeLatex) {
       const verifiedSummary =
         'I could not apply that request: after validation, the saved resume.tex is unchanged. No new revision was created.';
-      this.recordConversation(session, recordedInstruction, verifiedSummary);
+      this.recordConversation(session, recordedInstruction, verifiedSummary, undefined, [...activityHistory.values()]);
       await (session as any).save();
       return {
         ...this.view(session),
@@ -1134,6 +1232,7 @@ export class ResumeHarnessService {
       recordedInstruction,
       summary,
       session.revision,
+      [...activityHistory.values()],
     );
     try {
       await (session as any).save();
@@ -1161,6 +1260,7 @@ export class ResumeHarnessService {
     instruction: string,
     response?: string,
     revision?: number,
+    activities: HarnessActivity[] = [],
   ): void {
     const createdAt = new Date();
     session.conversation ||= [];
@@ -1178,6 +1278,7 @@ export class ResumeHarnessService {
             ? 'I updated the résumé and verified the saved document.'
             : 'I reviewed the résumé and did not make a document change.'),
         revision,
+        activities,
         createdAt,
       } as any,
     );
@@ -1287,39 +1388,49 @@ export class ResumeHarnessService {
     onEvent?: (event: { type: string; [k: string]: unknown }) => void,
   ): Promise<string | undefined> {
     let streamBuffer = '';
+    let streamError: string | undefined;
+    const consumeLine = (line: string) => {
+      if (!adapter.parseStreamEvent || !line.trim()) return;
+      for (const event of adapter.parseStreamEvent(line)) {
+        if (event.type === 'error') streamError = event.message;
+        else onEvent?.(event);
+      }
+    };
     const result = onEvent
       ? await this.sandbox.execStream(
           sandboxId,
           adapter.turnCommand(boot, prompt),
           (chunk) => {
-            if (!adapter.parseOutput) return;
+            if (!adapter.parseStreamEvent) return;
             streamBuffer += chunk;
             const lines = streamBuffer.split(/\r?\n/);
             streamBuffer = lines.pop() || '';
-            for (const line of lines) {
-              for (const activity of adapter.parseOutput(line).activities) {
-                onEvent({ type: 'activity', activity });
-              }
-            }
+            for (const line of lines) consumeLine(line);
           },
-          { timeoutSeconds: 900 },
+          { timeoutSeconds: 120 },
         )
       : await this.sandbox.exec(sandboxId, adapter.turnCommand(boot, prompt), {
-          timeoutSeconds: 900,
+          timeoutSeconds: 120,
         });
+    if (onEvent && streamBuffer.trim()) consumeLine(streamBuffer);
+    const parsed = adapter.parseOutput?.(result.stdout || '');
     if (result.exitCode !== 0) {
       this.logger.warn(
         `${adapter.id} exited ${result.exitCode}: ${result.stderr?.slice(0, 400)}`,
       );
-      const detail = (result.stderr || result.stdout || 'unknown harness error')
+      const detail = (parsed?.error || streamError || result.stderr || result.stdout || 'unknown harness error')
         .trim()
         .slice(0, 400);
       throw new ServiceUnavailableException(
         `${adapter.displayName} failed before the résumé could be verified: ${detail}`,
       );
     }
-    if (adapter.parseOutput) {
-      return adapter.parseOutput(result.stdout || '').response?.slice(-6000);
+    if (parsed) {
+      const failure = parsed.error || streamError;
+      if (failure) throw new ServiceUnavailableException(
+        `${adapter.displayName} failed before the résumé could be verified: ${failure.slice(0, 240)}`,
+      );
+      return parsed.response?.slice(-6000);
     }
     return (result.stdout || '').trim().slice(-6000) || undefined;
   }
@@ -1339,9 +1450,13 @@ export class ResumeHarnessService {
           ].join('\n')
         : '';
     return [
+      'First decide whether the instruction requests a résumé document change.',
+      `Answer a question or general chat request directly without editing ${TEX_PATH} or running the build.`,
+      'Do not claim a document change when the file is unchanged.',
+      '',
       mode === 'create'
         ? [
-            `Create ${TEX_PATH} from scratch, starting from the skeleton in TEMPLATE.tex.`,
+            `Only when asked to create a résumé, create ${TEX_PATH} from the skeleton in TEMPLATE.tex.`,
             // Naming the look here rather than trusting the harness to act on a
             // section it merely read: verified against Nova Lite, which copied
             // the skeleton's own default accent and ignored the selected one on
@@ -1367,7 +1482,7 @@ export class ResumeHarnessService {
       'Instruction:',
       instruction,
       '',
-      `When you are done, run the build command from AGENTS.md and make sure it exits 0.`,
+      'If you changed the document, run the build command from AGENTS.md and make sure it exits 0.',
     ]
       .filter((line) => line !== undefined)
       .join('\n');

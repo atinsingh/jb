@@ -93,6 +93,8 @@ describe('ResumeHarnessService', () => {
           if (q.status != null && d.status !== q.status) return false;
           if (q.createdAt?.$lt && !(d.createdAt < q.createdAt.$lt))
             return false;
+          if (q.updatedAt?.$lt && !(d.updatedAt < q.updatedAt.$lt))
+            return false;
           return true;
         }),
     })),
@@ -138,6 +140,7 @@ describe('ResumeHarnessService', () => {
     writeFiles: jest.fn(async () => undefined),
     readFile: jest.fn(async () => resumeDoc('base')),
     exec: jest.fn(async () => ({ exitCode: 0, stdout: 'ok', stderr: '' })),
+    execStream: jest.fn(),
     destroy: jest.fn(async () => undefined),
   };
 
@@ -678,6 +681,108 @@ describe('ResumeHarnessService', () => {
     expect(latex.compile).toHaveBeenCalledTimes(1);
   });
 
+  it('reaps an idle candidate sandbox but keeps a recently used session', async () => {
+    const old = await startWith(service, 'u1', 'opencode');
+    const recent = await startWith(service, 'u2', 'opencode');
+    store.find((session) => session._id === old.id).updatedAt = new Date('2026-09-17T12:00:00Z');
+    store.find((session) => session._id === recent.id).updatedAt = new Date('2026-09-17T12:19:00Z');
+
+    const reaped = await service.reapIdleSessions(new Date('2026-09-17T12:20:00Z'));
+
+    expect(reaped).toBe(1);
+    expect(sandbox.destroy).toHaveBeenCalledWith(old.sandboxId);
+    expect(sandbox.destroy).not.toHaveBeenCalledWith(recent.sandboxId);
+    expect((await service.getSession('u1', old.id)).status).toBe('ended');
+    expect((await service.getSession('u2', recent.id)).status).toBe('active');
+  });
+
+  it('does not invoke a turn if idle cleanup claimed its sandbox first', async () => {
+    const session = await startWith(service, 'u1', 'opencode');
+    sessionModel.updateOne.mockReturnValueOnce({
+      exec: async () => ({ matchedCount: 0, modifiedCount: 0 }),
+    });
+
+    await expect(service.runTurn('u1', session.id, { instruction: 'Build a résumé.' }))
+      .rejects.toBeInstanceOf(ConflictException);
+    expect(sandbox.exec).not.toHaveBeenCalled();
+  });
+
+  it('keeps the candidate container while a turn is running', async () => {
+    const session = await startWith(service, 'u1', 'opencode');
+    store[0].updatedAt = new Date(Date.now() - 20 * 60 * 1000);
+    let finishTurn!: (result: any) => void;
+    let started!: () => void;
+    const running = new Promise<void>((resolve) => { started = resolve; });
+    sandbox.exec.mockImplementationOnce(() => new Promise((resolve) => {
+      finishTurn = resolve;
+      started();
+    }));
+
+    const turn = service.runTurn('u1', session.id, { instruction: 'Build a résumé.' });
+    await running;
+    expect(await service.reapIdleSessions()).toBe(0);
+    expect(sandbox.destroy).not.toHaveBeenCalled();
+    finishTurn({ exitCode: 0, stdout: 'Done', stderr: '' });
+    await turn;
+  });
+
+  it('asks every harness to answer a first-turn question without creating a résumé', async () => {
+    for (const harness of ['opencode', 'claude-code', 'codex']) {
+      const session = await start(harness);
+      sandbox.exec.mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: harness === 'opencode'
+          ? JSON.stringify({ type: 'text', part: { type: 'text', text: 'I can help with your résumé.' } })
+          : 'I can help with your résumé.',
+        stderr: '',
+      });
+      sandbox.readFile.mockResolvedValueOnce(null);
+
+      const answer = await service.runTurn('u1', session.id, {
+        instruction: 'What can you do?',
+      });
+
+      const command = sandbox.exec.mock.calls.at(-1)?.[1]?.join(' ') || '';
+      expect(command).toMatch(/answer.*question.*without.*edit/i);
+      expect(command).not.toMatch(/Create resume\.tex from scratch/i);
+      expect(answer.revision).toBe(0);
+      expect(answer.documentChanged).toBe(false);
+    }
+    expect(latex.compile).not.toHaveBeenCalled();
+  });
+
+  it('streams normalized actions and assistant text across split and unterminated JSONL records', async () => {
+    const session = await start('opencode');
+    const records = [
+      JSON.stringify({ type: 'tool_use', part: { type: 'tool', callID: 'read-1', tool: 'read', state: { status: 'running' } } }),
+      JSON.stringify({ type: 'tool_use', part: { type: 'tool', callID: 'read-1', tool: 'read', state: { status: 'completed' } } }),
+      JSON.stringify({ type: 'text', part: { type: 'text', text: 'I can help with your résumé.' } }),
+    ];
+    const output = records.join('\n');
+    sandbox.execStream.mockImplementationOnce(async (_id: string, _command: string[], onChunk: (chunk: string) => void) => {
+      onChunk(output.slice(0, 31));
+      onChunk(output.slice(31));
+      return { exitCode: 0, stdout: output, stderr: '' };
+    });
+    sandbox.readFile.mockResolvedValueOnce(null);
+    const events: any[] = [];
+
+    const answer = await service.runTurnStreaming('u1', session.id, {
+      instruction: 'What can you do?',
+    }, (event) => events.push(event));
+
+    expect(events).toEqual(expect.arrayContaining([
+      { type: 'activity', activity: { id: 'read-1', kind: 'tool', label: 'Read', status: 'running' } },
+      { type: 'activity', activity: { id: 'read-1', kind: 'tool', label: 'Read', status: 'completed' } },
+      { type: 'token', text: 'I can help with your résumé.' },
+    ]));
+    expect(answer.summary).toBe('I can help with your résumé.');
+    expect(answer.conversation.at(-1)).toMatchObject({
+      role: 'assistant',
+      activities: [{ id: 'read-1', kind: 'tool', label: 'Read', status: 'completed' }],
+    });
+  });
+
   it('does not create a revision or repeat a false success when repair restores the previous source', async () => {
     const session = await start('opencode');
     sandbox.readFile.mockResolvedValueOnce(resumeDoc('v1'));
@@ -738,8 +843,22 @@ describe('ResumeHarnessService', () => {
     await expect(
       service.runTurn('u1', session.id, { instruction: 'build it' }),
     ).rejects.toThrow(/model route failed/);
+    expect(sandbox.exec).toHaveBeenCalledWith(
+      expect.any(String), expect.any(Array), expect.objectContaining({ timeoutSeconds: 120 }),
+    );
     expect(latex.compile).not.toHaveBeenCalled();
     expect(session.revision).toBe(0);
+  });
+
+  it('surfaces the structured Codex failure ahead of its generic stdin diagnostic', async () => {
+    await start('codex');
+    sandbox.exec.mockResolvedValueOnce({
+      exitCode: 1,
+      stdout: JSON.stringify({ type: 'turn.failed', error: { message: 'Model unavailable for this account' } }),
+      stderr: 'Reading additional input from stdin...',
+    });
+    await expect(service.runTurn('u1', 'sess-1', { instruction: 'Build it' }))
+      .rejects.toThrow(/Model unavailable for this account/);
   });
 
   it('feeds a compile failure back to the harness instead of failing the request', async () => {

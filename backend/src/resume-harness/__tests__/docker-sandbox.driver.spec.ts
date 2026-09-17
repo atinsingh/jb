@@ -1,4 +1,49 @@
-import { DockerSandboxDriver } from '../sandbox/docker-sandbox.driver';
+import { DockerSandboxDriver, defaultDockerRunner } from '../sandbox/docker-sandbox.driver';
+import { EventEmitter } from 'events';
+
+describe('defaultDockerRunner', () => {
+  it('closes Docker stdin even when a command has no input', async () => {
+    const childProcess = require('child_process');
+    const end = jest.fn();
+    const spy = jest.spyOn(childProcess, 'execFile').mockImplementation((
+      _file: string, _argv: string[], _options: unknown, callback: Function,
+    ) => {
+      const child = new EventEmitter() as any;
+      child.stdout = new EventEmitter();
+      child.stderr = new EventEmitter();
+      child.stdin = { end: (...args: unknown[]) => {
+        end(...args);
+        callback(null, '', '');
+      } };
+      return child;
+    });
+    try {
+      const run = defaultDockerRunner(['exec', 'box', 'codex', 'exec', 'prompt']);
+      expect(end).toHaveBeenCalledWith();
+      await expect(run).resolves.toMatchObject({ code: 0 });
+      expect(spy).toHaveBeenCalledTimes(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('reports a killed command as a timeout rather than only buffered CLI chatter', async () => {
+    const childProcess = require('child_process');
+    const spy = jest.spyOn(childProcess, 'execFile').mockImplementation((
+      _file: string, _argv: string[], _options: unknown, callback: Function,
+    ) => {
+      const child = new EventEmitter() as any;
+      child.stdin = { end: () => callback(Object.assign(new Error('timed out'), { code: 'ETIMEDOUT', killed: true }), '', 'Reading additional input from stdin...') };
+      return child;
+    });
+    try {
+      await expect(defaultDockerRunner(['exec', 'box', 'codex'], undefined, 120000))
+        .resolves.toMatchObject({ code: 124, stderr: expect.stringMatching(/timed out/i) });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
 
 /**
  * The local-Docker sandbox driver.
@@ -108,16 +153,28 @@ describe('DockerSandboxDriver', () => {
     expect(argv.join(' ')).not.toMatch(/sh -c .*EVIL/);
   });
 
-  it('writes files through stdin rather than the command line', async () => {
+  it('writes all context files in one Docker exec through stdin', async () => {
     await driver().putFiles('resume-sess-1', [
       { path: 'AGENTS.md', contents: '# rules\nline two' },
+      { path: '.codex/config.toml', contents: 'model = "test"' },
     ]);
 
+    expect(calls).toHaveLength(1);
     const { argv, stdin } = calls[0];
     expect(argv.slice(0, 3)).toEqual(['exec', '-i', 'resume-sess-1']);
-    // The content is piped, so LaTeX backslashes and quotes cannot be reparsed.
-    expect(stdin).toBe('# rules\nline two');
+    expect(argv).toContain('python3');
+    expect(JSON.parse(stdin!)).toEqual([
+      { path: 'AGENTS.md', contents: '# rules\nline two' },
+      { path: '.codex/config.toml', contents: 'model = "test"' },
+    ]);
     expect(argv.join(' ')).not.toContain('line two');
+  });
+
+  it('rejects workspace escape paths before calling Docker', async () => {
+    await expect(driver().putFiles('resume-sess-1', [
+      { path: '../secret', contents: 'x' },
+    ])).rejects.toThrow('Invalid sandbox file path');
+    expect(calls).toHaveLength(0);
   });
 
   it('reads a file back as base64 so binary survives', async () => {

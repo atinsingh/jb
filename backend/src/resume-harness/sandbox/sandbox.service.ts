@@ -36,9 +36,7 @@ export class SandboxService {
   private readonly image =
     process.env.RESUME_SANDBOX_IMAGE || 'jobocate/resume-harness:latest';
 
-  private readonly ttlSeconds = Number(
-    process.env.RESUME_SANDBOX_TTL_SECONDS || 900,
-  );
+  private readonly ttlSeconds = 24 * 60 * 60;
 
   constructor(
     @Inject(SANDBOX_DRIVER) private readonly client: SandboxDriver,
@@ -68,12 +66,15 @@ export class SandboxService {
   }
 
   async provision(input: ProvisionInput): Promise<{ sandboxId: string }> {
+    // Both candidate and employer sandboxes use idle cleanup. Docker's sleep
+    // is only a safety backstop if the backend cannot run its reaper.
+    const ttlSeconds = this.ttlSeconds;
     const sandboxId = await this.client.create({
       name: `jb-resume-${input.sessionId}`,
       image: this.image,
       env: input.env,
       workdir: SANDBOX_WORKDIR,
-      ttlSeconds: this.ttlSeconds,
+      ttlSeconds,
       labels: {
         app: 'jobocate',
         namespace: 'jb',
@@ -81,7 +82,7 @@ export class SandboxService {
         harness: input.harness,
         session: input.sessionId,
         expiresAt: new Date(
-          Date.now() + this.ttlSeconds * 1000,
+          Date.now() + ttlSeconds * 1000,
         ).toISOString(),
       },
     });

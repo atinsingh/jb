@@ -51,8 +51,12 @@ async def analyze(payload: dict) -> dict:
         headers["x-litellm-tags"] = "harness=ats"
         params["extra_headers"] = headers
 
-    resume = await parse_resume_to_json(payload["latex"])
-    job_keywords = await extract_job_keywords(payload["jobDescription"])
+    # These model calls use independent inputs. Run them together so preview
+    # latency is bounded by the slower call instead of their sum.
+    resume, job_keywords = await asyncio.gather(
+        parse_resume_to_json(payload["latex"]),
+        extract_job_keywords(payload["jobDescription"]),
+    )
     gaps = analyze_keyword_gaps(job_keywords, resume, resume)
     match = calculate_keyword_match(resume, job_keywords)
     return compute_ats_score(

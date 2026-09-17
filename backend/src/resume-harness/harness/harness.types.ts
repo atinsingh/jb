@@ -109,12 +109,19 @@ export interface ModelCapability {
 export interface HarnessActivity {
   id?: string;
   label: string;
+  kind?: 'tool' | 'reasoning';
   status?: 'pending' | 'running' | 'completed' | 'error';
 }
+
+export type HarnessStreamEvent =
+  | { type: 'token'; text: string }
+  | { type: 'activity'; activity: HarnessActivity }
+  | { type: 'error'; message: string };
 
 export interface HarnessOutput {
   response?: string;
   activities: HarnessActivity[];
+  error?: string;
 }
 
 /** Substituted with the turn's instruction when the command is executed. */
@@ -134,6 +141,8 @@ export interface HarnessAdapter {
   turnCommand(bootstrap: HarnessBootstrap, prompt: string): string[];
   /** Separates user-facing output from structured tool activity when supported. */
   parseOutput?(stdout: string): HarnessOutput;
+  /** Normalizes one complete provider JSONL record for live SSE delivery. */
+  parseStreamEvent?(line: string): HarnessStreamEvent[];
 }
 
 /** The tag every proxy request from `id` carries. */

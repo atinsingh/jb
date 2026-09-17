@@ -361,7 +361,8 @@ test.describe('Employer screening resume assessment', () => {
     await expect(page.getByRole('heading', { name: 'Backend Engineer' })).toBeVisible();
     await expect.poll(() => acquires.length).toBe(1);
     await expect(page.getByText('ada.pdf')).toBeVisible();
-    await expect(page.getByText('71/100')).toBeVisible();
+    await expect(page.getByText('Assessment has not run.')).toBeVisible();
+    await expect(page.getByText('71/100')).toHaveCount(0);
     await page.evaluate(() => {
       Object.defineProperty(document, 'visibilityState', {
         configurable: true,
@@ -381,13 +382,87 @@ test.describe('Employer screening resume assessment', () => {
       document.dispatchEvent(new Event('visibilitychange'));
     });
     await expect.poll(() => acquires.length).toBe(2);
-    await expect(page.getByText('71/100')).toBeVisible();
+    await expect(page.getByText('Assessment has not run.')).toBeVisible();
+    await expect(page.getByText('71/100')).toHaveCount(0);
     await page.getByRole('button', { name: 'Score uploaded résumé' }).click();
     await expect.poll(() => reruns.length).toBe(1);
     await expect(page.getByText('72/100')).toBeVisible();
   });
 
-  test('explains that ATS matching stopped because the scoring sandbox was released', async ({
+  test('waits for ATS acquisition before requesting the budget on first visit', async ({ page }) => {
+    const jobId = '64b0000000000000000000aa';
+    let sandboxReady = false;
+    let budgetBeforeReady = false;
+    await page.route(`**/api/employer/jobs/${jobId}`, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ job: { _id: jobId, title: 'Backend Engineer' } }) }),
+    );
+    await page.route('**/api/employer/applicants?**', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) }),
+    );
+    await page.route('**/api/employer/applicants/resume-assessment/acquire', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      sandboxReady = true;
+      return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ ready: true }) });
+    });
+    await page.route('**/api/employer/applicants/resume-assessment/budget', (route) => {
+      budgetBeforeReady ||= !sandboxReady;
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(sandboxReady
+          ? { status: 'READY', spentUsd: 0, limitUsd: 1, remainingUsd: 1 }
+          : { status: 'CONFIGURATION_ERROR', reason: 'EMPLOYER_ATS_CONFIGURATION_ERROR' }),
+      });
+    });
+    await page.route('**/api/employer/applicants/resume-assessment/preview?**', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ saved: false }) }),
+    );
+
+    await page.goto(`/employer/jobs/${jobId}/applications`, { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: 'Backend Engineer' })).toBeVisible();
+    await expect(page.getByText('ATS budget: $1.00 of $1.00 remaining this month.')).toBeVisible();
+    expect(budgetBeforeReady).toBe(false);
+  });
+
+  test('renews the ATS sandbox while the applications page remains visible', async ({ page }) => {
+    const jobId = '64b0000000000000000000aa';
+    let acquires = 0;
+    await page.clock.install();
+    await page.route(`**/api/employer/jobs/${jobId}`, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ job: { _id: jobId, title: 'Backend Engineer' } }) }),
+    );
+    await page.route('**/api/employer/applicants?**', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) }),
+    );
+    await page.route('**/api/employer/applicants/resume-assessment/acquire', (route) => {
+      acquires += 1;
+      return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ ready: true }) });
+    });
+    await page.route('**/api/employer/applicants/resume-assessment/budget', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'READY' }) }),
+    );
+    await page.route('**/api/employer/applicants/resume-assessment/preview?**', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ saved: false }) }),
+    );
+
+    await page.goto(`/employer/jobs/${jobId}/applications`, { waitUntil: 'domcontentloaded' });
+    await expect.poll(() => acquires).toBe(1);
+    await page.clock.fastForward(5 * 60 * 1000);
+    await expect.poll(() => acquires).toBe(2);
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await page.clock.fastForward(16 * 60 * 1000);
+    expect(acquires).toBe(2);
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await expect.poll(() => acquires).toBe(3);
+  });
+
+  test('explains that ATS matching stopped because the scoring container became unavailable', async ({
     page,
   }) => {
     const jobId = '64b0000000000000000000aa';
@@ -444,14 +519,14 @@ test.describe('Employer screening resume assessment', () => {
     await page.getByRole('button', { name: 'Score uploaded résumé' }).click();
 
     await expect(
-      page.getByText(/scoring container was shut down/i),
+      page.getByText(/scoring container became unavailable/i),
     ).toBeVisible();
     await expect(
       page.getByText('ATS matching failed during execution. Retry the assessment.'),
     ).toHaveCount(0);
   });
 
-  test('releases the employer ATS sandbox when focus is lost during scoring', async ({
+  test('keeps an ATS preview running when the tab loses focus', async ({
     page,
   }) => {
     const jobId = '64b0000000000000000000aa';
@@ -522,6 +597,7 @@ test.describe('Employer screening resume assessment', () => {
       document.dispatchEvent(new Event('visibilitychange'));
     });
 
-    await expect.poll(() => releases.length).toBe(1);
+    await expect(page.getByText('71/100')).toBeVisible();
+    expect(releases).toHaveLength(0);
   });
 });
