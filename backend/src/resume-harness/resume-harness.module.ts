@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ResumeHarnessController } from './resume-harness.controller';
 import { ResumeHarnessService } from './resume-harness.service';
@@ -61,10 +61,12 @@ import {
 import { ResumeSandboxReaperService } from './resume-sandbox-reaper.service';
 import { IngestionModule } from '../ingestion/ingestion.module';
 import { JobDescriptionResolverService } from './job-description-resolver.service';
+import { AiBudgetModule } from '../ai-budget/ai-budget.module';
 
 @Module({
   imports: [
     IngestionModule,
+    forwardRef(() => AiBudgetModule),
     MongooseModule.forFeature([
       { name: ResumeHarnessSession.name, schema: ResumeHarnessSessionSchema },
       { name: HarnessModelAlias.name, schema: HarnessModelAliasSchema },
@@ -87,6 +89,11 @@ import { JobDescriptionResolverService } from './job-description-resolver.servic
     { provide: SANDBOX_DRIVER, useFactory: sandboxDriverFactory },
     LatexService,
   ],
-  exports: [ResumeHarnessService, ModelAliasService, ResumeTemplateService, SandboxService],
+  exports: [
+    ResumeHarnessService,
+    ModelAliasService,
+    ResumeTemplateService,
+    SandboxService,
+  ],
 })
 export class ResumeHarnessModule {}

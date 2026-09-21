@@ -157,6 +157,7 @@ describe('AI budget policy', () => {
     try {
       const service = new AiBudgetPolicyService(policyPath);
 
+      expect(service.lowRemainingRatio()).toBe(0.2);
       expect(service.tier('FREE').maxBudgetUsd).toBe(0.5);
       expect(service.service('resume_agent_turn').pool).toBe('candidate-ai');
       expect(

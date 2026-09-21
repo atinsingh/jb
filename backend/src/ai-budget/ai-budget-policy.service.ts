@@ -216,6 +216,10 @@ export class AiBudgetPolicyService {
     return policy;
   }
 
+  lowRemainingRatio(): number {
+    return this.policy.lowRemainingRatio;
+  }
+
   service(service: AiBudgetServiceId): ServiceBudgetPolicy {
     return this.policy.services[service];
   }

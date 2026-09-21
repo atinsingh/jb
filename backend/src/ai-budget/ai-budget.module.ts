@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AiBudgetPolicyService } from './ai-budget-policy.service';
@@ -8,19 +8,28 @@ import {
   AiBudgetAccount,
   AiBudgetAccountSchema,
 } from './schemas/ai-budget-account.schema';
+import { ResumeHarnessModule } from '../resume-harness/resume-harness.module';
+import { AiBudgetService } from './ai-budget.service';
 
 @Module({
   imports: [
     ConfigModule,
+    forwardRef(() => ResumeHarnessModule),
     MongooseModule.forFeature([
       { name: AiBudgetAccount.name, schema: AiBudgetAccountSchema },
     ]),
   ],
-  providers: [AiBudgetPolicyService, AiBudgetSecretCodec, LiteLlmBudgetClient],
+  providers: [
+    AiBudgetPolicyService,
+    AiBudgetSecretCodec,
+    LiteLlmBudgetClient,
+    AiBudgetService,
+  ],
   exports: [
     AiBudgetPolicyService,
     AiBudgetSecretCodec,
     LiteLlmBudgetClient,
+    AiBudgetService,
     MongooseModule,
   ],
 })
