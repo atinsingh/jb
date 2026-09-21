@@ -25,6 +25,9 @@ model_list:
   # Haiku and Sonnet 4.6 are the verified Claude routes. Alias names stay
   # anthropic/… so Claude Code is the harness; the wire call uses Bedrock IAM.
   - model_name: anthropic/claude-haiku-4-5/low
+    # USD/token. Final spend uses actual input, output, and reasoning usage.
+    model_info:
+      { input_cost_per_token: 0.000001, output_cost_per_token: 0.000005 }
     litellm_params:
       model: bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0
       # Codex's Responses transport supplies metadata Bedrock rejects here.
@@ -35,6 +38,8 @@ model_list:
       thinking: { type: disabled }
 
   - model_name: anthropic/claude-sonnet-4-6/low
+    model_info:
+      { input_cost_per_token: 0.000003, output_cost_per_token: 0.000015 }
     litellm_params:
       model: bedrock/us.anthropic.claude-sonnet-4-6
       aws_region_name: os.environ/AWS_REGION
@@ -43,6 +48,8 @@ model_list:
       thinking: { type: disabled }
 
   - model_name: anthropic/claude-sonnet-4-6/high
+    model_info:
+      { input_cost_per_token: 0.000003, output_cost_per_token: 0.000015 }
     litellm_params:
       model: bedrock/us.anthropic.claude-sonnet-4-6
       aws_region_name: os.environ/AWS_REGION
@@ -114,6 +121,8 @@ model_list:
   # loop together well enough to produce compiling LaTeX. Keep tier defaults on
   # Claude; reach for Nova to prove the pipe, not the product.
   - model_name: bedrock/nova-micro/low
+    model_info:
+      { input_cost_per_token: 0.000000035, output_cost_per_token: 0.00000014 }
     litellm_params:
       model: bedrock/us.amazon.nova-micro-v1:0
       aws_region_name: os.environ/AWS_REGION
@@ -121,6 +130,8 @@ model_list:
       aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
 
   - model_name: bedrock/nova-lite/low
+    model_info:
+      { input_cost_per_token: 0.00000006, output_cost_per_token: 0.00000024 }
     litellm_params:
       model: bedrock/us.amazon.nova-lite-v1:0
       aws_region_name: os.environ/AWS_REGION
@@ -128,6 +139,8 @@ model_list:
       aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
 
   - model_name: bedrock/nova-pro/low
+    model_info:
+      { input_cost_per_token: 0.0000008, output_cost_per_token: 0.0000032 }
     litellm_params:
       model: bedrock/us.amazon.nova-pro-v1:0
       aws_region_name: os.environ/AWS_REGION
@@ -135,6 +148,8 @@ model_list:
       aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
 
   - model_name: bedrock/nova-2-lite/low
+    model_info:
+      { input_cost_per_token: 0.0000003, output_cost_per_token: 0.0000025 }
     litellm_params:
       model: bedrock/us.amazon.nova-2-lite-v1:0
       aws_region_name: os.environ/AWS_REGION
@@ -145,6 +160,8 @@ model_list:
   # this passed the production OpenCode adapter's three-pass scripted résumé
   # check on 2026-09-09 after session continuity and grounding were fixed.
   - model_name: bedrock/qwen3-coder-next/low
+    model_info:
+      { input_cost_per_token: 0.0000005, output_cost_per_token: 0.0000012 }
     litellm_params:
       model: bedrock/qwen.qwen3-coder-next
       aws_region_name: os.environ/AWS_REGION
@@ -155,6 +172,8 @@ model_list:
   # openai/… so the seed `provider: openai` still routes the session through
   # Codex. The wire call is IAM → converse/us.openai.gpt-5.6-luna, not OPENAI_API_KEY.
   - model_name: openai/gpt-5.6-luna/low
+    model_info:
+      { input_cost_per_token: 0.00000022, output_cost_per_token: 0.00000132 }
     litellm_params:
       model: bedrock/converse/us.openai.gpt-5.6-luna
       aws_region_name: os.environ/AWS_REGION
@@ -163,6 +182,8 @@ model_list:
       reasoning_effort: low
 
   - model_name: openai/gpt-5.6-luna/medium
+    model_info:
+      { input_cost_per_token: 0.00000022, output_cost_per_token: 0.00000132 }
     litellm_params:
       model: bedrock/converse/us.openai.gpt-5.6-luna
       aws_region_name: os.environ/AWS_REGION
@@ -171,6 +192,8 @@ model_list:
       reasoning_effort: medium
 
   - model_name: openai/gpt-5.6-luna/high
+    model_info:
+      { input_cost_per_token: 0.00000022, output_cost_per_token: 0.00000132 }
     litellm_params:
       model: bedrock/converse/us.openai.gpt-5.6-luna
       aws_region_name: os.environ/AWS_REGION
@@ -179,6 +202,8 @@ model_list:
       reasoning_effort: high
 
   - model_name: openai/gpt-5.6-luna/xhigh
+    model_info:
+      { input_cost_per_token: 0.00000022, output_cost_per_token: 0.00000132 }
     litellm_params:
       model: bedrock/converse/us.openai.gpt-5.6-luna
       aws_region_name: os.environ/AWS_REGION
@@ -187,6 +212,8 @@ model_list:
       reasoning_effort: xhigh
 
   - model_name: openai/gpt-5.6-luna/max
+    model_info:
+      { input_cost_per_token: 0.00000022, output_cost_per_token: 0.00000132 }
     litellm_params:
       model: bedrock/converse/us.openai.gpt-5.6-luna
       aws_region_name: os.environ/AWS_REGION
