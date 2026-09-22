@@ -23,16 +23,23 @@ const apiCall = async (endpoint, options = {}) => {
 };
 
 // ---------------------------------------------------------------- Billing
-// There is no live billing/invoices endpoint on the backend yet. We expose
-// thin helpers that hit the closest existing surface (entitlements, which lives
-// under /api/users) so the page can attempt a real fetch and gracefully fall
-// back to the design's own sample data on failure / when unauthenticated.
+export const getPlans = async () => apiCall('/api/billing/plans');
+
+export const getSubscription = async () => apiCall('/api/billing/subscription');
+
+// The authoritative measured LiteLLM spend and monthly USD allowance.
+export const getAiBudget = async () => apiCall('/api/resume-harness/budget');
+
+export const createCheckout = async (planId, billingCycle) =>
+  apiCall('/api/billing/checkout', {
+    method: 'POST',
+    body: JSON.stringify({ planId, billingCycle }),
+  });
 
 // GET /api/users/entitlements — current plan entitlements (used to derive the
 // "next charge" summary). Returns whatever the backend provides; the page
 // normalizes and falls back when it is unavailable.
 export const getBillingSummary = async () => apiCall('/api/users/entitlements');
 
-// GET /api/users/invoices — invoice history. No live endpoint exists today;
-// this will throw and the page falls back to SAMPLE_INVOICES.
+// Candidate invoices intentionally remain on the established users endpoint.
 export const getInvoices = async () => apiCall('/api/users/invoices');

@@ -61,7 +61,7 @@ export class BillingService {
 
   async getPlanById(planId: string): Promise<SubscriptionPlanDocument> {
     const plan = await this.planModel.findById(planId);
-    if (!plan) {
+    if (!plan || !plan.isActive) {
       throw new NotFoundException('Plan not found');
     }
     return plan;

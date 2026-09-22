@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { getModelToken } from '@nestjs/mongoose';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { BillingService } from '../billing.service';
 import { PinoLogger } from 'nestjs-pino';
 import { EmployerBillingService } from '../../employer-billing/employer-billing.service';
@@ -132,6 +132,46 @@ describe('BillingService', () => {
 
       expect(mockPlanModel.find).toHaveBeenCalledWith({ isActive: true });
       expect(result).toEqual(mockPlans);
+    });
+
+    it('does not expose an inactive legacy plan by id', async () => {
+      mockPlanModel.findById.mockResolvedValue({
+        _id: 'legacy-id',
+        type: 'ELITE',
+        isActive: false,
+      });
+
+      await expect(service.getPlanById('legacy-id')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('createCheckoutSession', () => {
+    it('uses the yearly Stripe price without changing the monthly AI reset', async () => {
+      const checkoutCreate = jest.fn().mockResolvedValue({ id: 'cs_year', url: 'https://stripe.test/cs_year' });
+      (service as any).stripe = { checkout: { sessions: { create: checkoutCreate } } };
+      jest.spyOn(service, 'getPlanById').mockResolvedValue({
+        _id: { toString: () => 'paid-id' },
+        type: 'PRO',
+        isActive: true,
+        stripePriceIdMonthly: 'price_monthly',
+        stripePriceIdYearly: 'price_yearly',
+      } as any);
+      jest.spyOn(service, 'createOrGetStripeCustomer').mockResolvedValue('cus_123');
+      const user = { _id: { toString: () => 'user-id' } } as any;
+
+      await service.createCheckoutSession(user, {
+        planId: 'paid-id',
+        billingCycle: 'yearly',
+      });
+
+      expect(checkoutCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          line_items: [{ price: 'price_yearly', quantity: 1 }],
+          metadata: expect.objectContaining({ billingCycle: 'yearly' }),
+        }),
+      );
     });
   });
 
