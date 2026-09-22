@@ -9,6 +9,10 @@ import {
   ResumeAiContentHeuristicService,
 } from '../employer-pipeline/resume-ai-content-heuristic.service';
 import { Resume, ResumeDocument } from '../schemas/resume.schema';
+import { JobDescriptionResolverService } from '../resume-harness/job-description-resolver.service';
+import { StorageService } from '../storage';
+import { randomUUID } from 'crypto';
+import { extname } from 'path';
 
 export type ResumeComparisonAnnotation = {
   id: string;
@@ -28,12 +32,59 @@ export class ResumeComparisonService {
     private readonly atsParseability: AtsParseabilityService,
     private readonly atsMatch: AtsMatchService,
     private readonly aiContent: ResumeAiContentHeuristicService,
+    private readonly jobDescriptions: JobDescriptionResolverService,
+    private readonly storage: StorageService,
   ) {}
+
+  async attachSource(resumeId: string, userId: string, file: Express.Multer.File) {
+    const resume = await this.resumeModel
+      .findOne({ _id: resumeId, userId: new Types.ObjectId(userId) })
+      .exec();
+    if (!resume) throw new NotFoundException('Resume not found');
+    if (resume.creationMethod !== 'imported') {
+      throw new BadRequestException('Only imported resumes can retain a source file.');
+    }
+    const extension = extname(file.originalname).toLowerCase();
+    if (!['.pdf', '.docx'].includes(extension)) {
+      throw new BadRequestException('Only PDF and DOCX files are supported.');
+    }
+    const mimeType = extension === '.pdf'
+      ? 'application/pdf'
+      : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const key = `resumes/compare/${userId}/${randomUUID()}${extension}`;
+    await this.storage.put(key, file.buffer, { contentType: mimeType });
+    resume.source = {
+      ...(resume.source || {}),
+      originalFilename: file.originalname,
+      fileExtension: extension,
+      mimeType,
+      fileSize: file.size,
+      storageKey: key,
+    };
+    await resume.save();
+    return { filename: file.originalname };
+  }
+
+  async getSource(resumeId: string, userId: string) {
+    const resume = await this.resumeModel
+      .findOne({ _id: resumeId, userId: new Types.ObjectId(userId) })
+      .exec();
+    if (!resume) throw new NotFoundException('Resume not found');
+    if (!resume.source?.storageKey) throw new NotFoundException('Source file not found');
+    if (!resume.source.storageKey.startsWith(`resumes/compare/${userId}/`)) {
+      throw new NotFoundException('Source file not found');
+    }
+    return {
+      buffer: await this.storage.getBuffer(resume.source.storageKey),
+      mimeType: resume.source.mimeType || 'application/octet-stream',
+      filename: resume.source.originalFilename || 'resume',
+    };
+  }
 
   async compare(
     resumeId: string,
     userId: string,
-    input: { jobDescription?: string },
+    input: { jobDescription?: string; jobUrl?: string },
   ) {
     const resume = await this.resumeModel
       .findOne({ _id: resumeId, userId: new Types.ObjectId(userId) })
@@ -44,11 +95,23 @@ export class ResumeComparisonService {
     }
 
     const structured = resume.toObject ? resume.toObject() : resume;
+    const jobDescription = Object.prototype.hasOwnProperty.call(input, 'jobDescription')
+      ? input.jobDescription?.trim()
+      : structured.source?.jobDescription?.trim();
+    const jobUrl = Object.prototype.hasOwnProperty.call(input, 'jobUrl')
+      ? input.jobUrl?.trim()
+      : structured.source?.jobUrl?.trim();
+    if (!jobDescription && !jobUrl) {
+      throw new BadRequestException('A job description or job URL is required to compare.');
+    }
+    const resolved = jobDescription ? undefined : await this.jobDescriptions.resolve(jobUrl!);
+    const targetText = jobDescription || resolved?.description;
+    if (!targetText) {
+      throw new BadRequestException(resolved?.warning || 'Could not read the job URL. Paste the job description.');
+    }
     const text = this.resumeText(structured as Resume);
     const ats = this.atsParseability.check({ structured: structured as any });
-    const match = input.jobDescription?.trim()
-      ? this.atsMatch.match(structured as any, input.jobDescription)
-      : null;
+    const match = this.atsMatch.match(structured as any, targetText);
     const aiContent = this.aiContent.analyze(text);
 
     return {

@@ -224,6 +224,9 @@ export class ResumeBuilderService {
     const user = await this.userModel.findById(userId).exec();
     if (!user) throw new NotFoundException('User not found');
 
+    const safeSource = body.source ? { ...body.source } : null;
+    if (safeSource) delete safeSource.storageKey;
+
     const defaultName = body?.source?.originalFilename
       ? String(body.source.originalFilename).replace(/\.[^.]+$/, '')
       : 'Imported Resume';
@@ -237,11 +240,11 @@ export class ResumeBuilderService {
       targetRole: body.targetRole,
       targetCompany: body.targetCompany,
       tags: Array.isArray(body.tags) ? body.tags : [],
-      source: body.source
+      source: safeSource
         ? {
-            ...body.source,
-            importedAt: body.source.importedAt ? new Date(body.source.importedAt) : new Date(),
-            importMode: body.importMode || body.source.importMode || 'keep_format',
+            ...safeSource,
+            importedAt: safeSource.importedAt ? new Date(safeSource.importedAt) : new Date(),
+            importMode: body.importMode || safeSource.importMode || 'keep_format',
           }
         : null,
     };

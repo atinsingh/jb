@@ -61,17 +61,90 @@ describe('ResumeComparisonService', () => {
       },
     })),
   };
+  const jobDescriptions = {
+    resolve: jest.fn(),
+  };
+  const storage = {
+    put: jest.fn().mockResolvedValue({ key: 'resumes/compare/original.pdf' }),
+    getBuffer: jest.fn().mockResolvedValue(Buffer.from('%PDF-preview')),
+  };
 
   let service: ResumeComparisonService;
 
   beforeEach(() => {
     jest.clearAllMocks();
     resumeModel.findOne.mockReturnValue({ exec: () => Promise.resolve(resume) });
-    service = new ResumeComparisonService(
+    service = new (ResumeComparisonService as any)(
       resumeModel as any,
       atsParseability as any,
       atsMatch as any,
       aiContent as any,
+      jobDescriptions as any,
+      storage as any,
+    );
+  });
+
+  it('requires a job description or URL before comparison starts', async () => {
+    await expect(service.compare('resume-1', userId, {})).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+
+  it('resolves a job URL and matches against the extracted posting', async () => {
+    jobDescriptions.resolve.mockResolvedValue({ description: 'TypeScript and AWS role' });
+
+    const result = await service.compare('resume-1', userId, {
+      jobUrl: 'https://jobs.example.com/role',
+    } as any);
+
+    expect(result.match.coverage).toBe(50);
+    expect(atsMatch.match).toHaveBeenCalledWith(expect.anything(), 'TypeScript and AWS role');
+  });
+
+  it('uses an explicitly changed job URL instead of stale saved description', async () => {
+    resumeModel.findOne.mockReturnValue({ exec: () => Promise.resolve({
+      ...resume,
+      source: { jobDescription: 'Old posting' },
+    }) });
+    jobDescriptions.resolve.mockResolvedValue({ description: 'New posting' });
+
+    await service.compare('resume-1', userId, {
+      jobDescription: '',
+      jobUrl: 'https://jobs.example.com/new',
+    });
+
+    expect(atsMatch.match).toHaveBeenCalledWith(expect.anything(), 'New posting');
+  });
+
+  it('retains an uploaded source file for an owned imported resume', async () => {
+    const owned = {
+      ...resume,
+      source: { originalFilename: 'resume.pdf' } as any,
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+    resumeModel.findOne.mockReturnValue({ exec: () => Promise.resolve(owned) });
+    const file = {
+      originalname: 'resume.pdf',
+      mimetype: 'text/html',
+      buffer: Buffer.from('%PDF-preview'),
+    } as any;
+
+    await (service as any).attachSource('resume-1', userId, file);
+    const document = await (service as any).getSource('resume-1', userId);
+
+    expect(document.buffer.toString()).toBe('%PDF-preview');
+    expect(document.mimeType).toBe('application/pdf');
+    expect(owned.source).toEqual(expect.objectContaining({ storageKey: expect.any(String) }));
+  });
+
+  it('refuses a source key outside the authenticated user path', async () => {
+    resumeModel.findOne.mockReturnValue({ exec: () => Promise.resolve({
+      ...resume,
+      source: { storageKey: 'resumes/compare/other-user/private.pdf' },
+    }) });
+
+    await expect(service.getSource('resume-1', userId)).rejects.toBeInstanceOf(
+      NotFoundException,
     );
   });
 
@@ -117,7 +190,7 @@ describe('ResumeComparisonService', () => {
       }),
     });
 
-    const result = await service.compare('resume-1', userId, {});
+    const result = await service.compare('resume-1', userId, { jobDescription: 'Backend engineer' });
 
     expect(result.annotations).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: 'ai-stock-phrases', section: 'experience' }),

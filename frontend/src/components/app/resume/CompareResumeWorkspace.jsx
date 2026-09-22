@@ -5,9 +5,12 @@ import {
   compareResume,
   getResumeById,
   importResume,
+  uploadCompareSource,
+  getCompareSource,
   updateResume,
 } from '@/services/resumeApi';
 import { uploadResume } from '@/services/api';
+import CompareDocumentPreview from './CompareDocumentPreview';
 
 const colors = {
   red: { border: '#D9485F', bg: 'color-mix(in srgb, #D9485F 8%, transparent)', label: 'Fix first' },
@@ -66,11 +69,13 @@ function parsedResume(parsed) {
 
 function CompareUpload({ onOpen }) {
   const [file, setFile] = useState(null);
+  const [jobDescription, setJobDescription] = useState('');
+  const [jobUrl, setJobUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   const start = async () => {
-    if (!file || busy) return;
+    if (!file || (!jobDescription.trim() && !jobUrl.trim()) || busy) return;
     setBusy(true);
     setError('');
     try {
@@ -88,9 +93,13 @@ function CompareUpload({ onOpen }) {
           fileSize: file.size,
           parseStatus: parsed._source === 'heuristic' ? 'partial' : 'parsed',
           parseConfidence: parsed._source === 'heuristic' ? 0.6 : 0.9,
+          jobDescription: jobDescription.trim(),
+          jobUrl: jobUrl.trim(),
         },
       });
-      onOpen(created.id || created._id);
+      const id = created.id || created._id;
+      await uploadCompareSource(id, file);
+      onOpen(id);
     } catch (cause) {
       setError(cause?.message || 'Could not import this resume.');
     } finally {
@@ -116,8 +125,16 @@ function CompareUpload({ onOpen }) {
           onChange={(event) => setFile(event.target.files?.[0] || null)}
         />
         {file && <div style={{ marginTop: 10, fontSize: 13 }}>{file.name}</div>}
+        <label style={{ display: 'block', fontSize: 13, fontWeight: 700, marginTop: 18 }}>
+          Job URL
+          <input type="url" value={jobUrl} onChange={(event) => setJobUrl(event.target.value)} placeholder="https://company.com/jobs/role" style={{ ...input, marginTop: 6 }} />
+        </label>
+        <label style={{ display: 'block', fontSize: 13, fontWeight: 700, marginTop: 12 }}>
+          Job description
+          <textarea value={jobDescription} onChange={(event) => setJobDescription(event.target.value)} rows={5} placeholder="Or paste the job description" style={{ ...input, marginTop: 6, resize: 'vertical' }} />
+        </label>
         {error && <div role="alert" style={{ color: 'var(--jb-v3-danger)', marginTop: 10 }}>{error}</div>}
-        <button type="button" onClick={start} disabled={!file || busy} style={{ ...button, marginTop: 16, opacity: !file || busy ? 0.5 : 1 }}>
+        <button type="button" onClick={start} disabled={!file || (!jobDescription.trim() && !jobUrl.trim()) || busy} style={{ ...button, marginTop: 16, opacity: !file || (!jobDescription.trim() && !jobUrl.trim()) || busy ? 0.5 : 1 }}>
           {busy ? 'Importing…' : 'Import and compare'}
         </button>
       </div>
@@ -203,35 +220,55 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
   const [resume, setResume] = useState(null);
   const [assessment, setAssessment] = useState(null);
   const [jobDescription, setJobDescription] = useState('');
+  const [jobUrl, setJobUrl] = useState('');
   const [busy, setBusy] = useState(Boolean(resumeId));
   const [message, setMessage] = useState('');
   const [validationError, setValidationError] = useState('');
+  const [sourceBlob, setSourceBlob] = useState(null);
+  const [sourceError, setSourceError] = useState('');
 
-  const runComparison = useCallback(async (id = resumeId, jd = jobDescription) => {
+  const runComparison = useCallback(async (id = resumeId, jd = jobDescription, url = jobUrl) => {
     if (!id) return;
     setBusy(true);
     setMessage('');
     try {
-      setAssessment(await compareResume(id, jd.trim() ? { jobDescription: jd.trim() } : {}));
+      const context = { jobDescription: jd.trim(), jobUrl: url.trim() };
+      if (resume && (context.jobDescription !== (resume.source?.jobDescription || '') || context.jobUrl !== (resume.source?.jobUrl || ''))) {
+        const updated = await updateResume(id, { source: { ...resume.source, ...context } });
+        setResume(updated);
+      }
+      setAssessment(await compareResume(id, context));
     } catch (cause) {
       setMessage(cause?.message || 'Comparison is temporarily unavailable.');
     } finally {
       setBusy(false);
     }
-  }, [resumeId, jobDescription]);
+  }, [resumeId, jobDescription, jobUrl, resume]);
 
   useEffect(() => {
     if (!resumeId) return;
     let cancelled = false;
     setBusy(true);
-    Promise.all([getResumeById(resumeId), compareResume(resumeId, {})])
-      .then(([document, result]) => {
+    getResumeById(resumeId)
+      .then((document) => {
         if (cancelled) return;
         setResume(document);
-        setAssessment(result);
+        setJobDescription(document.source?.jobDescription || '');
+        setJobUrl(document.source?.jobUrl || '');
+        return compareResume(resumeId, {});
       })
+      .then((result) => !cancelled && result && setAssessment(result))
       .catch((cause) => !cancelled && setMessage(cause?.message || 'Could not open this resume.'))
       .finally(() => !cancelled && setBusy(false));
+    return () => { cancelled = true; };
+  }, [resumeId]);
+
+  useEffect(() => {
+    if (!resumeId) return;
+    let cancelled = false;
+    getCompareSource(resumeId)
+      .then((blob) => !cancelled && setSourceBlob(blob))
+      .catch((cause) => !cancelled && setSourceError(cause?.message || 'Could not open the uploaded résumé.'));
     return () => { cancelled = true; };
   }, [resumeId]);
 
@@ -303,6 +340,11 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
       {validationError && <div role="alert" style={{ marginBottom: 14, color: 'var(--jb-v3-danger)' }}>{validationError}</div>}
       <div className="compare-resume-layout">
         <div style={{ display: 'grid', gap: 12 }}>
+          {sourceBlob ? (
+            <CompareDocumentPreview blob={sourceBlob} filename={resume.source?.originalFilename || 'resume.pdf'} annotations={annotations} resume={resume} />
+          ) : sourceError ? (
+            <div role="status" style={{ padding: 12, border: '1px solid var(--jb-v3-line)' }}>{sourceError}</div>
+          ) : null}
           <Section section="personal" title="Contact details" annotations={annotations}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               {['fullName', 'email', 'phone', 'location', 'linkedin'].map((key) => (
@@ -365,10 +407,14 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
             <span style={{ color: colors.blue.border }}>{summaryCounts.blue} review</span>
           </div>
           <label style={{ fontSize: 12, fontWeight: 700 }}>
-            Job description (optional)
+            Job description
             <textarea value={jobDescription} onChange={(event) => setJobDescription(event.target.value)} rows={6} style={{ ...input, marginTop: 6, resize: 'vertical' }} />
           </label>
-          <button type="button" onClick={() => runComparison()} disabled={busy} style={{ ...button, width: '100%', marginTop: 10, opacity: busy ? 0.55 : 1 }}>
+          <label style={{ display: 'block', fontSize: 12, fontWeight: 700, marginTop: 10 }}>
+            Job URL
+            <input type="url" value={jobUrl} onChange={(event) => setJobUrl(event.target.value)} style={{ ...input, marginTop: 6 }} />
+          </label>
+          <button type="button" onClick={() => runComparison()} disabled={busy || (!jobDescription.trim() && !jobUrl.trim())} style={{ ...button, width: '100%', marginTop: 10, opacity: busy || (!jobDescription.trim() && !jobUrl.trim()) ? 0.55 : 1 }}>
             {busy ? 'Comparing…' : 'Refresh comparison'}
           </button>
           <p style={{ fontSize: 11.5, lineHeight: 1.5, color: 'var(--jb-v3-fg-3)', marginBottom: 0 }}>

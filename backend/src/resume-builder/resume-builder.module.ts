@@ -18,6 +18,8 @@ import { AtsModule } from '../ats/ats.module';
 import { ResumeAiContentHeuristicService } from '../employer-pipeline/resume-ai-content-heuristic.service';
 import { ResumeComparisonController } from './resume-comparison.controller';
 import { ResumeComparisonService } from './resume-comparison.service';
+import { IngestionModule } from '../ingestion/ingestion.module';
+import { JobDescriptionResolverService } from '../resume-harness/job-description-resolver.service';
 
 @Module({
   imports: [
@@ -29,6 +31,7 @@ import { ResumeComparisonService } from './resume-comparison.service';
     ]),
     LLMModule,
     AtsModule,
+    IngestionModule,
     forwardRef(() => ResumeModule),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -60,6 +63,7 @@ import { ResumeComparisonService } from './resume-comparison.service';
   providers: [
     ResumeBuilderService,
     ResumeComparisonService,
+    JobDescriptionResolverService,
     ResumeAiContentHeuristicService,
     // Dependency-free and stateless, so a local instance is fine — avoids
     // pulling in the whole IngestionModule (queues, cron) just to sanitize.

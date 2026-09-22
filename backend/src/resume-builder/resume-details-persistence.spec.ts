@@ -35,6 +35,7 @@ describe('Resume Details persistence', () => {
       importMode: 'keep_format',
       achievements: ['Conference speaker'],
       certifications: [{ name: 'AWS Certified', issuer: 'AWS', date: '2025' }],
+      source: { originalFilename: 'resume.pdf', jobDescription: 'TypeScript engineer', storageKey: 'another-users/private.pdf' },
     });
 
     expect(saved).toHaveLength(1);
@@ -43,5 +44,7 @@ describe('Resume Details persistence', () => {
       { name: 'AWS Certified', issuer: 'AWS', date: '2025' },
     ]);
     expect(result.creationMethod).toBe('imported');
+    expect(result.source.jobDescription).toBe('TypeScript engineer');
+    expect(result.source.storageKey).toBeUndefined();
   });
 });

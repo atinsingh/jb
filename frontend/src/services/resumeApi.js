@@ -119,6 +119,31 @@ export const importResume = async (payload) =>
     body: JSON.stringify(payload),
   });
 
+export const uploadCompareSource = async (id, file) => {
+  const token = await getAccessToken();
+  const body = new FormData();
+  body.append('resume', file);
+  const response = await fetch(`${API_URL}/api/resume-builder/${id}/compare/source`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body,
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Could not retain the source resume.' }));
+    throw new Error(error.message || 'Could not retain the source resume.');
+  }
+  return response.json();
+};
+
+export const getCompareSource = async (id) => {
+  const token = await getAccessToken();
+  const response = await fetch(`${API_URL}/api/resume-builder/${id}/compare/source`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) throw new Error('Could not open the uploaded resume.');
+  return response.blob();
+};
+
 // POST /api/resume-builder/:id/duplicate  -> new independent resume
 export const duplicateResume = async (id, name) =>
   apiCall(`/api/resume-builder/${id}/duplicate`, {

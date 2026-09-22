@@ -251,6 +251,9 @@ export class Resume {
     parseStatus?: string; // 'parsed' | 'partial' | 'failed'
     parseConfidence?: number; // 0..1
     parserVersion?: string;
+    jobDescription?: string;
+    jobUrl?: string;
+    storageKey?: string;
   } | null;
 
   // Timestamps (automatically added by Mongoose with timestamps: true)
