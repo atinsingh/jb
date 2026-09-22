@@ -50,9 +50,7 @@ describe('EmployerBillingService', () => {
         {
           provide: getModelToken(EmployerSubscription.name),
           useValue: {
-            findOneAndUpdate: jest
-              .fn()
-              .mockReturnValue({ exec: () => Promise.resolve(doc) }),
+            findOneAndUpdate: jest.fn().mockReturnValue({ exec: () => Promise.resolve(doc) }),
             findOne: jest.fn().mockResolvedValue(doc),
           },
         },
@@ -90,9 +88,7 @@ describe('EmployerBillingService', () => {
     });
 
     it('drops a past_due employer back to free limits', async () => {
-      await service.applyStripeSubscription(
-        stripeSubscription({ status: 'past_due' }),
-      );
+      await service.applyStripeSubscription(stripeSubscription({ status: 'past_due' }));
 
       expect(doc.plan).toBe('free');
       expect(doc.aiActionsLimit).toBe(25);
@@ -100,9 +96,7 @@ describe('EmployerBillingService', () => {
     });
 
     it('drops a canceled employer back to free limits', async () => {
-      await service.applyStripeSubscription(
-        stripeSubscription({ status: 'canceled' }),
-      );
+      await service.applyStripeSubscription(stripeSubscription({ status: 'canceled' }));
 
       expect(doc.plan).toBe('free');
       expect(doc.aiActionsLimit).toBe(25);
@@ -110,7 +104,10 @@ describe('EmployerBillingService', () => {
 
     it('keeps a trialing employer on the paid tier', async () => {
       await service.applyStripeSubscription(
-        stripeSubscription({ status: 'trialing', metadata: { audience: 'employer', ownerId: OWNER_ID, plan: 'scale' } }),
+        stripeSubscription({
+          status: 'trialing',
+          metadata: { audience: 'employer', ownerId: OWNER_ID, plan: 'scale' },
+        }),
       );
 
       expect(doc.plan).toBe('scale');
@@ -118,9 +115,7 @@ describe('EmployerBillingService', () => {
     });
 
     it('ignores a subscription with no ownerId rather than guessing', async () => {
-      await service.applyStripeSubscription(
-        stripeSubscription({ metadata: { audience: 'employer' } }),
-      );
+      await service.applyStripeSubscription(stripeSubscription({ metadata: { audience: 'employer' } }));
 
       expect(doc.plan).toBe('free');
       expect(doc.save).not.toHaveBeenCalled();
@@ -129,7 +124,11 @@ describe('EmployerBillingService', () => {
     it('ignores an unknown plan key rather than falling back to a paid tier', async () => {
       await service.applyStripeSubscription(
         stripeSubscription({
-          metadata: { audience: 'employer', ownerId: OWNER_ID, plan: 'platinum' },
+          metadata: {
+            audience: 'employer',
+            ownerId: OWNER_ID,
+            plan: 'platinum',
+          },
         }),
       );
 
@@ -140,24 +139,18 @@ describe('EmployerBillingService', () => {
 
   describe('upgrade', () => {
     it('refuses the sales-led enterprise plan', async () => {
-      await expect(
-        service.upgrade(OWNER_ID, { plan: 'enterprise' }),
-      ).rejects.toThrow(/sales-led/i);
+      await expect(service.upgrade(OWNER_ID, { plan: 'enterprise' })).rejects.toThrow(/sales-led/i);
       expect(doc.plan).toBe('free');
     });
 
     it('refuses an unknown plan', async () => {
-      await expect(
-        service.upgrade(OWNER_ID, { plan: 'platinum' }),
-      ).rejects.toThrow(/unknown plan/i);
+      await expect(service.upgrade(OWNER_ID, { plan: 'platinum' })).rejects.toThrow(/unknown plan/i);
     });
 
     it('does not touch the subscription when checkout cannot be created', async () => {
       // No Stripe key in this module, so price resolution fails — the important
       // part is that the employer is not upgraded on the way through.
-      await expect(
-        service.upgrade(OWNER_ID, { plan: 'growth' }),
-      ).rejects.toBeDefined();
+      await expect(service.upgrade(OWNER_ID, { plan: 'growth' })).rejects.toBeDefined();
 
       expect(doc.plan).toBe('free');
       expect(doc.aiActionsLimit).toBe(25);
@@ -188,15 +181,115 @@ describe('EmployerBillingService', () => {
   });
 
   describe('getPlans', () => {
-    it('flags the current plan and which tiers are self-serve', async () => {
+    it('builds paid employer tiers and prices from the active Stripe catalog', async () => {
+      (service as any).stripe = {
+        prices: {
+          list: jest.fn().mockResolvedValue({
+            data: [
+              {
+                id: 'price_starter_monthly',
+                active: true,
+                currency: 'cad',
+                unit_amount: 4900,
+                recurring: { interval: 'month' },
+                product: {
+                  id: 'prod_ULahlAACsFrTeC',
+                  active: true,
+                  name: 'Starter Plan Monthly',
+                  default_price: 'price_starter_monthly',
+                  metadata: {},
+                },
+              },
+              {
+                id: 'price_starter_yearly',
+                active: true,
+                currency: 'cad',
+                unit_amount: 49980,
+                recurring: { interval: 'year' },
+                product: {
+                  id: 'prod_ULaiIvDicodwAD',
+                  active: true,
+                  name: 'Starter Plan Yearly',
+                  default_price: 'price_starter_yearly',
+                  metadata: {},
+                },
+              },
+              {
+                id: 'price_professional_monthly',
+                active: true,
+                currency: 'cad',
+                unit_amount: 39900,
+                recurring: { interval: 'month' },
+                product: {
+                  id: 'prod_ULakRfz5ZpnBJm',
+                  active: true,
+                  name: 'Professional Plan Monthly',
+                  default_price: 'price_professional_monthly',
+                  metadata: {},
+                },
+              },
+              {
+                id: 'price_professional_yearly',
+                active: true,
+                currency: 'cad',
+                unit_amount: 406980,
+                recurring: { interval: 'year' },
+                product: {
+                  id: 'prod_ULalgrNRItx2Fg',
+                  active: true,
+                  name: 'Professional Plan Yearly',
+                  default_price: 'price_professional_yearly',
+                  metadata: {},
+                },
+              },
+              {
+                id: 'price_other_starter_monthly',
+                active: true,
+                currency: 'cad',
+                unit_amount: 99900,
+                recurring: { interval: 'month' },
+                product: {
+                  id: 'prod_other_starter_monthly',
+                  active: true,
+                  name: 'Starter Plan Monthly',
+                  metadata: {},
+                },
+              },
+            ],
+          }),
+        },
+      };
+
       const res = await service.getPlans(OWNER_ID);
       const byKey = Object.fromEntries(res.plans.map((p) => [p.key, p]));
 
+      expect((service as any).stripe.prices.list).toHaveBeenCalledWith(
+        expect.objectContaining({ product: 'prod_ULahlAACsFrTeC' }),
+      );
+      expect((service as any).stripe.prices.list).not.toHaveBeenCalledWith(
+        expect.objectContaining({ product: 'prod_other_starter_monthly' }),
+      );
+
       expect(res.currentPlan).toBe('free');
       expect(byKey.free.current).toBe(true);
-      expect(byKey.growth.selfServe).toBe(true);
-      expect(byKey.enterprise.selfServe).toBe(false);
-      expect(byKey.growth.levers).toContainEqual(['AI actions / mo', '500']);
+      expect(res.plans.map((p) => p.key)).toEqual(['free', 'starter', 'scale']);
+      expect(byKey.starter).toEqual(
+        expect.objectContaining({
+          name: 'Starter',
+          priceMonthly: 49,
+          priceYearly: 499.8,
+          currency: 'cad',
+          stripePriceIdMonthly: 'price_starter_monthly',
+          stripePriceIdYearly: 'price_starter_yearly',
+        }),
+      );
+      expect(byKey.scale).toEqual(
+        expect.objectContaining({
+          name: 'Professional',
+          priceMonthly: 399,
+          priceYearly: 4069.8,
+        }),
+      );
     });
   });
 });

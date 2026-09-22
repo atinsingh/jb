@@ -3,23 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import Head from 'next/head';
 import { LoadingState, EmptyState, ErrorState } from '@/components/app/AppStates';
-import {
-  Screen,
-  CellGrid,
-  Label,
-  EndRule,
-  MonoButton,
-  MonoSwitch,
-  mono,
-  HAIR,
-} from '@/components/app/v3/kit';
-import {
-  createCheckout,
-  getAiBudget,
-  getInvoices,
-  getPlans,
-  getSubscription,
-} from '@/services/billingApi';
+import { Screen, CellGrid, Label, EndRule, MonoButton, MonoSwitch, mono, HAIR } from '@/components/app/v3/kit';
+import { createCheckout, getAiBudget, getInvoices, getPlans, getSubscription } from '@/services/billingApi';
 
 // Best-effort mapping of an API invoice shape onto the v3 row.
 const normalizeInvoice = (i) => {
@@ -50,6 +35,12 @@ const normalizeInvoice = (i) => {
  * billing amounts returned by the candidate catalogue.
  */
 const COLS = '110px 1fr 90px 70px';
+const formatPlanPrice = (amount, currency = 'usd') =>
+  new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: String(currency).toUpperCase(),
+    minimumFractionDigits: Number(amount) % 1 ? 2 : 0,
+  }).format(Number(amount) || 0);
 
 export default function AppBilling() {
   const [invoices, setInvoices] = useState([]);
@@ -64,9 +55,7 @@ export default function AppBilling() {
     let alive = true;
     (async () => {
       try {
-        const [invoiceData, planData, subscriptionData, budgetData] = await Promise.all([
-          getInvoices(), getPlans(), getSubscription(), getAiBudget().catch(() => ({ status: 'unavailable' })),
-        ]);
+        const [invoiceData, planData, subscriptionData, budgetData] = await Promise.all([getInvoices(), getPlans(), getSubscription(), getAiBudget().catch(() => ({ status: 'unavailable' }))]);
         if (!alive) return;
         const list = invoiceData?.invoices || (Array.isArray(invoiceData) ? invoiceData : []);
         setInvoices((Array.isArray(list) ? list : []).map(normalizeInvoice));
@@ -95,10 +84,7 @@ export default function AppBilling() {
     }
   };
 
-  const paidTotal = useMemo(
-    () => invoices.filter((i) => i.status === 'paid').length,
-    [invoices],
-  );
+  const paidTotal = useMemo(() => invoices.filter((i) => i.status === 'paid').length, [invoices]);
 
   return (
     <>
@@ -120,7 +106,12 @@ export default function AppBilling() {
             <div style={{ ...mono(), marginBottom: 10 }}>Invoices paid</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
               <span
-                style={{ fontSize: 44, fontWeight: 600, letterSpacing: '-0.045em', lineHeight: 1 }}
+                style={{
+                  fontSize: 44,
+                  fontWeight: 600,
+                  letterSpacing: '-0.045em',
+                  lineHeight: 1,
+                }}
               >
                 {paidTotal}
               </span>
@@ -129,21 +120,15 @@ export default function AppBilling() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={mono(10, '0.12em', yearly ? 'var(--jb-v3-fg-3)' : 'var(--jb-v3-fg)')}>
-              Monthly
-            </span>
+            <span style={mono(10, '0.12em', yearly ? 'var(--jb-v3-fg-3)' : 'var(--jb-v3-fg)')}>Monthly</span>
             <MonoSwitch checked={yearly} onChange={() => setYearly(!yearly)} label="Billing cycle" />
-            <span style={mono(10, '0.12em', yearly ? 'var(--jb-v3-fg)' : 'var(--jb-v3-fg-3)')}>
-              Yearly −20%
-            </span>
+            <span style={mono(10, '0.12em', yearly ? 'var(--jb-v3-fg)' : 'var(--jb-v3-fg-3)')}>Yearly</span>
           </div>
         </div>
 
         {budget && (
           <div data-testid="billing-budget" style={{ ...mono(11, '0'), marginBottom: 18 }}>
-            {budget.status === 'unavailable'
-              ? 'AI budget unavailable · model-running actions are paused'
-              : `AI budget: $${Number(budget.remaining || 0).toFixed(2)} of $${Number(budget.limit || 0).toFixed(2)} remaining · ${budget.status} · renews monthly`}
+            {budget.status === 'unavailable' ? 'AI budget unavailable · model-running actions are paused' : `AI budget: $${Number(budget.remaining || 0).toFixed(2)} of $${Number(budget.limit || 0).toFixed(2)} remaining · ${budget.status} · renews monthly`}
           </div>
         )}
 
@@ -152,73 +137,94 @@ export default function AppBilling() {
             const current = subscription?.planId?._id === p._id || subscription?.planId === p._id;
             const amount = yearly ? p.priceYearly : p.priceMonthly;
             return (
-            <div
-              key={p.name}
-              data-testid={`billing-plan-${p.type}`}
-              style={{
-                background: 'var(--jb-v3-panel)',
-                padding: '24px 22px',
-                display: 'flex',
-                flexDirection: 'column',
-              }}
-            >
               <div
+                key={p.name}
+                data-testid={`billing-plan-${p.type}`}
                 style={{
-                  display: 'flex',
-                  alignItems: 'baseline',
-                  justifyContent: 'space-between',
-                  marginBottom: 18,
-                }}
-              >
-                <span style={{ fontSize: 15, fontWeight: 600 }}>{p.name}</span>
-                {p.type === 'PRO' && (
-                  <span style={mono(9.5, '0.12em', 'var(--jb-v3-accent)')}>Paid</span>
-                )}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, marginBottom: 22 }}>
-                <span
-                  style={{ fontSize: 34, fontWeight: 600, letterSpacing: '-0.045em', lineHeight: 1 }}
-                >
-                  ${amount}
-                </span>
-                <span style={mono(10, '0')}>{yearly ? '/year' : '/month'}</span>
-              </div>
-              <div
-                style={{
-                  flex: 1,
+                  background: 'var(--jb-v3-panel)',
+                  padding: '24px 22px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: 9,
-                  marginBottom: 22,
                 }}
               >
-                {(p.features || []).map((l) => (
-                  <div key={l} style={{ display: 'flex', alignItems: 'baseline', gap: 9 }}>
-                    <span
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'baseline',
+                    justifyContent: 'space-between',
+                    marginBottom: 18,
+                  }}
+                >
+                  <span style={{ fontSize: 15, fontWeight: 600 }}>{p.name}</span>
+                  {p.type === 'PRO' && <span style={mono(9.5, '0.12em', 'var(--jb-v3-accent)')}>Paid</span>}
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'baseline',
+                    gap: 5,
+                    marginBottom: 22,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 34,
+                      fontWeight: 600,
+                      letterSpacing: '-0.045em',
+                      lineHeight: 1,
+                    }}
+                  >
+                    {formatPlanPrice(amount, p.currency)}
+                  </span>
+                  <span style={mono(10, '0')}>{yearly ? '/year' : '/month'}</span>
+                </div>
+                <div
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 9,
+                    marginBottom: 22,
+                  }}
+                >
+                  {(p.features || []).map((l) => (
+                    <div
+                      key={l}
                       style={{
-                        width: 3,
-                        height: 10,
-                        display: 'block',
-                        flex: 'none',
-                        background: 'var(--jb-v3-accent)',
+                        display: 'flex',
+                        alignItems: 'baseline',
+                        gap: 9,
                       }}
-                    />
-                    <span style={{ fontSize: 12.5, color: 'var(--jb-v3-fg-2)' }}>{l}</span>
-                  </div>
-                ))}
+                    >
+                      <span
+                        style={{
+                          width: 3,
+                          height: 10,
+                          display: 'block',
+                          flex: 'none',
+                          background: 'var(--jb-v3-accent)',
+                        }}
+                      />
+                      <span style={{ fontSize: 12.5, color: 'var(--jb-v3-fg-2)' }}>{l}</span>
+                    </div>
+                  ))}
+                </div>
+                <MonoButton
+                  block
+                  filled={p.type === 'PRO'}
+                  disabled={p.type === 'FREE' || current}
+                  data-testid={`billing-checkout-${p.type}`}
+                  onClick={() => checkout(p)}
+                  style={{
+                    padding: '8px 0',
+                    opacity: p.type === 'FREE' || current ? 0.55 : 1,
+                  }}
+                >
+                  {current ? 'Current' : p.type === 'FREE' ? 'Free' : 'Choose Paid'}
+                </MonoButton>
               </div>
-              <MonoButton
-                block
-                filled={p.type === 'PRO'}
-                disabled={p.type === 'FREE' || current}
-                data-testid={`billing-checkout-${p.type}`}
-                onClick={() => checkout(p)}
-                style={{ padding: '8px 0', opacity: p.type === 'FREE' || current ? 0.55 : 1 }}
-              >
-                {current ? 'Current' : p.type === 'FREE' ? 'Free' : 'Choose Paid'}
-              </MonoButton>
-            </div>
-          );})}
+            );
+          })}
         </CellGrid>
 
         {loading && <LoadingState label="Loading your invoices…" />}
@@ -243,7 +249,12 @@ export default function AppBilling() {
                 <span style={{ fontSize: 13, color: 'var(--jb-v3-fg-2)' }}>
                   {i.label}
                   {i.status === 'refunded' && (
-                    <span style={{ ...mono(9.5, '0.12em', 'var(--jb-v3-warn)'), marginLeft: 10 }}>
+                    <span
+                      style={{
+                        ...mono(9.5, '0.12em', 'var(--jb-v3-warn)'),
+                        marginLeft: 10,
+                      }}
+                    >
                       Refunded
                     </span>
                   )}
@@ -252,7 +263,10 @@ export default function AppBilling() {
                 {i.url ? (
                   <a
                     href={i.url}
-                    style={{ ...mono(10, '0.1em', 'var(--jb-v3-accent)'), textAlign: 'right' }}
+                    style={{
+                      ...mono(10, '0.1em', 'var(--jb-v3-accent)'),
+                      textAlign: 'right',
+                    }}
                   >
                     PDF
                   </a>
@@ -265,9 +279,7 @@ export default function AppBilling() {
           </>
         )}
 
-        {!loading && !error && invoices.length === 0 && (
-          <EmptyState title="No invoices yet" hint="Charges appear here once you upgrade." />
-        )}
+        {!loading && !error && invoices.length === 0 && <EmptyState title="No invoices yet" hint="Charges appear here once you upgrade." />}
       </Screen>
     </>
   );

@@ -6,19 +6,22 @@ import Link from 'next/link';
 import EmployerSidebar from '@/components/employer/EmployerSidebar';
 import { appRoute } from '@/components/app/appRoutes';
 import { employerBillingApi } from '@/services/employerApi';
-import {
-  LoadingState,
-  ErrorState,
-  InlineError,
-} from '@/components/employer/EmployerStates';
+import { LoadingState, ErrorState, InlineError } from '@/components/employer/EmployerStates';
 
 /* -------------------------------------------------------------- transform --- */
 // Map a live plan (from the billing API) to the card's visual model.
 function computeTiers(annual, data) {
   return data.map((t) => {
-    const custom = !t.monthly && !t.annual; // e.g. Enterprise
+    const custom = !t.priceMonthly && !t.priceYearly; // e.g. Enterprise
     const dark = t.key === 'scale';
-    const price = custom ? null : annual ? t.annual : t.monthly;
+    const price = custom ? null : annual ? t.priceYearly : t.priceMonthly;
+    const formattedPrice = custom
+      ? ''
+      : new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: String(t.currency || 'cad').toUpperCase(),
+          minimumFractionDigits: Number(price) % 1 ? 2 : 0,
+        }).format(price);
     const levers = Array.isArray(t.levers) ? t.levers : [];
     return {
       key: t.key,
@@ -28,18 +31,14 @@ function computeTiers(annual, data) {
       current: !!t.current,
       cardBg: dark ? '#15140F' : '#FFFEFB',
       border: t.current ? '#1FA463' : dark ? '#4263EB' : '#E6DECF',
-      ring: t.popular
-        ? '0 0 0 3px rgba(66,99,235,0.18)'
-        : t.current
-          ? '0 0 0 3px rgba(31,164,99,0.16)'
-          : 'none',
+      ring: t.popular ? '0 0 0 3px rgba(66,99,235,0.18)' : t.current ? '0 0 0 3px rgba(31,164,99,0.16)' : 'none',
       nameColor: dark ? '#FBF8F1' : '#1B1A16',
       taglineColor: dark ? '#9A9286' : '#8A8378',
       leverLabelColor: dark ? '#9A9286' : '#8A8378',
       hasPrice: !custom,
       noPrice: custom,
-      price: custom ? '' : '$' + price,
-      per: '/mo',
+      price: formattedPrice,
+      per: annual ? '/year' : '/month',
       isCurrent: !!t.current,
       cta: 'Choose ' + t.name,
       ctaBg: dark ? '#4263EB' : '#1B1A16',
@@ -47,16 +46,7 @@ function computeTiers(annual, data) {
       levers: levers.map((l) => ({
         label: l[0],
         value: l[1],
-        valColor:
-          l[1] === '—'
-            ? dark
-              ? '#5A544A'
-              : '#C9BFAC'
-            : l[1] === '✓' || String(l[1]).startsWith('✓')
-              ? '#1FA463'
-              : dark
-                ? '#FBF8F1'
-                : '#1B1A16',
+        valColor: l[1] === '—' ? (dark ? '#5A544A' : '#C9BFAC') : l[1] === '✓' || String(l[1]).startsWith('✓') ? '#1FA463' : dark ? '#FBF8F1' : '#1B1A16',
       })),
     };
   });
@@ -117,9 +107,7 @@ export default function EmployerPlans() {
   };
 
   const tiers = computeTiers(annual, tierData);
-  const currentName =
-    tierData.find((t) => t.current)?.name ||
-    (currentPlan ? currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1) : null);
+  const currentName = tierData.find((t) => t.current)?.name || (currentPlan ? currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1) : null);
   const scale = tierData.find((t) => t.key === 'scale');
   const showScaleUpsell = scale && !scale.current;
 
@@ -167,7 +155,14 @@ export default function EmployerPlans() {
       >
         <EmployerSidebar active="settings" />
 
-        <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        <main
+          style={{
+            flex: 1,
+            minWidth: 0,
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
           {/* HEADER */}
           <header
             style={{
@@ -185,21 +180,63 @@ export default function EmployerPlans() {
           >
             <Link
               href={appRoute('Employer Settings.dc.html')}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13.5, fontWeight: 600, color: '#5A544A', textDecoration: 'none' }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 7,
+                fontSize: 13.5,
+                fontWeight: 600,
+                color: '#5A544A',
+                textDecoration: 'none',
+              }}
             >
               ← Back to settings
             </Link>
             <div style={{ flex: 1 }} />
-            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, color: '#9A9286' }}>Plan &amp; billing</span>
+            <span
+              style={{
+                fontFamily: 'var(--jb-font-mono)',
+                fontSize: 11.5,
+                color: '#9A9286',
+              }}
+            >
+              Plan &amp; billing
+            </span>
           </header>
 
-          <div style={{ padding: '32px 32px 64px', maxWidth: 1180, width: '100%', margin: '0 auto' }}>
+          <div
+            style={{
+              padding: '32px 32px 64px',
+              maxWidth: 1180,
+              width: '100%',
+              margin: '0 auto',
+            }}
+          >
             {/* HERO */}
             <div style={{ textAlign: 'center', marginBottom: 24 }}>
-              <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 40, lineHeight: 1.02, margin: '0 0 10px' }}>Scale your hiring.</h1>
-              <p style={{ fontSize: 15.5, color: '#5A544A', margin: '0 auto 20px', maxWidth: 480 }}>
+              <h1
+                style={{
+                  fontFamily: 'var(--jb-font-display)',
+                  fontWeight: 400,
+                  fontSize: 40,
+                  lineHeight: 1.02,
+                  margin: '0 0 10px',
+                }}
+              >
+                Scale your hiring.
+              </h1>
+              <p
+                style={{
+                  fontSize: 15.5,
+                  color: '#5A544A',
+                  margin: '0 auto 20px',
+                  maxWidth: 480,
+                }}
+              >
                 {currentName ? (
-                  <>You&rsquo;re on <b style={{ color: '#1B1A16' }}>{currentName}</b>. Here&rsquo;s what each plan unlocks.</>
+                  <>
+                    You&rsquo;re on <b style={{ color: '#1B1A16' }}>{currentName}</b>. Here&rsquo;s what each plan unlocks.
+                  </>
                 ) : (
                   <>Here&rsquo;s what each plan unlocks.</>
                 )}
@@ -249,7 +286,18 @@ export default function EmployerPlans() {
                   }}
                 >
                   Annual{' '}
-                  <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, background: '#1FA463', color: '#0C2C1C', padding: '2px 7px', borderRadius: 999 }}>−25%</span>
+                  <span
+                    style={{
+                      fontFamily: 'var(--jb-font-mono)',
+                      fontSize: 11,
+                      background: '#1FA463',
+                      color: '#0C2C1C',
+                      padding: '2px 7px',
+                      borderRadius: 999,
+                    }}
+                  >
+                    −25%
+                  </span>
                 </button>
               </div>
             </div>
@@ -263,7 +311,15 @@ export default function EmployerPlans() {
             ) : (
               <>
                 {/* TIER CARDS */}
-                <div className="em-tier-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, alignItems: 'stretch' }}>
+                <div
+                  className="em-tier-grid"
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(4,1fr)',
+                    gap: 14,
+                    alignItems: 'stretch',
+                  }}
+                >
                   {tiers.map((t) => (
                     <div
                       key={t.key}
@@ -321,17 +377,61 @@ export default function EmployerPlans() {
                         </span>
                       )}
 
-                      <div style={{ fontSize: 18, fontWeight: 700, color: t.nameColor, marginBottom: 4 }}>{t.name}</div>
-                      <div style={{ fontSize: 12.5, color: t.taglineColor, marginBottom: 16, minHeight: 34 }}>{t.tagline}</div>
+                      <div
+                        style={{
+                          fontSize: 18,
+                          fontWeight: 700,
+                          color: t.nameColor,
+                          marginBottom: 4,
+                        }}
+                      >
+                        {t.name}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 12.5,
+                          color: t.taglineColor,
+                          marginBottom: 16,
+                          minHeight: 34,
+                        }}
+                      >
+                        {t.tagline}
+                      </div>
 
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 18 }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'baseline',
+                          gap: 4,
+                          marginBottom: 18,
+                        }}
+                      >
                         {t.hasPrice && (
                           <>
-                            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 30, fontWeight: 600, color: t.nameColor }}>{t.price}</span>
+                            <span
+                              style={{
+                                fontFamily: 'var(--jb-font-mono)',
+                                fontSize: 30,
+                                fontWeight: 600,
+                                color: t.nameColor,
+                              }}
+                            >
+                              {t.price}
+                            </span>
                             <span style={{ fontSize: 12.5, color: t.taglineColor }}>{t.per}</span>
                           </>
                         )}
-                        {t.noPrice && <span style={{ fontFamily: 'var(--jb-font-display)', fontSize: 26, color: t.nameColor }}>Custom</span>}
+                        {t.noPrice && (
+                          <span
+                            style={{
+                              fontFamily: 'var(--jb-font-display)',
+                              fontSize: 26,
+                              color: t.nameColor,
+                            }}
+                          >
+                            Custom
+                          </span>
+                        )}
                       </div>
 
                       {t.isCurrent ? (
@@ -379,11 +479,35 @@ export default function EmployerPlans() {
                         </button>
                       )}
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 11,
+                        }}
+                      >
                         {t.levers.map((l) => (
-                          <div key={l.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, fontSize: 12.5 }}>
+                          <div
+                            key={l.label}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: 10,
+                              fontSize: 12.5,
+                            }}
+                          >
                             <span style={{ color: t.leverLabelColor }}>{l.label}</span>
-                            <span style={{ fontFamily: 'var(--jb-font-mono)', fontWeight: 600, color: l.valColor, textAlign: 'right' }}>{l.value}</span>
+                            <span
+                              style={{
+                                fontFamily: 'var(--jb-font-mono)',
+                                fontWeight: 600,
+                                color: l.valColor,
+                                textAlign: 'right',
+                              }}
+                            >
+                              {l.value}
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -393,15 +517,52 @@ export default function EmployerPlans() {
 
                 {/* SCALE UPSELL — built from the real Scale plan levers */}
                 {showScaleUpsell && (
-                  <div style={{ marginTop: 22, background: '#EDF0FE', border: '1px solid #C7D2FB', borderRadius: 18, padding: 24 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                      <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#364FC7' }}>
+                  <div
+                    style={{
+                      marginTop: 22,
+                      background: '#EDF0FE',
+                      border: '1px solid #C7D2FB',
+                      borderRadius: 18,
+                      padding: 24,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        marginBottom: 14,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontFamily: 'var(--jb-font-mono)',
+                          fontSize: 11,
+                          letterSpacing: '0.08em',
+                          textTransform: 'uppercase',
+                          color: '#364FC7',
+                        }}
+                      >
                         Upgrade to {scale.name} — what you&rsquo;ll unlock
                       </span>
                     </div>
-                    <div className="em-delta-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 13 }}>
+                    <div
+                      className="em-delta-grid"
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(2,1fr)',
+                        gap: 13,
+                      }}
+                    >
                       {(scale.levers || []).map((l) => (
-                        <div key={l[0]} style={{ display: 'flex', alignItems: 'flex-start', gap: 11 }}>
+                        <div
+                          key={l[0]}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: 11,
+                          }}
+                        >
                           <span
                             style={{
                               width: 22,
@@ -419,7 +580,15 @@ export default function EmployerPlans() {
                             ↑
                           </span>
                           <div>
-                            <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1F2D6B' }}>{l[0]}</div>
+                            <div
+                              style={{
+                                fontSize: 13.5,
+                                fontWeight: 700,
+                                color: '#1F2D6B',
+                              }}
+                            >
+                              {l[0]}
+                            </div>
                             <div style={{ fontSize: 12.5, color: '#3F4A7A' }}>{l[1]}</div>
                           </div>
                         </div>

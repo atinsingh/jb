@@ -1,0 +1,56 @@
+version: 1
+
+# Product IDs are stable, non-secret Stripe identifiers. They form an explicit
+# allowlist so this app never imports products belonging to another app that
+# shares the Stripe account. Deployments may override an ID with the named env
+# var. The active default Price is fetched from Stripe at request time.
+audiences:
+  candidate:
+    - key: paid
+      name: Paid
+      products:
+        monthly:
+          productId: prod_VAucq8N2hh10sb
+          env: STRIPE_CANDIDATE_PAID_MONTHLY_PRODUCT_ID
+        yearly:
+          productId: prod_VAue1EgKKX8FIz
+          env: STRIPE_CANDIDATE_PAID_YEARLY_PRODUCT_ID
+
+  employer:
+    - key: starter
+      name: Starter
+      products:
+        monthly:
+          productId: prod_ULahlAACsFrTeC
+          env: STRIPE_EMPLOYER_STARTER_MONTHLY_PRODUCT_ID
+        yearly:
+          productId: prod_ULaiIvDicodwAD
+          env: STRIPE_EMPLOYER_STARTER_YEARLY_PRODUCT_ID
+    - key: growth
+      name: Growth
+      products:
+        monthly:
+          productId: prod_ULajiQDkqMAUaZ
+          env: STRIPE_EMPLOYER_GROWTH_MONTHLY_PRODUCT_ID
+        yearly:
+          productId: prod_ULajOgQneQN1BI
+          env: STRIPE_EMPLOYER_GROWTH_YEARLY_PRODUCT_ID
+    - key: scale
+      name: Professional
+      products:
+        monthly:
+          productId: prod_ULakRfz5ZpnBJm
+          env: STRIPE_EMPLOYER_PROFESSIONAL_MONTHLY_PRODUCT_ID
+        yearly:
+          productId: prod_ULalgrNRItx2Fg
+          env: STRIPE_EMPLOYER_PROFESSIONAL_YEARLY_PRODUCT_ID
+    - key: enterprise
+      name: Enterprise
+      products:
+        monthly:
+          productId: prod_ULalyh9TaQHbDe
+          env: STRIPE_EMPLOYER_ENTERPRISE_MONTHLY_PRODUCT_ID
+        yearly:
+          productId: prod_ULalXyHPySqwnD
+          env: STRIPE_EMPLOYER_ENTERPRISE_YEARLY_PRODUCT_ID
+

@@ -1,38 +1,19 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  UseGuards,
-  Req,
-  RawBodyRequest,
-  Headers,
-  HttpCode,
-  HttpStatus,
-  Param,
-  Request,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiExcludeEndpoint,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Body, UseGuards, Req, RawBodyRequest, Headers, HttpCode, HttpStatus, Param, Request } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiExcludeEndpoint } from '@nestjs/swagger';
 import { Request as ExpressRequest } from 'express';
 import { BillingService } from './billing.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UserDocument } from '../schemas/user.schema';
-import {
-  CreateCheckoutSessionDto,
-  CreateBillingPortalDto,
-  CancelSubscriptionDto,
-} from './dto';
+import { CreateCheckoutSessionDto, CreateBillingPortalDto, CancelSubscriptionDto } from './dto';
+import { EmployerBillingService } from '../employer-billing/employer-billing.service';
 
 @ApiTags('billing')
 @Controller('billing')
 export class BillingController {
-  constructor(private readonly billingService: BillingService) {}
+  constructor(
+    private readonly billingService: BillingService,
+    private readonly employerBillingService: EmployerBillingService,
+  ) {}
 
   @Get('plans')
   @ApiOperation({ summary: 'Get all available subscription plans' })
@@ -40,6 +21,13 @@ export class BillingController {
   async getPlans() {
     const plans = await this.billingService.getPlans();
     return { plans };
+  }
+
+  @Get('employer-plans')
+  @ApiOperation({ summary: 'Get the public employer plan catalog from Stripe' })
+  async getEmployerPlans() {
+    const result = await this.employerBillingService.getPlansCatalog();
+    return { plans: result };
   }
 
   @Get('plans/:id')
@@ -57,9 +45,7 @@ export class BillingController {
   @ApiResponse({ status: 200, description: 'User subscription details' })
   async getSubscription(@Request() req: any) {
     const user = req.user as UserDocument;
-    const subscription = await this.billingService.getUserSubscription(
-      user._id.toString(),
-    );
+    const subscription = await this.billingService.getUserSubscription(user._id.toString());
     return { subscription };
   }
 
@@ -68,10 +54,7 @@ export class BillingController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a Stripe checkout session' })
   @ApiResponse({ status: 200, description: 'Checkout session URL' })
-  async createCheckoutSession(
-    @Request() req: any,
-    @Body() dto: CreateCheckoutSessionDto,
-  ) {
+  async createCheckoutSession(@Request() req: any, @Body() dto: CreateCheckoutSessionDto) {
     const user = req.user as UserDocument;
     return this.billingService.createCheckoutSession(user, dto);
   }
@@ -81,10 +64,7 @@ export class BillingController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a Stripe billing portal session' })
   @ApiResponse({ status: 200, description: 'Portal session URL' })
-  async createPortalSession(
-    @Request() req: any,
-    @Body() dto: CreateBillingPortalDto,
-  ) {
+  async createPortalSession(@Request() req: any, @Body() dto: CreateBillingPortalDto) {
     const user = req.user as UserDocument;
     return this.billingService.createBillingPortalSession(user, dto.returnUrl);
   }
@@ -94,10 +74,7 @@ export class BillingController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Cancel subscription' })
   @ApiResponse({ status: 200, description: 'Subscription canceled' })
-  async cancelSubscription(
-    @Request() req: any,
-    @Body() dto: CancelSubscriptionDto,
-  ) {
+  async cancelSubscription(@Request() req: any, @Body() dto: CancelSubscriptionDto) {
     const user = req.user as UserDocument;
     return this.billingService.cancelSubscription(user, dto);
   }
@@ -117,15 +94,9 @@ export class BillingController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get usage for a specific feature' })
   @ApiResponse({ status: 200, description: 'Feature usage' })
-  async getUsage(
-    @Request() req: any,
-    @Param('featureKey') featureKey: string,
-  ) {
+  async getUsage(@Request() req: any, @Param('featureKey') featureKey: string) {
     const user = req.user as UserDocument;
-    const usage = await this.billingService.getUsage(
-      user._id.toString(),
-      featureKey,
-    );
+    const usage = await this.billingService.getUsage(user._id.toString(), featureKey);
     return { featureKey, usage };
   }
 
@@ -134,10 +105,7 @@ export class BillingController {
   @Post('webhook')
   @HttpCode(HttpStatus.OK)
   @ApiExcludeEndpoint()
-  async handleWebhook(
-    @Req() req: RawBodyRequest<ExpressRequest>,
-    @Headers('stripe-signature') signature: string,
-  ) {
+  async handleWebhook(@Req() req: RawBodyRequest<ExpressRequest>, @Headers('stripe-signature') signature: string) {
     const payload = req.rawBody;
     if (!payload) {
       return { received: false, error: 'No payload' };

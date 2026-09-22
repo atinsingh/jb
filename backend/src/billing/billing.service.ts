@@ -1,10 +1,4 @@
-import {
-  Injectable,
-  BadRequestException,
-  NotFoundException,
-  InternalServerErrorException,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, InternalServerErrorException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
@@ -15,6 +9,11 @@ import { UserSubscription, UserSubscriptionDocument } from '../schemas/user-subs
 import { UsageRecord, UsageRecordDocument } from '../schemas/usage-record.schema';
 import { EmployerBillingService } from '../employer-billing/employer-billing.service';
 import { CreateCheckoutSessionDto, CancelSubscriptionDto } from './dto';
+import {
+  buildLiveStripeTiers,
+  fetchConfiguredStripePrices,
+  LiveStripeTier,
+} from './stripe-catalog';
 
 // Define types locally to avoid dependency on contracts package initially
 type BillingCycle = 'monthly' | 'yearly';
@@ -29,25 +28,21 @@ export class BillingService {
 
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
-    @InjectModel(SubscriptionPlan.name) private planModel: Model<SubscriptionPlanDocument>,
-    @InjectModel(UserSubscription.name) private subscriptionModel: Model<UserSubscriptionDocument>,
-    @InjectModel(UsageRecord.name) private usageModel: Model<UsageRecordDocument>,
+    @InjectModel(SubscriptionPlan.name)
+    private planModel: Model<SubscriptionPlanDocument>,
+    @InjectModel(UserSubscription.name)
+    private subscriptionModel: Model<UserSubscriptionDocument>,
+    @InjectModel(UsageRecord.name)
+    private usageModel: Model<UsageRecordDocument>,
     private configService: ConfigService,
     private employerBilling: EmployerBillingService,
   ) {
     const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY', '');
     if (!stripeSecretKey) {
-      this.logger.warn(
-        '⚠️  STRIPE_SECRET_KEY is not set — billing is INERT. Checkout, portal, ' +
-          'cancellation and webhook signature verification will all fail until ' +
-          'STRIPE_SECRET_KEY (and STRIPE_WEBHOOK_SECRET) are provided via env.',
-      );
+      this.logger.warn('⚠️  STRIPE_SECRET_KEY is not set — billing is INERT. Checkout, portal, ' + 'cancellation and webhook signature verification will all fail until ' + 'STRIPE_SECRET_KEY (and STRIPE_WEBHOOK_SECRET) are provided via env.');
     }
     if (!this.configService.get<string>('STRIPE_WEBHOOK_SECRET', '')) {
-      this.logger.warn(
-        '⚠️  STRIPE_WEBHOOK_SECRET is not set — incoming Stripe webhooks cannot be ' +
-          'verified and subscription state will NOT sync until it is provided.',
-      );
+      this.logger.warn('⚠️  STRIPE_WEBHOOK_SECRET is not set — incoming Stripe webhooks cannot be ' + 'verified and subscription state will NOT sync until it is provided.');
     }
     this.stripe = new Stripe(stripeSecretKey, {
       apiVersion: '2023-10-16',
@@ -55,8 +50,30 @@ export class BillingService {
     this.frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000');
   }
 
-  async getPlans(): Promise<SubscriptionPlanDocument[]> {
-    return this.planModel.find({ isActive: true }).sort({ sortOrder: 1 });
+  private async getCandidateStripeTiers(): Promise<LiveStripeTier[]> {
+    const prices = await fetchConfiguredStripePrices(this.stripe, 'candidate');
+    return buildLiveStripeTiers(prices, 'candidate');
+  }
+
+  async getPlans(): Promise<any[]> {
+    const [storedPlans, stripeTiers] = await Promise.all([this.planModel.find({ isActive: true, type: { $in: ['FREE', 'PRO'] } }).sort({ sortOrder: 1 }), this.getCandidateStripeTiers()]);
+    const paid = stripeTiers.find((tier) => tier.key === 'paid');
+
+    return storedPlans
+      .filter((storedPlan: any) => ['FREE', 'PRO'].includes(storedPlan.type))
+      .map((storedPlan: any) => {
+        const plan = typeof storedPlan.toObject === 'function' ? storedPlan.toObject() : { ...storedPlan };
+        if (plan.type === 'FREE') {
+          return {
+            ...plan,
+            priceMonthly: 0,
+            priceYearly: 0,
+            currency: paid?.currency ?? 'usd',
+          };
+        }
+        if (plan.type === 'PRO' && paid) return { ...plan, ...paid };
+        throw new InternalServerErrorException(`No complete active Stripe price pair for candidate plan ${plan.name}`);
+      });
   }
 
   async getPlanById(planId: string): Promise<SubscriptionPlanDocument> {
@@ -72,9 +89,7 @@ export class BillingService {
   }
 
   async getUserSubscription(userId: string): Promise<UserSubscriptionDocument | null> {
-    return this.subscriptionModel
-      .findOne({ userId: new Types.ObjectId(userId) })
-      .populate('planId');
+    return this.subscriptionModel.findOne({ userId: new Types.ObjectId(userId) }).populate('planId');
   }
 
   /**
@@ -87,11 +102,7 @@ export class BillingService {
    * that is a real empty state, not an error, so it returns `[]` rather than
    * throwing.
    */
-  async getUserInvoices(
-    userId: string,
-  ): Promise<
-    { date: string; description: string; amount: number; status: string }[]
-  > {
+  async getUserInvoices(userId: string): Promise<{ date: string; description: string; amount: number; status: string }[]> {
     const user = await this.userModel.findById(userId);
     if (!user?.stripeCustomerId) return [];
 
@@ -101,13 +112,8 @@ export class BillingService {
     });
 
     return invoices.data.map((inv) => ({
-      date: inv.created
-        ? new Date(inv.created * 1000).toISOString()
-        : new Date().toISOString(),
-      description:
-        inv.lines?.data?.[0]?.description ||
-        inv.description ||
-        'Subscription',
+      date: inv.created ? new Date(inv.created * 1000).toISOString() : new Date().toISOString(),
+      description: inv.lines?.data?.[0]?.description || inv.description || 'Subscription',
       // Stripe amounts are in the smallest currency unit (cents for USD).
       amount: (inv.amount_paid ?? inv.total ?? 0) / 100,
       status: inv.status === 'paid' ? 'paid' : (inv.status ?? 'open'),
@@ -136,21 +142,22 @@ export class BillingService {
     return customer.id;
   }
 
-  async createCheckoutSession(
-    user: UserDocument,
-    dto: CreateCheckoutSessionDto,
-  ): Promise<{ sessionId: string; url: string }> {
+  async createCheckoutSession(user: UserDocument, dto: CreateCheckoutSessionDto): Promise<{ sessionId: string; url: string }> {
     const plan = await this.getPlanById(dto.planId);
 
     if (plan.type === 'FREE') {
       throw new BadRequestException('Cannot checkout for free plan');
     }
+    if (plan.type !== 'PRO') {
+      throw new BadRequestException(
+        'Only the configured Paid plan can be purchased',
+      );
+    }
 
     const customerId = await this.createOrGetStripeCustomer(user);
 
-    const priceId = dto.billingCycle === 'yearly'
-      ? plan.stripePriceIdYearly
-      : plan.stripePriceIdMonthly;
+    const paid = (await this.getCandidateStripeTiers()).find((tier) => tier.key === 'paid');
+    const priceId = dto.billingCycle === 'yearly' ? paid?.stripePriceIdYearly : paid?.stripePriceIdMonthly;
 
     if (!priceId) {
       throw new BadRequestException('Plan pricing not configured');
@@ -183,10 +190,7 @@ export class BillingService {
       },
     });
 
-    this.logger.log(
-      { userId: user._id, planId: plan._id, sessionId: session.id },
-      'Checkout session created',
-    );
+    this.logger.log({ userId: user._id, planId: plan._id, sessionId: session.id }, 'Checkout session created');
 
     return {
       sessionId: session.id,
@@ -194,10 +198,7 @@ export class BillingService {
     };
   }
 
-  async createBillingPortalSession(
-    user: UserDocument,
-    returnUrl?: string,
-  ): Promise<{ url: string }> {
+  async createBillingPortalSession(user: UserDocument, returnUrl?: string): Promise<{ url: string }> {
     if (!user.stripeCustomerId) {
       throw new BadRequestException('No billing information found');
     }
@@ -210,10 +211,7 @@ export class BillingService {
     return { url: session.url };
   }
 
-  async cancelSubscription(
-    user: UserDocument,
-    dto: CancelSubscriptionDto,
-  ): Promise<{ message: string }> {
+  async cancelSubscription(user: UserDocument, dto: CancelSubscriptionDto): Promise<{ message: string }> {
     const subscription = await this.getUserSubscription(user._id.toString());
 
     if (!subscription || !subscription.stripeSubscriptionId) {
@@ -228,12 +226,11 @@ export class BillingService {
       subscription.cancelAtPeriodEnd = true;
       await subscription.save();
 
-      this.logger.log(
-        { userId: user._id, subscriptionId: subscription._id },
-        'Subscription set to cancel at period end',
-      );
+      this.logger.log({ userId: user._id, subscriptionId: subscription._id }, 'Subscription set to cancel at period end');
 
-      return { message: 'Subscription will be canceled at the end of the billing period' };
+      return {
+        message: 'Subscription will be canceled at the end of the billing period',
+      };
     } else {
       await this.stripe.subscriptions.cancel(subscription.stripeSubscriptionId);
 
@@ -244,10 +241,7 @@ export class BillingService {
       // Downgrade to free plan
       await this.downgradeToFree(user._id.toString());
 
-      this.logger.log(
-        { userId: user._id, subscriptionId: subscription._id },
-        'Subscription canceled immediately',
-      );
+      this.logger.log({ userId: user._id, subscriptionId: subscription._id }, 'Subscription canceled immediately');
 
       return { message: 'Subscription canceled' };
     }
@@ -271,10 +265,7 @@ export class BillingService {
     subscription.cancelAtPeriodEnd = false;
     await subscription.save();
 
-    this.logger.log(
-      { userId: user._id, subscriptionId: subscription._id },
-      'Subscription reactivated',
-    );
+    this.logger.log({ userId: user._id, subscriptionId: subscription._id }, 'Subscription reactivated');
 
     return { message: 'Subscription reactivated' };
   }
@@ -296,10 +287,7 @@ export class BillingService {
 
   // ==================== WEBHOOK HANDLERS ====================
 
-  async handleStripeWebhook(
-    payload: Buffer,
-    signature: string,
-  ): Promise<{ received: boolean }> {
+  async handleStripeWebhook(payload: Buffer, signature: string): Promise<{ received: boolean }> {
     const webhookSecret = this.configService.get<string>('STRIPE_WEBHOOK_SECRET', '');
 
     let event: Stripe.Event;
@@ -393,10 +381,7 @@ export class BillingService {
       return;
     }
 
-    this.logger.log(
-      { userId, planId, planType, sessionId: session.id },
-      'Checkout session completed',
-    );
+    this.logger.log({ userId, planId, planType, sessionId: session.id }, 'Checkout session completed');
 
     // Subscription will be created/updated by subscription webhook
   }
@@ -435,9 +420,7 @@ export class BillingService {
       stripeCustomerId: subscription.customer as string,
       stripeSubscriptionId: subscription.id,
       status,
-      billingCycle: subscription.items.data[0]?.price?.recurring?.interval === 'year'
-        ? 'yearly'
-        : 'monthly' as BillingCycle,
+      billingCycle: subscription.items.data[0]?.price?.recurring?.interval === 'year' ? 'yearly' : ('monthly' as BillingCycle),
       currentPeriodStart: new Date(subscription.current_period_start * 1000),
       currentPeriodEnd: new Date(subscription.current_period_end * 1000),
       cancelAtPeriodEnd: subscription.cancel_at_period_end,
@@ -460,10 +443,7 @@ export class BillingService {
       stripeCustomerId: subscription.customer as string,
     });
 
-    this.logger.log(
-      { userId, subscriptionId: subscription.id, status, planType },
-      'Subscription updated',
-    );
+    this.logger.log({ userId, subscriptionId: subscription.id, status, planType }, 'Subscription updated');
   }
 
   private async handleSubscriptionDeleted(subscription: Stripe.Subscription): Promise<void> {
@@ -497,11 +477,7 @@ export class BillingService {
       // Reset usage for the new billing period
       const subscription = await this.getUserSubscription(user._id.toString());
       if (subscription) {
-        await this.resetUsageForPeriod(
-          user._id.toString(),
-          subscription.currentPeriodStart,
-          subscription.currentPeriodEnd,
-        );
+        await this.resetUsageForPeriod(user._id.toString(), subscription.currentPeriodStart, subscription.currentPeriodEnd);
       }
     }
   }
@@ -522,11 +498,7 @@ export class BillingService {
 
   // ==================== USAGE TRACKING ====================
 
-  async recordUsage(
-    userId: string,
-    featureKey: string,
-    count: number = 1,
-  ): Promise<UsageRecordDocument> {
+  async recordUsage(userId: string, featureKey: string, count: number = 1): Promise<UsageRecordDocument> {
     const subscription = await this.getUserSubscription(userId);
     const periodStart = subscription?.currentPeriodStart || this.getMonthStart();
     const periodEnd = subscription?.currentPeriodEnd || this.getMonthEnd();
@@ -563,11 +535,7 @@ export class BillingService {
     return usage?.count || 0;
   }
 
-  async resetUsageForPeriod(
-    userId: string,
-    periodStart: Date,
-    periodEnd: Date,
-  ): Promise<void> {
+  async resetUsageForPeriod(userId: string, periodStart: Date, periodEnd: Date): Promise<void> {
     // Mark old usage records as complete (for historical tracking)
     // New period usage will be created as needed
     this.logger.log({ userId, periodStart, periodEnd }, 'Usage reset for new period');
@@ -583,4 +551,3 @@ export class BillingService {
     return new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
   }
 }
-

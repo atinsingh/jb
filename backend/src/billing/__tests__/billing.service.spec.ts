@@ -61,7 +61,10 @@ describe('BillingService', () => {
         { provide: ConfigService, useValue: mockConfigService },
         { provide: getModelToken('User'), useValue: mockUserModel },
         { provide: getModelToken('SubscriptionPlan'), useValue: mockPlanModel },
-        { provide: getModelToken('UserSubscription'), useValue: mockSubscriptionModel },
+        {
+          provide: getModelToken('UserSubscription'),
+          useValue: mockSubscriptionModel,
+        },
         { provide: getModelToken('UsageRecord'), useValue: mockUsageModel },
         { provide: PinoLogger, useValue: mockLogger },
         // BillingService routes employer-tagged webhook events here; these unit
@@ -90,27 +93,18 @@ describe('BillingService', () => {
 
       // BillingService logs via its own `new Logger(BillingService.name)`
       // (NestJS Logger), not the injected PinoLogger — spy on the real instance.
-      const errorSpy = jest
-        .spyOn((service as any).logger, 'error')
-        .mockImplementation(() => undefined);
+      const errorSpy = jest.spyOn((service as any).logger, 'error').mockImplementation(() => undefined);
 
-      await expect(
-        service.handleStripeWebhook(payload, invalidSignature),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.handleStripeWebhook(payload, invalidSignature)).rejects.toThrow(BadRequestException);
 
-      expect(errorSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ error: expect.any(String) }),
-        'Webhook signature verification failed',
-      );
+      expect(errorSpy).toHaveBeenCalledWith(expect.objectContaining({ error: expect.any(String) }), 'Webhook signature verification failed');
     });
 
     it('should validate webhook signature format', async () => {
       const payload = Buffer.from(JSON.stringify({ type: 'test' }));
       const malformedSignature = 't=123,v1=abc'; // Malformed but structured
 
-      await expect(
-        service.handleStripeWebhook(payload, malformedSignature),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.handleStripeWebhook(payload, malformedSignature)).rejects.toThrow(BadRequestException);
     });
 
     // Note: Full webhook signature verification requires actual Stripe SDK mocking
@@ -118,20 +112,125 @@ describe('BillingService', () => {
   });
 
   describe('getPlans', () => {
-    it('should return active plans sorted by order', async () => {
+    it('replaces seeded candidate prices with the current Stripe amounts', async () => {
       const mockPlans = [
-        { name: 'Free', type: 'FREE', sortOrder: 0 },
-        { name: 'Pro', type: 'PRO', sortOrder: 1 },
+        {
+          name: 'Free',
+          type: 'FREE',
+          sortOrder: 0,
+          priceMonthly: 0,
+          priceYearly: 0,
+        },
+        {
+          name: 'Paid',
+          type: 'PRO',
+          sortOrder: 1,
+          priceMonthly: 999,
+          priceYearly: 9999,
+          stripePriceIdMonthly: 'price_paid_monthly',
+          stripePriceIdYearly: 'price_paid_yearly',
+        },
+        {
+          name: 'Elite',
+          type: 'ELITE',
+          sortOrder: 2,
+          priceMonthly: 29,
+          priceYearly: 290,
+        },
       ];
 
       mockPlanModel.find.mockReturnValue({
         sort: jest.fn().mockResolvedValue(mockPlans),
       });
+      (service as any).stripe = {
+        prices: {
+          list: jest.fn().mockResolvedValue({
+            data: [
+              {
+                id: 'price_paid_monthly',
+                active: true,
+                currency: 'usd',
+                unit_amount: 1000,
+                recurring: { interval: 'month' },
+                product: {
+                  id: 'prod_VAucq8N2hh10sb',
+                  active: true,
+                  name: 'Jobocate Paid Tier Monthly',
+                  default_price: 'price_paid_monthly',
+                  metadata: {},
+                },
+              },
+              {
+                id: 'price_paid_yearly',
+                active: true,
+                currency: 'usd',
+                unit_amount: 10000,
+                recurring: { interval: 'year' },
+                product: {
+                  id: 'prod_VAue1EgKKX8FIz',
+                  active: true,
+                  name: 'Jobocate Paid Tier Yearly',
+                  default_price: 'price_paid_yearly',
+                  metadata: {},
+                },
+              },
+              {
+                id: 'price_other_app_monthly',
+                active: true,
+                currency: 'usd',
+                unit_amount: 9900,
+                recurring: { interval: 'month' },
+                product: {
+                  id: 'prod_other_app_monthly',
+                  active: true,
+                  name: 'Jobocate Paid Tier Monthly',
+                  metadata: {},
+                },
+              },
+              {
+                id: 'price_other_app_yearly',
+                active: true,
+                currency: 'usd',
+                unit_amount: 99900,
+                recurring: { interval: 'year' },
+                product: {
+                  id: 'prod_other_app_yearly',
+                  active: true,
+                  name: 'Jobocate Paid Tier Yearly',
+                  metadata: {},
+                },
+              },
+            ],
+          }),
+        },
+      };
 
       const result = await service.getPlans();
 
-      expect(mockPlanModel.find).toHaveBeenCalledWith({ isActive: true });
-      expect(result).toEqual(mockPlans);
+      expect((service as any).stripe.prices.list).toHaveBeenCalledWith(
+        expect.objectContaining({ product: 'prod_VAucq8N2hh10sb' }),
+      );
+      expect((service as any).stripe.prices.list).toHaveBeenCalledWith(
+        expect.objectContaining({ product: 'prod_VAue1EgKKX8FIz' }),
+      );
+
+      expect(result).toEqual([
+        expect.objectContaining({
+          name: 'Free',
+          type: 'FREE',
+          priceMonthly: 0,
+          priceYearly: 0,
+        }),
+        expect.objectContaining({
+          name: 'Paid',
+          type: 'PRO',
+          priceMonthly: 10,
+          priceYearly: 100,
+          currency: 'usd',
+          stripeProductIdMonthly: 'prod_VAucq8N2hh10sb',
+          stripeProductIdYearly: 'prod_VAue1EgKKX8FIz',
+        }),
+      ]);
     });
 
     it('does not expose an inactive legacy plan by id', async () => {
@@ -141,16 +240,72 @@ describe('BillingService', () => {
         isActive: false,
       });
 
-      await expect(service.getPlanById('legacy-id')).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(service.getPlanById('legacy-id')).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 
   describe('createCheckoutSession', () => {
+    it('rejects active legacy candidate plans before creating a customer', async () => {
+      jest.spyOn(service, 'getPlanById').mockResolvedValue({
+        _id: { toString: () => 'legacy-id' },
+        type: 'ELITE',
+        isActive: true,
+      } as any);
+      const createCustomer = jest
+        .spyOn(service, 'createOrGetStripeCustomer')
+        .mockResolvedValue('cus_legacy');
+
+      await expect(
+        service.createCheckoutSession({ _id: 'user-id' } as any, {
+          planId: 'legacy-id',
+          billingCycle: 'monthly',
+        }),
+      ).rejects.toThrow('Only the configured Paid plan can be purchased');
+      expect(createCustomer).not.toHaveBeenCalled();
+    });
+
     it('uses the yearly Stripe price without changing the monthly AI reset', async () => {
-      const checkoutCreate = jest.fn().mockResolvedValue({ id: 'cs_year', url: 'https://stripe.test/cs_year' });
-      (service as any).stripe = { checkout: { sessions: { create: checkoutCreate } } };
+      const checkoutCreate = jest.fn().mockResolvedValue({
+        id: 'cs_year',
+        url: 'https://stripe.test/cs_year',
+      });
+      (service as any).stripe = {
+        prices: {
+          list: jest.fn().mockResolvedValue({
+            data: [
+              {
+                id: 'price_monthly',
+                active: true,
+                currency: 'usd',
+                unit_amount: 1000,
+                recurring: { interval: 'month' },
+                product: {
+                  id: 'prod_VAucq8N2hh10sb',
+                  active: true,
+                  name: 'Jobocate Paid Tier Monthly',
+                  default_price: 'price_monthly',
+                  metadata: {},
+                },
+              },
+              {
+                id: 'price_yearly',
+                active: true,
+                currency: 'usd',
+                unit_amount: 10000,
+                recurring: { interval: 'year' },
+                product: {
+                  id: 'prod_VAue1EgKKX8FIz',
+                  active: true,
+                  name: 'Jobocate Paid Tier Yearly',
+                  default_price: 'price_yearly',
+                  metadata: {},
+                },
+              },
+            ],
+          }),
+        },
+        checkout: { sessions: { create: checkoutCreate } },
+      };
       jest.spyOn(service, 'getPlanById').mockResolvedValue({
         _id: { toString: () => 'paid-id' },
         type: 'PRO',
@@ -239,4 +394,3 @@ describe('BillingService', () => {
     });
   });
 });
-

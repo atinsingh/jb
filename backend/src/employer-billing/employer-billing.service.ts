@@ -1,53 +1,34 @@
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import Stripe from 'stripe';
-import {
-  EmployerSubscription,
-  EmployerSubscriptionDocument,
-} from './schemas/employer-subscription.schema';
+import { EmployerSubscription, EmployerSubscriptionDocument } from './schemas/employer-subscription.schema';
 import { UpgradeDto } from './dto/upgrade.dto';
+import { EMPLOYER_PLANS, getEmployerPlan } from './employer-plans';
 import {
-  EMPLOYER_PLANS,
-  employerPriceLookupKey,
-  getEmployerPlan,
-} from './employer-plans';
+  buildLiveStripeTiers,
+  fetchConfiguredStripePrices,
+  LiveStripeTier,
+} from '../billing/stripe-catalog';
 
 @Injectable()
 export class EmployerBillingService {
   private readonly logger = new Logger(EmployerBillingService.name);
   private readonly stripe: Stripe;
   private readonly frontendUrl: string;
-  /** lookup key → price id. Prices are immutable in Stripe, so this never goes stale. */
-  private readonly priceIdCache = new Map<string, string>();
 
   constructor(
     @InjectModel(EmployerSubscription.name)
     private subscriptionModel: Model<EmployerSubscriptionDocument>,
     private configService: ConfigService,
   ) {
-    const stripeSecretKey = this.configService.get<string>(
-      'STRIPE_SECRET_KEY',
-      '',
-    );
+    const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY', '');
     if (!stripeSecretKey) {
-      this.logger.warn(
-        '⚠️  STRIPE_SECRET_KEY is not set — employer checkout and the billing ' +
-          'portal will fail. Employers stay on the free tier, which is the safe ' +
-          'default: paid tiers are only ever granted by a Stripe webhook.',
-      );
+      this.logger.warn('⚠️  STRIPE_SECRET_KEY is not set — employer checkout and the billing ' + 'portal will fail. Employers stay on the free tier, which is the safe ' + 'default: paid tiers are only ever granted by a Stripe webhook.');
     }
     this.stripe = new Stripe(stripeSecretKey, { apiVersion: '2023-10-16' });
-    this.frontendUrl = this.configService.get<string>(
-      'FRONTEND_URL',
-      'http://localhost:3000',
-    );
+    this.frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000');
   }
 
   async getOrCreateSubscription(ownerId: string): Promise<EmployerSubscriptionDocument> {
@@ -55,13 +36,7 @@ export class EmployerBillingService {
     const renewsAt = new Date();
     renewsAt.setFullYear(renewsAt.getFullYear() + 1);
 
-    return this.subscriptionModel
-      .findOneAndUpdate(
-        { ownerId: ownerObjectId },
-        { $setOnInsert: { ownerId: ownerObjectId, renewsAt } },
-        { new: true, upsert: true, setDefaultsOnInsert: true },
-      )
-      .exec();
+    return this.subscriptionModel.findOneAndUpdate({ ownerId: ownerObjectId }, { $setOnInsert: { ownerId: ownerObjectId, renewsAt } }, { new: true, upsert: true, setDefaultsOnInsert: true }).exec();
   }
 
   async getUsage(ownerId: string): Promise<{
@@ -113,20 +88,11 @@ export class EmployerBillingService {
     }
 
     if (!plan.selfServe) {
-      throw new BadRequestException(
-        plan.key === 'enterprise'
-          ? 'The Enterprise plan is sales-led — contact sales to be provisioned.'
-          : `The ${plan.name} plan cannot be purchased. Use the billing portal to downgrade.`,
-      );
+      throw new BadRequestException(plan.key === 'enterprise' ? 'The Enterprise plan is sales-led — contact sales to be provisioned.' : `The ${plan.name} plan cannot be purchased. Use the billing portal to downgrade.`);
     }
 
     const billingCycle = (dto.billingCycle || 'monthly') as 'monthly' | 'annual';
-    const { url } = await this.createCheckoutSession(
-      ownerId,
-      plan.key,
-      billingCycle,
-      email,
-    );
+    const { url } = await this.createCheckoutSession(ownerId, plan.key, billingCycle, email);
 
     return {
       checkoutUrl: url,
@@ -141,20 +107,17 @@ export class EmployerBillingService {
    * The price is resolved by lookup key rather than a hardcoded `price_...`, so
    * the same code works against the test and live accounts.
    */
-  async createCheckoutSession(
-    ownerId: string,
-    planKey: string,
-    billingCycle: 'monthly' | 'annual',
-    email?: string,
-  ): Promise<{ sessionId: string; url: string }> {
+  async createCheckoutSession(ownerId: string, planKey: string, billingCycle: 'monthly' | 'annual', email?: string): Promise<{ sessionId: string; url: string }> {
     const plan = getEmployerPlan(planKey);
     if (!plan?.selfServe) {
       throw new BadRequestException(`Plan ${planKey} is not purchasable`);
     }
 
-    const priceId = await this.resolvePriceId(
-      employerPriceLookupKey(plan.key, billingCycle),
-    );
+    const livePlan = (await this.getEmployerStripeTiers()).find((tier) => tier.key === plan.key);
+    const priceId = billingCycle === 'annual' ? livePlan?.stripePriceIdYearly : livePlan?.stripePriceIdMonthly;
+    if (!priceId) {
+      throw new NotFoundException(`No complete active Stripe price pair for ${plan.name}`);
+    }
     const sub = await this.getOrCreateSubscription(ownerId);
     const customerId = await this.resolveCustomerId(sub, email);
 
@@ -177,16 +140,11 @@ export class EmployerBillingService {
       },
     });
 
-    this.logger.log(
-      `Employer checkout session ${session.id} created for ${ownerId} (${plan.key}/${billingCycle})`,
-    );
+    this.logger.log(`Employer checkout session ${session.id} created for ${ownerId} (${plan.key}/${billingCycle})`);
     return { sessionId: session.id, url: session.url! };
   }
 
-  async createBillingPortalSession(
-    ownerId: string,
-    returnUrl?: string,
-  ): Promise<{ url: string }> {
+  async createBillingPortalSession(ownerId: string, returnUrl?: string): Promise<{ url: string }> {
     const sub = await this.getOrCreateSubscription(ownerId);
     if (!sub.stripeCustomerId) {
       throw new BadRequestException('No billing information found');
@@ -204,15 +162,11 @@ export class EmployerBillingService {
    * paid tier is granted, and it is reached only from a signature-verified
    * webhook.
    */
-  async applyStripeSubscription(
-    subscription: Stripe.Subscription,
-  ): Promise<void> {
+  async applyStripeSubscription(subscription: Stripe.Subscription): Promise<void> {
     const ownerId = subscription.metadata?.ownerId;
     const planKey = subscription.metadata?.plan;
     if (!ownerId || !planKey) {
-      this.logger.error(
-        `Employer subscription ${subscription.id} is missing ownerId/plan metadata`,
-      );
+      this.logger.error(`Employer subscription ${subscription.id} is missing ownerId/plan metadata`);
       return;
     }
 
@@ -230,10 +184,7 @@ export class EmployerBillingService {
 
     sub.plan = effective.key;
     sub.status = subscription.status;
-    sub.billingCycle =
-      subscription.items.data[0]?.price?.recurring?.interval === 'year'
-        ? 'annual'
-        : 'monthly';
+    sub.billingCycle = subscription.items.data[0]?.price?.recurring?.interval === 'year' ? 'annual' : 'monthly';
     sub.jobSlotsLimit = effective.limits.jobSlotsLimit;
     sub.seatsLimit = effective.limits.seatsLimit;
     sub.aiActionsLimit = effective.limits.aiActionsLimit;
@@ -246,9 +197,7 @@ export class EmployerBillingService {
     }
 
     await sub.save();
-    this.logger.log(
-      `Employer ${ownerId} set to ${sub.plan} (stripe status: ${subscription.status})`,
-    );
+    this.logger.log(`Employer ${ownerId} set to ${sub.plan} (stripe status: ${subscription.status})`);
   }
 
   /** Record a paid invoice against the employer, for the invoices screen. */
@@ -261,8 +210,7 @@ export class EmployerBillingService {
 
     sub.invoices.push({
       date: new Date((invoice.created ?? Date.now() / 1000) * 1000),
-      description:
-        invoice.lines?.data?.[0]?.description || `Invoice ${invoice.number ?? ''}`.trim(),
+      description: invoice.lines?.data?.[0]?.description || `Invoice ${invoice.number ?? ''}`.trim(),
       // Stripe reports minor units; the UI shows dollars.
       amount: (invoice.amount_paid ?? 0) / 100,
       status: invoice.status === 'paid' ? 'paid' : (invoice.status ?? 'open'),
@@ -270,30 +218,12 @@ export class EmployerBillingService {
     await sub.save();
   }
 
-  private async resolvePriceId(lookupKey: string): Promise<string> {
-    const cached = this.priceIdCache.get(lookupKey);
-    if (cached) return cached;
-
-    const prices = await this.stripe.prices.list({
-      lookup_keys: [lookupKey],
-      active: true,
-      limit: 1,
-    });
-    const price = prices.data[0];
-    if (!price) {
-      throw new NotFoundException(
-        `No active Stripe price with lookup key "${lookupKey}". Run: npm run stripe:sync -- --apply`,
-      );
-    }
-
-    this.priceIdCache.set(lookupKey, price.id);
-    return price.id;
+  private async getEmployerStripeTiers(): Promise<LiveStripeTier[]> {
+    const prices = await fetchConfiguredStripePrices(this.stripe, 'employer');
+    return buildLiveStripeTiers(prices, 'employer');
   }
 
-  private async resolveCustomerId(
-    sub: EmployerSubscriptionDocument,
-    email?: string,
-  ): Promise<string> {
+  private async resolveCustomerId(sub: EmployerSubscriptionDocument, email?: string): Promise<string> {
     if (sub.stripeCustomerId) return sub.stripeCustomerId;
 
     const customer = await this.stripe.customers.create({
@@ -317,29 +247,70 @@ export class EmployerBillingService {
       key: string;
       name: string;
       tagline: string;
-      monthly: number;
-      annual: number;
+      priceMonthly: number;
+      priceYearly: number;
+      currency: string;
+      stripePriceIdMonthly?: string;
+      stripePriceIdYearly?: string;
+      stripeProductIdMonthly?: string;
+      stripeProductIdYearly?: string;
       current: boolean;
       popular: boolean;
       selfServe: boolean;
       levers: Array<[string, string]>;
     }>;
   }> {
-    const sub = await this.getOrCreateSubscription(ownerId);
+    const [sub, plans] = await Promise.all([this.getOrCreateSubscription(ownerId), this.getPlansCatalog()]);
     return {
       currentPlan: sub.plan,
       billingCycle: sub.billingCycle,
-      plans: EMPLOYER_PLANS.map(({ limits, ...p }) => ({
-        ...p,
-        current: sub.plan === p.key,
-        levers: [
-          ['Job slots', String(limits.jobSlotsLimit)],
-          ['Team seats', String(limits.seatsLimit)],
-          ['AI actions / mo', String(limits.aiActionsLimit)],
-          ['Sourcing credits', String(limits.sourcingCreditsLimit)],
-        ] as Array<[string, string]>,
-      })),
+      plans: plans.map((plan) => ({ ...plan, current: sub.plan === plan.key })),
     };
+  }
+
+  async getPlansCatalog(): Promise<
+    Array<{
+      key: string;
+      name: string;
+      tagline: string;
+      priceMonthly: number;
+      priceYearly: number;
+      currency: string;
+      stripePriceIdMonthly?: string;
+      stripePriceIdYearly?: string;
+      stripeProductIdMonthly?: string;
+      stripeProductIdYearly?: string;
+      current: boolean;
+      popular: boolean;
+      selfServe: boolean;
+      levers: Array<[string, string]>;
+    }>
+  > {
+    const stripeTiers = await this.getEmployerStripeTiers();
+    const tiersByKey = new Map(stripeTiers.map((tier) => [tier.key, tier]));
+    return EMPLOYER_PLANS.flatMap(({ limits, monthly: _monthly, annual: _annual, ...plan }) => {
+      const live = tiersByKey.get(plan.key);
+      if (plan.key !== 'free' && !live) return [];
+      const stripeFields = live ?? {
+        priceMonthly: 0,
+        priceYearly: 0,
+        currency: stripeTiers[0]?.currency ?? 'cad',
+      };
+      return [
+        {
+          ...plan,
+          ...stripeFields,
+          name: live?.name ?? plan.name,
+          current: false,
+          levers: [
+            ['Job slots', String(limits.jobSlotsLimit)],
+            ['Team seats', String(limits.seatsLimit)],
+            ['AI actions / mo', String(limits.aiActionsLimit)],
+            ['Sourcing credits', String(limits.sourcingCreditsLimit)],
+          ] as Array<[string, string]>,
+        },
+      ];
+    });
   }
 
   async getInvoices(ownerId: string): Promise<

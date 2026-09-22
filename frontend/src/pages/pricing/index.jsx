@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import PublicLayout from '@/components/layout/PublicLayout';
 import styles from '@/components/site/v3/PublicV3.module.css';
+import { getPlans } from '@/services/billingApi';
 
 /**
  * Pricing, rebuilt against the "Jobocate Candidate v3" artboard.
@@ -23,94 +24,49 @@ import styles from '@/components/site/v3/PublicV3.module.css';
  * metadata, and the FAQ as a hairline ledger rather than an accordion.
  */
 
-const TIERS = [
-  {
-    id: 'free',
-    name: 'Free',
-    sub: 'Try the loop',
-    features: [
-      'AI resume builder',
-      'Smart job matching',
-      '10 auto-apply credits / mo',
-      'Application tracker',
-      'Community support',
-    ],
-    cta: 'Start free',
-  },
-  {
-    id: 'pro',
-    name: 'Pro',
-    sub: 'Active search',
-    featured: true,
-    tag: 'Most picked',
-    features: [
-      'Unlimited job matching',
-      '150 auto-apply credits / mo',
-      'AI cover letters',
-      'Per-role personalization',
-      'Interview prep (basic)',
-      'Priority email support',
-    ],
-    cta: 'Choose Pro',
-  },
-  {
-    id: 'premium',
-    name: 'Premium',
-    sub: 'Senior search',
-    features: [
-      'Unlimited auto-apply',
-      'Advanced personalization',
-      'Full AI interview prep',
-      'Salary & offer insights',
-      'Priority application routing',
-      '1:1 onboarding',
-    ],
-    cta: 'Choose Premium',
-  },
-];
-
 const FAQS = [
-  [
-    'What counts as an auto-apply credit?',
-    'One credit = one application submitted on your behalf to a verified company career page. Matching, resume building and tracking never use credits.',
-  ],
-  [
-    'Can I switch plans or cancel anytime?',
-    'Yes. Upgrade, downgrade or cancel from your dashboard at any time. Changes take effect at the next billing cycle and unused annual time is prorated.',
-  ],
-  [
-    'What happens when I hit the free limit?',
-    'Your matches keep updating and your tracker keeps working. You only lose the extra auto-apply volume, and nothing already filed is affected.',
-  ],
-  [
-    'Does it invent experience?',
-    'No. Anything inferred goes to claims review, and export locks until you clear it.',
-  ],
-  [
-    'Are there credit packs I should watch for?',
-    'No. One flat monthly price per tier, cancel in two clicks, and your plan never silently renews at a higher rate.',
-  ],
+  ['What counts as an auto-apply credit?', 'One credit = one application submitted on your behalf to a verified company career page. Matching, resume building and tracking never use credits.'],
+  ['Can I switch plans or cancel anytime?', 'Yes. Upgrade, downgrade or cancel from your dashboard at any time. Changes take effect at the next billing cycle and unused annual time is prorated.'],
+  ['What happens when I hit the free limit?', 'Your matches keep updating and your tracker keeps working. You only lose the extra auto-apply volume, and nothing already filed is affected.'],
+  ['Does it invent experience?', 'No. Anything inferred goes to claims review, and export locks until you clear it.'],
+  ['Are there credit packs I should watch for?', 'No. One flat monthly price per tier, cancel in two clicks, and your plan never silently renews at a higher rate.'],
 ];
 
 const SIGNUP = '/app/signup';
 
 export default function Pricing() {
   const [annual, setAnnual] = useState(false);
+  const [tiers, setTiers] = useState([]);
+  const [error, setError] = useState(null);
 
-  const priceFor = (id) => {
-    if (id === 'free') return '$0';
-    if (id === 'pro') return annual ? '$19' : '$29';
-    return annual ? '$39' : '$59';
+  useEffect(() => {
+    let active = true;
+    getPlans()
+      .then((result) => {
+        if (active) setTiers(Array.isArray(result?.plans) ? result.plans : []);
+      })
+      .catch((err) => {
+        if (active) setError(err);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const formatPrice = (tier) => {
+    const amount = annual ? tier.priceYearly : tier.priceMonthly;
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: String(tier.currency || 'usd').toUpperCase(),
+      minimumFractionDigits: amount % 1 ? 2 : 0,
+    }).format(amount || 0);
   };
 
   return (
     <>
       <Head>
         <title>Jobocate Pricing — AI Job Search Plans</title>
-        <meta
-          name="description"
-          content="Start free, forever. Upgrade only if the extra volume earns it — no hidden auto-renewals, no credit packs, cancel anytime."
-        />
+        <meta name="description" content="Start free, forever. Upgrade only if the extra volume earns it — no hidden auto-renewals, no credit packs, cancel anytime." />
         <link rel="canonical" href="https://jobocate.com/pricing" />
       </Head>
 
@@ -119,46 +75,29 @@ export default function Pricing() {
           <div className={styles.headRow}>
             <h1>Pricing</h1>
 
-            <button
-              type="button"
-              className={styles.cycle}
-              onClick={() => setAnnual((v) => !v)}
-              aria-pressed={annual}
-              aria-label={annual ? 'Switch to monthly billing' : 'Switch to annual billing'}
-            >
-              <span
-                className={`${styles.cycleLabel} ${annual ? '' : styles.cycleLabelOn}`}
-              >
-                Monthly
-              </span>
+            <button type="button" className={styles.cycle} onClick={() => setAnnual((v) => !v)} aria-pressed={annual} aria-label={annual ? 'Switch to monthly billing' : 'Switch to annual billing'}>
+              <span className={`${styles.cycleLabel} ${annual ? '' : styles.cycleLabelOn}`}>Monthly</span>
               <span className={styles.cycleTrack} aria-hidden="true">
                 <span className={`${styles.cycleKnob} ${annual ? styles.cycleKnobOn : ''}`} />
               </span>
-              <span
-                className={`${styles.cycleLabel} ${annual ? styles.cycleLabelOn : ''}`}
-              >
-                Yearly -33%
-              </span>
+              <span className={`${styles.cycleLabel} ${annual ? styles.cycleLabelOn : ''}`}>Yearly</span>
             </button>
           </div>
 
-          <div className={`${styles.strip} ${styles.strip3}`}>
-            {TIERS.map((tier) => (
-              <div
-                key={tier.id}
-                className={`${styles.tier} ${tier.featured ? styles.tierFeatured : ''}`}
-              >
+          {error ? <p role="alert">Unable to load pricing from Stripe. Please try again.</p> : null}
+          {!error && tiers.length === 0 ? <p>Loading pricing…</p> : null}
+          <div className={`${styles.strip} ${tiers.length === 3 ? styles.strip3 : ''}`}>
+            {tiers.map((tier) => (
+              <div key={tier.type} data-testid="candidate-pricing-tier" data-tier={tier.type} className={`${styles.tier} ${tier.type === 'PRO' ? styles.tierFeatured : ''}`}>
                 <div className={styles.tierHead}>
                   <h2 className={styles.tierName}>{tier.name}</h2>
-                  {tier.tag ? <span className={styles.tierTag}>{tier.tag}</span> : null}
+                  {tier.type === 'PRO' ? <span className={styles.tierTag}>Paid</span> : null}
                 </div>
-                <p className={styles.tierSub}>{tier.sub}</p>
+                <p className={styles.tierSub}>{tier.description || (tier.type === 'FREE' ? 'Try the loop' : 'Active search')}</p>
 
                 <p className={styles.tierPrice}>
-                  <span className={styles.tierPriceValue}>{priceFor(tier.id)}</span>
-                  <span className={styles.tierPriceUnit}>
-                    {tier.id === 'free' ? 'forever' : '/mo'}
-                  </span>
+                  <span className={styles.tierPriceValue}>{formatPrice(tier)}</span>
+                  <span className={styles.tierPriceUnit}>{tier.type === 'FREE' ? 'forever' : annual ? '/year' : '/month'}</span>
                 </p>
 
                 <ul className={styles.tierFeatures}>
@@ -170,11 +109,8 @@ export default function Pricing() {
                   ))}
                 </ul>
 
-                <Link
-                  href={SIGNUP}
-                  className={`${styles.tierCta} ${tier.featured ? styles.tierCtaPrimary : ''}`}
-                >
-                  {tier.cta}
+                <Link href={SIGNUP} data-testid={`candidate-pricing-tier-${tier.type}`} className={`${styles.tierCta} ${tier.type === 'PRO' ? styles.tierCtaPrimary : ''}`}>
+                  {tier.type === 'FREE' ? 'Start free' : `Choose ${tier.name}`}
                 </Link>
               </div>
             ))}

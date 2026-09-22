@@ -13,7 +13,10 @@ const apiCall = async (endpoint, options = {}) => {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    ...options,
+    headers,
+  });
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'Request failed' }));
@@ -24,6 +27,8 @@ const apiCall = async (endpoint, options = {}) => {
 
 // ---------------------------------------------------------------- Billing
 export const getPlans = async () => apiCall('/api/billing/plans');
+
+export const getEmployerPlans = async () => apiCall('/api/billing/employer-plans');
 
 export const getSubscription = async () => apiCall('/api/billing/subscription');
 
