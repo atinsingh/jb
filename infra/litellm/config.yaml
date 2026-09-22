@@ -237,18 +237,9 @@ litellm_settings:
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
-  # `database_url` is deliberately NOT set here.
-  #
-  # LiteLLM requires a PostgreSQL URL for its database features and refuses to
-  # start when the variable resolves to an empty string — which is exactly what
-  # `os.environ/LITELLM_DATABASE_URL` does on a machine that has not configured
-  # one. Point the proxy at Postgres by exporting LITELLM_DATABASE_URL and
-  # adding `database_url: os.environ/LITELLM_DATABASE_URL` back here.
-  #
-  # What you give up without it: virtual keys and the spend log. The proxy
-  # still serves every alias and still receives the `x-litellm-tags` harness
-  # tag, but nothing persists it, so per-harness usage reporting needs the DB.
-  # Sandboxes get short-lived virtual keys, never the master key.
+  # Required for durable virtual keys, monthly budgets, and tagged spend logs.
+  # Compose provides a nonblank in-network URL; host-run proxies must set it.
+  database_url: os.environ/LITELLM_DATABASE_URL
   allow_user_auth: false
   # Anthropic-shaped route used by Claude Code (ANTHROPIC_BASE_URL) alongside
   # the OpenAI-shaped route used by Codex and OpenCode. Same aliases either way.

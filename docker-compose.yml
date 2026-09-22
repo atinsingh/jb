@@ -98,6 +98,28 @@ services:
       - jobocate-network
     command: npm run dev
 
+  # Durable LiteLLM control-plane state: virtual keys, monthly budgets, and
+  # spend logs. It is intentionally network-only; host apps should use their
+  # own explicit LITELLM_DATABASE_URL from .env.local when run outside Compose.
+  litellm-db:
+    image: postgres:16.4-alpine
+    container_name: jobocate-litellm-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=litellm
+      - POSTGRES_PASSWORD=litellm-local-only
+      - POSTGRES_DB=litellm
+    volumes:
+      - litellm_postgres_data:/var/lib/postgresql/data
+    networks:
+      - jobocate-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm -d litellm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
   # LiteLLM proxy — the only route between a harness and a model.
   # Aliases (provider+model+effort) live in infra/litellm/config.yaml.
   litellm:
@@ -114,9 +136,16 @@ services:
     # Claude Pro/Max or ChatGPT Plus/Pro login must never be configured here.
     env_file:
       - ./.env.local
+    environment:
+      # A Compose-only value: never let a blank host variable override the
+      # in-network database required for virtual keys and spend persistence.
+      - LITELLM_DATABASE_URL=postgresql://litellm:litellm-local-only@litellm-db:5432/litellm
     volumes:
       - ./infra/litellm/config.yaml:/app/config.yaml:ro
     command: ["--config", "/app/config.yaml", "--port", "4000"]
+    depends_on:
+      litellm-db:
+        condition: service_healthy
     networks:
       - jobocate-network
     healthcheck:
@@ -161,4 +190,6 @@ volumes:
   mongodb_data:
     driver: local
   backend-uploads:
+    driver: local
+  litellm_postgres_data:
     driver: local
