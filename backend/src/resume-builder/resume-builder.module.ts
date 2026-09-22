@@ -15,6 +15,9 @@ import { isQueueEnabled, QUEUE_PDF } from '../queue/queue.constants';
 import { ResumeBuilderPdfProcessor } from './resume-builder.pdf.processor';
 import { HtmlSanitizerService } from '../ingestion/pipeline/html-sanitizer.service';
 import { AtsModule } from '../ats/ats.module';
+import { ResumeAiContentHeuristicService } from '../employer-pipeline/resume-ai-content-heuristic.service';
+import { ResumeComparisonController } from './resume-comparison.controller';
+import { ResumeComparisonService } from './resume-comparison.service';
 
 @Module({
   imports: [
@@ -51,11 +54,13 @@ import { AtsModule } from '../ats/ats.module';
     // Registers the 'pdf' Bull queue only when QUEUE_ENABLED=true; [] otherwise.
     ...bullQueueImports(QUEUE_PDF),
   ],
-  controllers: [ResumeBuilderController],
+  controllers: [ResumeBuilderController, ResumeComparisonController],
   // The processor is only wired in when queues are enabled — without it, the
   // @Optional() @InjectQueue in the service resolves to undefined → inline path.
   providers: [
     ResumeBuilderService,
+    ResumeComparisonService,
+    ResumeAiContentHeuristicService,
     // Dependency-free and stateless, so a local instance is fine — avoids
     // pulling in the whole IngestionModule (queues, cron) just to sanitize.
     HtmlSanitizerService,

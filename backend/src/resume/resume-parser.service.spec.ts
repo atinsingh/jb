@@ -31,8 +31,31 @@ describe('ResumeParserService (llm migration)', () => {
     const result = await service.parseResume(fakeFile, USER_ID);
 
     expect(aiParser.parseResume).toHaveBeenCalledWith(USER_ID, 'raw resume text');
-    expect(result.parsedData).toEqual({ name: 'Jane', skills: ['ts'] });
+    expect(result.parsedData).toEqual({
+      name: 'Jane',
+      skills: ['ts'],
+      achievements: [],
+      certifications: [],
+    });
     expect(result.originalText).toBe('raw resume text');
+  });
+
+  it('keeps standalone achievements and certifications alongside an AI parse', async () => {
+    aiParser.parseResume.mockResolvedValue({ name: 'Jane', skills: ['ts'] });
+    jest.spyOn(service, 'heuristicParse').mockReturnValue({
+      achievements: ['Spoke at NodeConf'],
+      certifications: [{ name: 'AWS Certified' }],
+      _source: 'heuristic',
+    } as any);
+
+    const result = await service.parseResume(fakeFile, USER_ID);
+
+    expect(result.parsedData).toEqual({
+      name: 'Jane',
+      skills: ['ts'],
+      achievements: ['Spoke at NodeConf'],
+      certifications: [{ name: 'AWS Certified' }],
+    });
   });
 
   it('falls back to the deterministic heuristicParse when the AI parser throws', async () => {

@@ -467,6 +467,111 @@ async function stubHarnessApi(page: Page) {
   });
 }
 
+test.describe("Compare Resume manual workflow", () => {
+  test("keeps imported resumes editable and explains color-coded improvement areas", async ({
+    page,
+  }) => {
+    await stubHarnessApi(page);
+    let restoredHarnessRequests = 0;
+    page.on("request", (request) => {
+      if (
+        request.method() === "GET" &&
+        request.url().includes("/api/resume-harness/sessions/resume-session-e2e")
+      ) restoredHarnessRequests += 1;
+    });
+    await page.addInitScript(() =>
+      sessionStorage.setItem("jobocate.resumeHarness.activeSessionId", "resume-session-e2e"),
+    );
+    const updates: any[] = [];
+    const imported = {
+      _id: "imported-1",
+      id: "imported-1",
+      name: "Imported profile",
+      creationMethod: "imported",
+      fullName: "Jordan Reyes",
+      email: "jordan@example.com",
+      summary: "Results-driven engineer.",
+      skills: ["TypeScript"],
+      experience: [{
+        title: "Engineer",
+        company: "Example Co",
+        startDate: "2023",
+        endDate: "Present",
+        description: "Built the customer API.",
+        achievements: [],
+      }],
+      achievements: [],
+      certifications: [],
+    };
+    await page.route("**/api/resume-builder/imported-1/compare", (route: Route) =>
+      route.fulfill({
+        json: {
+          resumeId: "imported-1",
+          ats: { score: 72, findings: [] },
+          match: null,
+          aiContent: { composite: 78, signals: {} },
+          annotations: [
+            {
+              id: "ai-stock-phrases",
+              section: "summary",
+              severity: "critical",
+              color: "red",
+              quote: "Results-driven",
+              message: "Stock phrases can make this read as generic.",
+              fix: "Replace it with a specific outcome from your work.",
+            },
+          ],
+        },
+      }),
+    );
+    await page.route("**/api/resume-builder/imported-1", async (route: Route) => {
+      if (route.request().method() === "PATCH") {
+        updates.push(route.request().postDataJSON());
+        await route.fulfill({ json: { ...imported, ...updates.at(-1) } });
+        return;
+      }
+      await route.fulfill({ json: imported });
+    });
+
+    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("button", { name: "Compare Resume" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "AI Generate Resume" })).toBeVisible();
+    expect(restoredHarnessRequests).toBe(0);
+    await page.getByRole("button", { name: "Compare Resume" }).click();
+    await expect(page.getByTestId("compare-resume-upload")).toBeVisible();
+
+    await page.goto("/app/resume?mode=compare&id=imported-1", {
+      waitUntil: "domcontentloaded",
+    });
+    await expect(page.getByRole("heading", { name: "Compare Resume" })).toBeVisible();
+    await expect(page.getByTestId("compare-ats-score")).toHaveText("72");
+    await expect(page.getByTestId("compare-ai-score")).toHaveText("78");
+
+    const summaryAnnotation = page.getByTestId("annotation-summary");
+    await summaryAnnotation.hover();
+    await expect(page.getByRole("tooltip")).toContainText(
+      "Replace it with a specific outcome",
+    );
+
+    await expect(page.getByLabel("Role description 1")).toHaveValue(
+      "Built the customer API.",
+    );
+    await page.getByLabel("Role description 1").fill("Built and owned the customer API.");
+    await page.getByRole("button", { name: "+ Add certification" }).click();
+    await page.getByRole("button", { name: "Save Resume Details" }).click();
+    await expect(page.getByRole("alert").filter({ hasText: "Certification name" })).toBeVisible();
+    expect(updates).toHaveLength(0);
+    await page.getByLabel("name 1").fill("AWS Certified");
+    await page.getByLabel("issuer 1").fill("AWS");
+    await page.getByLabel("Achievements", { exact: true }).fill("Conference speaker");
+    await page.getByRole("button", { name: "Save Resume Details" }).click();
+    expect(updates.at(-1).achievements).toEqual(["Conference speaker"]);
+    expect(updates.at(-1).experience[0].description).toBe(
+      "Built and owned the customer API.",
+    );
+  });
+});
+
 test.describe("résumé session operation integrity", () => {
   test.describe.configure({ mode: "default" });
 

@@ -8,6 +8,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import AppTopNav from "@/components/app/AppTopNav";
 import { ErrorState } from "@/components/app/AppStates";
+import CompareResumeWorkspace from "@/components/app/resume/CompareResumeWorkspace";
 import {
   endHarnessSession,
   getHarnessPdf,
@@ -130,6 +131,10 @@ const ACTIVE_SESSION_KEY = "jobocate.resumeHarness.activeSessionId";
 
 export default function AppResume() {
   const router = useRouter();
+  const [entryMode, setEntryMode] = useState(null);
+  const importedResumeId =
+    router.isReady && typeof router.query.id === "string" ? router.query.id : "";
+  const compareMode = entryMode === "compare" || router.query.mode === "compare" || !!importedResumeId;
   const [options, setOptions] = useState(null);
   const [optionsError, setOptionsError] = useState(null);
 
@@ -268,11 +273,20 @@ export default function AppResume() {
 
   useEffect(() => {
     if (!router.isReady) return undefined;
+    if (compareMode) {
+      sessionRef.current = null;
+      setSession(null);
+      setPhase("idle");
+      setSessionRestoreDone(true);
+      return undefined;
+    }
     const requestedSessionId =
       typeof router.query.session === "string" ? router.query.session : "";
-    const sessionId =
-      requestedSessionId || window.sessionStorage.getItem(ACTIVE_SESSION_KEY);
-    if (!sessionId) {
+    if (!requestedSessionId) {
+      setSessionRestoreDone(true);
+      return undefined;
+    }
+    if (sessionRef.current?.id === requestedSessionId) {
       setSessionRestoreDone(true);
       return undefined;
     }
@@ -281,13 +295,8 @@ export default function AppResume() {
     let cancelled = false;
     const restore = async () => {
       try {
-        const current = await getHarnessSession(sessionId);
+        const current = await getHarnessSession(requestedSessionId);
         if (cancelled) return;
-        if (!requestedSessionId && current.status !== "active") {
-          window.sessionStorage.removeItem(ACTIVE_SESSION_KEY);
-          return;
-        }
-
         selectSession(current);
         if (current.status === "active") {
           window.sessionStorage.setItem(ACTIVE_SESSION_KEY, current.id);
@@ -311,7 +320,7 @@ export default function AppResume() {
     return () => {
       cancelled = true;
     };
-  }, [router.isReady, router.query.session, selectSession, loadPdf]);
+  }, [router.isReady, router.query.session, compareMode, selectSession, loadPdf]);
 
   useEffect(() => {
     if (!session?.id || !session.revision) {
@@ -366,7 +375,6 @@ export default function AppResume() {
   const busy = phase === "provisioning" || phase === "working";
   const platformDown = options && options.sandboxAvailable === false;
   const sessionOver = session && session.status !== "active";
-
   const start = async (requestedSourceSessionId) => {
     if (!sessionRestoreDone) return;
     const sourceSessionId = requestedSourceSessionId || carryFromSessionId;
@@ -391,6 +399,11 @@ export default function AppResume() {
       setSession(next);
       setCarryFromSessionId("");
       window.sessionStorage.setItem(ACTIVE_SESSION_KEY, next.id);
+      await router.replace(
+        { pathname: "/app/resume", query: { session: next.id } },
+        undefined,
+        { shallow: true },
+      );
       setTemplateKey(next.templateKey || "");
       setVibe(next.vibe || {});
       setJobUrl(next.jobUrl || jobUrl.trim());
@@ -415,6 +428,7 @@ export default function AppResume() {
       }
       setCarryFromSessionId(session.id);
       window.sessionStorage.removeItem(ACTIVE_SESSION_KEY);
+      await router.replace({ pathname: "/app/resume" }, undefined, { shallow: true });
       setSession(null);
       setPdfBase64("");
     } catch (e) {
@@ -756,6 +770,9 @@ export default function AppResume() {
           gap: 18px;
           align-items: start;
         }
+        .compare-entry-paths {
+          grid-template-columns: 1fr 1fr;
+        }
         /* The picker follows you down a long form rather than scrolling away. */
         .jbres-aside {
           position: sticky;
@@ -767,6 +784,9 @@ export default function AppResume() {
           }
           .jbres-aside {
             position: static;
+          }
+          .compare-entry-paths {
+            grid-template-columns: minmax(0, 1fr);
           }
         }
         /*
@@ -825,7 +845,15 @@ export default function AppResume() {
             here. Give it a target, then shape the result in conversation.
           </p>
         </div>
-        {!session ? (
+        {!session && !compareMode && (
+          <EntryPaths onCompare={() => setEntryMode("compare")} onGenerate={() => setEntryMode("ai")} />
+        )}
+        {!session && compareMode ? (
+          <CompareResumeWorkspace
+            resumeId={importedResumeId}
+            onOpen={(id) => router.replace({ pathname: "/app/resume", query: { mode: "compare", id } })}
+          />
+        ) : !session ? (
           <Setup
             {...{
               options,
@@ -893,6 +921,25 @@ export default function AppResume() {
         )}
       </div>
     </Shell>
+  );
+}
+
+function EntryPaths({ onCompare, onGenerate }) {
+  return (
+    <div className="compare-entry-paths" style={{ display: "grid", gap: 12, maxWidth: 720, marginBottom: 22 }}>
+      <button type="button" onClick={onCompare} style={{ ...ghostBtn, textAlign: "left", padding: 16 }}>
+        <span style={{ display: "block", fontSize: 15, marginBottom: 4 }}>Compare Resume</span>
+        <span style={{ display: "block", color: T.fg3, fontWeight: 400, lineHeight: 1.45 }}>
+          Import, assess, highlight, and manually improve an existing résumé.
+        </span>
+      </button>
+      <button type="button" onClick={onGenerate} style={{ ...ghostBtn, textAlign: "left", padding: 16 }}>
+        <span style={{ display: "block", fontSize: 15, marginBottom: 4 }}>AI Generate Resume</span>
+        <span style={{ display: "block", color: T.fg3, fontWeight: 400, lineHeight: 1.45 }}>
+          Start or continue the existing AI résumé session workflow.
+        </span>
+      </button>
+    </div>
   );
 }
 

@@ -39,6 +39,12 @@ export class ResumeParserService {
     let parsedData: any;
     try {
       parsedData = await this.resumeParserAIService.parseResume(userId, text);
+      const deterministicSections = this.heuristicParse(text);
+      parsedData = {
+        ...parsedData,
+        achievements: deterministicSections.achievements || [],
+        certifications: deterministicSections.certifications || [],
+      };
     } catch (aiError: any) {
       console.warn(
         '[resume] AI parse unavailable, using heuristic fallback:',
@@ -75,6 +81,7 @@ export class ResumeParserService {
       skills: ['skills', 'technical skills', 'core skills', 'key skills', 'core competencies', 'competencies', 'areas of expertise'],
       projects: ['projects', 'personal projects', 'selected projects'],
       certifications: ['certifications', 'certificates', 'licenses', 'licences'],
+      achievements: ['achievements', 'accomplishments', 'awards', 'honors', 'honours'],
     };
     const headerOf = (line: string): string | null => {
       if (line.length > 45) return null;
@@ -127,10 +134,16 @@ export class ResumeParserService {
     // ---- experience & education (grouped entries with dates + bullets) ----
     const experience = this.parseEntries(sections.experience || [], 'experience');
     const education = this.parseEntries(sections.education || [], 'education');
+    const achievements = (sections.achievements || [])
+      .map((line) => line.replace(/^[•·▪◦‣∙*-]\s*/, '').trim())
+      .filter(Boolean);
+    const certifications = (sections.certifications || [])
+      .map((line) => ({ name: line.replace(/^[•·▪◦‣∙*-]\s*/, '').trim(), issuer: '' }))
+      .filter((item) => item.name);
 
     return {
       name, fullName: name, email, phone, location, linkedin, github,
-      summary, skills, experience, education, _source: 'heuristic',
+      summary, skills, experience, education, achievements, certifications, _source: 'heuristic',
     };
   }
 

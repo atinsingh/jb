@@ -67,7 +67,7 @@ export class Resume {
     title: string;
     company: string;
     location?: string;
-    startDate: string;
+    startDate?: string;
     endDate?: string;
     current?: boolean;
     description?: string;
@@ -111,6 +111,10 @@ export class Resume {
     credentialId?: string;
     credentialUrl?: string;
   }>;
+
+  // Standalone accomplishments that are not tied to one employer.
+  @Prop([{ type: String }])
+  achievements?: string[];
 
   // Projects
   @Prop([{

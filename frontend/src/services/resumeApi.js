@@ -58,6 +58,13 @@ export const regenerateSection = async (id, payload) =>
     body: JSON.stringify(payload),
   });
 
+// POST /api/resume-builder/:id/compare -> ATS, AI-content signals and annotations
+export const compareResume = async (id, payload = {}) =>
+  apiCall(`/api/resume-builder/${id}/compare`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
 // POST /api/resume-builder/:id/generate-pdf  ->  { pdfUrl }
 export const generateResumePdf = async (id) =>
   apiCall(`/api/resume-builder/${id}/generate-pdf`, { method: 'POST' });

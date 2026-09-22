@@ -31,6 +31,7 @@ import { ResumeBuilderService } from './resume-builder.service';
 import { CreateResumeDto, UpdateResumeSectionDto, RegenerateSectionDto } from './dto/create-resume.dto';
 import { GenerateResumeDto, GenerateSectionDto } from './dto/generate-resume.dto';
 import { UpdateResumeDto, CreateShareLinkDto } from './dto/resume-operations.dto';
+import { ImportResumeDto, UpdateResumeDocumentDto } from './dto/resume-details.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { StorageService } from '../storage';
 
@@ -101,7 +102,7 @@ export class ResumeBuilderController {
   @Post('import')
   @ApiOperation({ summary: 'Create a resume from parsed import data + source metadata' })
   @ApiResponse({ status: 201, description: 'Resume imported successfully' })
-  async import(@Body() body: any, @Request() req) {
+  async import(@Body() body: ImportResumeDto, @Request() req) {
     return this.resumeBuilderService.importResume(req.user._id.toString(), body);
   }
 
@@ -249,7 +250,7 @@ export class ResumeBuilderController {
   @ApiResponse({ status: 200, description: 'Resume updated successfully' })
   async update(
     @Param('id') id: string,
-    @Body() updates: Partial<any>,
+    @Body() updates: UpdateResumeDocumentDto,
     @Request() req,
   ) {
     const resume = await this.resumeBuilderService.update(id, req.user._id.toString(), updates);
