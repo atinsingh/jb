@@ -30,7 +30,7 @@ const apiCall = async (endpoint, options = {}) => {
 export const getEntitlement = async () => apiCall('/api/entitlements');
 
 // GET /api/entitlements/plans/:planType — entitlements for a specific plan tier.
-// planType is one of FREE | PRO | ELITE | INTERVIEW (backend taxonomy).
+// Active candidate planType is FREE or PRO.
 export const getPlanEntitlements = async (planType) =>
   apiCall(`/api/entitlements/plans/${planType}`);
 

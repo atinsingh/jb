@@ -200,7 +200,7 @@ export default function AppConcierge() {
             style={{ position: 'relative',   display: 'flex', alignItems: 'center', gap: 20, padding: '15px 32px', background: 'color-mix(in srgb, var(--jb-v3-bg) 85%, transparent)', backdropFilter: 'blur(10px)', borderBottom: '1px solid var(--jb-v3-line)' }}
           >
             <div style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--jb-v3-fg-3)' }}>
-              Premium / Concierge
+              Career support
             </div>
             <div style={{ flex: 1 }} />
             <span

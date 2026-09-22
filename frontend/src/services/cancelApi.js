@@ -25,7 +25,7 @@ const apiCall = async (endpoint, options = {}) => {
 // ---------------------------------------------------------------- Subscription
 // GET /api/users/subscription — current plan/renewal info for the signed-in
 // user. Returns whatever the backend provides; the page derives the renewal
-// date and Premium status from it, falling back to design sample data.
+// date and Paid status from it, falling back to design sample data.
 export const getSubscription = async () => apiCall('/api/users/subscription');
 
 // ---------------------------------------------------------------- Retention

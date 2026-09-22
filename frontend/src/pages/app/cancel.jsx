@@ -18,9 +18,9 @@ const REASON_DEFS = [
 
 const OFFERS = {
   expensive: {
-    badge: '50% OFF · 3 MONTHS',
-    headline: 'Stay for half the price.',
-    body: 'Keep every Premium feature at $19.50/mo for your next three billing cycles. No strings — it reverts to your normal rate after.',
+    badge: '20% OFF · 3 MONTHS',
+    headline: 'Stay for less.',
+    body: 'Keep your Paid plan at $8/mo for your next three monthly billing cycles. No strings — it then returns to $10/mo.',
     accept: 'Apply discount & stay',
     successNote: 'Your 50% discount is applied for the next three months. Nothing else changes.',
   },
@@ -32,16 +32,16 @@ const OFFERS = {
     successNote: 'Your membership is paused. Resume anytime from Settings — your data stays exactly as it is.',
   },
   not_using: {
-    badge: 'DOWNGRADE TO PRO',
-    headline: 'Pay less for what you use.',
-    body: 'Not touching everything? Drop to Pro at $19/mo — keep matching, auto-apply credits and AI cover letters without the Premium extras.',
-    accept: 'Switch to Pro',
-    successNote: 'You’re now on Pro at $19/mo. You keep matching, auto-apply and cover letters.',
+    badge: 'PAUSE INSTEAD',
+    headline: 'Take a break without losing your work.',
+    body: 'Pause instead of cancelling. We’ll keep your profile, résumés and history ready for when your search picks up again.',
+    accept: 'Pause for free instead',
+    successNote: 'Your membership is paused. Resume anytime — everything is saved.',
   },
   missing: {
     badge: '1 MONTH FREE',
     headline: 'Let’s make it work.',
-    body: 'Tell us what’s missing and get a month of Premium on us while we look into it. Marcus will follow up with you personally.',
+    body: 'Tell us what’s missing and get a month of Paid on us while we look into it. Our team will follow up with you.',
     accept: 'Get a free month',
     successNote: 'Your next month is on us. Marcus will reach out about what you need.',
   },
@@ -58,17 +58,17 @@ const OFFERS = {
 const OFFER_OUTCOME = {
   expensive: 'discounted',
   found_job: 'paused',
-  not_using: 'downgraded',
+  not_using: 'paused',
   missing: 'free_month',
   other: 'paused',
 };
 
 const LOSING = [
-  'Concierge career coach — Marcus Bell',
-  'Unlimited auto-apply',
-  'Live Interview copilot',
-  'Advanced per-company personalization',
-  'Salary & offer insights',
+  '$4 monthly AI allowance',
+  'AI cover letters',
+  'Per-role résumé personalization',
+  'Priority job matching',
+  'Email support',
 ];
 
 const offerFor = (reason) => OFFERS[reason] || OFFERS.other;
@@ -142,7 +142,7 @@ export default function AppCancel() {
       icon: '✓',
       iconBg: 'var(--jb-v3-accent)',
       iconColor: 'var(--jb-v3-accent-ink)',
-      title: 'You’re staying on Premium.',
+      title: 'You’re staying on Paid.',
       body: offer.successNote,
       cta: 'Back to settings',
       href: appRoute('App Settings.dc.html'),
@@ -154,7 +154,7 @@ export default function AppCancel() {
       iconBg: 'var(--jb-v3-accent)',
       iconColor: 'var(--jb-v3-accent-ink)',
       title: 'Glad you’re staying.',
-      body: 'Your Premium membership is unchanged — we’ll keep working your search in the background.',
+      body: 'Your Paid membership is unchanged — your tools and monthly AI allowance remain active.',
       cta: 'Back to dashboard',
       href: appRoute('App Dashboard.dc.html'),
       secondary: false,
@@ -165,7 +165,7 @@ export default function AppCancel() {
       iconBg: 'var(--jb-v3-control)',
       iconColor: 'var(--jb-v3-fg-3)',
       title: 'Membership cancelled.',
-      body: `Your Premium access stays active until ${renewal || 'the end of your billing period'}, then you’ll move to the Free plan. Your data is never deleted.`,
+      body: `Your Paid access stays active until ${renewal || 'the end of your billing period'}, then you’ll move to the Free plan. Your data is never deleted.`,
       cta: 'Back to settings',
       href: appRoute('App Settings.dc.html'),
       secondary: true,
@@ -547,7 +547,7 @@ export default function AppCancel() {
                 >
                   <span style={{ color: 'var(--jb-v3-fg-3)', flexShrink: 0 }}>◷</span>
                   <span style={{ fontSize: 13.5, color: 'var(--jb-v3-fg-2)' }}>
-                    Your Premium access stays active until{' '}
+                    Your Paid access stays active until{' '}
                     <b style={{ color: 'var(--jb-v3-fg)' }}>{renewal || 'the end of your billing period'}</b>. Your data is
                     never deleted.
                   </span>
@@ -584,7 +584,7 @@ export default function AppCancel() {
                       cursor: 'pointer',
                     }}
                   >
-                    Never mind, keep Premium
+                    Never mind, keep Paid
                   </button>
                 </div>
               </div>

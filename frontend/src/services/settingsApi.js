@@ -78,6 +78,6 @@ export const changeUserPassword = async ({ newPassword }) => {
 // GET /api/entitlements — { planType, entitlements }
 export const getEntitlements = async () => apiCall('/api/entitlements');
 
-// GET /api/entitlements/plans/:planType — plan entitlements (FREE|PRO|ELITE|INTERVIEW)
+// GET /api/entitlements/plans/:planType — active candidate plan entitlements (FREE|PRO)
 export const getPlanEntitlements = async (planType) =>
   apiCall(`/api/entitlements/plans/${planType}`);

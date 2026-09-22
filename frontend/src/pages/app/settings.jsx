@@ -209,7 +209,7 @@ export default function AppSettings() {
         const res = await getEntitlements();
         const planType = res?.planType;
         if (planType && !cancelled) {
-          const PRICE = { FREE: '$0/mo', PRO: '$29/mo', ELITE: '$79/mo', INTERVIEW: '$19/mo' };
+          const PRICE = { FREE: '$0/mo', PRO: '$10/mo' };
           const pretty = String(planType).charAt(0) + String(planType).slice(1).toLowerCase();
           setBilling({
             planType,
