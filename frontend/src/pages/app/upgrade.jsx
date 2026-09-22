@@ -5,36 +5,25 @@ import Head from 'next/head';
 import Link from 'next/link';
 import AppTopNav from '@/components/app/AppTopNav';
 import { appRoute } from '@/components/app/appRoutes';
-import { getEntitlement, confirmUpgrade } from '@/services/upgradeApi';
+import { getEntitlement } from '@/services/upgradeApi';
+import { createCheckout, getPlans } from '@/services/billingApi';
 
 // ---------------------------------------------------------------------------
-// SAMPLE DATA — ported verbatim from "App Upgrade.dc.html" planData/deltaData.
-// Always used as the faithful fallback when unauthenticated or the request fails.
+// Safe two-tier fallback while the live catalogue is loading.
 // ---------------------------------------------------------------------------
 const PLAN_DATA = [
-  { key: 'free', name: 'Free', tagline: 'Start your search the smart way.', monthly: 0, annual: 0, popular: false },
-  { key: 'pro', name: 'Pro', tagline: 'Put the busywork on autopilot.', monthly: 29, annual: 19, popular: true },
-  { key: 'premium', name: 'Premium', tagline: 'Maximum volume, maximum signal.', monthly: 59, annual: 39, popular: false },
+  { key: 'free', name: 'Free', tagline: 'Essential search tools with a $0.50 monthly AI allowance.', monthly: 0, annual: 0, popular: false },
+  { key: 'paid', name: 'Paid', tagline: 'More capacity with a $4 monthly AI allowance.', monthly: 10, annual: 100, popular: true },
 ];
 
 const DELTA_DATA = {
-  premium: {
-    label: 'What Premium unlocks',
+  paid: {
+    label: 'What Paid unlocks',
     items: [
-      { title: 'Concierge career coach', desc: 'Marcus Bell applies, negotiates and preps on your behalf.' },
-      { title: 'Unlimited auto-apply', desc: 'No weekly credit cap — apply to every strong match.' },
-      { title: 'Live Interview copilot', desc: 'Real-time prompts and notes during your actual calls.' },
-      { title: 'Advanced personalization', desc: 'Per-company résumé and cover-letter tuning.' },
-      { title: 'Salary & offer insights', desc: 'Benchmarks and a side-by-side offer comparison.' },
-    ],
-  },
-  pro: {
-    label: 'What Pro unlocks',
-    items: [
-      { title: '150 auto-apply credits / mo', desc: 'Apply at volume without lifting a finger.' },
+      { title: '$4 AI allowance / mo', desc: 'Measured model spend shared across candidate AI services.' },
       { title: 'AI cover letters', desc: 'Tailored, editable drafts for every role.' },
       { title: 'Per-role personalization', desc: 'Résumés tuned to each job description.' },
-      { title: 'Interview prep', desc: 'Question banks and practice for your roles.' },
+      { title: 'Monthly renewal', desc: 'The AI allowance renews monthly on either billing cycle.' },
     ],
   },
   free: {
@@ -42,7 +31,7 @@ const DELTA_DATA = {
     items: [
       { title: 'AI résumé builder', desc: 'ATS-friendly résumés in minutes.' },
       { title: 'Smart job matching', desc: 'Roles ranked by fit, every day.' },
-      { title: '10 auto-apply credits / mo', desc: 'A taste of hands-off applying.' },
+      { title: '$0.50 AI allowance / mo', desc: 'Measured model spend renews every month.' },
       { title: 'Application tracker', desc: 'Your whole pipeline in one board.' },
     ],
   },
@@ -50,33 +39,23 @@ const DELTA_DATA = {
 
 const money = (n) => '$' + Number(n || 0).toLocaleString('en-US');
 
-// Map backend planType (FREE|PRO|ELITE|INTERVIEW) → this screen's plan keys.
+// Map the active backend plan types to this screen's labels.
 const PLAN_KEY_FROM_BACKEND = {
   FREE: 'free',
-  PRO: 'pro',
-  ELITE: 'premium',
-  PREMIUM: 'premium',
-  INTERVIEW: 'pro',
+  PRO: 'paid',
 };
-
-const COUNTRIES = ['United States', 'Canada', 'United Kingdom', 'Germany', 'Australia'];
 
 export default function AppUpgrade() {
   // ---- dc state: { plan, annual, success } -------------------------------
-  const [plan, setPlan] = useState('premium');
+  const [plan, setPlan] = useState('paid');
   const [annual, setAnnual] = useState(true);
   const [success, setSuccess] = useState(false);
+  const [catalog, setCatalog] = useState(PLAN_DATA);
+  const [checkoutError, setCheckoutError] = useState('');
 
   // ---- backend entitlement (best-effort, graceful fallback) --------------
   const [entitlement, setEntitlement] = useState(null);
   const [confirming, setConfirming] = useState(false);
-
-  // payment form (purely presentational, mirrors the design inputs)
-  const [card, setCard] = useState('');
-  const [exp, setExp] = useState('');
-  const [cvc, setCvc] = useState('');
-  const [name, setName] = useState('Sarah Chen');
-  const [country, setCountry] = useState('United States');
 
   useEffect(() => {
     let alive = true;
@@ -85,10 +64,8 @@ export default function AppUpgrade() {
         if (!alive || !res) return;
         setEntitlement(res);
         const key = PLAN_KEY_FROM_BACKEND[(res.planType || '').toUpperCase()];
-        // Default the selector to the next tier up from the user's current plan
-        // when we can resolve it; otherwise keep the design default (premium).
-        if (key === 'free') setPlan('pro');
-        else if (key === 'pro') setPlan('premium');
+        // Free users land on Paid; Paid users see their current plan.
+        if (key === 'free' || key === 'paid') setPlan('paid');
       })
       .catch(() => {
         // Unauthenticated or backend down — keep the design's sample data.
@@ -98,25 +75,44 @@ export default function AppUpgrade() {
     };
   }, []);
 
-  // Trial banner: reflect backend trial state when present, else the design's
-  // "PREMIUM TRIAL · 4 DAYS LEFT".
+  useEffect(() => {
+    let alive = true;
+    getPlans()
+      .then((res) => {
+        if (!alive || !Array.isArray(res?.plans)) return;
+        const live = res.plans.map((item) => ({
+          id: item._id,
+          key: item.type === 'FREE' ? 'free' : 'paid',
+          name: item.name,
+          tagline: item.description,
+          monthly: item.priceMonthly,
+          annual: item.priceYearly,
+          popular: item.type === 'PRO',
+        }));
+        if (live.length) setCatalog(live);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  // Reflect a real trial when present; otherwise explain the AI renewal cadence.
   const trialLabel = useMemo(() => {
     const days = entitlement?.trialDaysLeft;
     const tier = entitlement?.trialPlan || entitlement?.planType;
     if (typeof days === 'number' && days > 0) {
-      const t = (tier || 'PREMIUM').toString().toUpperCase();
+      const t = (tier || 'PAID').toString().toUpperCase();
       return `${t} TRIAL · ${days} DAY${days === 1 ? '' : 'S'} LEFT`;
     }
-    return 'PREMIUM TRIAL · 4 DAYS LEFT';
+    return 'AI ALLOWANCE · RENEWS MONTHLY';
   }, [entitlement]);
 
   // ---- renderVals() port -------------------------------------------------
-  const data = PLAN_DATA;
+  const data = catalog;
   const sel = data.find((p) => p.key === plan) || data[0];
 
   const plans = data.map((p) => {
     const on = p.key === plan;
-    const price = annual ? p.annual : p.monthly;
+    const price = annual ? Number((p.annual / 12).toFixed(2)) : p.monthly;
     const dark = p.popular;
     return {
       ...p,
@@ -136,19 +132,16 @@ export default function AppUpgrade() {
   });
 
   const monthlyPrice = sel.monthly;
-  const annualPerMo = sel.annual;
-  const billed = annual ? annualPerMo * 12 : monthlyPrice;
+  const annualPerMo = Number((sel.annual / 12).toFixed(2));
+  const billed = annual ? sel.annual : monthlyPrice;
   const fullAnnual = monthlyPrice * 12;
   const discountAmt = annual ? fullAnnual - billed : 0;
-  const tax = Math.round(billed * 0.085);
-  const total = billed + tax;
+  const total = billed;
 
   const delta = DELTA_DATA[plan] || DELTA_DATA.free;
 
   const successSubs = {
-    premium:
-      'Your card was charged ' + money(total) + '. Concierge, unlimited auto-apply and the Live Interview copilot are now unlocked.',
-    pro: 'Your card was charged ' + money(total) + '. AI cover letters and 150 monthly auto-apply credits are now active.',
+    paid: 'Your Paid plan is active. The $4 AI allowance renews monthly.',
     free: 'You’re on the Free plan. Upgrade anytime to put your search on autopilot.',
   };
 
@@ -160,38 +153,33 @@ export default function AppUpgrade() {
 
   const planName = sel.name;
   const cycleLabel = annual ? 'Billed annually' : 'Billed monthly';
-  const priceLine = '$' + (annual ? annualPerMo : monthlyPrice) + '/mo';
+  const priceLine = money(annual ? annualPerMo : monthlyPrice) + '/mo';
   const subtotal = money(annual ? fullAnnual : monthlyPrice);
   const hasDiscount = discountAmt > 0;
   const totalLabel = annual ? 'Total billed today' : 'Total per month';
   const confirmLabel = total === 0 ? 'Switch to Free' : 'Confirm upgrade · ' + money(total);
-  const successHref = plan === 'premium' ? appRoute('App Concierge.dc.html') : appRoute('App Dashboard.dc.html');
-  const successCta = plan === 'premium' ? 'Meet your concierge' : 'Go to dashboard';
+  const successHref = appRoute('App Dashboard.dc.html');
+  const successCta = 'Go to dashboard';
 
   const onConfirm = async () => {
     if (confirming) return;
     setConfirming(true);
+    setCheckoutError('');
     try {
-      // Best-effort backend call; success state shows regardless so the
-      // screen always completes faithfully.
-      await confirmUpgrade({ plan, annual, total }).catch(() => {});
+      if (sel.key === 'free') {
+        window.location.assign('/app/cancel');
+        return;
+      }
+      if (!sel.id) throw new Error('Paid plan is not available yet. Please refresh and try again.');
+      const checkout = await createCheckout(sel.id, annual ? 'yearly' : 'monthly');
+      if (!checkout?.url) throw new Error('Stripe checkout did not return a URL.');
+      window.location.assign(checkout.url);
+    } catch (error) {
+      setCheckoutError(error?.message || 'Unable to start checkout. Please try again.');
     } finally {
       setConfirming(false);
-      setSuccess(true);
     }
   };
-
-  const inputStyle = {
-    width: '100%',
-    fontFamily: 'var(--jb-v3-font-mono)',
-    fontSize: 14,
-    color: 'var(--jb-v3-fg)',
-    background: 'var(--jb-v3-panel)',
-    border: '1px solid var(--jb-v3-line)',
-    borderRadius: 2,
-    padding: '12px 14px',
-  };
-  const labelStyle = { fontSize: 12, fontWeight: 600, color: 'var(--jb-v3-fg-2)', marginBottom: 6, display: 'block' };
 
   return (
     <>
@@ -260,7 +248,7 @@ export default function AppUpgrade() {
                   <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--jb-v3-line)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, padding: 5, marginBottom: 18 }}>
                     <button onClick={() => setAnnual(false)} style={{ background: monthlyBg, color: monthlyColor, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13.5, fontWeight: 600, padding: '8px 18px', borderRadius: 2 }}>Monthly</button>
                     <button onClick={() => setAnnual(true)} style={{ background: annualBg, color: annualColor, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13.5, fontWeight: 600, padding: '8px 18px', borderRadius: 2, display: 'flex', alignItems: 'center', gap: 8 }}>
-                      Annual <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, background: 'var(--jb-v3-accent)', color: 'var(--jb-v3-accent-ink)', padding: '2px 7px', borderRadius: 2 }}>−33%</span>
+                      Annual <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, background: 'var(--jb-v3-accent)', color: 'var(--jb-v3-accent-ink)', padding: '2px 7px', borderRadius: 2 }}>save $20</span>
                     </button>
                   </div>
 
@@ -331,10 +319,7 @@ export default function AppUpgrade() {
                           <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 13, color: 'var(--jb-v3-accent)' }}>−{money(discountAmt)}</span>
                         </div>
                       )}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: 13, color: 'var(--jb-v3-fg-2)' }}>Tax (est. 8.5%)</span>
-                        <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 13 }}>{money(tax)}</span>
-                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--jb-v3-fg-3)' }}>Taxes, if applicable, are calculated by Stripe.</div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
                       <span style={{ fontSize: 14, fontWeight: 700 }}>{totalLabel}</span>
@@ -344,34 +329,11 @@ export default function AppUpgrade() {
 
                   {/* PAYMENT */}
                   <div style={{ background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2, padding: 22 }}>
-                    <div style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--jb-v3-fg-3)', marginBottom: 16 }}>Payment details</div>
+                    <div style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--jb-v3-fg-3)', marginBottom: 16 }}>Secure checkout</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
-                      <div>
-                        <label style={labelStyle}>Card number</label>
-                        <input value={card} onChange={(e) => setCard(e.target.value)} placeholder="1234 1234 1234 1234" style={inputStyle} />
-                      </div>
-                      <div style={{ display: 'flex', gap: 12 }}>
-                        <div style={{ flex: 1 }}>
-                          <label style={labelStyle}>Expiry</label>
-                          <input value={exp} onChange={(e) => setExp(e.target.value)} placeholder="MM / YY" style={inputStyle} />
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <label style={labelStyle}>CVC</label>
-                          <input value={cvc} onChange={(e) => setCvc(e.target.value)} placeholder="CVC" style={inputStyle} />
-                        </div>
-                      </div>
-                      <div>
-                        <label style={labelStyle}>Name on card</label>
-                        <input value={name} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, fontFamily: 'inherit' }} />
-                      </div>
-                      <div>
-                        <label style={labelStyle}>Country</label>
-                        <select value={country} onChange={(e) => setCountry(e.target.value)} style={{ ...inputStyle, fontFamily: 'inherit', cursor: 'pointer', WebkitAppearance: 'none', appearance: 'none' }}>
-                          {COUNTRIES.map((c) => (
-                            <option key={c}>{c}</option>
-                          ))}
-                        </select>
-                      </div>
+                      <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6, color: 'var(--jb-v3-fg-2)' }}>
+                        Continue to Stripe to enter payment details. Jobocate never stores your card number.
+                      </p>
                     </div>
 
                     <button
@@ -381,6 +343,9 @@ export default function AppUpgrade() {
                     >
                       {confirming ? 'Processing…' : confirmLabel}
                     </button>
+                    {checkoutError && (
+                      <p role="alert" style={{ margin: '12px 0 0', fontSize: 12.5, color: 'var(--jb-v3-danger)' }}>{checkoutError}</p>
+                    )}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 13, fontSize: 12, color: 'var(--jb-v3-fg-3)' }}>
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--jb-v3-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <rect x="5" y="11" width="14" height="9" rx="2" />

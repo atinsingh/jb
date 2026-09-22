@@ -21,6 +21,8 @@ const apiCall = async (endpoint, options = {}) => {
     // session, 503 means the sandbox platform is down. Same copy for all three
     // would send the candidate to the wrong fix.
     error.status = response.status;
+    error.code = body.code;
+    error.budget = body.budget;
     throw error;
   }
   return response.json();
@@ -38,6 +40,9 @@ const apiCall = async (endpoint, options = {}) => {
  * both beat an invented one.
  */
 export const getHarnessOptions = () => apiCall("/api/resume-harness/options");
+
+/** GET /api/resume-harness/budget -> authoritative measured monthly USD spend. */
+export const getHarnessBudget = () => apiCall("/api/resume-harness/budget");
 
 /**
  * GET /api/resume-harness/templates
@@ -129,6 +134,8 @@ const streamPost = async (path, payload, onEvent) => {
     const body = await res.json().catch(() => ({}));
     const error = new Error(body.message || "Request failed");
     error.status = res.status;
+    error.code = body.code;
+    error.budget = body.budget;
     throw error;
   }
 

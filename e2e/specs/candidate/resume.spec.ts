@@ -27,6 +27,10 @@ const OPTIONS = {
       model: "claude-sonnet-4-5",
       label: "Claude Sonnet 4.5",
       efforts: ["high", "low"],
+      estimates: {
+        high: { kind: "range", minUsd: 0.03, maxUsd: 0.4, label: "$0.03-$0.40 estimated" },
+        low: { kind: "range", minUsd: 0.01, maxUsd: 0.15, label: "$0.01-$0.15 estimated" },
+      },
     },
     {
       model: "gpt-5.6-luna",
@@ -225,6 +229,23 @@ async function stubHarnessApi(page: Page) {
 
   await page.route("**/api/resume-harness/options", (route: Route) =>
     route.fulfill({ json: OPTIONS }),
+  );
+
+  await page.route("**/api/resume-harness/budget", (route: Route) =>
+    route.fulfill({
+      json: {
+        unit: "USD",
+        tier: "PRO",
+        limit: 4,
+        spent: 0.75,
+        remaining: 3.25,
+        periodStart: "2026-09-01T00:00:00.000Z",
+        periodEnd: "2026-10-01T00:00:00.000Z",
+        resetAt: "2026-10-01T00:00:00.000Z",
+        status: "healthy",
+        lastRefreshedAt: "2026-09-21T00:00:00.000Z",
+      },
+    }),
   );
 
   await page.route("**/api/resume-harness/templates", (route: Route) =>
@@ -466,6 +487,35 @@ async function stubHarnessApi(page: Page) {
     return route.fulfill({ json: ats });
   });
 }
+
+test.describe("résumé AI budget", () => {
+  test("shows remaining allowance, reset, and the selected effort estimate", async ({ page }) => {
+    await stubHarnessApi(page);
+    await page.goto("/app/resume");
+
+    await expect(page.getByTestId("ai-budget")).toContainText("$3.25 of $4.00 remaining");
+    await expect(page.getByTestId("ai-budget")).toContainText("$0.03-$0.40 estimated");
+    await expect(page.getByTestId("ai-budget")).toContainText("resets");
+  });
+
+  test("disables model-running actions when the allowance is exhausted", async ({ page }) => {
+    await stubHarnessApi(page);
+    await page.route("**/api/resume-harness/budget", (route: Route) =>
+      route.fulfill({
+        json: {
+          unit: "USD", tier: "FREE", limit: 0.5, spent: 0.5, remaining: 0,
+          periodStart: "2026-09-01T00:00:00.000Z", periodEnd: "2026-10-01T00:00:00.000Z",
+          resetAt: "2026-10-01T00:00:00.000Z", status: "exhausted",
+          lastRefreshedAt: "2026-09-21T00:00:00.000Z",
+        },
+      }),
+    );
+    await page.goto("/app/resume");
+
+    await expect(page.getByTestId("ai-budget")).toContainText("exhausted");
+    await expect(page.getByTestId("start-session")).toBeDisabled();
+  });
+});
 
 test.describe("résumé session operation integrity", () => {
   test.describe.configure({ mode: "default" });

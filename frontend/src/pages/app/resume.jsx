@@ -10,6 +10,7 @@ import AppTopNav from "@/components/app/AppTopNav";
 import { ErrorState } from "@/components/app/AppStates";
 import {
   endHarnessSession,
+  getHarnessBudget,
   getHarnessPdf,
   getHarnessOptions,
   getHarnessSession,
@@ -132,6 +133,7 @@ export default function AppResume() {
   const router = useRouter();
   const [options, setOptions] = useState(null);
   const [optionsError, setOptionsError] = useState(null);
+  const [budget, setBudget] = useState(null);
 
   /** The seeded template catalogue, and the look the next session will use. */
   const [templates, setTemplates] = useState(null);
@@ -238,6 +240,14 @@ export default function AppResume() {
     }
   }, []);
 
+  const loadBudget = useCallback(async () => {
+    try {
+      setBudget(await getHarnessBudget());
+    } catch {
+      setBudget({ status: "unavailable" });
+    }
+  }, []);
+
   /**
    * The catalogue loads separately from `options`.
    *
@@ -264,7 +274,8 @@ export default function AppResume() {
   useEffect(() => {
     loadOptions();
     loadTemplates();
-  }, [loadOptions, loadTemplates]);
+    loadBudget();
+  }, [loadOptions, loadTemplates, loadBudget]);
 
   useEffect(() => {
     if (!router.isReady) return undefined;
@@ -366,9 +377,11 @@ export default function AppResume() {
   const busy = phase === "provisioning" || phase === "working";
   const platformDown = options && options.sandboxAvailable === false;
   const sessionOver = session && session.status !== "active";
+  const budgetBlocked =
+    budget?.status === "exhausted" || budget?.status === "unavailable";
 
   const start = async (requestedSourceSessionId) => {
-    if (!sessionRestoreDone) return;
+    if (!sessionRestoreDone || budgetBlocked) return;
     const sourceSessionId = requestedSourceSessionId || carryFromSessionId;
     setError(null);
     setPhase("provisioning");
@@ -399,6 +412,7 @@ export default function AppResume() {
       await loadPdf(next);
       setPhase("ready");
     } catch (e) {
+      if (e?.budget) setBudget(e.budget);
       setError(e);
       setPhase("idle");
     }
@@ -437,7 +451,7 @@ export default function AppResume() {
 
   const send = async () => {
     const text = instruction.trim();
-    if (!session || sessionOver || !text || busy) return;
+    if (!session || sessionOver || !text || busy || budgetBlocked) return;
 
     setError(null);
     setPhase("working");
@@ -478,9 +492,13 @@ export default function AppResume() {
           const s = acceptSession(event.session);
           if (s.pdfBase64) setPdfBase64(s.pdfBase64);
           setMessages(sessionMessages(s));
+          void loadBudget();
         } else if (event.type === "error") {
           const err = new Error(event.message);
           err.status = event.status;
+          err.code = event.code;
+          err.budget = event.budget;
+          if (event.budget) setBudget(event.budget);
           streamedError = err;
           setError(err);
         }
@@ -491,6 +509,7 @@ export default function AppResume() {
         );
       }
     } catch (e) {
+      if (e?.budget) setBudget(e.budget);
       if (!receivedResult) {
         try {
           if (await recoverSavedTurn()) return;
@@ -530,7 +549,7 @@ export default function AppResume() {
    * place every other change is.
    */
   const applyLook = async (next) => {
-    if (!session || sessionOver || busy) return;
+    if (!session || sessionOver || busy || budgetBlocked) return;
     const changingTemplate =
       next.templateKey && next.templateKey !== session.templateKey;
 
@@ -571,9 +590,13 @@ export default function AppResume() {
             activities: s.conversation?.at(-1)?.activities || [],
           },
         ]);
+        void loadBudget();
       } else if (event.type === "error") {
         const err = new Error(event.message);
         err.status = event.status;
+        err.code = event.code;
+        err.budget = event.budget;
+        if (event.budget) setBudget(event.budget);
         setError(err);
       }
     };
@@ -592,6 +615,7 @@ export default function AppResume() {
         await streamVibeChange(session.id, { vibe: next.vibe }, handle);
       }
     } catch (e) {
+      if (e?.budget) setBudget(e.budget);
       setError(e);
     } finally {
       setLiveActivities([]);
@@ -824,6 +848,14 @@ export default function AppResume() {
             Your details come straight from your account — you never retype them
             here. Give it a target, then shape the result in conversation.
           </p>
+          <BudgetSummary
+            budget={budget}
+            estimate={
+              options?.models
+                ?.find((model) => model.model === selectedModel)
+                ?.estimates?.[effort]
+            }
+          />
         </div>
         {!session ? (
           <Setup
@@ -853,6 +885,7 @@ export default function AppResume() {
               busy,
               phase,
               sessionRestoreDone,
+              budgetBlocked,
               start,
             }}
           />
@@ -870,6 +903,7 @@ export default function AppResume() {
               setInstruction,
               send,
               busy,
+              budgetBlocked,
               phase,
               error,
               pdfBase64,
@@ -893,6 +927,36 @@ export default function AppResume() {
         )}
       </div>
     </Shell>
+  );
+}
+
+function BudgetSummary({ budget, estimate }) {
+  if (!budget) {
+    return <div data-testid="ai-budget" style={{ fontSize: 13, color: T.fg3, marginBottom: 22 }}>Checking AI budget…</div>;
+  }
+  if (budget.status === "unavailable") {
+    return (
+      <Notice
+        data-testid="ai-budget"
+        tone="error"
+        text="AI budget is unavailable. Model-running actions are paused; saved résumés and downloads remain available."
+      />
+    );
+  }
+  const remaining = Number(budget.remaining || 0).toFixed(2);
+  const limit = Number(budget.limit || 0).toFixed(2);
+  const reset = budget.resetAt
+    ? new Date(budget.resetAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+    : "unavailable";
+  return (
+    <div
+      data-testid="ai-budget"
+      style={{ border: `1px solid ${T.line}`, background: T.panel, borderRadius: 3, padding: "12px 14px", marginBottom: 22, fontSize: 13, lineHeight: 1.55 }}
+    >
+      <strong>AI budget: ${remaining} of ${limit} remaining</strong>
+      <span style={{ color: T.fg3 }}> · {budget.status} · resets {reset}</span>
+      {estimate?.label && <div style={{ color: T.fg2 }}>Selected run: {estimate.label}</div>}
+    </div>
   );
 }
 
@@ -1332,12 +1396,13 @@ function SetupForm(p) {
             disabled={
               !p.sessionRestoreDone ||
               p.busy ||
+              p.budgetBlocked ||
               p.platformDown ||
               !p.options?.models?.length
             }
             style={{
               ...primaryBtn,
-              opacity: p.busy || p.platformDown ? 0.45 : 1,
+              opacity: p.busy || p.budgetBlocked || p.platformDown ? 0.45 : 1,
             }}
           >
             {p.phase === "provisioning"
@@ -1503,6 +1568,7 @@ function Workspace(p) {
           templates={p.templates}
           session={session}
           busy={p.busy}
+          budgetBlocked={p.budgetBlocked}
           applyLook={p.applyLook}
           revertLook={p.revertLook}
         />
@@ -1656,10 +1722,10 @@ function Workspace(p) {
               <button
                 data-testid="send-instruction"
                 onClick={p.send}
-                disabled={p.busy || !p.instruction.trim()}
+                disabled={p.busy || p.budgetBlocked || !p.instruction.trim()}
                 style={{
                   ...primaryBtn,
-                  opacity: p.busy || !p.instruction.trim() ? 0.45 : 1,
+                  opacity: p.busy || p.budgetBlocked || !p.instruction.trim() ? 0.45 : 1,
                 }}
               >
                 {p.busy ? "Working…" : session.revision ? "Update" : "Generate"}
@@ -2425,7 +2491,7 @@ function KnobRow({ template, vibe, onChange, disabled, idPrefix }) {
  * must not start one. The button says how many things will change, and stays
  * disabled until something has.
  */
-function LookPanel({ templates, session, busy, applyLook, revertLook }) {
+function LookPanel({ templates, session, busy, budgetBlocked, applyLook, revertLook }) {
   const current = (templates || []).find((t) => t.key === session.templateKey);
   const [draftTemplate, setDraftTemplate] = useState(session.templateKey || "");
   const [draftVibe, setDraftVibe] = useState(session.vibe || {});
@@ -2570,7 +2636,7 @@ function LookPanel({ templates, session, busy, applyLook, revertLook }) {
           >
             <button
               data-testid="apply-look"
-              disabled={busy || !dirty}
+              disabled={busy || budgetBlocked || !dirty}
               onClick={() =>
                 applyLook(
                   templateChanged
@@ -2578,7 +2644,7 @@ function LookPanel({ templates, session, busy, applyLook, revertLook }) {
                     : { vibe: draftVibe },
                 )
               }
-              style={{ ...primaryBtn, opacity: busy || !dirty ? 0.45 : 1 }}
+              style={{ ...primaryBtn, opacity: busy || budgetBlocked || !dirty ? 0.45 : 1 }}
             >
               {busy ? "Re-applying…" : "Apply look"}
             </button>

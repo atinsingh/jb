@@ -13,7 +13,13 @@ import {
   mono,
   HAIR,
 } from '@/components/app/v3/kit';
-import { getInvoices } from '@/services/billingApi';
+import {
+  createCheckout,
+  getAiBudget,
+  getInvoices,
+  getPlans,
+  getSubscription,
+} from '@/services/billingApi';
 
 // Best-effort mapping of an API invoice shape onto the v3 row.
 const normalizeInvoice = (i) => {
@@ -40,41 +46,16 @@ const normalizeInvoice = (i) => {
 };
 
 /*
- * Plans are product content, not user data. Prices are the two published
- * cycles; the yearly figure is the monthly-equivalent at the annual discount,
- * which is what the design's toggle switches between.
+ * Plans are live product data. Monthly and yearly values are the actual Stripe
+ * billing amounts returned by the candidate catalogue.
  */
-const PLANS = [
-  {
-    name: 'Free',
-    monthly: 0,
-    yearly: 0,
-    tag: '',
-    lines: ['5 matches a day', 'Manual apply', 'One résumé'],
-    cta: 'Current',
-  },
-  {
-    name: 'Pro',
-    monthly: 29,
-    yearly: 23,
-    tag: 'Popular',
-    lines: ['Unlimited matches', 'Auto-apply drafts', 'Résumé tailoring', 'Interview drills'],
-    cta: 'Choose Pro',
-  },
-  {
-    name: 'Premium',
-    monthly: 59,
-    yearly: 47,
-    tag: '',
-    lines: ['Everything in Pro', 'Human concierge', 'Offer negotiation', 'Priority support'],
-    cta: 'Choose Premium',
-  },
-];
-
 const COLS = '110px 1fr 90px 70px';
 
 export default function AppBilling() {
   const [invoices, setInvoices] = useState([]);
+  const [plans, setPlans] = useState([]);
+  const [subscription, setSubscription] = useState(null);
+  const [budget, setBudget] = useState(null);
   const [yearly, setYearly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -83,10 +64,15 @@ export default function AppBilling() {
     let alive = true;
     (async () => {
       try {
-        const data = await getInvoices();
+        const [invoiceData, planData, subscriptionData, budgetData] = await Promise.all([
+          getInvoices(), getPlans(), getSubscription(), getAiBudget().catch(() => ({ status: 'unavailable' })),
+        ]);
         if (!alive) return;
-        const list = data?.invoices || (Array.isArray(data) ? data : []);
+        const list = invoiceData?.invoices || (Array.isArray(invoiceData) ? invoiceData : []);
         setInvoices((Array.isArray(list) ? list : []).map(normalizeInvoice));
+        setPlans(Array.isArray(planData?.plans) ? planData.plans : []);
+        setSubscription(subscriptionData?.subscription || null);
+        setBudget(budgetData || null);
       } catch (e) {
         if (alive) setError(e || new Error('Could not load your invoices'));
       } finally {
@@ -97,6 +83,17 @@ export default function AppBilling() {
       alive = false;
     };
   }, []);
+
+  const checkout = async (plan) => {
+    setError(null);
+    try {
+      const result = await createCheckout(plan._id, yearly ? 'yearly' : 'monthly');
+      if (!result?.url) throw new Error('Stripe checkout did not return a URL');
+      window.location.assign(result.url);
+    } catch (e) {
+      setError(e);
+    }
+  };
 
   const paidTotal = useMemo(
     () => invoices.filter((i) => i.status === 'paid').length,
@@ -142,10 +139,22 @@ export default function AppBilling() {
           </div>
         </div>
 
-        <CellGrid cols={3} style={{ marginBottom: 34 }}>
-          {PLANS.map((p) => (
+        {budget && (
+          <div data-testid="billing-budget" style={{ ...mono(11, '0'), marginBottom: 18 }}>
+            {budget.status === 'unavailable'
+              ? 'AI budget unavailable · model-running actions are paused'
+              : `AI budget: $${Number(budget.remaining || 0).toFixed(2)} of $${Number(budget.limit || 0).toFixed(2)} remaining · ${budget.status} · renews monthly`}
+          </div>
+        )}
+
+        <CellGrid cols={Math.max(plans.length, 1)} style={{ marginBottom: 34 }}>
+          {plans.map((p) => {
+            const current = subscription?.planId?._id === p._id || subscription?.planId === p._id;
+            const amount = yearly ? p.priceYearly : p.priceMonthly;
+            return (
             <div
               key={p.name}
+              data-testid={`billing-plan-${p.type}`}
               style={{
                 background: 'var(--jb-v3-panel)',
                 padding: '24px 22px',
@@ -162,17 +171,17 @@ export default function AppBilling() {
                 }}
               >
                 <span style={{ fontSize: 15, fontWeight: 600 }}>{p.name}</span>
-                {p.tag && (
-                  <span style={mono(9.5, '0.12em', 'var(--jb-v3-accent)')}>{p.tag}</span>
+                {p.type === 'PRO' && (
+                  <span style={mono(9.5, '0.12em', 'var(--jb-v3-accent)')}>Paid</span>
                 )}
               </div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, marginBottom: 22 }}>
                 <span
                   style={{ fontSize: 34, fontWeight: 600, letterSpacing: '-0.045em', lineHeight: 1 }}
                 >
-                  ${yearly ? p.yearly : p.monthly}
+                  ${amount}
                 </span>
-                <span style={mono(10, '0')}>/mo</span>
+                <span style={mono(10, '0')}>{yearly ? '/year' : '/month'}</span>
               </div>
               <div
                 style={{
@@ -183,7 +192,7 @@ export default function AppBilling() {
                   marginBottom: 22,
                 }}
               >
-                {p.lines.map((l) => (
+                {(p.features || []).map((l) => (
                   <div key={l} style={{ display: 'flex', alignItems: 'baseline', gap: 9 }}>
                     <span
                       style={{
@@ -198,11 +207,18 @@ export default function AppBilling() {
                   </div>
                 ))}
               </div>
-              <MonoButton block filled={p.name === 'Pro'} href="/app/upgrade" style={{ padding: '8px 0' }}>
-                {p.cta}
+              <MonoButton
+                block
+                filled={p.type === 'PRO'}
+                disabled={p.type === 'FREE' || current}
+                data-testid={`billing-checkout-${p.type}`}
+                onClick={() => checkout(p)}
+                style={{ padding: '8px 0', opacity: p.type === 'FREE' || current ? 0.55 : 1 }}
+              >
+                {current ? 'Current' : p.type === 'FREE' ? 'Free' : 'Choose Paid'}
               </MonoButton>
             </div>
-          ))}
+          );})}
         </CellGrid>
 
         {loading && <LoadingState label="Loading your invoices…" />}
