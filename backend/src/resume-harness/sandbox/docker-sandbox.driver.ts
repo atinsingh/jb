@@ -3,6 +3,7 @@ import { execFile } from 'child_process';
 import {
   ExecResult,
   ReapedSandbox,
+  SandboxExecOptions,
   SandboxDriver,
   SandboxSpec,
 } from './sandbox-driver.interface';
@@ -194,9 +195,13 @@ export class DockerSandboxDriver implements SandboxDriver {
   async exec(
     id: string,
     command: string[],
-    opts: { timeoutSeconds?: number; cwd?: string } = {},
+    opts: SandboxExecOptions = {},
   ): Promise<ExecResult> {
-    const argv = ['exec', '-w', opts.cwd || this.workdir, id, ...command];
+    const argv = ['exec', '-w', opts.cwd || this.workdir];
+    for (const [key, value] of Object.entries(opts.env ?? {})) {
+      argv.push('-e', `${key}=${value}`);
+    }
+    argv.push(id, ...command);
     const res = await this.run(
       argv,
       undefined,
@@ -216,9 +221,13 @@ export class DockerSandboxDriver implements SandboxDriver {
     id: string,
     command: string[],
     onChunk: (chunk: string) => void,
-    opts: { timeoutSeconds?: number; cwd?: string } = {},
+    opts: SandboxExecOptions = {},
   ): Promise<ExecResult> {
-    const argv = ['exec', '-w', opts.cwd || this.workdir, id, ...command];
+    const argv = ['exec', '-w', opts.cwd || this.workdir];
+    for (const [key, value] of Object.entries(opts.env ?? {})) {
+      argv.push('-e', `${key}=${value}`);
+    }
+    argv.push(id, ...command);
     const res = await this.run(
       argv,
       undefined,

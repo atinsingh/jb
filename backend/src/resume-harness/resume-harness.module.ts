@@ -1,4 +1,4 @@
-import { forwardRef, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ResumeHarnessController } from './resume-harness.controller';
 import { ResumeHarnessService } from './resume-harness.service';
@@ -46,30 +46,27 @@ import {
   ResumeHarnessSessionSchema,
 } from './schemas/resume-harness-session.schema';
 import {
-  HarnessModelAlias,
-  HarnessModelAliasSchema,
-} from './schemas/harness-model-alias.schema';
-import {
   ResumeTemplate,
   ResumeTemplateSchema,
 } from './schemas/resume-template.schema';
-import { User, UserSchema } from '../schemas/user.schema';
 import {
   UserPreferences,
   UserPreferencesSchema,
 } from '../schemas/user-preferences.schema';
+import { User, UserSchema } from '../schemas/user.schema';
 import { ResumeSandboxReaperService } from './resume-sandbox-reaper.service';
 import { IngestionModule } from '../ingestion/ingestion.module';
 import { JobDescriptionResolverService } from './job-description-resolver.service';
 import { AiBudgetModule } from '../ai-budget/ai-budget.module';
+import { ModelAliasModule } from './model-alias.module';
 
 @Module({
   imports: [
     IngestionModule,
-    forwardRef(() => AiBudgetModule),
+    AiBudgetModule,
+    ModelAliasModule,
     MongooseModule.forFeature([
       { name: ResumeHarnessSession.name, schema: ResumeHarnessSessionSchema },
-      { name: HarnessModelAlias.name, schema: HarnessModelAliasSchema },
       { name: ResumeTemplate.name, schema: ResumeTemplateSchema },
       { name: User.name, schema: UserSchema },
       { name: UserPreferences.name, schema: UserPreferencesSchema },
@@ -78,7 +75,6 @@ import { AiBudgetModule } from '../ai-budget/ai-budget.module';
   controllers: [ResumeHarnessController],
   providers: [
     ResumeHarnessService,
-    ModelAliasService,
     CandidateContextService,
     ContextFilesService,
     ResumeTemplateService,
@@ -91,7 +87,7 @@ import { AiBudgetModule } from '../ai-budget/ai-budget.module';
   ],
   exports: [
     ResumeHarnessService,
-    ModelAliasService,
+    ModelAliasModule,
     ResumeTemplateService,
     SandboxService,
   ],

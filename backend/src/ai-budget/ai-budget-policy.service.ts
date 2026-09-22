@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 import {
@@ -193,7 +193,11 @@ export function parseAiBudgetPolicy(value: unknown): AiBudgetPolicy {
 export class AiBudgetPolicyService {
   private readonly policy: AiBudgetPolicy;
 
-  constructor(policyPath = join(process.cwd(), 'config', 'ai-budget.yaml')) {
+  constructor(
+    @Optional()
+    @Inject('AI_BUDGET_POLICY_PATH')
+    policyPath = join(process.cwd(), 'config', 'ai-budget.yaml'),
+  ) {
     try {
       this.policy = parseAiBudgetPolicy(
         parseYaml(readFileSync(policyPath, 'utf8')),

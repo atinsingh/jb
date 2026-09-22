@@ -1,4 +1,4 @@
-import { forwardRef, Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { randomUUID } from 'crypto';
 import { Model } from 'mongoose';
@@ -65,7 +65,6 @@ export class AiBudgetService {
     private readonly policy: AiBudgetPolicyService,
     private readonly client: LiteLlmBudgetClient,
     private readonly codec: AiBudgetSecretCodec,
-    @Inject(forwardRef(() => ModelAliasService))
     private readonly aliases: ModelAliasService,
   ) {}
 
@@ -321,15 +320,15 @@ export class AiBudgetService {
     runId: string,
   ): readonly string[] {
     return [
-      'owner_type:candidate',
-      `owner_id:${userId}`,
-      `service:${service}`,
-      `harness:${attribution.harness}`,
-      `alias:${attribution.alias}`,
-      `model:${attribution.model}`,
-      `effort:${attribution.effort}`,
-      `session:${attribution.sessionId}`,
-      `run:${runId}`,
+      'ownerType=candidate',
+      `ownerId=${userId}`,
+      `usageContext=${service}`,
+      `harness=${attribution.harness}`,
+      `modelAlias=${attribution.alias}`,
+      `model=${attribution.model}`,
+      `effort=${attribution.effort}`,
+      `sessionId=${attribution.sessionId}`,
+      `logicalRunId=${runId}`,
     ];
   }
 

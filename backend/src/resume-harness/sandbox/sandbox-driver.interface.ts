@@ -25,6 +25,13 @@ export interface ExecResult {
   stderr: string;
 }
 
+export interface SandboxExecOptions {
+  timeoutSeconds?: number;
+  cwd?: string;
+  /** Environment overrides applied only to this process invocation. */
+  env?: Record<string, string>;
+}
+
 export interface ReapedSandbox {
   sandboxId: string;
   sessionId?: string;
@@ -43,14 +50,14 @@ export interface SandboxDriver {
   exec(
     id: string,
     command: string[],
-    opts?: { timeoutSeconds?: number; cwd?: string },
+    opts?: SandboxExecOptions,
   ): Promise<ExecResult>;
   /** Optional: run a command and report stdout as it arrives. */
   execStream?(
     id: string,
     command: string[],
     onChunk: (chunk: string) => void,
-    opts?: { timeoutSeconds?: number; cwd?: string },
+    opts?: SandboxExecOptions,
   ): Promise<ExecResult>;
   sweepExpired(now?: Date): Promise<ReapedSandbox[]>;
   destroy(id: string): Promise<void>;

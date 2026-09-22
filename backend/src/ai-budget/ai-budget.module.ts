@@ -1,4 +1,4 @@
-import { forwardRef, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AiBudgetPolicyService } from './ai-budget-policy.service';
@@ -8,13 +8,13 @@ import {
   AiBudgetAccount,
   AiBudgetAccountSchema,
 } from './schemas/ai-budget-account.schema';
-import { ResumeHarnessModule } from '../resume-harness/resume-harness.module';
+import { ModelAliasModule } from '../resume-harness/model-alias.module';
 import { AiBudgetService } from './ai-budget.service';
 
 @Module({
   imports: [
     ConfigModule,
-    forwardRef(() => ResumeHarnessModule),
+    ModelAliasModule,
     MongooseModule.forFeature([
       { name: AiBudgetAccount.name, schema: AiBudgetAccountSchema },
     ]),

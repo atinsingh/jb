@@ -8,8 +8,17 @@ import { LoggingInterceptor } from '../src/common/interceptors/logging.intercept
 import { SANDBOX_DRIVER } from '../src/resume-harness/sandbox/sandbox-driver.interface';
 import { HarnessModelAlias } from '../src/resume-harness/schemas/harness-model-alias.schema';
 import { ResumeTemplate } from '../src/resume-harness/schemas/resume-template.schema';
+import { User } from '../src/schemas/user.schema';
 import { seedResumeTemplates } from '../src/resume-harness/templates/resume-templates.seed';
 import { HARNESS_IDS } from '../src/resume-harness/harness/harness.types';
+import {
+  AiBudgetService,
+  AiBudgetSnapshot,
+} from '../src/ai-budget/ai-budget.service';
+import {
+  AiBudgetExhaustedException,
+  AiBudgetUnavailableException,
+} from '../src/ai-budget/ai-budget.errors';
 import {
   api,
   auth,
@@ -116,7 +125,7 @@ class FakeSandboxDriver {
 
     const body = existing
       ? `${existing}\n% ${first}`
-      : `${skeleton || '\\documentclass{article}\n\\begin{document}\n\\end{document}'}\n% ${first}`;
+      : `${this.generatedResume(skeleton || '\\documentclass{article}\n\\begin{document}\n\\end{document}')}\n% ${first}`;
     box.files.set('resume.tex', body);
     return { exitCode: 0, stdout: 'edited resume.tex', stderr: '' };
   }
@@ -129,6 +138,32 @@ class FakeSandboxDriver {
     const box = this.sandboxes.get(id);
     if (!box) throw new Error(`sandbox ${id} does not exist`);
     return box;
+  }
+
+  private generatedResume(skeleton: string): string {
+    return skeleton
+      .replaceAll('FULL NAME', 'Resume Harness Tester')
+      .replaceAll(
+        'Email \\textperiodcentered\\ Phone \\textperiodcentered\\ Location \\textperiodcentered\\ LinkedIn',
+        'resume@example.com \\textperiodcentered\\ Toronto \\textperiodcentered\\ linkedin.com/in/resume-harness',
+      )
+      .replaceAll(
+        'Two or three lines, written from CANDIDATE.md.',
+        'Backend engineer who builds reliable payment platforms.',
+      )
+      .replaceAll(
+        "Achievement, in the candidate's own facts.",
+        'Improved payment reliability for a high-volume platform.',
+      )
+      .replaceAll('Grouped, comma separated.', 'TypeScript, Kubernetes, MongoDB.')
+      .replaceAll(
+        '\\resentry{Role}{Organisation}{Dates}{Location}',
+        '\\resentry{Staff Engineer}{Stripe}{2019--2024}{Toronto}',
+      )
+      .replaceAll(
+        '\\resentry{Degree}{Institution}{Dates}{Location}',
+        '\\resentry{BSc Computer Science}{University of Toronto}{2015--2019}{}',
+      );
   }
 }
 
@@ -183,6 +218,29 @@ describe('Resume harness (e2e)', () => {
   let app: INestApplication;
   let platform: FakeSandboxDriver;
   let candidate: TestUser;
+  const budgetSnapshot: AiBudgetSnapshot = {
+    unit: 'USD', tier: 'FREE', limit: 0.5, spent: 0.1, remaining: 0.4,
+    periodStart: '2026-09-01T00:00:00.000Z',
+    periodEnd: '2026-10-01T00:00:00.000Z',
+    resetAt: '2026-10-01T00:00:00.000Z', status: 'healthy',
+    lastRefreshedAt: '2026-09-21T12:00:00.000Z',
+  };
+  const candidateAccess = {
+    apiKey: 'sk-e2e-candidate', keyId: 'key-e2e',
+    keyAlias: 'candidate:e2e', snapshot: budgetSnapshot,
+  };
+  let budgetFailure: Error | undefined;
+  const budget = {
+    statusCandidate: jest.fn(async () => budgetSnapshot),
+    ensureCandidateAccess: jest.fn(async () => {
+      if (budgetFailure) throw budgetFailure;
+      return candidateAccess;
+    }),
+    withCandidateLease: jest.fn(async (_u, _s, _a, run) => {
+      if (budgetFailure) throw budgetFailure;
+      return run(candidateAccess, ['ownerType=candidate']);
+    }),
+  };
 
   beforeAll(async () => {
     platform = new FakeSandboxDriver();
@@ -190,6 +248,8 @@ describe('Resume harness (e2e)', () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(SANDBOX_DRIVER)
       .useValue(platform)
+      .overrideProvider(AiBudgetService)
+      .useValue(budget)
       .compile();
 
     app = moduleRef.createNestApplication({ rawBody: true });
@@ -207,6 +267,28 @@ describe('Resume harness (e2e)', () => {
 
     await resetDatabase(app);
     candidate = await registerUser(app, 'ROLE_CANDIDATE', 'resume-harness');
+
+    await app.get<Model<any>>(getModelToken(User.name)).findByIdAndUpdate(
+      candidate.id,
+      {
+        $set: {
+          name: 'Resume Harness Tester',
+          location: 'Toronto',
+          linkedin: 'linkedin.com/in/resume-harness',
+          skills: ['TypeScript', 'Kubernetes', 'MongoDB'],
+          experience: [{
+            title: 'Staff Engineer', company: 'Stripe', location: 'Toronto',
+            startDate: '2019', endDate: '2024',
+            description: 'Built reliable payment platforms.',
+            achievements: ['Improved payment reliability for a high-volume platform.'],
+          }],
+          education: [{
+            degree: 'BSc Computer Science', institution: 'University of Toronto',
+            startDate: '2015', endDate: '2019',
+          }],
+        },
+      },
+    );
 
     const aliases = app.get<Model<any>>(getModelToken(HarnessModelAlias.name));
     await aliases.create([
@@ -228,6 +310,18 @@ describe('Resume harness (e2e)', () => {
     await app?.close();
   });
 
+  beforeEach(() => {
+    budgetFailure = undefined;
+  });
+
+  it('returns the exact candidate budget snapshot', async () => {
+    const res = await api(app)
+      .get('/api/resume-harness/budget')
+      .set(auth(candidate.token))
+      .expect(200);
+    expect(res.body).toEqual(budgetSnapshot);
+  });
+
   it('offers model capabilities without provider or runtime details', async () => {
     const res = await api(app)
       .get('/api/resume-harness/options')
@@ -240,16 +334,34 @@ describe('Resume harness (e2e)', () => {
         model: FREE_TIER_ALIAS.model,
         label: FREE_TIER_ALIAS.modelLabel,
         efforts: [FREE_TIER_ALIAS.effort],
+        estimates: {
+          low: {
+            kind: 'range', minUsd: 0.01, maxUsd: 0.15,
+            label: '$0.01-$0.15 estimated',
+          },
+        },
       },
       {
         model: FREE_OPENAI_ALIAS.model,
         label: FREE_OPENAI_ALIAS.modelLabel,
         efforts: [FREE_OPENAI_ALIAS.effort],
+        estimates: {
+          low: {
+            kind: 'range', minUsd: 0.003, maxUsd: 0.08,
+            label: '$0.003-$0.08 estimated',
+          },
+        },
       },
       {
         model: FREE_BEDROCK_ALIAS.model,
         label: FREE_BEDROCK_ALIAS.modelLabel,
         efforts: [FREE_BEDROCK_ALIAS.effort],
+        estimates: {
+          low: {
+            kind: 'range', minUsd: 0.001, maxUsd: 0.02,
+            label: '$0.001-$0.02 estimated',
+          },
+        },
       },
     ]);
     expect(res.body.tier).toBe('FREE');
@@ -261,6 +373,65 @@ describe('Resume harness (e2e)', () => {
       .set(auth(candidate.token))
       .send({ model: ELITE_ONLY_ALIAS.model, effort: ELITE_ONLY_ALIAS.effort })
       .expect(403);
+  });
+
+  it.each([
+    {
+      status: 402,
+      code: 'AI_BUDGET_EXHAUSTED',
+      failure: () => new AiBudgetExhaustedException({
+        ...budgetSnapshot, spent: 0.5, remaining: 0, status: 'exhausted',
+      }),
+    },
+    {
+      status: 503,
+      code: 'AI_BUDGET_UNAVAILABLE',
+      failure: () => new AiBudgetUnavailableException(),
+    },
+  ])('blocks session provisioning with $status when budget preflight fails', async ({ status, code, failure }) => {
+    const before = platform.sandboxes.size;
+    budgetFailure = failure();
+    const res = await api(app)
+      .post('/api/resume-harness/sessions')
+      .set(auth(candidate.token))
+      .send({ model: FREE_TIER_ALIAS.model, effort: FREE_TIER_ALIAS.effort })
+      .expect(status);
+    expect(res.body.code).toBe(code);
+    expect(platform.sandboxes.size).toBe(before);
+  });
+
+  it('ends a blocked stream with a typed error frame before sandbox execution', async () => {
+    const started = await api(app)
+      .post('/api/resume-harness/sessions')
+      .set(auth(candidate.token))
+      .send({ model: FREE_OPENAI_ALIAS.model, effort: FREE_OPENAI_ALIAS.effort })
+      .expect(201);
+    const box = platform.sandboxes.get(started.body.sandboxId)!;
+    const beforeExecs = box.execs.length;
+    const exhausted = { ...budgetSnapshot, spent: 0.5, remaining: 0, status: 'exhausted' as const };
+    budgetFailure = new AiBudgetExhaustedException(exhausted);
+
+    const res = await api(app)
+      .post(`/api/resume-harness/sessions/${started.body.id}/turns/stream`)
+      .set(auth(candidate.token))
+      .send({ instruction: 'Build my resume.' })
+      .expect(201);
+    const events = res.text
+      .split(/\n\n/)
+      .filter(Boolean)
+      .map((frame) => JSON.parse(frame.replace(/^data: /, '')));
+    expect(events.at(-1)).toEqual({
+      type: 'error',
+      code: 'AI_BUDGET_EXHAUSTED',
+      message: 'Your monthly AI budget is exhausted. No AI work was started.',
+      budget: exhausted,
+    });
+    expect(box.execs).toHaveLength(beforeExecs);
+    budgetFailure = undefined;
+    await api(app)
+      .post(`/api/resume-harness/sessions/${started.body.id}/end`)
+      .set(auth(candidate.token))
+      .expect(201);
   });
 
   // Provider metadata chooses the private runtime on the server.

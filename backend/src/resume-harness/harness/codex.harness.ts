@@ -47,7 +47,7 @@ export class CodexHarness implements HarnessAdapter {
         ...input.contextFiles,
         {
           path: '.codex/config.toml',
-          contents: this.configToml(proxy.baseUrl, alias),
+          contents: this.configToml(proxy.baseUrl, alias, input.requestTags),
         },
       ],
       command: [
@@ -63,7 +63,7 @@ export class CodexHarness implements HarnessAdapter {
         '--dangerously-bypass-approvals-and-sandbox',
         PROMPT_PLACEHOLDER,
       ],
-      proxyHeaders: harnessProxyHeaders(this.id),
+      proxyHeaders: harnessProxyHeaders(this.id, input.requestTags),
     };
   }
 
@@ -221,7 +221,11 @@ export class CodexHarness implements HarnessAdapter {
     return undefined;
   }
 
-  private configToml(baseUrl: string, alias: ResolvedModelAlias): string {
+  private configToml(
+    baseUrl: string,
+    alias: ResolvedModelAlias,
+    requestTags?: readonly string[],
+  ): string {
     // The OpenAI-compatible route lives under /v1; Codex appends the rest.
     const apiBase = `${baseUrl.replace(/\/+$/, '')}/v1`;
     const ceiling = alias.maxOutputTokens
@@ -244,7 +248,7 @@ export class CodexHarness implements HarnessAdapter {
       'wire_api = "responses"',
       '',
       '[model_providers.litellm.http_headers]',
-      `"${LITELLM_TAG_HEADER}" = "${harnessTag(this.id)}"`,
+      `"${LITELLM_TAG_HEADER}" = "${(requestTags?.length ? requestTags : [harnessTag(this.id)]).join(',')}"`,
       '',
     ].join('\n');
   }

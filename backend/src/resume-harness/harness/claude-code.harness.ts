@@ -46,7 +46,9 @@ export class ClaudeCodeHarness implements HarnessAdapter {
         ANTHROPIC_MODEL: alias.alias,
         ANTHROPIC_SMALL_FAST_MODEL: alias.alias,
         // Tags the spend log so per-harness usage is reportable.
-        ANTHROPIC_CUSTOM_HEADERS: Object.entries(harnessProxyHeaders(this.id))
+        ANTHROPIC_CUSTOM_HEADERS: Object.entries(
+          harnessProxyHeaders(this.id, input.requestTags),
+        )
           .map(([k, v]) => `${k}: ${v}`)
           .join('\n'),
         // Only set when the alias states a ceiling — an invented default here
@@ -71,7 +73,7 @@ export class ClaudeCodeHarness implements HarnessAdapter {
         '--verbose',
         PROMPT_PLACEHOLDER,
       ],
-      proxyHeaders: harnessProxyHeaders(this.id),
+      proxyHeaders: harnessProxyHeaders(this.id, input.requestTags),
     };
   }
 

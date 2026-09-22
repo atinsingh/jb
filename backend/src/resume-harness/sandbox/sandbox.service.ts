@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   ExecResult,
   ReapedSandbox,
+  SandboxExecOptions,
   SandboxDriver,
   SANDBOX_DRIVER,
 } from './sandbox-driver.interface';
@@ -112,7 +113,7 @@ export class SandboxService {
   exec(
     sandboxId: string,
     command: string[],
-    opts: { timeoutSeconds?: number } = {},
+    opts: Omit<SandboxExecOptions, 'cwd'> = {},
   ): Promise<ExecResult> {
     return this.client.exec(sandboxId, command, {
       ...opts,
@@ -128,7 +129,7 @@ export class SandboxService {
     sandboxId: string,
     command: string[],
     onChunk: (chunk: string) => void,
-    opts: { timeoutSeconds?: number } = {},
+    opts: Omit<SandboxExecOptions, 'cwd'> = {},
   ): Promise<ExecResult> {
     if (this.client.execStream) {
       return this.client.execStream(sandboxId, command, onChunk, {

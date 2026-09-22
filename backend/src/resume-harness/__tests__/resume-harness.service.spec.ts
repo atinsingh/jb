@@ -13,6 +13,8 @@ import { ResumeHarnessSession } from '../schemas/resume-harness-session.schema';
 import { LITELLM_TAG_HEADER } from '../harness/harness.types';
 import { StorageService } from '../../storage/storage.service';
 import { JobDescriptionResolverService } from '../job-description-resolver.service';
+import { AiBudgetService } from '../../ai-budget/ai-budget.service';
+import { AiBudgetPolicyService } from '../../ai-budget/ai-budget-policy.service';
 
 /**
  * A minimally realistic résumé.
@@ -136,11 +138,12 @@ describe('ResumeHarnessService', () => {
   };
 
   const sandbox: any = {
+    isAvailable: jest.fn(async () => true),
     provision: jest.fn(async () => ({ sandboxId: `sbx-${++boxSeq}` })),
     writeFiles: jest.fn(async () => undefined),
     readFile: jest.fn(async () => resumeDoc('base')),
     exec: jest.fn(async () => ({ exitCode: 0, stdout: 'ok', stderr: '' })),
-    execStream: jest.fn(),
+    execStream: jest.fn(async () => ({ exitCode: 0, stdout: 'ok', stderr: '' })),
     destroy: jest.fn(async () => undefined),
   };
 
@@ -158,6 +161,37 @@ describe('ResumeHarnessService', () => {
     resolveSelectionForUser: jest.fn(async () => LUNA_ALIAS),
     listForUser: jest.fn(async () => [ALIAS]),
     capabilitiesForUser: jest.fn(async () => []),
+    tierFor: jest.fn(async () => 'FREE'),
+  };
+
+  const budgetSnapshot = {
+    unit: 'USD', tier: 'FREE', limit: 0.5, spent: 0.1, remaining: 0.4,
+    periodStart: '2026-09-01T00:00:00.000Z',
+    periodEnd: '2026-10-01T00:00:00.000Z',
+    resetAt: '2026-10-01T00:00:00.000Z', status: 'healthy',
+    lastRefreshedAt: '2026-09-21T12:00:00.000Z',
+  };
+  const candidateAccess = {
+    apiKey: 'sk-candidate-u1', keyId: 'key-u1',
+    keyAlias: 'candidate:u1', snapshot: budgetSnapshot,
+  };
+  const aiBudget: any = {
+    statusCandidate: jest.fn(async () => budgetSnapshot),
+    ensureCandidateAccess: jest.fn(async () => candidateAccess),
+    withCandidateLease: jest.fn(async (_userId, _service, _attribution, run) =>
+      run(candidateAccess, [
+        'ownerType=candidate', 'ownerId=u1', 'usageContext=resume_agent_turn',
+        'harness=codex', 'modelAlias=openai/gpt-5.6-luna/high',
+        'model=gpt-5.6-luna', 'effort=high', 'sessionId=sess-1',
+        'logicalRunId=run-1',
+      ]),
+    ),
+  };
+  const aiBudgetPolicy: any = {
+    estimate: jest.fn(() => ({
+      kind: 'range', minUsd: 0.005, maxUsd: 0.12,
+      label: '$0.005-$0.12 estimated',
+    })),
   };
 
   const candidateContext: any = {
@@ -227,6 +261,14 @@ describe('ResumeHarnessService', () => {
       sandboxId: `sbx-${++boxSeq}`,
     }));
     sandbox.destroy.mockReset().mockResolvedValue(undefined);
+    sandbox.execStream.mockReset().mockResolvedValue({
+      exitCode: 0,
+      stdout: 'ok',
+      stderr: '',
+    });
+    aiBudget.ensureCandidateAccess.mockReset().mockResolvedValue(candidateAccess);
+    aiBudget.withCandidateLease.mockClear();
+    aiBudget.statusCandidate.mockClear();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -244,6 +286,8 @@ describe('ResumeHarnessService', () => {
         { provide: CandidateContextService, useValue: candidateContext },
         { provide: ResumeTemplateService, useValue: templates },
         { provide: JobDescriptionResolverService, useValue: jobDescriptions },
+        { provide: AiBudgetService, useValue: aiBudget },
+        { provide: AiBudgetPolicyService, useValue: aiBudgetPolicy },
       ],
     }).compile();
 
@@ -274,6 +318,76 @@ describe('ResumeHarnessService', () => {
 
   const start = (harness: any = 'claude-code', input = {}) =>
     startWith(service, 'u1', harness, input);
+
+  it('preflights before provisioning and injects only the candidate virtual key', async () => {
+    const oldShared = process.env.RESUME_HARNESS_LITELLM_KEY;
+    process.env.RESUME_HARNESS_LITELLM_KEY = 'sk-shared-must-not-be-used';
+    try {
+      await start('codex');
+      expect(aiBudget.ensureCandidateAccess).toHaveBeenCalledWith('u1');
+      expect(aiBudget.ensureCandidateAccess.mock.invocationCallOrder[0]).toBeLessThan(
+        sandbox.provision.mock.invocationCallOrder[0],
+      );
+      const { env } = sandbox.provision.mock.calls[0][0];
+      expect(env.OPENAI_API_KEY).toBe(candidateAccess.apiKey);
+      expect(env.JOBOCATE_LITELLM_API_KEY).toBe(candidateAccess.apiKey);
+      expect(JSON.stringify(env)).not.toContain('sk-shared-must-not-be-used');
+    } finally {
+      if (oldShared === undefined) delete process.env.RESUME_HARNESS_LITELLM_KEY;
+      else process.env.RESUME_HARNESS_LITELLM_KEY = oldShared;
+    }
+  });
+
+  it('reports budget and adds a per-effort estimate without exposing aliases', async () => {
+    modelAlias.capabilitiesForUser.mockResolvedValueOnce([{
+      model: LUNA_ALIAS.model, label: 'GPT-5.6 Luna', efforts: ['high'],
+    }]);
+    modelAlias.listForUser.mockResolvedValueOnce([LUNA_ALIAS]);
+
+    await expect(service.budget('u1')).resolves.toEqual(budgetSnapshot);
+    const result = await service.options('u1');
+    expect(result.models).toEqual([{
+      model: LUNA_ALIAS.model,
+      label: 'GPT-5.6 Luna',
+      efforts: ['high'],
+      estimates: {
+        high: {
+          kind: 'range', minUsd: 0.005, maxUsd: 0.12,
+          label: '$0.005-$0.12 estimated',
+        },
+      },
+    }]);
+    expect(JSON.stringify(result.models)).not.toContain(LUNA_ALIAS.alias);
+  });
+
+  it('runs ordinary and streaming model turns inside candidate leases', async () => {
+    const session = await start('codex');
+    sandbox.readFile.mockResolvedValue(resumeDoc('changed'));
+
+    await service.runTurn('u1', session.id, { instruction: 'build it' });
+    await service.runTurnStreaming(
+      'u1', session.id, { instruction: 'tighten it' }, jest.fn(),
+    );
+
+    expect(aiBudget.withCandidateLease).toHaveBeenNthCalledWith(
+      1, 'u1', 'resume_agent_turn',
+      expect.objectContaining({
+        harness: 'codex', alias: CODEX_ALIAS.alias, model: CODEX_ALIAS.model,
+        effort: CODEX_ALIAS.effort, sessionId: session.id,
+        runId: expect.any(String),
+      }),
+      expect.any(Function),
+    );
+    expect(aiBudget.withCandidateLease).toHaveBeenNthCalledWith(
+      2, 'u1', 'resume_agent_turn', expect.any(Object), expect.any(Function),
+    );
+    expect(JSON.stringify(sandbox.writeFiles.mock.calls)).toContain(
+      'usageContext=resume_agent_turn',
+    );
+    expect(sandbox.exec.mock.calls[0][2].env.OPENAI_API_KEY).toBe(
+      candidateAccess.apiKey,
+    );
+  });
 
   it('persists Luna selection and routes its sandbox through Codex', async () => {
     modelAlias.resolveSelectionForUser.mockResolvedValueOnce(LUNA_ALIAS);
@@ -436,6 +550,8 @@ describe('ResumeHarnessService', () => {
       sandbox,
       latex,
       storage,
+      aiBudget,
+      aiBudgetPolicy,
     );
 
     let firstProvisionEnteredResolve!: () => void;
@@ -561,20 +677,16 @@ describe('ResumeHarnessService', () => {
 
   it('gives in-sandbox ATS tooling the same LiteLLM route and credential as generation', async () => {
     const oldUrl = process.env.RESUME_HARNESS_LITELLM_INTERNAL_URL;
-    const oldKey = process.env.RESUME_HARNESS_LITELLM_KEY;
     process.env.RESUME_HARNESS_LITELLM_INTERNAL_URL = 'http://litellm:4000';
-    process.env.RESUME_HARNESS_LITELLM_KEY = 'sk-one-user-key';
     try {
       await start('codex');
       const { env } = sandbox.provision.mock.calls[0][0];
       expect(env.JOBOCATE_LITELLM_BASE_URL).toBe('http://litellm:4000');
-      expect(env.JOBOCATE_LITELLM_API_KEY).toBe('sk-one-user-key');
+      expect(env.JOBOCATE_LITELLM_API_KEY).toBe(candidateAccess.apiKey);
     } finally {
       if (oldUrl === undefined)
         delete process.env.RESUME_HARNESS_LITELLM_INTERNAL_URL;
       else process.env.RESUME_HARNESS_LITELLM_INTERNAL_URL = oldUrl;
-      if (oldKey === undefined) delete process.env.RESUME_HARNESS_LITELLM_KEY;
-      else process.env.RESUME_HARNESS_LITELLM_KEY = oldKey;
     }
   });
 

@@ -83,6 +83,8 @@ export interface HarnessBootstrapInput {
   alias: ResolvedModelAlias;
   /** Shared/context files produced by `ContextFilesService`. */
   contextFiles: HarnessContextFile[];
+  /** Per-action LiteLLM attribution tags. Defaults to the harness tag. */
+  requestTags?: readonly string[];
 }
 
 export interface HarnessBootstrap {
@@ -149,8 +151,11 @@ export interface HarnessAdapter {
 export const harnessTag = (id: HarnessId): string => `harness=${id}`;
 
 /** Header map shared by all adapters. */
-export const harnessProxyHeaders = (id: HarnessId): Record<string, string> => ({
-  [LITELLM_TAG_HEADER]: harnessTag(id),
+export const harnessProxyHeaders = (
+  id: HarnessId,
+  requestTags?: readonly string[],
+): Record<string, string> => ({
+  [LITELLM_TAG_HEADER]: (requestTags?.length ? requestTags : [harnessTag(id)]).join(','),
 });
 
 /** Default prompt substitution shared by all adapters. */

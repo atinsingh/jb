@@ -48,7 +48,7 @@ export class OpenCodeHarness implements HarnessAdapter {
         ...input.contextFiles,
         {
           path: configPath,
-          contents: this.config(proxy.baseUrl, alias),
+          contents: this.config(proxy.baseUrl, alias, input.requestTags),
         },
       ],
       command: [
@@ -70,7 +70,7 @@ export class OpenCodeHarness implements HarnessAdapter {
         'json',
         PROMPT_PLACEHOLDER,
       ],
-      proxyHeaders: harnessProxyHeaders(this.id),
+      proxyHeaders: harnessProxyHeaders(this.id, input.requestTags),
     };
   }
 
@@ -144,7 +144,11 @@ export class OpenCodeHarness implements HarnessAdapter {
     return `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
   }
 
-  private config(baseUrl: string, alias: ResolvedModelAlias): string {
+  private config(
+    baseUrl: string,
+    alias: ResolvedModelAlias,
+    requestTags?: readonly string[],
+  ): string {
     // The AI SDK's openai-compatible provider appends /chat/completions to
     // baseURL, so it must point at the proxy's /v1 root, not the host root.
     const apiBase = `${baseUrl.replace(/\/+$/, '')}/v1`;
@@ -172,7 +176,10 @@ export class OpenCodeHarness implements HarnessAdapter {
               baseURL: apiBase,
               apiKey: '{env:LITELLM_API_KEY}',
               headers: {
-                [LITELLM_TAG_HEADER]: harnessTag(this.id),
+                [LITELLM_TAG_HEADER]: (requestTags?.length
+                  ? requestTags
+                  : [harnessTag(this.id)]
+                ).join(','),
               },
             },
             models: {

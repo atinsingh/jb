@@ -104,10 +104,10 @@ describe('AiBudgetService', () => {
           seenKeys.push(access.apiKey);
           expect(tags).toEqual(
             expect.arrayContaining([
-              'owner_type:candidate',
-              'owner_id:candidate-1',
-              `harness:${harness}`,
-              'service:resume_agent_turn',
+              'ownerType=candidate',
+              'ownerId=candidate-1',
+              `harness=${harness}`,
+              'usageContext=resume_agent_turn',
             ]),
           );
           return 'ok';

@@ -6,7 +6,7 @@ export type AiBudgetAccountDocument = HydratedDocument<AiBudgetAccount>;
 
 @Schema({ timestamps: true, collection: 'ai_budget_accounts' })
 export class AiBudgetAccount {
-  @Prop({ required: true, enum: ['candidate', 'employer'] })
+  @Prop({ type: String, required: true, enum: ['candidate', 'employer'] })
   ownerType: AiBudgetOwnerType;
 
   @Prop({
@@ -31,7 +31,7 @@ export class AiBudgetAccount {
   @Prop({ required: true, min: 0 })
   appliedLimitUsd: number;
 
-  @Prop({ required: true, enum: ['1mo'] })
+  @Prop({ type: String, required: true, enum: ['1mo'] })
   budgetDuration: '1mo';
 
   @Prop()

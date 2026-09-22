@@ -15,6 +15,8 @@ interface ErrorResponse {
   timestamp: string;
   path: string;
   correlationId?: string;
+  code?: string;
+  budget?: unknown;
 }
 
 @Catch()
@@ -31,6 +33,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let status: number;
     let message: string | string[];
     let error: string;
+    let details: Pick<ErrorResponse, 'code' | 'budget'> = {};
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -40,6 +43,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
         const responseObj = exceptionResponse as Record<string, any>;
         message = responseObj.message || exception.message;
         error = responseObj.error || 'Error';
+        if (typeof responseObj.code === 'string') details.code = responseObj.code;
+        if (responseObj.budget !== undefined) details.budget = responseObj.budget;
       } else {
         message = exception.message;
         error = 'Error';
@@ -82,6 +87,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
       path: request.url,
       correlationId: (request as any).correlationId,
+      ...details,
     };
 
     // Log error response

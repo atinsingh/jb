@@ -3,7 +3,10 @@ import {
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { ReapedSandbox } from './sandbox-driver.interface';
+import {
+  ReapedSandbox,
+  SandboxExecOptions,
+} from './sandbox-driver.interface';
 
 /**
  * Thin HTTP client for a self-hosted LiteLLM Agent Platform deployment
@@ -138,7 +141,7 @@ export class AgentPlatformClient {
   async exec(
     sandboxId: string,
     command: string[],
-    opts: { timeoutSeconds?: number; cwd?: string } = {},
+    opts: SandboxExecOptions = {},
   ): Promise<ExecResult> {
     const body = await this.request<{
       exit_code: number;
@@ -148,6 +151,7 @@ export class AgentPlatformClient {
       command,
       timeout_seconds: opts.timeoutSeconds ?? 600,
       cwd: opts.cwd,
+      env: opts.env,
     });
     return {
       exitCode: body.exit_code,

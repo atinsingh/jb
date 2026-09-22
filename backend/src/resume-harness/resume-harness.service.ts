@@ -7,6 +7,7 @@ import {
   Optional,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import {
@@ -43,6 +44,12 @@ import {
   ResolvedModelAlias,
 } from './harness/harness.types';
 import { JobDescriptionResolverService } from './job-description-resolver.service';
+import {
+  AiBudgetAttribution,
+  AiBudgetService,
+  CandidateBudgetAccess,
+} from '../ai-budget/ai-budget.service';
+import { AiBudgetPolicyService } from '../ai-budget/ai-budget-policy.service';
 
 export interface StartSessionInput {
   /** Candidate-facing model id from the tier-filtered capability catalogue. */
@@ -162,21 +169,41 @@ export class ResumeHarnessService {
     private readonly sandbox: SandboxService,
     private readonly latex: LatexService,
     private readonly storage: StorageService,
+    private readonly aiBudget: AiBudgetService,
+    private readonly aiBudgetPolicy: AiBudgetPolicyService,
     @Optional()
     private readonly jobDescriptions?: JobDescriptionResolverService,
   ) {}
 
   /** Candidate-facing model choices. Runtime and provider stay server-side. */
   async options(userId: string) {
-    const [models, tier, sandboxAvailable, context] = await Promise.all([
+    const [models, aliases, tier, sandboxAvailable, context] = await Promise.all([
       this.modelAlias.capabilitiesForUser(userId),
+      this.modelAlias.listForUser(userId),
       this.modelAlias.tierFor(userId),
       this.sandbox.isAvailable(),
       this.candidateContext.build(userId),
     ]);
     return {
       tier,
-      models,
+      models: models.map((model) => ({
+        ...model,
+        estimates: Object.fromEntries(
+          model.efforts.map((effort) => {
+            const alias = aliases.find(
+              (candidate) =>
+                candidate.model === model.model && candidate.effort === effort,
+            );
+            return [
+              effort,
+              this.aiBudgetPolicy.estimate(
+                alias?.alias || '',
+                'resume_agent_turn',
+              ),
+            ];
+          }),
+        ),
+      })),
       sandboxAvailable,
       /**
        * What the résumé will be written from. Surfaced so the screen can show
@@ -192,6 +219,10 @@ export class ResumeHarnessService {
         ready: context.hasEnoughToGenerate,
       },
     };
+  }
+
+  budget(userId: string) {
+    return this.aiBudget.statusCandidate(userId);
   }
 
   /** The seeded template catalogue, for the picker. */
@@ -232,6 +263,8 @@ export class ResumeHarnessService {
       input.model,
       input.effort,
     );
+    // Fail closed before an existing session is ended or a sandbox is created.
+    const budgetAccess = await this.aiBudget.ensureCandidateAccess(userId);
     const adapter = this.registry.forProvider(alias.provider);
     const harness = adapter.id;
 
@@ -309,7 +342,7 @@ export class ResumeHarnessService {
 
     const sessionId = String((session as any)._id);
     return this.withSessionMutationLock(userId, sessionId, async () => {
-      const proxy = this.proxyAuth();
+      const proxy = this.candidateProxy(budgetAccess.apiKey);
       const boot = adapter.bootstrap({
         sessionId,
         workdir: SANDBOX_WORKDIR,
@@ -523,11 +556,19 @@ export class ResumeHarnessService {
 
     await this.claimActiveSandbox(session);
 
-    return this.executeTurn(
-      session,
-      this.turnPrompt(session, input.instruction),
-      input.instruction,
-      onEvent,
+    return this.aiBudget.withCandidateLease(
+      userId,
+      'resume_agent_turn',
+      this.budgetAttribution(session, randomUUID()),
+      (access, tags) =>
+        this.executeTurn(
+          session,
+          this.turnPrompt(session, input.instruction),
+          input.instruction,
+          access,
+          tags,
+          onEvent,
+        ),
     );
   }
 
@@ -621,18 +662,13 @@ export class ResumeHarnessService {
     // model turn to rewrite the document into what it already is.
     if (!changes.length) return this.view(session);
 
-    // 1. The condition reaches the sandbox first. If this throws, nothing below
-    //    runs and nothing about the session has changed.
-    await this.sandbox.writeFiles(
-      session.sandboxId!,
-      this.contextFiles.filesFor(session.harness, {
+    const conditionFiles = this.contextFiles.filesFor(session.harness, {
         workdir: SANDBOX_WORKDIR,
         texPath: TEX_PATH,
         pdfPath: PDF_PATH,
         buildCommand: BUILD_COMMAND,
         template: condition,
-      }),
-    );
+      });
 
     // 2. Before there is a résumé, changing the look IS the whole operation.
     //    The condition is now on disk and the next Generate will honour it;
@@ -640,23 +676,34 @@ export class ResumeHarnessService {
     //    document they have not asked for yet, and would leave an empty
     //    snapshot behind for "back to previous look" to restore.
     if (!session.latex) {
+      await this.sandbox.writeFiles(session.sandboxId!, conditionFiles);
       session.templateKey = look.template.key;
       session.vibe = look.vibe;
       await (session as any).save();
       return this.view(session);
     }
 
-    session.templateKey = look.template.key;
-    session.vibe = look.vibe;
-
-    // The completed turn records both the selected look and its artifact.
     const instruction = this.lookInstruction(changes);
-    return this.executeTurn(
-      session,
-      instruction,
-      instruction,
-      onEvent,
-      'look-change',
+    return this.aiBudget.withCandidateLease(
+      userId,
+      'resume_look_change',
+      this.budgetAttribution(session, randomUUID()),
+      async (access, tags) => {
+        // The condition reaches the sandbox only after budget preflight. If
+        // this throws, session state and model spend both remain unchanged.
+        await this.sandbox.writeFiles(session.sandboxId!, conditionFiles);
+        session.templateKey = look.template!.key;
+        session.vibe = look.vibe;
+        return this.executeTurn(
+          session,
+          instruction,
+          instruction,
+          access,
+          tags,
+          onEvent,
+          'look-change',
+        );
+      },
     );
   }
 
@@ -1059,6 +1106,8 @@ export class ResumeHarnessService {
     session: ResumeHarnessSessionDocument,
     prompt: string,
     recordedInstruction: string,
+    access: CandidateBudgetAccess,
+    requestTags: readonly string[],
     onEvent?: (event: { type: string; [k: string]: unknown }) => void,
     kind: 'instruction' | 'look-change' = 'instruction',
   ): Promise<TurnResult> {
@@ -1066,10 +1115,16 @@ export class ResumeHarnessService {
     const boot = adapter.bootstrap({
       sessionId: String((session as any)._id),
       workdir: SANDBOX_WORKDIR,
-      proxy: this.proxyAuth(),
+      proxy: this.candidateProxy(access.apiKey),
       alias: this.aliasOf(session),
       contextFiles: [],
+      requestTags,
     });
+    // Codex and OpenCode carry per-action tags in generated config. Claude
+    // carries them in the process environment below.
+    if (boot.files.length) {
+      await this.sandbox.writeFiles(session.sandboxId!, boot.files);
+    }
 
     const beforeLatex = session.latex || '';
     const activityHistory = new Map<string, HarnessActivity>();
@@ -1414,10 +1469,11 @@ export class ResumeHarnessService {
             streamBuffer = lines.pop() || '';
             for (const line of lines) consumeLine(line);
           },
-          { timeoutSeconds: 120 },
+          { timeoutSeconds: 120, env: boot.env },
         )
       : await this.sandbox.exec(sandboxId, adapter.turnCommand(boot, prompt), {
           timeoutSeconds: 120,
+          env: boot.env,
         });
     if (onEvent && streamBuffer.trim()) consumeLine(streamBuffer);
     const parsed = adapter.parseOutput?.(result.stdout || '');
@@ -1638,7 +1694,7 @@ export class ResumeHarnessService {
    * The proxy every harness talks to. The key is a LiteLLM virtual key —
    * metered and revocable — and is the only credential a sandbox receives.
    */
-  private proxyAuth() {
+  private candidateProxy(apiKey: string) {
     // The URL as seen FROM INSIDE the sandbox, which is not the URL the backend
     // uses: a container on the proxy's network reaches it by service name, and
     // `localhost` there would be the sandbox itself.
@@ -1646,11 +1702,21 @@ export class ResumeHarnessService {
       process.env.RESUME_HARNESS_LITELLM_INTERNAL_URL ||
       process.env.LITELLM_BASE_URL ||
       'http://localhost:4000';
-    const apiKey =
-      process.env.RESUME_HARNESS_LITELLM_KEY ||
-      process.env.LITELLM_API_KEY ||
-      '';
     return { baseUrl: baseUrl.replace(/\/v1\/?$/, ''), apiKey };
+  }
+
+  private budgetAttribution(
+    session: ResumeHarnessSessionDocument,
+    runId: string,
+  ): AiBudgetAttribution {
+    return {
+      harness: session.harness,
+      alias: session.alias,
+      model: session.model,
+      effort: session.effort,
+      sessionId: String((session as any)._id),
+      runId,
+    };
   }
 
   /** A session can only be worked on while it is live and has its sandbox. */

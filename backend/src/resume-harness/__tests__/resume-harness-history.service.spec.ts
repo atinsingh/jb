@@ -11,6 +11,8 @@ import { ResumeTemplateService } from '../resume-template.service';
 import { HarnessRegistry } from '../harness/harness.registry';
 import { SandboxService } from '../sandbox/sandbox.service';
 import { LatexService } from '../latex/latex.service';
+import { AiBudgetService } from '../../ai-budget/ai-budget.service';
+import { AiBudgetPolicyService } from '../../ai-budget/ai-budget-policy.service';
 
 describe('Resume harness saved sessions and revisions', () => {
   let service: any;
@@ -164,6 +166,7 @@ describe('Resume harness saved sessions and revisions', () => {
         {
           provide: ModelAliasService,
           useValue: {
+            tierFor: async () => 'FREE',
             resolveSelectionForUser: async () => ({
               alias: 'openai/test/low',
               provider: 'openai',
@@ -172,6 +175,19 @@ describe('Resume harness saved sessions and revisions', () => {
               label: 'Test',
             }),
           },
+        },
+        {
+          provide: AiBudgetService,
+          useValue: {
+            ensureCandidateAccess: async () => ({ apiKey: 'sk-test' }),
+            statusCandidate: async () => ({}),
+            withCandidateLease: async (_u, _s, _a, run) =>
+              run({ apiKey: 'sk-test' }, []),
+          },
+        },
+        {
+          provide: AiBudgetPolicyService,
+          useValue: { estimate: () => ({ kind: 'usage_based', label: 'Usage based' }) },
         },
       ],
     }).compile();

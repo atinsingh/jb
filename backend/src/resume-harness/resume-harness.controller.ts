@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpException,
   Param,
   ParseIntPipe,
   Patch,
@@ -48,6 +49,12 @@ export class ResumeHarnessController {
   })
   options(@Request() req) {
     return this.service.options(this.userId(req));
+  }
+
+  @Get('budget')
+  @ApiOperation({ summary: 'Current monthly AI budget and remaining allowance' })
+  budget(@Request() req) {
+    return this.service.budget(this.userId(req));
   }
 
   /**
@@ -291,10 +298,20 @@ export class ResumeHarnessController {
     try {
       send({ type: 'result', session: await run(send) });
     } catch (err: any) {
+      const response =
+        err instanceof HttpException && typeof err.getResponse() === 'object'
+          ? (err.getResponse() as Record<string, unknown>)
+          : {};
       send({
         type: 'error',
-        status: err?.status ?? 500,
-        message: err?.message ?? 'Turn failed',
+        ...(response.code || err?.code
+          ? { code: response.code || err.code }
+          : {}),
+        message:
+          (typeof response.message === 'string' && response.message) ||
+          err?.message ||
+          'Turn failed',
+        ...(response.budget ? { budget: response.budget } : {}),
       });
     } finally {
       res.end();

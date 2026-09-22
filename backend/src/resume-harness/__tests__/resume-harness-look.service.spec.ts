@@ -11,6 +11,8 @@ import { SandboxService } from '../sandbox/sandbox.service';
 import { LatexService } from '../latex/latex.service';
 import { ResumeHarnessSession } from '../schemas/resume-harness-session.schema';
 import { StorageService } from '../../storage/storage.service';
+import { AiBudgetService } from '../../ai-budget/ai-budget.service';
+import { AiBudgetPolicyService } from '../../ai-budget/ai-budget-policy.service';
 
 /**
  * Template selection and in-session vibe changes.
@@ -135,6 +137,17 @@ describe('ResumeHarnessService — template and vibe', () => {
             String(d.userId) === String(q.userId),
         ) || null,
     })),
+    updateOne: jest.fn((q: any, update: any) => ({
+      exec: async () => {
+        const found = store.find(
+          (d) => String(d._id) === String(q._id) && String(d.userId) === String(q.userId),
+        );
+        if (!found) return { acknowledged: true, modifiedCount: 0 };
+        Object.assign(found, update.$set || {});
+        for (const key of Object.keys(update.$unset || {})) delete found[key];
+        return { acknowledged: true, modifiedCount: 1 };
+      },
+    })),
   };
 
   const sandbox: any = {
@@ -154,6 +167,17 @@ describe('ResumeHarnessService — template and vibe', () => {
       Object.values(ROUTED_ALIASES).find((alias: any) => alias.model === model),
     ),
     listForUser: jest.fn(async () => [ALIAS]),
+    tierFor: jest.fn(async () => 'FREE'),
+  };
+
+  const access: any = {
+    apiKey: 'sk-candidate-u1', keyId: 'key-u1', keyAlias: 'candidate:u1',
+    snapshot: {},
+  };
+  const aiBudget: any = {
+    ensureCandidateAccess: jest.fn(async () => access),
+    statusCandidate: jest.fn(async () => access.snapshot),
+    withCandidateLease: jest.fn(async (_u, _s, _a, run) => run(access, [])),
   };
 
   const candidateContext: any = {
@@ -221,6 +245,11 @@ describe('ResumeHarnessService — template and vibe', () => {
         { provide: ModelAliasService, useValue: modelAlias },
         { provide: CandidateContextService, useValue: candidateContext },
         { provide: ResumeTemplateService, useValue: templates },
+        { provide: AiBudgetService, useValue: aiBudget },
+        {
+          provide: AiBudgetPolicyService,
+          useValue: { estimate: jest.fn(() => ({ kind: 'usage_based', label: 'Usage based' })) },
+        },
       ],
     }).compile();
 
@@ -279,6 +308,24 @@ describe('ResumeHarnessService — template and vibe', () => {
     expect(sandbox.writeFiles.mock.invocationCallOrder[0]).toBeLessThan(
       sandbox.exec.mock.invocationCallOrder[0],
     );
+  });
+
+  it('leases model-backed template and vibe changes but not a stored revert', async () => {
+    const session = await startGenerated();
+    aiBudget.withCandidateLease.mockClear();
+
+    await service.selectTemplate('u1', session.id, { templateKey: 'modern-sans' });
+    await service.applyVibe('u1', session.id, { vibe: { density: 'compact' } });
+    const callsBeforeRevert = aiBudget.withCandidateLease.mock.calls.length;
+    await service.revertLook('u1', session.id);
+
+    expect(aiBudget.withCandidateLease).toHaveBeenNthCalledWith(
+      1, 'u1', 'resume_look_change', expect.any(Object), expect.any(Function),
+    );
+    expect(aiBudget.withCandidateLease).toHaveBeenNthCalledWith(
+      2, 'u1', 'resume_look_change', expect.any(Object), expect.any(Function),
+    );
+    expect(aiBudget.withCandidateLease).toHaveBeenCalledTimes(callsBeforeRevert);
   });
 
   it('writes CLAUDE.md on a look change only for a Claude Code session', async () => {
