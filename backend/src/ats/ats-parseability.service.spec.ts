@@ -68,6 +68,28 @@ describe('AtsParseabilityService', () => {
       expect(a.findings.map((f) => f.code)).toEqual(b.findings.map((f) => f.code));
     });
 
+    it('does not score its saved report or job posting as resume content', () => {
+      const resume = {
+        fullName: 'Ada Lovelace',
+        email: 'ada@example.com',
+        phone: '+1 555 0100',
+        summary: 'Backend engineer focused on payments.',
+      };
+      const beforeSave = service.check({ structured: resume });
+      const afterSave = service.check({
+        structured: {
+          ...resume,
+          atsReport: { ...beforeSave, checkedAt: new Date() },
+          source: { jobDescription: 'Experience Education Skills', jobUrl: 'https://example.com/job' },
+        } as AtsStructuredResume,
+      });
+
+      expect(afterSave.score).toBe(beforeSave.score);
+      expect(afterSave.findings.map((finding) => finding.code)).toEqual(
+        beforeSave.findings.map((finding) => finding.code),
+      );
+    });
+
     it('never invokes anything asynchronous', () => {
       // A synchronous return is the structural guarantee that no model call can
       // creep into this path later.

@@ -468,6 +468,93 @@ async function stubHarnessApi(page: Page) {
 }
 
 test.describe("Compare Resume manual workflow", () => {
+  test("opens a library-imported PDF before job context and compares after it is added", async ({ page }) => {
+    const { PDFDocument } = require("../../../backend/node_modules/pdf-lib");
+    const pdf = await PDFDocument.create();
+    pdf.addPage([600, 800]).drawText("Jordan Reyes", { x: 50, y: 700, size: 12 });
+    const source = Buffer.from(await pdf.save());
+    let imported: any = null;
+    let sourceRetained = false;
+    let comparisons = 0;
+
+    await stubHarnessApi(page);
+    await page.route("**/api/resume/parse", (route: Route) => route.fulfill({ json: {
+      parsedData: { fullName: "Jordan Reyes", email: "jordan@example.com", summary: "Backend engineer", skills: ["TypeScript"] },
+    } }));
+    await page.route("**/api/resume-builder/import", (route: Route) => {
+      imported = { ...route.request().postDataJSON(), id: "library-import-1", creationMethod: "imported", version: 1 };
+      return route.fulfill({ json: imported });
+    });
+    await page.route("**/api/resume-builder", (route: Route) => route.fulfill({ json: imported ? [imported] : [] }));
+    await page.route("**/api/resume-builder/library-import-1/compare/source", (route: Route) => {
+      if (route.request().method() === "POST") {
+        sourceRetained = true;
+        return route.fulfill({ json: { filename: "profile.pdf" } });
+      }
+      return route.fulfill({ body: source, contentType: "application/pdf" });
+    });
+    await page.route("**/api/resume-builder/library-import-1/compare", (route: Route) => {
+      comparisons += 1;
+      return route.fulfill({ json: {
+        resumeId: "library-import-1", ats: { score: 72, findings: [] },
+        match: { coverage: 60, matched: [], missing: [] }, aiContent: { composite: 70, signals: {} }, annotations: [],
+      } });
+    });
+    await page.route("**/api/resume-builder/library-import-1", (route: Route) => {
+      if (route.request().method() === "PATCH") imported = { ...imported, ...route.request().postDataJSON() };
+      return route.fulfill({ json: imported });
+    });
+
+    await page.goto("/app/resume-library", { waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: /Import Resume/i }).first().click();
+    await page.locator('input[type="file"][accept=".pdf,.docx"]').setInputFiles({ name: "profile.pdf", mimeType: "application/pdf", buffer: source });
+    await page.getByRole("button", { name: "Import resume", exact: true }).click();
+    await expect(page.getByTestId("resume-library-import-1")).toBeVisible();
+    expect(sourceRetained).toBe(true);
+
+    await page.getByTestId("resume-library-import-1").getByRole("button", { name: "Open resume" }).click();
+    await expect(page.getByTestId("compare-document-preview")).toBeVisible();
+    await expect(page.getByLabel("Full name")).toHaveValue("Jordan Reyes");
+    await expect(page.getByTestId("compare-ats-score")).toHaveText("—");
+    expect(comparisons).toBe(0);
+    await page.getByLabel("Job description").fill("TypeScript engineer wanted");
+    await page.getByRole("button", { name: "Refresh comparison" }).click();
+    await expect(page.getByTestId("compare-ats-score")).toHaveText("72");
+    expect(comparisons).toBe(1);
+  });
+
+  test("lets an older library import reattach its missing original file", async ({ page, guards }) => {
+    guards.allowFailures(/\/api\/resume-builder\/legacy-import\/compare\/source$/);
+    guards.allowConsoleErrors();
+    const { PDFDocument } = require("../../../backend/node_modules/pdf-lib");
+    const pdf = await PDFDocument.create();
+    pdf.addPage([600, 800]).drawText("Jordan Reyes", { x: 50, y: 700, size: 12 });
+    const source = Buffer.from(await pdf.save());
+    let retained = false;
+    const imported = {
+      id: "legacy-import", name: "Older import", creationMethod: "imported",
+      fullName: "Jordan Reyes", summary: "Backend engineer", skills: [], experience: [],
+      achievements: [], certifications: [], source: { originalFilename: "older.pdf", fileExtension: ".pdf" },
+    };
+    await stubHarnessApi(page);
+    await page.route("**/api/resume-builder/legacy-import/compare/source", (route: Route) => {
+      if (route.request().method() === "POST") {
+        retained = true;
+        return route.fulfill({ json: { filename: "older.pdf" } });
+      }
+      return retained
+        ? route.fulfill({ body: source, contentType: "application/pdf" })
+        : route.fulfill({ status: 404, json: { message: "Source file not found" } });
+    });
+    await page.route("**/api/resume-builder/legacy-import", (route: Route) => route.fulfill({ json: imported }));
+
+    await page.goto("/app/resume?id=legacy-import", { waitUntil: "domcontentloaded" });
+    await page.getByLabel("Re-upload original résumé").setInputFiles({ name: "older.pdf", mimeType: "application/pdf", buffer: source });
+    await expect(page.getByTestId("compare-document-preview")).toBeVisible();
+    await expect(page.getByTestId("compare-document-preview").locator("canvas").first()).toBeVisible();
+    expect(retained).toBe(true);
+  });
+
   test("keeps the resume open when a job URL needs a pasted description", async ({ page, guards }) => {
     guards.allowFailures(/\/api\/resume-builder\/imported-url\/compare$/);
     guards.allowConsoleErrors();

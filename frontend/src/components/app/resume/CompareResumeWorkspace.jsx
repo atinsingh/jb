@@ -226,6 +226,7 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
   const [validationError, setValidationError] = useState('');
   const [sourceBlob, setSourceBlob] = useState(null);
   const [sourceError, setSourceError] = useState('');
+  const [sourceBusy, setSourceBusy] = useState(false);
 
   const runComparison = useCallback(async (id = resumeId, jd = jobDescription, url = jobUrl) => {
     if (!id) return;
@@ -255,6 +256,7 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
         setResume(document);
         setJobDescription(document.source?.jobDescription || '');
         setJobUrl(document.source?.jobUrl || '');
+        if (!document.source?.jobDescription?.trim() && !document.source?.jobUrl?.trim()) return null;
         return compareResume(resumeId, {});
       })
       .then((result) => !cancelled && result && setAssessment(result))
@@ -266,11 +268,29 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
   useEffect(() => {
     if (!resumeId) return;
     let cancelled = false;
+    setSourceBlob(null);
+    setSourceError('');
     getCompareSource(resumeId)
       .then((blob) => !cancelled && setSourceBlob(blob))
       .catch((cause) => !cancelled && setSourceError(cause?.message || 'Could not open the uploaded résumé.'));
     return () => { cancelled = true; };
   }, [resumeId]);
+
+  const reattachSource = async (file) => {
+    if (!file) return;
+    setSourceBusy(true);
+    setSourceError('');
+    try {
+      await uploadCompareSource(resumeId, file);
+      const [document, blob] = await Promise.all([getResumeById(resumeId), getCompareSource(resumeId)]);
+      setResume(document);
+      setSourceBlob(blob);
+    } catch (cause) {
+      setSourceError(cause?.message || 'Could not attach the original résumé.');
+    } finally {
+      setSourceBusy(false);
+    }
+  };
 
   const annotations = assessment?.annotations || [];
   const update = (patch) => setResume((current) => ({ ...current, ...patch }));
@@ -304,7 +324,8 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
       };
       setResume(await updateResume(resumeId, payload));
       setMessage('Resume details saved.');
-      await runComparison(resumeId, jobDescription);
+      if (jobDescription.trim() || jobUrl.trim()) await runComparison(resumeId, jobDescription, jobUrl);
+      else setBusy(false);
     } catch (cause) {
       setMessage(cause?.message || 'Could not save resume details.');
       setBusy(false);
@@ -337,13 +358,24 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
       </div>
 
       {message && <div role="status" style={{ marginBottom: 14, color: 'var(--jb-v3-fg-2)' }}>{message}</div>}
+      {!assessment && !jobDescription.trim() && !jobUrl.trim() && (
+        <div role="status" style={{ marginBottom: 14, color: 'var(--jb-v3-fg-2)' }}>
+          Add a job description or job URL to compare this résumé.
+        </div>
+      )}
       {validationError && <div role="alert" style={{ marginBottom: 14, color: 'var(--jb-v3-danger)' }}>{validationError}</div>}
       <div className="compare-resume-layout">
         <div style={{ display: 'grid', gap: 12 }}>
           {sourceBlob ? (
             <CompareDocumentPreview blob={sourceBlob} filename={resume.source?.originalFilename || 'resume.pdf'} annotations={annotations} resume={resume} />
           ) : sourceError ? (
-            <div role="status" style={{ padding: 12, border: '1px solid var(--jb-v3-line)' }}>{sourceError}</div>
+            <div role="status" style={{ padding: 12, border: '1px solid var(--jb-v3-line)' }}>
+              <div>{sourceError} Re-upload the original PDF or DOCX to preview it here.</div>
+              <label style={{ display: 'block', marginTop: 10, fontSize: 13 }}>
+                Re-upload original résumé
+                <input type="file" accept=".pdf,.docx" disabled={sourceBusy} onChange={(event) => reattachSource(event.target.files?.[0])} style={{ display: 'block', marginTop: 6 }} />
+              </label>
+            </div>
           ) : null}
           <Section section="personal" title="Contact details" annotations={annotations}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
