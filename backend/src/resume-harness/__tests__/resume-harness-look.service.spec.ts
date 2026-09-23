@@ -140,12 +140,17 @@ describe('ResumeHarnessService — template and vibe', () => {
     updateOne: jest.fn((q: any, update: any) => ({
       exec: async () => {
         const found = store.find(
-          (d) => String(d._id) === String(q._id) && String(d.userId) === String(q.userId),
+          (d) =>
+            String(d._id) === String(q._id) &&
+            String(d.userId) === String(q.userId) &&
+            (q.status === undefined || d.status === q.status) &&
+            (q.sandboxId === undefined || d.sandboxId === q.sandboxId),
         );
-        if (!found) return { acknowledged: true, modifiedCount: 0 };
-        Object.assign(found, update.$set || {});
-        for (const key of Object.keys(update.$unset || {})) delete found[key];
-        return { acknowledged: true, modifiedCount: 1 };
+        if (found) {
+          Object.assign(found, update.$set || {});
+          for (const key of Object.keys(update.$unset || {})) delete found[key];
+        }
+        return { acknowledged: true, matchedCount: found ? 1 : 0, modifiedCount: found ? 1 : 0 };
       },
     })),
   };

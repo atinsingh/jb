@@ -91,7 +91,7 @@ export class AtsParseabilityService {
     return { score, findings, extractedTextLength: text.length };
   }
 
-  /** Flatten every available input into one searchable string. */
+  /** Flatten candidate-visible content, never source metadata or prior findings. */
   private flatten(input: AtsCheckInput): string {
     const parts: string[] = [];
     if (input.text) parts.push(input.text);
@@ -112,7 +112,15 @@ export class AtsParseabilityService {
         if (Array.isArray(v)) return v.forEach(walk);
         if (typeof v === 'object') Object.values(v).forEach(walk);
       };
-      walk(input.structured);
+      const resume = input.structured as Record<string, unknown>;
+      for (const key of [
+        'fullName', 'email', 'phone', 'location', 'linkedin', 'website', 'github',
+        'headline', 'summary', 'profileSummary', 'skills', 'experience',
+        'education', 'achievements', 'certifications', 'projects', 'languages',
+        'customSections',
+      ]) {
+        walk(resume[key]);
+      }
     }
 
     return parts.join('\n');

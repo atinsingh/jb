@@ -15,6 +15,7 @@ import { uploadResume } from "@/services/api";
 import {
   listResumes,
   importResume,
+  uploadCompareSource,
   duplicateResume,
   setPrimaryResume,
   deleteResume,
@@ -1468,6 +1469,7 @@ function ImportModal({ onClose, onDone }) {
   const [step, setStep] = useState("upload"); // upload | mode | processing
   const [err, setErr] = useState(null);
   const inputRef = useRef(null);
+  const createdResumeId = useRef(null);
 
   const pick = (f) => {
     setErr(null);
@@ -1482,6 +1484,7 @@ function ImportModal({ onClose, onDone }) {
       return;
     }
     setFile(f);
+    createdResumeId.current = null;
     setName((n) => n || f.name.replace(/\.[^.]+$/, ""));
     setStep("mode");
   };
@@ -1494,7 +1497,7 @@ function ImportModal({ onClose, onDone }) {
       const res = await uploadResume(file); // POST /api/resume/parse (heuristic fallback safe)
       const parsed = res?.parsedData || res?.parsed || res || {};
       const ext = (file.name.match(/\.[^.]+$/) || [""])[0].toLowerCase();
-      await importResume({
+      const created = createdResumeId.current ? null : await importResume({
         name: name || file.name.replace(/\.[^.]+$/, ""),
         importMode: mode,
         targetRole: targetRole || undefined,
@@ -1509,6 +1512,10 @@ function ImportModal({ onClose, onDone }) {
           parseConfidence: parsed._source === "heuristic" ? 0.6 : 0.9,
         },
       });
+      const id = createdResumeId.current || created?.id || created?._id;
+      if (!id) throw new Error("Could not identify the imported résumé.");
+      createdResumeId.current = id;
+      await uploadCompareSource(id, file);
       await onDone();
     } catch (e) {
       setErr(e);
@@ -1616,6 +1623,7 @@ function ImportModal({ onClose, onDone }) {
                   type="button"
                   onClick={() => {
                     setFile(null);
+                    createdResumeId.current = null;
                     setStep("upload");
                   }}
                   style={{

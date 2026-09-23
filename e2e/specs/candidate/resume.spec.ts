@@ -517,6 +517,348 @@ test.describe("résumé AI budget", () => {
   });
 });
 
+test.describe("Compare Resume manual workflow", () => {
+  test("opens a library-imported PDF before job context and compares after it is added", async ({ page }) => {
+    const { PDFDocument } = require("../../../backend/node_modules/pdf-lib");
+    const pdf = await PDFDocument.create();
+    pdf.addPage([600, 800]).drawText("Jordan Reyes", { x: 50, y: 700, size: 12 });
+    const source = Buffer.from(await pdf.save());
+    let imported: any = null;
+    let sourceRetained = false;
+    let comparisons = 0;
+
+    await stubHarnessApi(page);
+    await page.route("**/api/resume/parse", (route: Route) => route.fulfill({ json: {
+      parsedData: { fullName: "Jordan Reyes", email: "jordan@example.com", summary: "Backend engineer", skills: ["TypeScript"] },
+    } }));
+    await page.route("**/api/resume-builder/import", (route: Route) => {
+      imported = { ...route.request().postDataJSON(), id: "library-import-1", creationMethod: "imported", version: 1 };
+      return route.fulfill({ json: imported });
+    });
+    await page.route("**/api/resume-builder", (route: Route) => route.fulfill({ json: imported ? [imported] : [] }));
+    await page.route("**/api/resume-builder/library-import-1/compare/source", (route: Route) => {
+      if (route.request().method() === "POST") {
+        sourceRetained = true;
+        return route.fulfill({ json: { filename: "profile.pdf" } });
+      }
+      return route.fulfill({ body: source, contentType: "application/pdf" });
+    });
+    await page.route("**/api/resume-builder/library-import-1/compare", (route: Route) => {
+      comparisons += 1;
+      return route.fulfill({ json: {
+        resumeId: "library-import-1", ats: { score: 72, findings: [] },
+        match: { coverage: 60, matched: [], missing: [] }, aiContent: { composite: 70, signals: {} }, annotations: [],
+      } });
+    });
+    await page.route("**/api/resume-builder/library-import-1", (route: Route) => {
+      if (route.request().method() === "PATCH") imported = { ...imported, ...route.request().postDataJSON() };
+      return route.fulfill({ json: imported });
+    });
+
+    await page.goto("/app/resume-library", { waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: /Import Resume/i }).first().click();
+    await page.locator('input[type="file"][accept=".pdf,.docx"]').setInputFiles({ name: "profile.pdf", mimeType: "application/pdf", buffer: source });
+    await page.getByRole("button", { name: "Import resume", exact: true }).click();
+    await expect(page.getByTestId("resume-library-import-1")).toBeVisible();
+    expect(sourceRetained).toBe(true);
+
+    await page.getByTestId("resume-library-import-1").getByRole("button", { name: "Open resume" }).click();
+    await expect(page.getByTestId("compare-document-preview")).toBeVisible();
+    await expect(page.getByLabel("Full name")).toHaveValue("Jordan Reyes");
+    await expect(page.getByTestId("compare-ats-score")).toHaveText("—");
+    expect(comparisons).toBe(0);
+    await page.getByLabel("Job description").fill("TypeScript engineer wanted");
+    await page.getByRole("button", { name: "Refresh comparison" }).click();
+    await expect(page.getByTestId("compare-ats-score")).toHaveText("72");
+    expect(comparisons).toBe(1);
+  });
+
+  test("lets an older library import reattach its missing original file", async ({ page, guards }) => {
+    guards.allowFailures(/\/api\/resume-builder\/legacy-import\/compare\/source$/);
+    guards.allowConsoleErrors();
+    const { PDFDocument } = require("../../../backend/node_modules/pdf-lib");
+    const pdf = await PDFDocument.create();
+    pdf.addPage([600, 800]).drawText("Jordan Reyes", { x: 50, y: 700, size: 12 });
+    const source = Buffer.from(await pdf.save());
+    let retained = false;
+    const imported = {
+      id: "legacy-import", name: "Older import", creationMethod: "imported",
+      fullName: "Jordan Reyes", summary: "Backend engineer", skills: [], experience: [],
+      achievements: [], certifications: [], source: { originalFilename: "older.pdf", fileExtension: ".pdf" },
+    };
+    await stubHarnessApi(page);
+    await page.route("**/api/resume-builder/legacy-import/compare/source", (route: Route) => {
+      if (route.request().method() === "POST") {
+        retained = true;
+        return route.fulfill({ json: { filename: "older.pdf" } });
+      }
+      return retained
+        ? route.fulfill({ body: source, contentType: "application/pdf" })
+        : route.fulfill({ status: 404, json: { message: "Source file not found" } });
+    });
+    await page.route("**/api/resume-builder/legacy-import", (route: Route) => route.fulfill({ json: imported }));
+
+    await page.goto("/app/resume?id=legacy-import", { waitUntil: "domcontentloaded" });
+    await page.getByLabel("Re-upload original résumé").setInputFiles({ name: "older.pdf", mimeType: "application/pdf", buffer: source });
+    await expect(page.getByTestId("compare-document-preview")).toBeVisible();
+    await expect(page.getByTestId("compare-document-preview").locator("canvas").first()).toBeVisible();
+    expect(retained).toBe(true);
+  });
+
+  test("keeps the resume open when a job URL needs a pasted description", async ({ page, guards }) => {
+    guards.allowFailures(/\/api\/resume-builder\/imported-url\/compare$/);
+    guards.allowConsoleErrors();
+    const imported = {
+      _id: "imported-url", id: "imported-url", name: "resume", creationMethod: "imported",
+      summary: "Backend engineer", skills: [], experience: [], achievements: [], certifications: [],
+      source: { originalFilename: "resume.pdf", jobUrl: "https://jobs.example.com/protected" },
+    };
+    let saved: any = imported;
+    const { PDFDocument } = require("../../../backend/node_modules/pdf-lib");
+    const pdf = await PDFDocument.create();
+    pdf.addPage([600, 800]).drawText("Backend engineer", { x: 50, y: 700, size: 12 });
+    const source = Buffer.from(await pdf.save());
+    await stubHarnessApi(page);
+    await page.route("**/api/resume-builder/imported-url/compare/source", (route: Route) => route.fulfill({
+      body: source, contentType: "application/pdf",
+    }));
+    await page.route("**/api/resume-builder/imported-url/compare", (route: Route) => {
+      const body = route.request().postDataJSON() || {};
+      if (!body.jobDescription && !saved.source.jobDescription) return route.fulfill({ status: 400, json: { message: "Paste the job description." } });
+      return route.fulfill({ json: { resumeId: "imported-url", ats: { score: 72, findings: [] },
+        match: { coverage: 60, matched: [], missing: [] }, aiContent: { composite: 70, signals: {} }, annotations: [] } });
+    });
+    await page.route("**/api/resume-builder/imported-url", (route: Route) => {
+      if (route.request().method() === "PATCH") {
+        saved = { ...saved, ...route.request().postDataJSON() };
+      }
+      return route.fulfill({ json: saved });
+    });
+
+    await page.goto("/app/resume?mode=compare&id=imported-url", { waitUntil: "domcontentloaded" });
+    await expect(page.getByText("Paste the job description.")).toBeVisible();
+    await page.getByLabel("Job description").fill("Backend engineer wanted");
+    await page.getByRole("button", { name: "Refresh comparison" }).click();
+    await expect(page.getByTestId("compare-ats-score")).toHaveText("72");
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.getByTestId("compare-ats-score")).toHaveText("72");
+  });
+
+  test("shows repair comments on the uploaded DOCX text", async ({ page }) => {
+    const JSZip = require(require.resolve("jszip", { paths: [require.resolve("../../../frontend/node_modules/docx-preview/package.json")] }));
+    const zip = new JSZip();
+    zip.file("[Content_Types].xml", '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
+    zip.file("_rels/.rels", '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
+    zip.file("word/document.xml", '<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Results-</w:t></w:r><w:r><w:t>driven engineer</w:t></w:r></w:p></w:body></w:document>');
+    const source = await zip.generateAsync({ type: "nodebuffer" });
+    const imported = {
+      _id: "imported-docx", id: "imported-docx", name: "resume", creationMethod: "imported",
+      summary: "Results-driven engineer", skills: [], experience: [], achievements: [], certifications: [],
+      source: { originalFilename: "resume.docx", fileExtension: ".docx", jobDescription: "Engineer" },
+    };
+    await stubHarnessApi(page);
+    await page.route("**/api/resume-builder/imported-docx/compare/source", (route: Route) => route.fulfill({
+      body: source, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    }));
+    await page.route("**/api/resume-builder/imported-docx/compare", (route: Route) => route.fulfill({ json: {
+      resumeId: "imported-docx", ats: { score: 70, findings: [] }, match: { coverage: 60, matched: [], missing: [] },
+      aiContent: { composite: 80, signals: {} }, annotations: [
+        { id: "ai-stock-phrases", section: "summary", severity: "critical", color: "red",
+          quote: "Results-driven", message: "Generic phrase", fix: "Add a measured outcome." },
+      ],
+    } }));
+    await page.route("**/api/resume-builder/imported-docx", (route: Route) => route.fulfill({ json: imported }));
+
+    await page.goto("/app/resume?mode=compare&id=imported-docx", { waitUntil: "domcontentloaded" });
+    const highlight = page.getByTestId("document-highlight-ai-stock-phrases");
+    await expect(highlight).toBeVisible();
+    await highlight.hover();
+    await expect(page.getByRole("tooltip")).toContainText("Add a measured outcome.");
+  });
+
+  test("highlights a source PDF phrase with a repair comment", async ({ page }) => {
+    const { PDFDocument, StandardFonts } = require("../../../backend/node_modules/pdf-lib");
+    const pdf = await PDFDocument.create();
+    const pageOne = pdf.addPage([600, 800]);
+    pageOne.drawText("Jordan Reyes", { x: 50, y: 740, size: 16, font: await pdf.embedFont(StandardFonts.Helvetica) });
+    pageOne.drawText("Results-", { x: 50, y: 700, size: 12 });
+    pageOne.drawText("driven engineer", { x: 94, y: 700, size: 12 });
+    const source = Buffer.from(await pdf.save());
+    await stubHarnessApi(page);
+    const imported = {
+      _id: "imported-preview", id: "imported-preview", name: "resume", creationMethod: "imported",
+      fullName: "Jordan Reyes", summary: "Results-driven engineer", skills: ["TypeScript"],
+      experience: [], achievements: [], certifications: [],
+      source: { originalFilename: "resume.pdf", fileExtension: ".pdf", jobDescription: "TypeScript engineer" },
+    };
+    await page.route("**/api/resume/parse", (route: Route) => route.fulfill({ json: {
+      parsedData: { fullName: "Jordan Reyes", summary: "Results-driven engineer", skills: ["TypeScript"] },
+    } }));
+    await page.route("**/api/resume-builder/import", (route: Route) => route.fulfill({ json: imported }));
+    await page.route("**/api/resume-builder/imported-preview/compare/source", (route: Route) => {
+      if (route.request().method() === "POST") return route.fulfill({ json: { filename: "resume.pdf" } });
+      return route.fulfill({ body: source, contentType: "application/pdf" });
+    });
+    await page.route("**/api/resume-builder/imported-preview/compare", (route: Route) => route.fulfill({ json: {
+      resumeId: "imported-preview", ats: { score: 72, findings: [] },
+      match: { coverage: 50, matched: ["typescript"], missing: [] },
+      aiContent: { composite: 78, signals: {} },
+      annotations: [{ id: "ai-stock-phrases", section: "summary", severity: "critical", color: "red",
+        quote: "Results-driven", message: "Generic language", fix: "Use a concrete result instead." },
+      { id: "ats-summary", section: "summary", severity: "warning", color: "amber",
+        message: "Needs job evidence", fix: "Mention relevant TypeScript work." }],
+    } }));
+    await page.route("**/api/resume-builder/imported-preview", (route: Route) => route.fulfill({ json: imported }));
+
+    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: "Compare Resume" }).click();
+    await page.getByLabel("Existing resume").setInputFiles({ name: "resume.pdf", mimeType: "application/pdf", buffer: source });
+    await page.getByLabel("Job description").fill("TypeScript engineer");
+    await page.getByRole("button", { name: "Import and compare" }).click();
+    const highlight = page.getByTestId("document-highlight-ai-stock-phrases");
+    await expect(highlight).toBeVisible();
+    await highlight.hover();
+    await expect(page.getByRole("tooltip")).toContainText("Use a concrete result instead.");
+    await expect(page.getByRole("tooltip")).toContainText("Mention relevant TypeScript work.");
+    const canvas = page.getByTestId("compare-document-preview").locator("canvas").first();
+    await canvas.evaluate((element) => element.setAttribute("data-render-token", "kept"));
+    await page.getByLabel("Summary").fill("More specific summary");
+    await expect(canvas).toHaveAttribute("data-render-token", "kept");
+  });
+
+  test("requires a resume and job context before starting", async ({ page }) => {
+    await stubHarnessApi(page);
+    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: "Compare Resume" }).click();
+
+    const start = page.getByRole("button", { name: "Import and compare" });
+    await expect(start).toBeDisabled();
+    await page.getByLabel("Existing resume").setInputFiles({
+      name: "resume.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from("%PDF-1.4"),
+    });
+    await expect(start).toBeDisabled();
+    await page.getByLabel("Job URL").fill("https://jobs.example.com/engineer");
+    await expect(start).toBeEnabled();
+    await page.getByLabel("Job URL").fill("");
+    await expect(start).toBeDisabled();
+    await page.getByLabel("Job description").fill("TypeScript engineer");
+    await expect(start).toBeEnabled();
+  });
+
+  test("keeps imported resumes editable and explains color-coded improvement areas", async ({
+    page,
+  }) => {
+    await stubHarnessApi(page);
+    let restoredHarnessRequests = 0;
+    page.on("request", (request) => {
+      if (
+        request.method() === "GET" &&
+        request.url().includes("/api/resume-harness/sessions/resume-session-e2e")
+      ) restoredHarnessRequests += 1;
+    });
+    await page.addInitScript(() =>
+      sessionStorage.setItem("jobocate.resumeHarness.activeSessionId", "resume-session-e2e"),
+    );
+    const updates: any[] = [];
+    const { PDFDocument } = require("../../../backend/node_modules/pdf-lib");
+    const sourcePdf = await PDFDocument.create();
+    sourcePdf.addPage([600, 800]).drawText("Results-driven engineer.", { x: 50, y: 700, size: 12 });
+    const sourceBytes = Buffer.from(await sourcePdf.save());
+    const imported = {
+      _id: "imported-1",
+      id: "imported-1",
+      name: "Imported profile",
+      creationMethod: "imported",
+      fullName: "Jordan Reyes",
+      email: "jordan@example.com",
+      summary: "Results-driven engineer.",
+      skills: ["TypeScript"],
+      experience: [{
+        title: "Engineer",
+        company: "Example Co",
+        startDate: "2023",
+        endDate: "Present",
+        description: "Built the customer API.",
+        achievements: [],
+      }],
+      achievements: [],
+      certifications: [],
+      source: { originalFilename: "resume.pdf", fileExtension: ".pdf", jobDescription: "Backend engineer" },
+    };
+    await page.route("**/api/resume-builder/imported-1/compare/source", (route: Route) =>
+      route.fulfill({ body: sourceBytes, contentType: "application/pdf" }),
+    );
+    await page.route("**/api/resume-builder/imported-1/compare", (route: Route) =>
+      route.fulfill({
+        json: {
+          resumeId: "imported-1",
+          ats: { score: 72, findings: [] },
+          match: null,
+          aiContent: { composite: 78, signals: {} },
+          annotations: [
+            {
+              id: "ai-stock-phrases",
+              section: "summary",
+              severity: "critical",
+              color: "red",
+              quote: "Results-driven",
+              message: "Stock phrases can make this read as generic.",
+              fix: "Replace it with a specific outcome from your work.",
+            },
+          ],
+        },
+      }),
+    );
+    await page.route("**/api/resume-builder/imported-1", async (route: Route) => {
+      if (route.request().method() === "PATCH") {
+        updates.push(route.request().postDataJSON());
+        await route.fulfill({ json: { ...imported, ...updates.at(-1) } });
+        return;
+      }
+      await route.fulfill({ json: imported });
+    });
+
+    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("button", { name: "Compare Resume" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "AI Generate Resume" })).toBeVisible();
+    expect(restoredHarnessRequests).toBe(0);
+    await page.getByRole("button", { name: "Compare Resume" }).click();
+    await expect(page.getByTestId("compare-resume-upload")).toBeVisible();
+
+    await page.goto("/app/resume?mode=compare&id=imported-1", {
+      waitUntil: "domcontentloaded",
+    });
+    await expect(page.getByRole("heading", { name: "Compare Resume" })).toBeVisible();
+    await expect(page.getByTestId("compare-ats-score")).toHaveText("72");
+    await expect(page.getByTestId("compare-ai-score")).toHaveText("78");
+
+    const summaryAnnotation = page.getByTestId("annotation-summary");
+    await summaryAnnotation.hover();
+    await expect(page.getByRole("tooltip")).toContainText(
+      "Replace it with a specific outcome",
+    );
+
+    await expect(page.getByLabel("Role description 1")).toHaveValue(
+      "Built the customer API.",
+    );
+    await page.getByLabel("Role description 1").fill("Built and owned the customer API.");
+    await page.getByRole("button", { name: "+ Add certification" }).click();
+    await page.getByRole("button", { name: "Save Resume Details" }).click();
+    await expect(page.getByRole("alert").filter({ hasText: "Certification name" })).toBeVisible();
+    expect(updates).toHaveLength(0);
+    await page.getByLabel("name 1").fill("AWS Certified");
+    await page.getByLabel("issuer 1").fill("AWS");
+    await page.getByLabel("Achievements", { exact: true }).fill("Conference speaker");
+    await page.getByRole("button", { name: "Save Resume Details" }).click();
+    expect(updates.at(-1).achievements).toEqual(["Conference speaker"]);
+    expect(updates.at(-1).experience[0].description).toBe(
+      "Built and owned the customer API.",
+    );
+  });
+});
+
 test.describe("résumé session operation integrity", () => {
   test.describe.configure({ mode: "default" });
 
