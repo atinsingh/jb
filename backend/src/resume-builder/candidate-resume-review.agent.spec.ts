@@ -189,6 +189,14 @@ describe('LiteLlmCandidateResumeReviewAgent session runtime', () => {
     expect(quota.consumeCredit).not.toHaveBeenCalled();
   });
 
+  it('counts professional passages rather than contact metadata for coverage', async () => {
+    const lines = ['Built payment services for clients', 'Reduced deployment time with automation', 'Documented production support workflows'];
+    sandbox.exec.mockResolvedValue({ exitCode: 0, stdout: reviewJson(lines.map((quote, i) => ({ id: String(i), section: 'experience', message: 'Clarify impact', fix: 'Describe the factual outcome', quote }))) });
+    const result = await agent.review({ userId: 'user-1', resumeId: 'resume-1', resumeText: 'jordan@example.test | Example City\n' + lines.join('\n'), jobDescription: 'Backend engineer' });
+    expect(result.annotations).toHaveLength(3);
+    expect(sandbox.exec).toHaveBeenCalledTimes(1);
+  });
+
   it('uses remaining configured turns to complete grounded coverage', async () => {
     const lines = ['Built payment services for clients', 'Reduced deployment time with automation', 'Documented production support workflows'];
     const item = (quote: string, i: number) => ({ id: 'item-' + i, section: 'experience', message: 'Clarify impact', fix: 'Describe the factual outcome', quote });

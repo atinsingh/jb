@@ -404,7 +404,10 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
   }
 
   private desiredAnnotationCount(resumeText: string): number {
-    const reviewable = resumeText.split(/\r?\n/).filter((line) => line.trim().split(/\s+/).length >= 3).length;
+    const reviewable = resumeText.split(/\r?\n/).filter((line) =>
+      !/\S+@\S+|https?:\/\/|(?:linkedin|github)\.com\//i.test(line)
+      && line.trim().split(/\s+/).length >= 3,
+    ).length;
     return Math.max(1, Math.min(8, reviewable));
   }
 
