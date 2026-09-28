@@ -34,9 +34,8 @@ const SIGNUP = '/app/signup?as=employer';
 
 const FAQS = [
   ['What counts as an "AI action"?', 'Any automated step: screening an applicant, drafting outreach, generating a scorecard, or scheduling an interview. Most teams use well under their monthly allowance.'],
-  ['Can I post a job for free?', 'Yes. Starter lets you post your first role and run basic matching at no cost. You only pay when you need more slots, seats or automation.'],
+  ['Can I post a job for free?', 'Yes. Free lets you post your first role. You only pay when you need more slots, seats or automation.'],
   ['How do job slots work?', 'A slot is one active, published requisition. Closing or pausing a req frees its slot, and keeps all its candidate data.'],
-  ['Do you integrate with our ATS?', 'Scale and Enterprise sync two-way with Greenhouse, Lever, Workday and Ashby. Field mapping and sync frequency are configurable.'],
   ['Is candidate data handled compliantly?', 'Yes. EEO reporting, GDPR/CCPA data-request tooling and configurable retention windows are built in. Enterprise adds a DPA and security review.'],
 ];
 

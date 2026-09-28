@@ -18,7 +18,7 @@ describe('EmployerAtsRuntimeService', () => {
   const billing = { getOrCreateSubscription: jest.fn() };
   const aliases = {
     listForTier: jest.fn(),
-    resolveForTier: jest.fn(),
+    resolveAutomaticForTier: jest.fn(),
   };
   const keys = {
     generate: jest.fn(),
@@ -69,7 +69,7 @@ describe('EmployerAtsRuntimeService', () => {
         tier: 'FREE',
       },
     ]);
-    aliases.resolveForTier.mockResolvedValue({
+    aliases.resolveAutomaticForTier.mockResolvedValue({
       alias: 'bedrock/nova-2-lite/low',
       provider: 'bedrock',
       model: 'nova-2-lite',
@@ -142,9 +142,9 @@ describe('EmployerAtsRuntimeService', () => {
     expect(result).toEqual({
       status: 'BUDGET_EXHAUSTED',
       reason: 'EMPLOYER_BUDGET_EXHAUSTED',
-      limitUsd: 1,
-      spentUsd: 1,
-      remainingUsd: 0,
+      limitCredits: 100,
+      spentCredits: 100,
+      remainingCredits: 0,
       period: 'monthly',
       resetAt: new Date('2026-10-01T00:00:00Z'),
     });
@@ -186,6 +186,18 @@ describe('EmployerAtsRuntimeService', () => {
           expect.objectContaining({ $set: expect.objectContaining({ activeRunId: expect.anything() }) }),
         ]),
       ]),
+    );
+  });
+
+  it('charges one whole credit for a positive sub-cent ATS run', async () => {
+    keys.info
+      .mockResolvedValueOnce({ spendUsd: 0.25, limitUsd: 1, resetAt: new Date('2026-10-01T00:00:00Z') })
+      .mockResolvedValueOnce({ spendUsd: 0.251, limitUsd: 1, resetAt: new Date('2026-10-01T00:00:00Z') });
+    const prepared = await service.prepare(OWNER, 'subcent-run');
+    await service.finish(prepared as any, { succeeded: true });
+    expect(runtimeModel.updateOne).toHaveBeenCalledWith(
+      expect.objectContaining({ ownerType: 'employer' }),
+      expect.objectContaining({ $set: expect.objectContaining({ creditsUsed: expect.any(Number) }) }),
     );
   });
 
@@ -294,7 +306,7 @@ describe('EmployerAtsRuntimeService', () => {
   });
 
   it('updates the same owner key when the employer plan changes', async () => {
-    billing.getOrCreateSubscription.mockResolvedValue({ plan: 'growth' });
+    billing.getOrCreateSubscription.mockResolvedValue({ plan: 'paid' });
     aliases.listForTier.mockResolvedValue([
       {
         alias: 'anthropic/claude-sonnet-4-5/high',
@@ -304,7 +316,7 @@ describe('EmployerAtsRuntimeService', () => {
         tier: 'PRO',
       },
     ]);
-    aliases.resolveForTier.mockResolvedValue({
+    aliases.resolveAutomaticForTier.mockResolvedValue({
       alias: 'anthropic/claude-sonnet-4-5/high',
       provider: 'anthropic',
       model: 'claude-sonnet-4-5',
@@ -316,12 +328,12 @@ describe('EmployerAtsRuntimeService', () => {
 
     expect(keys.update).toHaveBeenCalledWith('sk-employer-only', {
       models: ['anthropic/claude-sonnet-4-5/high'],
-      maxBudgetUsd: 30,
+      maxBudgetUsd: 4,
     });
     expect(runtimeModel.updateOne).toHaveBeenCalledWith(
       { ownerId: new Types.ObjectId(OWNER), ownerType: 'employer' },
       expect.objectContaining({
-        $set: expect.objectContaining({ plan: 'growth', modelTier: 'PRO' }),
+        $set: expect.objectContaining({ plan: 'paid', modelTier: 'PRO' }),
       }),
     );
   });
@@ -439,7 +451,7 @@ describe('EmployerAtsRuntimeService', () => {
         activeRunId: 'run-usage-failure',
       },
       {
-        $set: { spendUsd: 0.3 },
+        $set: { spendUsd: 0.3, creditsUsed: 30, creditsResetAt: expect.any(Date) },
         $unset: { activeRunId: 1, runLockUntil: 1 },
       },
     );

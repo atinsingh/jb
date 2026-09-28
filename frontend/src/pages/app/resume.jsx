@@ -971,8 +971,8 @@ function BudgetSummary({ budget, estimate }) {
       />
     );
   }
-  const remaining = Number(budget.remaining || 0).toFixed(2);
-  const limit = Number(budget.limit || 0).toFixed(2);
+  const remaining = Number(budget.remaining || 0);
+  const limit = Number(budget.limit || 0);
   const reset = budget.resetAt
     ? new Date(budget.resetAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })
     : "unavailable";
@@ -981,7 +981,7 @@ function BudgetSummary({ budget, estimate }) {
       data-testid="ai-budget"
       style={{ border: `1px solid ${T.line}`, background: T.panel, borderRadius: 3, padding: "12px 14px", marginBottom: 22, fontSize: 13, lineHeight: 1.55 }}
     >
-      <strong>AI budget: ${remaining} of ${limit} remaining</strong>
+      <strong>AI credits: {remaining} of {limit} remaining</strong>
       <span style={{ color: T.fg3 }}> · {budget.status} · resets {reset}</span>
       {estimate?.label && <div style={{ color: T.fg2 }}>Selected run: {estimate.label}</div>}
     </div>
@@ -1998,6 +1998,10 @@ function AtsPanel({
           >
             Score this exact résumé revision against the job description in the
             same agent sandbox.
+          </p>
+          <p style={{ margin: "6px 0 0", color: T.fg3, fontSize: 12 }}>
+            ATS analysis uses measured model credits (1 credit per cent of usage).
+            A failed analysis may still use credits if the model was called.
           </p>
           {!session.revision && (
             <p style={{ margin: "8px 0 0", color: T.fg3, fontSize: 12.5 }}>

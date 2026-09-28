@@ -44,7 +44,7 @@ export interface SandboxDriver {
   ping(): Promise<boolean>;
 
   create(spec: SandboxSpec): Promise<string>;
-  putFiles(id: string, files: { path: string; contents: string }[]): Promise<void>;
+  putFiles(id: string, files: import('../harness/harness.types').HarnessContextFile[]): Promise<void>;
   readFile(id: string, path: string): Promise<string | null>;
   readFileBase64(id: string, path: string): Promise<string | null>;
   exec(

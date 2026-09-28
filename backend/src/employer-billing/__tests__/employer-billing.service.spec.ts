@@ -24,7 +24,7 @@ describe('EmployerBillingService', () => {
     cancel_at_period_end: false,
     current_period_end: 1893456000,
     items: { data: [{ price: { recurring: { interval: 'month' } } }] },
-    metadata: { audience: 'employer', ownerId: OWNER_ID, plan: 'growth' },
+    metadata: { audience: 'employer', ownerId: OWNER_ID, plan: 'paid' },
     ...overrides,
   });
 
@@ -68,10 +68,10 @@ describe('EmployerBillingService', () => {
     it('grants the plan limits for an active subscription', async () => {
       await service.applyStripeSubscription(stripeSubscription());
 
-      expect(doc.plan).toBe('growth');
-      expect(doc.aiActionsLimit).toBe(500);
-      expect(doc.jobSlotsLimit).toBe(5);
-      expect(doc.seatsLimit).toBe(6);
+      expect(doc.plan).toBe('paid');
+      expect(doc.aiActionsLimit).toBe(200);
+      expect(doc.jobSlotsLimit).toBe(3);
+      expect(doc.seatsLimit).toBe(3);
       expect(doc.stripeSubscriptionId).toBe('sub_test_123');
       expect(doc.stripeCustomerId).toBe('cus_test_123');
       expect(doc.save).toHaveBeenCalled();
@@ -106,12 +106,12 @@ describe('EmployerBillingService', () => {
       await service.applyStripeSubscription(
         stripeSubscription({
           status: 'trialing',
-          metadata: { audience: 'employer', ownerId: OWNER_ID, plan: 'scale' },
+          metadata: { audience: 'employer', ownerId: OWNER_ID, plan: 'paid' },
         }),
       );
 
-      expect(doc.plan).toBe('scale');
-      expect(doc.aiActionsLimit).toBe(2000);
+      expect(doc.plan).toBe('paid');
+      expect(doc.aiActionsLimit).toBe(200);
     });
 
     it('ignores a subscription with no ownerId rather than guessing', async () => {
@@ -138,8 +138,27 @@ describe('EmployerBillingService', () => {
   });
 
   describe('upgrade', () => {
-    it('refuses the sales-led enterprise plan', async () => {
-      await expect(service.upgrade(OWNER_ID, { plan: 'enterprise' })).rejects.toThrow(/sales-led/i);
+    it('refuses a second paid employer subscription even if the local record says free', async () => {
+      const create = jest.fn();
+      (service as any).stripe = {
+        subscriptions: { list: jest.fn().mockResolvedValue({ data: [{ id: 'sub_active', status: 'active' }] }) },
+        checkout: { sessions: { create } },
+      };
+      doc.stripeCustomerId = 'cus_123';
+      await expect(service.upgrade(OWNER_ID, { plan: 'paid' })).rejects.toThrow(/already has a subscription/i);
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it('ignores cancellation of an old subscription when a different paid subscription is current', async () => {
+      doc.plan = 'paid';
+      doc.stripeSubscriptionId = 'sub_new';
+      await service.applyStripeSubscription(stripeSubscription({ status: 'canceled', id: 'sub_old' }));
+      expect(doc.plan).toBe('paid');
+      expect(doc.save).not.toHaveBeenCalled();
+    });
+
+    it('refuses the removed enterprise plan', async () => {
+      await expect(service.upgrade(OWNER_ID, { plan: 'enterprise' })).rejects.toThrow(/unknown plan/i);
       expect(doc.plan).toBe('free');
     });
 
@@ -150,7 +169,7 @@ describe('EmployerBillingService', () => {
     it('does not touch the subscription when checkout cannot be created', async () => {
       // No Stripe key in this module, so price resolution fails — the important
       // part is that the employer is not upgraded on the way through.
-      await expect(service.upgrade(OWNER_ID, { plan: 'growth' })).rejects.toBeDefined();
+      await expect(service.upgrade(OWNER_ID, { plan: 'paid' })).rejects.toBeDefined();
 
       expect(doc.plan).toBe('free');
       expect(doc.aiActionsLimit).toBe(25);
@@ -187,58 +206,30 @@ describe('EmployerBillingService', () => {
           list: jest.fn().mockResolvedValue({
             data: [
               {
-                id: 'price_starter_monthly',
+                id: 'price_paid_monthly',
                 active: true,
-                currency: 'cad',
-                unit_amount: 4900,
+                currency: 'usd',
+                unit_amount: 1000,
                 recurring: { interval: 'month' },
                 product: {
-                  id: 'prod_ULahlAACsFrTeC',
+                  id: 'prod_VAucq8N2hh10sb',
                   active: true,
-                  name: 'Starter Plan Monthly',
-                  default_price: 'price_starter_monthly',
+                  name: 'Paid Plan Monthly',
+                  default_price: 'price_paid_monthly',
                   metadata: {},
                 },
               },
               {
-                id: 'price_starter_yearly',
+                id: 'price_paid_yearly',
                 active: true,
-                currency: 'cad',
-                unit_amount: 49980,
+                currency: 'usd',
+                unit_amount: 10000,
                 recurring: { interval: 'year' },
                 product: {
-                  id: 'prod_ULaiIvDicodwAD',
+                  id: 'prod_VAue1EgKKX8FIz',
                   active: true,
-                  name: 'Starter Plan Yearly',
-                  default_price: 'price_starter_yearly',
-                  metadata: {},
-                },
-              },
-              {
-                id: 'price_professional_monthly',
-                active: true,
-                currency: 'cad',
-                unit_amount: 39900,
-                recurring: { interval: 'month' },
-                product: {
-                  id: 'prod_ULakRfz5ZpnBJm',
-                  active: true,
-                  name: 'Professional Plan Monthly',
-                  default_price: 'price_professional_monthly',
-                  metadata: {},
-                },
-              },
-              {
-                id: 'price_professional_yearly',
-                active: true,
-                currency: 'cad',
-                unit_amount: 406980,
-                recurring: { interval: 'year' },
-                product: {
-                  id: 'prod_ULalgrNRItx2Fg',
-                  active: true,
-                  name: 'Professional Plan Yearly',
-                  default_price: 'price_professional_yearly',
+                  name: 'Paid Plan Yearly',
+                  default_price: 'price_paid_yearly',
                   metadata: {},
                 },
               },
@@ -264,7 +255,7 @@ describe('EmployerBillingService', () => {
       const byKey = Object.fromEntries(res.plans.map((p) => [p.key, p]));
 
       expect((service as any).stripe.prices.list).toHaveBeenCalledWith(
-        expect.objectContaining({ product: 'prod_ULahlAACsFrTeC' }),
+        expect.objectContaining({ product: 'prod_VAucq8N2hh10sb' }),
       );
       expect((service as any).stripe.prices.list).not.toHaveBeenCalledWith(
         expect.objectContaining({ product: 'prod_other_starter_monthly' }),
@@ -272,22 +263,15 @@ describe('EmployerBillingService', () => {
 
       expect(res.currentPlan).toBe('free');
       expect(byKey.free.current).toBe(true);
-      expect(res.plans.map((p) => p.key)).toEqual(['free', 'starter', 'scale']);
-      expect(byKey.starter).toEqual(
+      expect(res.plans.map((p) => p.key)).toEqual(['free', 'paid']);
+      expect(byKey.paid).toEqual(
         expect.objectContaining({
-          name: 'Starter',
-          priceMonthly: 49,
-          priceYearly: 499.8,
-          currency: 'cad',
-          stripePriceIdMonthly: 'price_starter_monthly',
-          stripePriceIdYearly: 'price_starter_yearly',
-        }),
-      );
-      expect(byKey.scale).toEqual(
-        expect.objectContaining({
-          name: 'Professional',
-          priceMonthly: 399,
-          priceYearly: 4069.8,
+          name: 'Paid',
+          priceMonthly: 10,
+          priceYearly: 100,
+          currency: 'usd',
+          stripePriceIdMonthly: 'price_paid_monthly',
+          stripePriceIdYearly: 'price_paid_yearly',
         }),
       );
     });

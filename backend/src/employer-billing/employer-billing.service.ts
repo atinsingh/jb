@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import Stripe from 'stripe';
+import { existingPaidSubscription, rejectExistingSubscription, reusableCheckout } from '../billing/stripe-checkout-guard';
 import { EmployerSubscription, EmployerSubscriptionDocument } from './schemas/employer-subscription.schema';
 import { UpgradeDto } from './dto/upgrade.dto';
 import { EMPLOYER_PLANS, getEmployerPlan } from './employer-plans';
@@ -67,8 +68,7 @@ export class EmployerBillingService {
    *
    * A paid tier is NEVER granted here — this used to write the plan straight to
    * the document (plus a fabricated `amount: 0, status: 'paid'` invoice), which
-   * let any employer self-serve themselves the enterprise tier and its 10,000 AI
-   * actions for free. The only path to a paid plan is now Stripe Checkout →
+   * let an employer self-serve a paid tier without paying. The only path is Stripe Checkout →
    * webhook → `applyStripeSubscription`.
    *
    * Returns a `checkoutUrl` for self-serve plans; the caller must redirect.
@@ -88,7 +88,7 @@ export class EmployerBillingService {
     }
 
     if (!plan.selfServe) {
-      throw new BadRequestException(plan.key === 'enterprise' ? 'The Enterprise plan is sales-led — contact sales to be provisioned.' : `The ${plan.name} plan cannot be purchased. Use the billing portal to downgrade.`);
+      throw new BadRequestException(`The ${plan.name} plan cannot be purchased. Use the billing portal to downgrade.`);
     }
 
     const billingCycle = (dto.billingCycle || 'monthly') as 'monthly' | 'annual';
@@ -113,13 +113,23 @@ export class EmployerBillingService {
       throw new BadRequestException(`Plan ${planKey} is not purchasable`);
     }
 
+    const sub = await this.getOrCreateSubscription(ownerId);
+    const customerId = await this.resolveCustomerId(sub, email);
+
+    if (await existingPaidSubscription(this.stripe, customerId)) rejectExistingSubscription();
+    const pending = await reusableCheckout(
+      this.stripe,
+      customerId,
+      (session) => session.metadata?.audience === 'employer' && session.metadata?.ownerId === ownerId,
+      (session) => session.metadata?.plan === plan.key && session.metadata?.billingCycle === billingCycle,
+    );
+    if (pending) return { sessionId: pending.id, url: pending.url! };
+
     const livePlan = (await this.getEmployerStripeTiers()).find((tier) => tier.key === plan.key);
     const priceId = billingCycle === 'annual' ? livePlan?.stripePriceIdYearly : livePlan?.stripePriceIdMonthly;
     if (!priceId) {
       throw new NotFoundException(`No complete active Stripe price pair for ${plan.name}`);
     }
-    const sub = await this.getOrCreateSubscription(ownerId);
-    const customerId = await this.resolveCustomerId(sub, email);
 
     const session = await this.stripe.checkout.sessions.create({
       customer: customerId,
@@ -138,7 +148,7 @@ export class EmployerBillingService {
           billingCycle,
         },
       },
-    });
+    }, { idempotencyKey: `employer:${ownerId}:${plan.key}:${billingCycle}:${Math.floor(Date.now() / 600000)}` });
 
     this.logger.log(`Employer checkout session ${session.id} created for ${ownerId} (${plan.key}/${billingCycle})`);
     return { sessionId: session.id, url: session.url! };
@@ -178,6 +188,9 @@ export class EmployerBillingService {
 
     const sub = await this.getOrCreateSubscription(ownerId);
     const active = ['active', 'trialing'].includes(subscription.status);
+    if (!active && sub.stripeSubscriptionId && sub.stripeSubscriptionId !== subscription.id && ['active', 'trialing'].includes(sub.status)) {
+      return;
+    }
     // Anything that is not currently paid falls back to free limits rather than
     // leaving a lapsed employer on a paid tier.
     const effective = active ? plan : getEmployerPlan('free')!;
@@ -288,7 +301,7 @@ export class EmployerBillingService {
   > {
     const stripeTiers = await this.getEmployerStripeTiers();
     const tiersByKey = new Map(stripeTiers.map((tier) => [tier.key, tier]));
-    return EMPLOYER_PLANS.flatMap(({ limits, monthly: _monthly, annual: _annual, ...plan }) => {
+    return EMPLOYER_PLANS.flatMap(({ limits, ...plan }) => {
       const live = tiersByKey.get(plan.key);
       if (plan.key !== 'free' && !live) return [];
       const stripeFields = live ?? {
@@ -305,7 +318,7 @@ export class EmployerBillingService {
           levers: [
             ['Job slots', String(limits.jobSlotsLimit)],
             ['Team seats', String(limits.seatsLimit)],
-            ['AI actions / mo', String(limits.aiActionsLimit)],
+            ['AI credits / mo', String(limits.aiBudgetCreditsLimit)],
             ['Sourcing credits', String(limits.sourcingCreditsLimit)],
           ] as Array<[string, string]>,
         },

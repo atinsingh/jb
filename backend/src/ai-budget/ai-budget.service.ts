@@ -21,7 +21,7 @@ import {
 } from './schemas/ai-budget-account.schema';
 
 export interface AiBudgetSnapshot {
-  unit: 'USD';
+  unit: 'credits';
   tier: string;
   limit: number;
   spent: number;
@@ -38,6 +38,8 @@ export interface CandidateBudgetAccess {
   keyId: string;
   keyAlias: string;
   snapshot: AiBudgetSnapshot;
+  /** Internal reconciliation watermark, never returned by the budget endpoint. */
+  measuredSpendUsd: number;
 }
 
 export interface AiBudgetAttribution {
@@ -133,24 +135,25 @@ export class AiBudgetService {
 
     const claimedContext = { ...context, account: claimed };
     let ran = false;
+    let startingSpendUsd = 0;
+    let startingCredits = 0;
     try {
       const access = await this.refreshAccess(claimedContext, true);
+      startingSpendUsd = access.measuredSpendUsd;
+      startingCredits = access.snapshot.spent;
       ran = true;
       return await run(access, this.tags(userId, service, attribution, runId));
     } finally {
-      if (ran) {
-        try {
-          await this.refreshAccess(claimedContext, false);
-        } catch {
-          // The operation already ran; a later status request retries refresh.
-        }
+      try {
+        if (ran) await this.settleCandidateRun(claimedContext, startingSpendUsd, startingCredits);
+      } finally {
+        await this.accountModel
+          .updateOne(
+            { _id: claimed._id, activeRunId: runId },
+            { $unset: { activeRunId: 1, runLockUntil: 1 } },
+          )
+          .exec();
       }
-      await this.accountModel
-        .updateOne(
-          { _id: claimed._id, activeRunId: runId },
-          { $unset: { activeRunId: 1, runLockUntil: 1 } },
-        )
-        .exec();
     }
   }
 
@@ -160,6 +163,7 @@ export class AiBudgetService {
   ): Promise<CandidateAccountContext> {
     try {
       const tierPolicy = this.policy.tier(tier);
+      const maxBudgetUsd = tierPolicy.maxBudgetCredits / 100;
       const offered = await this.aliases.listForTier(tier);
       const models = offered.map((model) => model.alias);
       if (!models.length) {
@@ -180,7 +184,7 @@ export class AiBudgetService {
           pool: 'candidate-ai',
           keyAlias,
           models,
-          maxBudgetUsd: tierPolicy.maxBudgetUsd,
+          maxBudgetUsd,
         });
         account = await this.accountModel.create({
           ownerType: 'candidate',
@@ -189,7 +193,7 @@ export class AiBudgetService {
           keyAlias,
           encryptedKey: this.codec.encrypt(generated.key),
           appliedTier: tier,
-          appliedLimitUsd: tierPolicy.maxBudgetUsd,
+          appliedLimitUsd: maxBudgetUsd,
           budgetDuration: tierPolicy.budgetDuration,
         });
         return { account, apiKey: generated.key, tier };
@@ -198,16 +202,16 @@ export class AiBudgetService {
       const apiKey = this.codec.decrypt(account.encryptedKey);
       const changed =
         account.appliedTier !== tier ||
-        account.appliedLimitUsd !== tierPolicy.maxBudgetUsd ||
+        account.appliedLimitUsd !== maxBudgetUsd ||
         account.budgetDuration !== tierPolicy.budgetDuration;
       if (changed) {
         await this.client.update(apiKey, {
           models,
-          maxBudgetUsd: tierPolicy.maxBudgetUsd,
+          maxBudgetUsd,
         });
         const applied = {
           appliedTier: tier,
-          appliedLimitUsd: tierPolicy.maxBudgetUsd,
+          appliedLimitUsd: maxBudgetUsd,
           budgetDuration: tierPolicy.budgetDuration,
         };
         await this.accountModel
@@ -234,14 +238,22 @@ export class AiBudgetService {
     try {
       const info = await this.client.info(context.apiKey);
       const refreshedAt = new Date();
+      const resetAt = info.resetAt || this.nextUtcMonth(refreshedAt);
+      const samePeriod = context.account.creditsResetAt?.getTime() === resetAt.getTime();
+      const creditsUsed = Math.max(
+        samePeriod ? context.account.creditsUsed || 0 : 0,
+        this.roundCredits(info.spendUsd),
+      );
       await this.accountModel
         .updateOne(
           { _id: context.account._id },
-          { $set: { lastSyncedAt: refreshedAt } },
+          { $set: { lastSyncedAt: refreshedAt, creditsUsed, creditsResetAt: resetAt } },
         )
         .exec();
       context.account.lastSyncedAt = refreshedAt;
-      const snapshot = this.snapshot(context.tier, info, refreshedAt);
+      context.account.creditsUsed = creditsUsed;
+      context.account.creditsResetAt = resetAt;
+      const snapshot = this.snapshot(context.tier, info, refreshedAt, creditsUsed);
       if (blockExhausted && snapshot.status === 'exhausted') {
         throw new AiBudgetExhaustedException(snapshot);
       }
@@ -250,6 +262,7 @@ export class AiBudgetService {
         keyId: context.account.keyId,
         keyAlias: context.account.keyAlias,
         snapshot,
+        measuredSpendUsd: info.spendUsd,
       };
     } catch (error) {
       if (
@@ -262,25 +275,49 @@ export class AiBudgetService {
     }
   }
 
+  private async settleCandidateRun(context: CandidateAccountContext, beforeUsd: number, beforeCredits: number): Promise<void> {
+    const info = await this.client.info(context.apiKey);
+    const resetAt = info.resetAt || this.nextUtcMonth(new Date());
+    const samePeriod = context.account.creditsResetAt?.getTime() === resetAt.getTime();
+    const costUsd = Math.max(0, info.spendUsd - beforeUsd);
+    const creditsUsed = Math.max(
+      this.roundCredits(info.spendUsd),
+      (samePeriod ? beforeCredits : 0) + this.roundCredits(costUsd),
+    );
+    await this.accountModel.updateOne({ _id: context.account._id }, {
+      $set: { creditsUsed, creditsResetAt: resetAt, lastSyncedAt: new Date() },
+    }).exec();
+    context.account.creditsUsed = creditsUsed;
+    context.account.creditsResetAt = resetAt;
+  }
+
+  private roundCredits(usd: number): number {
+    return Math.ceil(Math.max(0, usd) * 100 - 1e-9);
+  }
+
   private snapshot(
     tier: string,
     info: LiteLlmKeyInfo,
     refreshedAt: Date,
+    usedCredits: number,
   ): AiBudgetSnapshot {
     const rawRemaining = info.limitUsd - info.spendUsd;
+    const limitCredits = Math.round(info.limitUsd * 100);
+    const spentCredits = usedCredits;
+    const remainingCredits = Math.max(0, limitCredits - spentCredits);
     const resetAt = info.resetAt || this.nextUtcMonth(refreshedAt);
     const status =
-      rawRemaining <= 0
+      remainingCredits <= 0
         ? 'exhausted'
         : rawRemaining / info.limitUsd <= this.policy.lowRemainingRatio()
           ? 'low'
           : 'healthy';
     return {
-      unit: 'USD',
+      unit: 'credits',
       tier,
-      limit: this.money(info.limitUsd),
-      spent: this.money(info.spendUsd),
-      remaining: this.money(Math.max(0, rawRemaining)),
+      limit: limitCredits,
+      spent: spentCredits,
+      remaining: remainingCredits,
       periodStart: this.previousUtcMonth(resetAt).toISOString(),
       periodEnd: resetAt.toISOString(),
       resetAt: resetAt.toISOString(),
@@ -294,15 +331,15 @@ export class AiBudgetService {
     const periodEnd = this.nextUtcMonth(now);
     let limit = 0;
     try {
-      limit = this.policy.tier(tier).maxBudgetUsd;
+      limit = this.policy.tier(tier).maxBudgetCredits;
     } catch {
       tier = 'FREE';
-      limit = this.policy.tier(tier).maxBudgetUsd;
+      limit = this.policy.tier(tier).maxBudgetCredits;
     }
     return {
-      unit: 'USD',
+      unit: 'credits',
       tier,
-      limit: this.money(limit),
+      limit,
       spent: 0,
       remaining: 0,
       periodStart: this.previousUtcMonth(periodEnd).toISOString(),
@@ -330,10 +367,6 @@ export class AiBudgetService {
       `sessionId=${attribution.sessionId}`,
       `logicalRunId=${runId}`,
     ];
-  }
-
-  private money(value: number): number {
-    return Math.round(value * 1_000_000) / 1_000_000;
   }
 
   private nextUtcMonth(value: Date): Date {

@@ -24,7 +24,7 @@ const commonFree: Entitlement[] = [
   { featureKey: 'analytics_advanced', featureName: 'Advanced Analytics', type: 'boolean', value: false },
   { featureKey: 'job_applications_per_month', featureName: 'Job Applications per Month', type: 'limit', value: 5 },
   { featureKey: 'resume_versions', featureName: 'Resume Versions', type: 'limit', value: 1 },
-  // Legacy action-count quota consumed by LLMQuotaService. This is deliberately
+  // Action-count quota consumed by LLMQuotaService. This is deliberately
   // separate from the USD-denominated LiteLLM budget in config/ai-budget.yaml.
   { featureKey: 'ai_credits_per_month', featureName: 'AI Actions per Month', type: 'limit', value: 25 },
   { featureKey: 'saved_jobs', featureName: 'Saved Jobs', type: 'limit', value: 10 },
@@ -44,7 +44,7 @@ const commonPaid: Entitlement[] = [
   { featureKey: 'analytics_advanced', featureName: 'Advanced Analytics', type: 'boolean', value: false },
   { featureKey: 'job_applications_per_month', featureName: 'Job Applications per Month', type: 'limit', value: 50 },
   { featureKey: 'resume_versions', featureName: 'Resume Versions', type: 'limit', value: 5 },
-  // Legacy action-count quota; the paid USD AI allowance remains $4/month and
+  // Action-count quota; the paid USD AI allowance remains $4/month and
   // resets monthly even when Stripe bills the subscription annually.
   { featureKey: 'ai_credits_per_month', featureName: 'AI Actions per Month', type: 'limit', value: 100 },
   { featureKey: 'saved_jobs', featureName: 'Saved Jobs', type: 'limit', value: 50 },

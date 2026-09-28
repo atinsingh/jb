@@ -8,6 +8,7 @@ describe('AtsSessionService', () => {
   let atsRows: any[];
   let resumeRows: any[];
   let adapter: jest.Mocked<ResumeMatcherAdapter>;
+  let quota: { enforceQuota: jest.Mock; consumeCredit: jest.Mock };
   let service: AtsSessionService;
 
   const query = (value: any) => ({ exec: async () => value });
@@ -61,7 +62,11 @@ describe('AtsSessionService', () => {
         suggestions: ['Add Kubernetes evidence.'],
       })),
     };
-    service = new AtsSessionService(atsModel, resumeModel, adapter);
+    quota = {
+      enforceQuota: jest.fn().mockResolvedValue(undefined),
+      consumeCredit: jest.fn().mockResolvedValue(undefined),
+    };
+    service = new AtsSessionService(atsModel, resumeModel, adapter, quota as any);
   });
 
   it('runs Resume-Matcher in the existing resume sandbox and persists its values unchanged', async () => {
@@ -85,6 +90,8 @@ describe('AtsSessionService', () => {
       sourceRevision: 2,
       stale: false,
     }));
+    expect(quota.enforceQuota).not.toHaveBeenCalled();
+    expect(quota.consumeCredit).not.toHaveBeenCalled();
   });
 
   it('returns a failed analysis as recoverable session state instead of an HTTP error', async () => {
@@ -103,6 +110,22 @@ describe('AtsSessionService', () => {
         unavailableReason: 'ATS analysis is temporarily unavailable.',
       }),
     );
+    expect(quota.consumeCredit).not.toHaveBeenCalled();
+  });
+
+  it('does not use the legacy action counter for ATS', async () => {
+    const started = await service.start(USER_ID, {
+      resumeSessionId: resumeRows[0]._id,
+      sourceRevision: 2,
+      jobDescription: 'Senior TypeScript engineer',
+    });
+    quota.enforceQuota.mockRejectedValueOnce(new Error('AI credits exhausted'));
+
+    await expect(service.run(USER_ID, started.id)).resolves.toMatchObject({ status: 'completed' });
+
+    expect(adapter.analyze).toHaveBeenCalled();
+    expect(quota.consumeCredit).not.toHaveBeenCalled();
+    expect(atsRows[0].status).toBe('completed');
   });
 
   it('marks a persisted result stale when the resume revision advances', async () => {

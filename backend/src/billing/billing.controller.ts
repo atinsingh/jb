@@ -45,8 +45,7 @@ export class BillingController {
   @ApiResponse({ status: 200, description: 'User subscription details' })
   async getSubscription(@Request() req: any) {
     const user = req.user as UserDocument;
-    const subscription = await this.billingService.getUserSubscription(user._id.toString());
-    return { subscription };
+    return this.billingService.getReconciledSubscription(user);
   }
 
   @Post('checkout')

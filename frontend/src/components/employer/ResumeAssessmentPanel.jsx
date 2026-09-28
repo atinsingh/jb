@@ -9,7 +9,7 @@ const assessmentStateCopy = {
   STALE: 'Assessment is stale because the submitted resume or job description changed.',
   NO_RESUME: 'No submitted resume is attached to this applicant.',
   NO_JOB_DESCRIPTION: 'This job needs a description before its resume can be assessed.',
-  BUDGET_EXHAUSTED: 'ATS match was not run because the employer AI budget is exhausted.',
+  BUDGET_EXHAUSTED: 'ATS match was not run because employer AI credits are exhausted.',
   CONFIGURATION_ERROR: 'ATS match could not start because employer ATS is not configured. Contact support before retrying.',
   ATS_FAILED: 'ATS matching failed during execution. Retry the assessment.',
   ATS_INTERRUPTED: 'ATS matching stopped because its scoring container became unavailable. Retry the assessment.',
@@ -21,11 +21,9 @@ const signalLabel = (key) =>
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/^./, (character) => character.toUpperCase());
 
-const dollars = (value) => `$${Number(value || 0).toFixed(2)}`;
-
 function AtsBudgetStatus({ budget }) {
   if (!budget) return null;
-  const hasAmounts = Number.isFinite(Number(budget.limitUsd));
+  const hasAmounts = Number.isFinite(Number(budget.limitCredits));
   const reset = budget.resetAt
     ? new Date(budget.resetAt).toLocaleDateString([], {
         month: 'short',
@@ -36,15 +34,15 @@ function AtsBudgetStatus({ budget }) {
   const copy = budget.status === 'CONFIGURATION_ERROR'
     ? 'ATS budget is unavailable because employer ATS is not configured.'
     : budget.status === 'BUDGET_EXHAUSTED'
-      ? `ATS budget is exhausted: ${dollars(budget.remainingUsd)} of ${dollars(budget.limitUsd)} remaining this month.`
+      ? `AI credits exhausted: ${budget.remainingCredits} of ${budget.limitCredits} remaining this month.`
       : hasAmounts
-        ? `ATS budget: ${dollars(budget.remainingUsd)} of ${dollars(budget.limitUsd)} remaining this month${reset ? ` · resets ${reset}` : ''}.`
+        ? `AI credits: ${budget.remainingCredits} of ${budget.limitCredits} remaining this month${reset ? ` · resets ${reset}` : ''}.`
         : 'ATS budget is ready.';
 
   return (
     <div className={styles.budget}>
       <div>{copy}</div>
-      <div>ATS match uses the same Resume-Matcher sandbox path as the candidate résumé flow. The local heuristic does not use this budget.</div>
+      <div>ATS uses measured model credits (1 credit per cent of usage). The local AI-content heuristic uses none.</div>
     </div>
   );
 }

@@ -115,6 +115,11 @@ describe('harness alias catalogue', () => {
     }
   });
 
+  it('keeps the no-picker automatic choice in environment config, not alias tier defaults', () => {
+    const haiku = SEED.match(/alias:\s*'anthropic\/claude-haiku-4-5\/low'([\s\S]*?)\r?\n  \},/);
+    expect(haiku?.[1]).toMatch(/defaultForTiers:\s*\[\]/);
+  });
+
   it('offers both Sonnet 4.6 efforts to every tier', () => {
     const sonnetTiers = [
       ...SEED.matchAll(
@@ -122,9 +127,13 @@ describe('harness alias catalogue', () => {
       ),
     ].map((match) => match[1]);
     expect(sonnetTiers).toEqual([
-      "'FREE', 'PRO', 'ELITE'",
-      "'FREE', 'PRO', 'ELITE'",
+      "'FREE', 'PRO'",
+      "'FREE', 'PRO'",
     ]);
+  });
+
+  it('does not seed retired candidate tiers into any selectable model alias', () => {
+    expect(SEED).not.toMatch(/tiers:\s*\[[^\]]*'ELITE'/);
   });
 
   it('shows Sonnet with the same kebab-case model name as other models', () => {

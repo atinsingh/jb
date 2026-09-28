@@ -13,6 +13,8 @@ import { StorageService } from '../storage';
 import { AtsParseabilityService } from '../ats/ats-parseability.service';
 import { AtsMatchService } from '../ats/ats-match.service';
 import { HtmlSanitizerService } from '../ingestion/pipeline/html-sanitizer.service';
+import { model } from 'mongoose';
+import { ResumeSchema } from '../schemas/resume.schema';
 
 // uuid ships as ESM which the repo's jest transform does not process; the
 // value is irrelevant to these tests.
@@ -90,6 +92,23 @@ describe('ResumeBuilderService (storage migration)', () => {
     }).compile();
 
     service = moduleRef.get<ResumeBuilderService>(ResumeBuilderService);
+  });
+
+  it('saves edited details on a hydrated imported resume with experience entries', async () => {
+    const ResumeModel = model('ResumeBuilderHydratedSave', ResumeSchema);
+    const document = new ResumeModel({
+      userId: USER_ID, template: 'classic', creationMethod: 'imported',
+      fullName: 'John Doe', email: 'john.doe@example.com',
+      experience: [{ title: 'Engineer', company: 'Example Co', startDate: '2023', achievements: ['Built an API.'] }],
+    });
+    const save = jest.spyOn(document, 'save').mockResolvedValue(document);
+    resumeModel.findOne.mockReturnValue({ exec: () => Promise.resolve(document) });
+
+    await expect(service.update(document.id, USER_ID, {
+      summary: 'Built reliable services.',
+      experience: [{ title: 'Engineer', company: 'Example Co', startDate: '2023', achievements: ['Built an API.'] }],
+    })).resolves.toBe(document);
+    expect(save).toHaveBeenCalledTimes(1);
   });
 
   describe('generatePDF', () => {

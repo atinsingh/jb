@@ -21,6 +21,10 @@ describe('EmployerAtsGateway', () => {
     wasReleasedDuring: jest.fn(),
   };
   const matcher = { analyze: jest.fn() };
+  const quota = {
+    enforceQuota: jest.fn(),
+    consumeCredit: jest.fn(),
+  };
   let gateway: EmployerAtsGateway;
 
   beforeEach(() => {
@@ -54,7 +58,9 @@ describe('EmployerAtsGateway', () => {
       requestIds: ['chatcmpl-1'],
     });
     runtime.wasReleasedDuring.mockResolvedValue(false);
-    gateway = new EmployerAtsGateway(runtime as any, matcher as any);
+    quota.enforceQuota.mockResolvedValue(undefined);
+    quota.consumeCredit.mockResolvedValue(undefined);
+    gateway = new EmployerAtsGateway(runtime as any, matcher as any, quota as any);
   });
 
   it('runs Resume-Matcher inside the employer sandbox and preserves its 0-100 scores', async () => {
@@ -88,15 +94,17 @@ describe('EmployerAtsGateway', () => {
       expect.objectContaining({ runId: 'assessment-1' }),
       { succeeded: true },
     );
+    expect(quota.enforceQuota).not.toHaveBeenCalled();
+    expect(quota.consumeCredit).not.toHaveBeenCalled();
   });
 
   it('does not dispatch Resume-Matcher when the employer pool is exhausted', async () => {
     runtime.prepare.mockResolvedValue({
       status: 'BUDGET_EXHAUSTED',
       reason: 'EMPLOYER_BUDGET_EXHAUSTED',
-      limitUsd: 1,
-      spentUsd: 1,
-      remainingUsd: 0,
+      limitCredits: 100,
+      spentCredits: 100,
+      remainingCredits: 0,
       period: 'monthly',
     });
 
@@ -106,11 +114,19 @@ describe('EmployerAtsGateway', () => {
       expect.objectContaining({
         status: 'BUDGET_EXHAUSTED',
         reason: 'EMPLOYER_BUDGET_EXHAUSTED',
-        remainingUsd: 0,
+        remainingCredits: 0,
       }),
     );
     expect(matcher.analyze).not.toHaveBeenCalled();
     expect(runtime.finish).not.toHaveBeenCalled();
+    expect(quota.consumeCredit).not.toHaveBeenCalled();
+  });
+
+  it('uses only the measured budget even when a legacy action quota is exhausted', async () => {
+    quota.enforceQuota.mockRejectedValueOnce(new Error('legacy action quota exceeded'));
+    await expect(gateway.assess(input)).resolves.toMatchObject({ status: 'COMPLETE' });
+    expect(runtime.prepare).toHaveBeenCalledTimes(1);
+    expect(quota.enforceQuota).not.toHaveBeenCalled();
   });
 
   it('returns a typed configuration state without exposing the management error', async () => {
@@ -125,6 +141,7 @@ describe('EmployerAtsGateway', () => {
       sourceRunId: 'assessment-1',
     });
     expect(JSON.stringify(result)).not.toContain('secret proxy failure body');
+    expect(quota.consumeCredit).not.toHaveBeenCalled();
   });
 
   it('reports focus loss during provisioning as interrupted', async () => {
@@ -144,6 +161,7 @@ describe('EmployerAtsGateway', () => {
       costUsd: 0.02,
       requestIds: ['chatcmpl-failed'],
     });
+    expect(quota.consumeCredit).not.toHaveBeenCalled();
 
     const result = await gateway.assess(input);
 
@@ -197,5 +215,16 @@ describe('EmployerAtsGateway', () => {
       harness: 'ats',
       sourceRunId: 'assessment-1',
     });
+    expect(quota.consumeCredit).not.toHaveBeenCalled();
+  });
+
+  it('does not double-charge a completed ATS run through the legacy counter', async () => {
+    quota.consumeCredit.mockRejectedValueOnce(new Error('credit write unavailable'));
+
+    const result = await gateway.assess(input);
+
+    expect(runtime.finish).toHaveBeenCalledWith(expect.any(Object), { succeeded: true });
+    expect(result).toEqual(expect.objectContaining({ status: 'COMPLETE', costUsd: 0.04 }));
+    expect(quota.consumeCredit).not.toHaveBeenCalled();
   });
 });

@@ -6,6 +6,7 @@ import { join } from 'path';
 import { ModelAliasService } from '../model-alias.service';
 import { HarnessModelAlias } from '../schemas/harness-model-alias.schema';
 import { User } from '../../schemas/user.schema';
+import { BillingService } from '../../billing/billing.service';
 
 /**
  * The ticket's hard rule: no model id, no effort level and no tier -> model
@@ -57,6 +58,7 @@ describe('ModelAliasService', () => {
 
   const aliasModel = { find: jest.fn() };
   const userModel = { findById: jest.fn() };
+  const billing = { reconcileCandidateTier: jest.fn() };
 
   /** Mimics `find(...).sort(...).lean().exec()`. */
   const findReturning = (docs: any[]) => ({
@@ -73,6 +75,7 @@ describe('ModelAliasService', () => {
           useValue: aliasModel,
         },
         { provide: getModelToken(User.name), useValue: userModel },
+        { provide: BillingService, useValue: billing },
       ],
     }).compile();
     service = module.get(ModelAliasService);
@@ -85,6 +88,15 @@ describe('ModelAliasService', () => {
       }),
     });
   };
+
+  it('reconciles Stripe before selecting the candidate model tier', async () => {
+    let tier = 'FREE';
+    billing.reconcileCandidateTier.mockImplementation(async () => { tier = 'PRO'; });
+    userModel.findById.mockReturnValue({ lean: () => ({ exec: async () => ({ currentPlanType: tier }) }) });
+
+    await expect(service.tierFor('u1')).resolves.toBe('PRO');
+    expect(billing.reconcileCandidateTier).toHaveBeenCalledWith('u1');
+  });
 
   it('resolves the allowed alias set from the user tier at request time', async () => {
     signedInAs('ELITE');
@@ -139,6 +151,48 @@ describe('ModelAliasService', () => {
 
     expect(resolved.alias).toBe(PRO_ALIAS.alias);
     expect(resolved.effort).toBe('high');
+  });
+
+  it('uses the environment-configured automatic alias for no-picker candidate and employer runs', async () => {
+    const previous = process.env.DEFAULT_AUTOMATIC_MODEL_ALIAS;
+    const haiku = {
+      ...PRO_ALIAS,
+      alias: 'anthropic/claude-haiku-4-5/low',
+      model: 'claude-haiku-4-5',
+      effort: 'low',
+    };
+    signedInAs('PRO');
+    aliasModel.find.mockReturnValue(findReturning([haiku, PRO_ALIAS]));
+    try {
+      process.env.DEFAULT_AUTOMATIC_MODEL_ALIAS = haiku.alias;
+      await expect(service.resolveAutomaticForUser('u1')).resolves.toMatchObject({
+        alias: haiku.alias, effort: 'low',
+      });
+      process.env.DEFAULT_AUTOMATIC_MODEL_ALIAS = PRO_ALIAS.alias;
+      await expect(service.resolveAutomaticForTier('PRO')).resolves.toMatchObject({
+        alias: PRO_ALIAS.alias, effort: 'high',
+      });
+    } finally {
+      if (previous === undefined) delete process.env.DEFAULT_AUTOMATIC_MODEL_ALIAS;
+      else process.env.DEFAULT_AUTOMATIC_MODEL_ALIAS = previous;
+    }
+  });
+
+  it('fails clearly when the automatic alias is invalid or unavailable to the owner tier', async () => {
+    const previous = process.env.DEFAULT_AUTOMATIC_MODEL_ALIAS;
+    signedInAs('PRO');
+    aliasModel.find.mockReturnValue(findReturning([PRO_ALIAS]));
+    try {
+      delete process.env.DEFAULT_AUTOMATIC_MODEL_ALIAS;
+      await expect(service.resolveAutomaticForUser('u1')).rejects.toThrow(/DEFAULT_AUTOMATIC_MODEL_ALIAS is required/i);
+      process.env.DEFAULT_AUTOMATIC_MODEL_ALIAS = 'not-an-alias';
+      await expect(service.resolveAutomaticForUser('u1')).rejects.toThrow(/automatic model alias configuration/i);
+      process.env.DEFAULT_AUTOMATIC_MODEL_ALIAS = 'anthropic/claude-haiku-4-5/low';
+      await expect(service.resolveAutomaticForTier('PRO')).rejects.toThrow(/automatic model alias configuration/i);
+    } finally {
+      if (previous === undefined) delete process.env.DEFAULT_AUTOMATIC_MODEL_ALIAS;
+      else process.env.DEFAULT_AUTOMATIC_MODEL_ALIAS = previous;
+    }
   });
 
   it('exposes Luna effort capabilities without leaking provider aliases', async () => {

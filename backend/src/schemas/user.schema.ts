@@ -4,7 +4,7 @@ import { HydratedDocument, Types, Document, Schema as MongooseSchema } from 'mon
 // Define types locally
 export type UserRole = 'ROLE_CANDIDATE' | 'ROLE_EMPLOYER' | 'ROLE_AGENT' | 'ROLE_ADMIN';
 export type AuthProvider = 'local' | 'google' | 'linkedin';
-export type PlanType = 'FREE' | 'PRO' | 'ELITE' | 'INTERVIEW';
+export type PlanType = 'FREE' | 'PRO';
 export type SubscriptionStatus = 'active' | 'canceled' | 'past_due' | 'incomplete' | 'incomplete_expired' | 'trialing' | 'unpaid' | 'paused';
 
 export type UserDocument = HydratedDocument<User>;
@@ -126,7 +126,7 @@ export class User {
   achievements?: string[];
 
   // Subscription info (denormalized for quick access)
-  @Prop({ enum: ['FREE', 'PRO', 'ELITE', 'INTERVIEW'], default: 'FREE' })
+  @Prop({ enum: ['FREE', 'PRO'], default: 'FREE' })
   currentPlanType?: PlanType;
 
   // Legacy package field (alias for currentPlanType)

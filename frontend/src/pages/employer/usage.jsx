@@ -5,7 +5,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import EmployerSidebar from '@/components/employer/EmployerSidebar';
 import { appRoute } from '@/components/app/appRoutes';
-import { employerBillingApi, employerTeamApi } from '@/services/employerApi';
+import { employerBillingApi, employerPipelineApi, employerTeamApi } from '@/services/employerApi';
 import {
   LoadingState,
   ErrorState,
@@ -19,7 +19,7 @@ const MONO = 'var(--jb-font-mono)';
 const METER_DEFS = [
   { label: 'Active jobs', usedKey: 'jobSlotsUsed', limitKey: 'jobSlotsLimit', unit: 'slots' },
   { label: 'Team seats', usedKey: 'seatsUsed', limitKey: 'seatsLimit', unit: 'seats' },
-  { label: 'AI actions', usedKey: 'aiActionsUsed', limitKey: 'aiActionsLimit', unit: 'this month' },
+  { label: 'AI credits', usedKey: 'aiCreditsUsed', limitKey: 'aiCreditsLimit', unit: 'credits this month' },
   { label: 'Sourcing credits', usedKey: 'sourcingCreditsUsed', limitKey: 'sourcingCreditsLimit', unit: 'credits' },
 ];
 
@@ -81,11 +81,16 @@ export default function EmployerUsage() {
     setLoading(true);
     setError(null);
     try {
-      const [usageRes, teamRes] = await Promise.all([
+      const [usageRes, teamRes, budget] = await Promise.all([
         employerBillingApi.usage(),
         employerTeamApi.get(),
+        employerPipelineApi.assessmentBudget(),
       ]);
-      const u = usageRes?.usage || null;
+      const u = usageRes?.usage ? {
+        ...usageRes.usage,
+        aiCreditsUsed: budget?.spentCredits,
+        aiCreditsLimit: budget?.limitCredits,
+      } : null;
       setUsage(u);
       setSeatsLimit(typeof u?.seatsLimit === 'number' ? u.seatsLimit : null);
       setMembers(Array.isArray(teamRes?.org?.members) ? teamRes.org.members : []);

@@ -7,6 +7,7 @@ import {
   EmployerAtsRuntimeService,
   PreparedEmployerAtsRun,
 } from './employer-ats-runtime.service';
+import { LLMQuotaService } from '../llm/llm-quota.service';
 
 export type AtsAssessmentStatus =
   | 'NOT_RUN'
@@ -43,9 +44,9 @@ export interface EmployerAtsAssessmentResult {
   sourceRunId?: string;
   costUsd?: number;
   requestIds?: string[];
-  limitUsd?: number;
-  spentUsd?: number;
-  remainingUsd?: number;
+  limitCredits?: number;
+  spentCredits?: number;
+  remainingCredits?: number;
   period?: 'monthly';
   resetAt?: Date;
 }
@@ -74,6 +75,7 @@ export class EmployerAtsGateway implements EmployerAtsAssessmentGateway {
   constructor(
     private readonly runtime: EmployerAtsRuntimeService,
     private readonly matcher: ResumeMatcherAdapter,
+    private readonly quota: LLMQuotaService,
   ) {}
 
   async assess(

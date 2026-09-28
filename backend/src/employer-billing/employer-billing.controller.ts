@@ -41,7 +41,7 @@ export class EmployerBillingController {
     summary: 'Start a plan change — returns a Stripe Checkout URL to redirect to',
     description:
       'Does NOT grant the plan. The plan changes only once Stripe confirms payment ' +
-      'via webhook. Sales-led plans (enterprise) are rejected with 400.',
+      'via webhook. The Free plan cannot be purchased through checkout.',
   })
   @ApiResponse({ status: 201, description: 'Checkout session created' })
   @ApiResponse({ status: 400, description: 'Plan is not self-serve purchasable' })

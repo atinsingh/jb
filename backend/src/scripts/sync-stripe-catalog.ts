@@ -19,10 +19,6 @@
 import mongoose from 'mongoose';
 import Stripe from 'stripe';
 import '../load-env';
-import {
-  EMPLOYER_PLANS,
-  employerPriceLookupKey,
-} from '../employer-billing/employer-plans';
 import { SubscriptionPlanSchema } from '../schemas/subscription-plan.schema';
 
 const APPLY = process.argv.includes('--apply');
@@ -77,30 +73,8 @@ async function buildDesiredCatalog(): Promise<DesiredProduct[]> {
     });
   }
 
-  // ---- Employer plans: `annual` is the marketed per-month price when billed
-  // yearly, so the yearly Stripe amount is that × 12.
-  for (const plan of EMPLOYER_PLANS.filter((p) => p.selfServe)) {
-    desired.push({
-      key: `jobocate_employer_${plan.key}`,
-      name: `Jobocate for Employers — ${plan.name}`,
-      audience: 'employer',
-      planRef: plan.key,
-      prices: [
-        {
-          lookupKey: employerPriceLookupKey(plan.key, 'monthly'),
-          amount: plan.monthly * 100,
-          interval: 'month',
-          nickname: `Employer ${plan.name} monthly`,
-        },
-        {
-          lookupKey: employerPriceLookupKey(plan.key, 'annual'),
-          amount: plan.annual * 12 * 100,
-          interval: 'year',
-          nickname: `Employer ${plan.name} annual`,
-        },
-      ],
-    });
-  }
+  // Employer Free/Paid uses the explicitly configured products in
+  // config/stripe-catalog.yaml. Never create duplicate employer products here.
 
   return desired;
 }

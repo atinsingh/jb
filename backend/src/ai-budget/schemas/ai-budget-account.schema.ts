@@ -31,6 +31,12 @@ export class AiBudgetAccount {
   @Prop({ required: true, min: 0 })
   appliedLimitUsd: number;
 
+  @Prop({ default: 0, min: 0 })
+  creditsUsed: number;
+
+  @Prop()
+  creditsResetAt?: Date;
+
   @Prop({ type: String, required: true, enum: ['1mo'] })
   budgetDuration: '1mo';
 

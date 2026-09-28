@@ -39,6 +39,12 @@ export class EmployerAtsRuntime {
   @Prop({ default: 0 })
   spendUsd: number;
 
+  @Prop({ default: 0, min: 0 })
+  creditsUsed: number;
+
+  @Prop()
+  creditsResetAt?: Date;
+
   @Prop()
   sandboxId?: string;
 

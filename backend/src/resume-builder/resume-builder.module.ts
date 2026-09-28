@@ -20,6 +20,17 @@ import { ResumeComparisonController } from './resume-comparison.controller';
 import { ResumeComparisonService } from './resume-comparison.service';
 import { IngestionModule } from '../ingestion/ingestion.module';
 import { JobDescriptionResolverService } from '../resume-harness/job-description-resolver.service';
+import { AiBudgetModule } from '../ai-budget/ai-budget.module';
+import { ModelAliasModule } from '../resume-harness/model-alias.module';
+import {
+  CandidateResumeReviewAgent,
+  LiteLlmCandidateResumeReviewAgent,
+} from './candidate-resume-review.agent';
+import { ResumeHarnessModule } from '../resume-harness/resume-harness.module';
+import {
+  CandidateAtsReviewSession,
+  CandidateAtsReviewSessionSchema,
+} from './schemas/candidate-ats-review-session.schema';
 
 @Module({
   imports: [
@@ -28,9 +39,13 @@ import { JobDescriptionResolverService } from '../resume-harness/job-description
       { name: User.name, schema: UserSchema },
       { name: ResumeVersion.name, schema: ResumeVersionSchema },
       { name: ShareLink.name, schema: ShareLinkSchema },
+      { name: CandidateAtsReviewSession.name, schema: CandidateAtsReviewSessionSchema },
     ]),
     LLMModule,
+    AiBudgetModule,
+    ModelAliasModule,
     AtsModule,
+    ResumeHarnessModule,
     IngestionModule,
     forwardRef(() => ResumeModule),
     JwtModule.registerAsync({
@@ -63,6 +78,10 @@ import { JobDescriptionResolverService } from '../resume-harness/job-description
   providers: [
     ResumeBuilderService,
     ResumeComparisonService,
+    {
+      provide: CandidateResumeReviewAgent,
+      useClass: LiteLlmCandidateResumeReviewAgent,
+    },
     JobDescriptionResolverService,
     ResumeAiContentHeuristicService,
     // Dependency-free and stateless, so a local instance is fine — avoids

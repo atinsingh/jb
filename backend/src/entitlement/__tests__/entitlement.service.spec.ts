@@ -25,6 +25,7 @@ describe('EntitlementService', () => {
   const mockUsageModel = {
     findOne: jest.fn(),
     findOneAndUpdate: jest.fn(),
+    create: jest.fn(),
   };
 
   const mockSubscriptionModel = {
@@ -60,6 +61,63 @@ describe('EntitlementService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+  });
+
+  it('deducts candidate AI action credits with a database-side limit guard', async () => {
+    mockUserModel.findById.mockResolvedValue({ _id: testUserId, currentPlanType: 'PRO' });
+    mockPlanModel.findOne.mockResolvedValue({ _id: testPlanId, name: 'Paid', type: 'PRO' });
+    mockEntitlementModel.findOne.mockResolvedValue({
+      featureKey: 'ai_credits_per_month', featureName: 'AI Actions per Month', type: 'limit', value: 100,
+    });
+    mockSubscriptionModel.findOne.mockResolvedValue(null);
+    mockUsageModel.findOne.mockResolvedValue({ count: 99 });
+    mockUsageModel.findOneAndUpdate.mockResolvedValue({ count: 100 });
+
+    const result = await service.consumeActionCredit(testUserId, 'ai_credits_per_month');
+
+    expect(result.allowed).toBe(true);
+    expect(mockUsageModel.findOneAndUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ count: { $lt: 100 } }),
+      expect.objectContaining({ $inc: { count: 1 } }),
+      expect.objectContaining({ new: true }),
+    );
+    expect(mockUsageModel.create).not.toHaveBeenCalled();
+  });
+
+  it('denies a racing candidate credit deduction once another review reaches the plan limit', async () => {
+    mockUserModel.findById.mockResolvedValue({ _id: testUserId, currentPlanType: 'FREE' });
+    mockPlanModel.findOne.mockResolvedValue({ _id: testPlanId, name: 'Free', type: 'FREE' });
+    mockEntitlementModel.findOne.mockResolvedValue({
+      featureKey: 'ai_credits_per_month', featureName: 'AI Actions per Month', type: 'limit', value: 25,
+    });
+    mockSubscriptionModel.findOne.mockResolvedValue(null);
+    mockUsageModel.findOne
+      .mockResolvedValueOnce({ count: 24 })
+      .mockResolvedValueOnce({ count: 25 });
+    mockUsageModel.findOneAndUpdate.mockResolvedValue(null);
+
+    const result = await service.consumeActionCredit(testUserId, 'ai_credits_per_month');
+    expect(result.allowed).toBe(false);
+    expect(mockUsageModel.create).not.toHaveBeenCalled();
+  });
+
+  it('uses a monthly AI action window even for an annual paid subscription', async () => {
+    mockUserModel.findById.mockResolvedValue({ _id: testUserId, currentPlanType: 'PRO' });
+    mockPlanModel.findOne.mockResolvedValue({ _id: testPlanId, name: 'Paid', type: 'PRO' });
+    mockEntitlementModel.findOne.mockResolvedValue({
+      featureKey: 'ai_credits_per_month', featureName: 'AI Actions per Month', type: 'limit', value: 100,
+    });
+    mockSubscriptionModel.findOne.mockResolvedValue({
+      currentPeriodStart: new Date('2026-01-01'), currentPeriodEnd: new Date('2027-01-01'),
+    });
+    mockUsageModel.findOne.mockResolvedValue({ count: 1 });
+    mockUsageModel.findOneAndUpdate.mockResolvedValue({ count: 2 });
+
+    await service.consumeActionCredit(testUserId, 'ai_credits_per_month');
+
+    const filter = mockUsageModel.findOneAndUpdate.mock.calls[0][0];
+    expect(filter.periodStart.getMonth()).toBe(new Date().getMonth());
+    expect(filter.periodStart.getFullYear()).toBe(new Date().getFullYear());
   });
 
   describe('checkEntitlement - Boolean Features', () => {

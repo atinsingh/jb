@@ -90,6 +90,7 @@ import { ModelAliasModule } from './model-alias.module';
     ModelAliasModule,
     ResumeTemplateService,
     SandboxService,
+    HarnessRegistry,
   ],
 })
 export class ResumeHarnessModule {}

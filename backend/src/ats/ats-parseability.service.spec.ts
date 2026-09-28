@@ -1,5 +1,7 @@
 import { AtsParseabilityService } from './ats-parseability.service';
 import { AtsLayout, AtsStructuredResume } from './ats.types';
+import { model } from 'mongoose';
+import { ResumeSchema } from '../schemas/resume.schema';
 
 /**
  * The generic score is the number the library's ring and sort have been showing
@@ -33,6 +35,13 @@ describe('AtsParseabilityService', () => {
   };
 
   const wordy = (n: number) => Array.from({ length: n }, (_, i) => `word${i}`).join(' ');
+
+  it('scores a hydrated resume with experience subdocuments without traversing Mongoose internals', () => {
+    const ResumeModel = model('AtsParseabilityHydratedResume', ResumeSchema);
+    const document = new ResumeModel({ ...goodResume, template: 'classic' });
+
+    expect(() => service.check({ structured: document as any })).not.toThrow();
+  });
 
   const singleColumn: AtsLayout = {
     pageWidth: 600,

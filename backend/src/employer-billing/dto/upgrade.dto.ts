@@ -1,7 +1,7 @@
 import { IsEnum, IsOptional } from 'class-validator';
 
 export class UpgradeDto {
-  @IsEnum(['starter', 'growth', 'scale', 'enterprise'])
+  @IsEnum(['paid'])
   plan: string;
 
   @IsOptional()

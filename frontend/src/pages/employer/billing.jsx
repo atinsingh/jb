@@ -80,6 +80,8 @@ export default function EmployerBilling() {
 
       setPlan({
         planName: catalogPlan?.name ? `${catalogPlan.name} plan` : sub.plan ? `${cap(sub.plan)} plan` : '—',
+        status: sub.status || 'active',
+        isFreePlan,
         nextCharge: isFreePlan ? 'No charge' : nextCharge != null && nextCharge > 0 ? fmtAmount(nextCharge, currency) : 'Custom',
         // A free plan has no billing date; only show a renewal date when a paid plan actually renews.
         nextChargeOn: isFreePlan ? '' : sub.renewsAt ? `on ${fmtDate(sub.renewsAt)}` : '',
@@ -160,6 +162,17 @@ export default function EmployerBilling() {
   };
 
   const onField = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  const manageSubscription = async () => {
+    setError(null);
+    try {
+      const result = await employerBillingApi.portal();
+      if (!result?.url) throw new Error('Billing portal did not return a URL');
+      window.location.assign(result.url);
+    } catch (err) {
+      setError(err);
+    }
+  };
 
   const inputStyle = {
     width: '100%',
@@ -333,7 +346,7 @@ export default function EmployerBilling() {
                             borderRadius: 999,
                           }}
                         >
-                          ACTIVE
+                          {String(plan.status).toUpperCase()}
                         </span>
                       </div>
                       <div
@@ -370,8 +383,7 @@ export default function EmployerBilling() {
                       <div style={{ fontSize: 13, color: '#8A8378', marginTop: 4 }}>{plan.billingLine}</div>
                     </div>
 
-                    {/* Payment method — no saved-payment integration exists, so we
-                        show an honest empty state rather than a fabricated card. */}
+                    {/* Payment methods are managed in Stripe, not mirrored locally. */}
                     <div
                       style={{
                         display: 'flex',
@@ -401,7 +413,7 @@ export default function EmployerBilling() {
                             color: '#1B1A16',
                           }}
                         >
-                          No payment method on file
+                          {plan.isFreePlan ? 'No payment method required' : 'Payment method managed in Stripe'}
                         </span>
                         <span
                           style={{
@@ -410,7 +422,7 @@ export default function EmployerBilling() {
                             color: '#8A8378',
                           }}
                         >
-                          Billing is not yet connected
+                          {plan.isFreePlan ? 'Upgrade when you need more capacity' : 'Open the billing portal to view or change it'}
                         </span>
                       </span>
                     </div>
@@ -440,6 +452,7 @@ export default function EmployerBilling() {
                   </div>
 
                   <div style={{ display: 'flex', gap: 11, marginTop: 18 }}>
+                    {!plan.isFreePlan && <button type="button" onClick={manageSubscription} style={{ padding: '10px 18px', borderRadius: 999, border: '1px solid #4263EB', background: '#fff', color: '#4263EB', fontWeight: 700, cursor: 'pointer' }}>Manage subscription</button>}
                     <Link
                       href={appRoute('Employer Plans.dc.html')}
                       className="em-changeplan"

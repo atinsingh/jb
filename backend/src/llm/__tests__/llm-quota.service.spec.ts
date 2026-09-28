@@ -30,6 +30,7 @@ describe('LLMQuotaService', () => {
           provide: EntitlementService,
           useValue: {
             checkEntitlement: jest.fn(),
+            consumeActionCredit: jest.fn(),
           },
         },
         {
@@ -124,6 +125,33 @@ describe('LLMQuotaService', () => {
     expect(employerSubModel.updateOne).not.toHaveBeenCalled();
   });
 
+  it('maps candidate ATS review to the candidate AI credit pool and consumes one credit', async () => {
+    (entitlementService.checkEntitlement as jest.Mock).mockResolvedValue({ allowed: true });
+    (entitlementService.consumeActionCredit as jest.Mock).mockResolvedValue({ allowed: true });
+
+    await service.enforceQuota('user123', LLMFeature.CANDIDATE_ATS_REVIEW);
+    await service.consumeCredit('user123', LLMFeature.CANDIDATE_ATS_REVIEW);
+
+    expect(entitlementService.checkEntitlement).toHaveBeenNthCalledWith(1, 'user123', {
+      featureKey: 'ai_credits_per_month',
+      incrementUsage: false,
+    });
+    expect(entitlementService.consumeActionCredit).toHaveBeenCalledWith('user123', 'ai_credits_per_month');
+    expect(employerSubModel.updateOne).not.toHaveBeenCalled();
+  });
+
+  it('renews employer AI actions at the month boundary before checking ATS quota', async () => {
+    employerSubModel.findOne.mockResolvedValue({ aiActionsLimit: 25, aiActionsUsed: 0 });
+
+    const result = await service.checkQuota(EMPLOYER_ID, LLMFeature.EMPLOYER_ATS_REVIEW);
+
+    expect(result).toMatchObject({ allowed: true, limit: 25, remaining: 25 });
+    expect(employerSubModel.updateOne).toHaveBeenCalledWith(
+      expect.objectContaining({ ownerId: new Types.ObjectId(EMPLOYER_ID), $or: expect.any(Array) }),
+      expect.objectContaining({ $set: expect.objectContaining({ aiActionsUsed: 0, aiActionsPeriodStart: expect.any(Date) }) }),
+    );
+  });
+
   // ==================== Employer "AI Recruiter" features ====================
 
   const RECRUITER_FEATURES = [
@@ -131,9 +159,10 @@ describe('LLMQuotaService', () => {
     LLMFeature.RECRUITER_COPILOT,
     LLMFeature.SOURCE_CANDIDATES,
     LLMFeature.INTERVIEW_SCORECARD,
+    LLMFeature.EMPLOYER_ATS_REVIEW,
   ];
 
-  it('maps all 4 recruiter features to the employer subscription, not candidate entitlements', async () => {
+  it('maps every employer AI feature including ATS to the employer subscription', async () => {
     for (const feature of RECRUITER_FEATURES) {
       employerSubModel.findOne.mockReset();
       (entitlementService.checkEntitlement as jest.Mock).mockClear();
@@ -150,6 +179,26 @@ describe('LLMQuotaService', () => {
       expect(employerSubModel.findOne).toHaveBeenCalledTimes(1);
       expect(entitlementService.checkEntitlement).not.toHaveBeenCalled();
     }
+  });
+
+  it('consumes one employer AI credit for a completed ATS review', async () => {
+    employerSubModel.updateOne.mockResolvedValue({ acknowledged: true, modifiedCount: 1 });
+
+    await service.consumeCredit(EMPLOYER_ID, LLMFeature.EMPLOYER_ATS_REVIEW);
+
+    expect(employerSubModel.updateOne).toHaveBeenCalledWith(
+      expect.objectContaining({ ownerId: new Types.ObjectId(EMPLOYER_ID) }),
+      { $inc: { aiActionsUsed: 1 } },
+    );
+    expect(entitlementService.checkEntitlement).not.toHaveBeenCalled();
+  });
+
+  it('refuses the employer credit write if another request consumed the final credit', async () => {
+    employerSubModel.updateOne.mockResolvedValue({ acknowledged: true, matchedCount: 0, modifiedCount: 0 });
+
+    await expect(
+      service.consumeCredit(EMPLOYER_ID, LLMFeature.EMPLOYER_ATS_REVIEW),
+    ).rejects.toThrow(ForbiddenException);
   });
 
   it('resolves the employer AI limit and remaining from the subscription', async () => {
@@ -260,7 +309,7 @@ describe('LLMQuotaService', () => {
     expect(accountingService.recordUsage).toHaveBeenCalled();
     // Employer counter incremented; candidate entitlement NOT touched.
     expect(employerSubModel.updateOne).toHaveBeenCalledWith(
-      { ownerId: new Types.ObjectId(EMPLOYER_ID) },
+      expect.objectContaining({ ownerId: new Types.ObjectId(EMPLOYER_ID) }),
       { $inc: { aiActionsUsed: 1 } },
     );
     expect(entitlementService.checkEntitlement).not.toHaveBeenCalled();

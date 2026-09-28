@@ -14,8 +14,11 @@ function targetText(annotation, resume) {
     summary: ['Summary', String(resume.summary || '').slice(0, 55)],
     experience: ['Experience', resume.experience?.[0]?.title, resume.experience?.[0]?.description],
     skills: ['Skills', resume.skills?.[0]],
+    education: ['Education', resume.education?.[0]?.institution, resume.education?.[0]?.degree],
+    projects: ['Projects', resume.projects?.[0]?.name, resume.projects?.[0]?.description],
     achievements: ['Achievements', resume.achievements?.[0]],
     certifications: ['Certifications', resume.certifications?.[0]?.name],
+    languages: ['Languages', resume.languages?.[0]?.name || resume.languages?.[0]],
   };
   return [annotation.quote, ...(bySection[annotation.section] || [])].filter(Boolean);
 }
@@ -31,11 +34,18 @@ function textNodes(root) {
   return nodes;
 }
 
+function comparableText(value) {
+  return String(value || '')
+    .normalize('NFKD')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]/gu, '');
+}
+
 function findSegments(root, phrase) {
   const pdfLayers = [...root.querySelectorAll('.compare-pdf-text-layer')];
   const docxBlocks = [...root.querySelectorAll('.docx p, .docx h1, .docx h2, .docx h3, .docx li')];
   const groups = pdfLayers.length ? pdfLayers : docxBlocks.length ? docxBlocks : [root];
-  const needle = phrase.replace(/\s/g, '').toLowerCase();
+  const needle = comparableText(phrase);
   if (!needle) return null;
   for (const group of groups) {
     const nodes = textNodes(group);
@@ -43,10 +53,11 @@ function findSegments(root, phrase) {
     let compact = '';
     for (const node of nodes) {
       for (let offset = 0; offset < node.textContent.length; offset += 1) {
-        const character = node.textContent[offset];
-        if (/\s/.test(character)) continue;
-        compact += character.toLowerCase();
-        locations.push({ node, offset });
+        const characters = comparableText(node.textContent[offset]);
+        for (const character of characters) {
+          compact += character;
+          locations.push({ node, offset });
+        }
       }
     }
     const start = compact.indexOf(needle);
@@ -68,14 +79,15 @@ function annotate(root, annotations, resume, showTooltip, hideTooltip) {
   const grouped = new Map();
   const ordered = [...annotations].sort((a, b) => Number(Boolean(b.quote)) - Number(Boolean(a.quote)));
   for (const annotation of ordered) {
+    const existing = [...grouped.keys()].find((mark) => mark.dataset.section === annotation.section);
     if (!annotation.quote) {
-      const existing = [...grouped.keys()].find((mark) => mark.dataset.section === annotation.section);
       if (existing) {
         grouped.get(existing).push(annotation);
         continue;
       }
     }
     const phrases = targetText(annotation, resume);
+    let placed = false;
     for (const phrase of phrases) {
       if (!phrase) continue;
       const segments = findSegments(root, phrase);
@@ -104,8 +116,14 @@ function annotate(root, annotations, resume, showTooltip, hideTooltip) {
         mark.addEventListener('mouseleave', hideTooltip);
         mark.addEventListener('blur', hideTooltip);
       }
+      placed = true;
       break;
     }
+    // Model output is grounded in parsed résumé text, while the PDF text layer
+    // comes from the original file. If a quote was normalized, truncated, or
+    // split differently during parsing, it may not exist verbatim in the PDF.
+    // Never drop that comment: attach it to the section's existing highlight.
+    if (!placed && existing) grouped.get(existing).push(annotation);
   }
 }
 
@@ -153,6 +171,58 @@ async function renderPdf(blob, container, signal) {
   };
 }
 
+function appendStructuredValue(parent, value) {
+  if (value == null || value === '') return;
+  if (Array.isArray(value)) {
+    const list = document.createElement('ul');
+    for (const item of value) {
+      const entry = document.createElement('li');
+      appendStructuredValue(entry, item);
+      if (entry.textContent?.trim()) list.appendChild(entry);
+    }
+    if (list.childNodes.length) parent.appendChild(list);
+    return;
+  }
+  if (typeof value === 'object') {
+    const block = document.createElement('div');
+    block.className = 'structured-resume-entry';
+    for (const field of Object.values(value)) appendStructuredValue(block, field);
+    if (block.textContent?.trim()) parent.appendChild(block);
+    return;
+  }
+  const line = document.createElement('p');
+  line.textContent = String(value);
+  parent.appendChild(line);
+}
+
+function renderStructuredResume(resume, container) {
+  const documentView = document.createElement('article');
+  documentView.dataset.testid = 'structured-document-fallback';
+  documentView.className = 'structured-resume-fallback';
+  const sections = [
+    ['Contact', [resume.fullName, resume.email, resume.phone, resume.location, resume.linkedin]],
+    ['Summary', resume.summary],
+    ['Experience', resume.experience],
+    ['Skills', resume.skills],
+    ['Education', resume.education],
+    ['Projects', resume.projects],
+    ['Achievements', resume.achievements],
+    ['Certifications', resume.certifications],
+    ['Languages', resume.languages],
+    ['Additional information', resume.customSections],
+  ];
+  for (const [title, value] of sections) {
+    const body = document.createElement('section');
+    appendStructuredValue(body, value);
+    if (!body.textContent?.trim()) continue;
+    const heading = document.createElement('h2');
+    heading.textContent = title;
+    body.prepend(heading);
+    documentView.appendChild(body);
+  }
+  container.appendChild(documentView);
+}
+
 export default function CompareDocumentPreview({ blob, filename, annotations, resume }) {
   const containerRef = useRef(null);
   const originalResume = useRef(resume);
@@ -176,12 +246,15 @@ export default function CompareDocumentPreview({ blob, filename, annotations, re
     const render = async () => {
       const staging = document.createElement('div');
       staging.style.cssText = container.style.cssText;
-      if (filename.toLowerCase().endsWith('.docx')) {
+      const normalizedFilename = filename.toLowerCase();
+      if (normalizedFilename.endsWith('.docx')) {
         const { renderAsync } = await import('docx-preview');
         if (controller.signal.aborted) return;
         await renderAsync(blob, staging, undefined, { breakPages: true });
-      } else {
+      } else if (normalizedFilename.endsWith('.pdf')) {
         dispose = await renderPdf(blob, staging, controller.signal);
+      } else {
+        renderStructuredResume(originalResume.current, staging);
       }
       if (controller.signal.aborted) return;
       container.replaceChildren(...staging.childNodes);
@@ -226,6 +299,12 @@ export default function CompareDocumentPreview({ blob, filename, annotations, re
         .compare-pdf-text-layer mark { color: transparent !important; }
         .compare-document-scroll .docx-wrapper { width: max-content; min-width: 100%; padding: 0; background: transparent; }
         .compare-document-scroll .docx { box-shadow: 0 3px 12px #0002; }
+        .structured-resume-fallback { box-sizing: border-box; width: min(760px, 100%); min-height: 920px; padding: 52px 58px; background: white; color: #171717; box-shadow: 0 3px 12px #0002; font-family: Arial, sans-serif; }
+        .structured-resume-fallback section { margin-bottom: 18px; }
+        .structured-resume-fallback h2 { margin: 0 0 7px; padding-bottom: 4px; border-bottom: 1px solid #777; font-size: 15px; text-transform: uppercase; }
+        .structured-resume-fallback p { margin: 3px 0; font-size: 12px; line-height: 1.45; }
+        .structured-resume-fallback ul { margin: 5px 0; padding-left: 20px; font-size: 12px; line-height: 1.45; }
+        .structured-resume-entry { margin-bottom: 8px; }
       `}</style>
     </section>
   );

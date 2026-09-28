@@ -9,7 +9,7 @@ export class EmployerSubscription {
   ownerId: Types.ObjectId;
 
   // New employers start on the free tier — never a paid plan they didn't buy.
-  @Prop({ enum: ['free', 'starter', 'growth', 'scale', 'enterprise'], default: 'free' })
+  @Prop({ enum: ['free', 'paid'], default: 'free' })
   plan: string;
 
   @Prop({ enum: ['monthly', 'annual'], default: 'monthly' })
@@ -32,6 +32,9 @@ export class EmployerSubscription {
 
   @Prop({ default: 0 })
   aiActionsUsed: number;
+
+  @Prop({ type: Date })
+  aiActionsPeriodStart?: Date;
 
   @Prop({ default: 10 })
   sourcingCreditsLimit: number;

@@ -1,22 +1,19 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { AtsMatchService } from '../ats/ats-match.service';
-import { AtsParseabilityService } from '../ats/ats-parseability.service';
 import { AtsSeverity } from '../ats/ats.types';
-import {
-  AI_CONTENT_HEURISTIC_CONFIG,
-  ResumeAiContentHeuristicService,
-} from '../employer-pipeline/resume-ai-content-heuristic.service';
+import { ResumeAiContentHeuristicService } from '../employer-pipeline/resume-ai-content-heuristic.service';
 import { Resume, ResumeDocument } from '../schemas/resume.schema';
 import { JobDescriptionResolverService } from '../resume-harness/job-description-resolver.service';
+import { ResumeParserService } from '../resume/resume-parser.service';
 import { StorageService } from '../storage';
 import { randomUUID } from 'crypto';
 import { extname } from 'path';
+import { CandidateResumeReviewAgent } from './candidate-resume-review.agent';
 
 export type ResumeComparisonAnnotation = {
   id: string;
-  section: 'personal' | 'summary' | 'experience' | 'skills' | 'achievements' | 'certifications';
+  section: 'personal' | 'summary' | 'experience' | 'skills' | 'education' | 'projects' | 'achievements' | 'certifications' | 'languages';
   severity: AtsSeverity;
   color: 'red' | 'amber' | 'blue';
   message: string;
@@ -29,11 +26,11 @@ export class ResumeComparisonService {
   constructor(
     @InjectModel(Resume.name)
     private readonly resumeModel: Model<ResumeDocument>,
-    private readonly atsParseability: AtsParseabilityService,
-    private readonly atsMatch: AtsMatchService,
     private readonly aiContent: ResumeAiContentHeuristicService,
     private readonly jobDescriptions: JobDescriptionResolverService,
     private readonly storage: StorageService,
+    private readonly agentReview: CandidateResumeReviewAgent,
+    private readonly parser: ResumeParserService,
   ) {}
 
   async attachSource(resumeId: string, userId: string, file: Express.Multer.File) {
@@ -45,12 +42,14 @@ export class ResumeComparisonService {
       throw new BadRequestException('Only imported resumes can retain a source file.');
     }
     const extension = extname(file.originalname).toLowerCase();
-    if (!['.pdf', '.docx'].includes(extension)) {
-      throw new BadRequestException('Only PDF and DOCX files are supported.');
+    if (!['.pdf', '.doc', '.docx'].includes(extension)) {
+      throw new BadRequestException('Only PDF, DOC, and DOCX files are supported.');
     }
     const mimeType = extension === '.pdf'
       ? 'application/pdf'
-      : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      : extension === '.docx'
+        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        : 'application/msword';
     const key = `resumes/compare/${userId}/${randomUUID()}${extension}`;
     await this.storage.put(key, file.buffer, { contentType: mimeType });
     resume.source = {
@@ -84,7 +83,7 @@ export class ResumeComparisonService {
   async compare(
     resumeId: string,
     userId: string,
-    input: { jobDescription?: string; jobUrl?: string },
+    input: { jobDescription?: string; jobUrl?: string; forceRefresh?: boolean },
   ) {
     const resume = await this.resumeModel
       .findOne({ _id: resumeId, userId: new Types.ObjectId(userId) })
@@ -109,90 +108,103 @@ export class ResumeComparisonService {
     if (!targetText) {
       throw new BadRequestException(resolved?.warning || 'Could not read the job URL. Paste the job description.');
     }
-    const text = this.resumeText(structured as Resume);
-    const ats = this.atsParseability.check({ structured: structured as any });
-    const match = this.atsMatch.match(structured as any, targetText);
+    const { text, originalFile } = await this.comparisonText(structured as Resume, resumeId, userId);
+    const missingSections = originalFile
+      ? this.missingCoreSections(text)
+      : (['summary', 'experience', 'skills', 'education', 'achievements'] as const)
+        .filter((section) => !structured[section] || Array.isArray(structured[section]) && structured[section].length === 0);
+    const details: Record<string, unknown> = {};
+    if (originalFile) {
+      const extracted = this.parser.heuristicParse(text);
+      for (const field of ['fullName', 'summary', 'experience', 'skills', 'education', 'achievements', 'certifications'] as const) {
+        const current = resume[field];
+        const value = extracted[field];
+        if ((current == null || current === '' || Array.isArray(current) && current.length === 0)
+          && (typeof value === 'string' && value.trim() || Array.isArray(value) && value.length)) {
+          (resume as any)[field] = value;
+          details[field] = value;
+        }
+      }
+      if (Object.keys(details).length) await resume.save();
+    }
     const aiContent = this.aiContent.analyze(text);
+    const review = await this.agentReview.review({
+      userId,
+      resumeId,
+      resumeText: text,
+      originalFile,
+      jobDescription: targetText,
+      missingSections,
+    }, { forceRefresh: input.forceRefresh === true });
+    const annotations = this.groundedAnnotations(review.annotations, text);
+    const sectionNotice = missingSections.length
+      ? `Missing sections: ${missingSections.map((section) => section[0].toUpperCase() + section.slice(1)).join(', ')}.`
+      : '';
 
     return {
       resumeId,
-      ats,
-      match,
+      ats: {
+        ...review.ats,
+        explanation: [review.ats.explanation, sectionNotice].filter(Boolean).join(' '),
+        missingSections,
+      },
+      match: review.match,
       aiContent,
-      annotations: this.annotations(structured as Resume, ats.findings, match, aiContent),
+      review: {
+        source: review.source,
+        sessionId: review.sessionId,
+        harness: review.harness,
+        modelAlias: review.modelAlias,
+      },
+      annotations,
+      details,
     };
   }
 
-  private annotations(resume: Resume, findings: any[], match: any, aiContent: any) {
-    const annotations: ResumeComparisonAnnotation[] = findings.map((finding, index) => ({
-      id: `ats-${finding.code || index}`,
-      section: this.sectionForFinding(finding.code),
-      severity: finding.severity,
-      color: this.colorFor(finding.severity),
-      message: finding.message,
-      fix: finding.fix,
-    }));
+  private missingCoreSections(text: string): string[] {
+    const headings = new Set(text.split(/\r?\n/).map((line) => line.trim().toLowerCase().replace(/[:\s]+$/, '')));
+    const aliases: Record<string, string[]> = {
+      summary: ['summary', 'professional summary', 'profile', 'profile summary', 'about me'],
+      experience: ['experience', 'work experience', 'professional experience', 'employment history'],
+      skills: ['skills', 'technical skills', 'core skills', 'key skills', 'core competencies'],
+      education: ['education', 'academic background', 'academics'],
+      achievements: ['achievements', 'accomplishments', 'awards', 'honors', 'honours'],
+    };
+    return Object.entries(aliases).filter(([, names]) => !names.some((name) => headings.has(name))).map(([section]) => section);
+  }
 
-    for (const skill of match?.missing || []) {
-      annotations.push({
-        id: `missing-${skill}`,
-        section: 'skills',
-        severity: 'warning',
-        color: 'amber',
-        message: `${this.title(skill)} is requested by the job but not evidenced in this resume.`,
-        fix: `Add ${this.title(skill)} only if it is accurate, and support it with a concrete example.`,
-      });
-    }
-
-    const stockPhrase = AI_CONTENT_HEURISTIC_CONFIG.stockPhrases.find((phrase) =>
-      this.resumeText(resume).toLowerCase().includes(phrase),
-    );
-    if (aiContent.signals?.stockPhrases?.likelihood >= 65 && stockPhrase) {
-      const stockPhraseSection = String(resume.summary || '').toLowerCase().includes(stockPhrase)
-        ? 'summary'
-        : 'experience';
-      annotations.push({
-        id: 'ai-stock-phrases',
-        section: stockPhraseSection,
-        severity: 'critical',
-        color: 'red',
-        message: aiContent.signals.stockPhrases.explanation,
-        fix: 'Replace the stock phrase with a specific outcome, scope, or example from your work.',
-        quote: this.title(stockPhrase),
-      });
-    }
-
-    const experienceSignals = [
-      ['repetitiveSentenceOpeners', 'Vary repeated sentence openings so each achievement reads distinctly.'],
-      ['punctuationBulletSectionRegularity', 'Vary bullet length and structure while keeping the style consistent.'],
-      ['sentenceLengthVariance', 'Mix concise impact statements with enough context to explain the result.'],
-    ] as const;
-    for (const [key, fix] of experienceSignals) {
-      const signal = aiContent.signals?.[key];
-      if (signal?.likelihood < 65) continue;
-      annotations.push({
-        id: `ai-${key}`,
-        section: 'experience',
-        severity: signal.likelihood >= 80 ? 'critical' : 'warning',
-        color: signal.likelihood >= 80 ? 'red' : 'amber',
-        message: signal.explanation,
+  private groundedAnnotations(items: ResumeComparisonAnnotation[], resumeText: string) {
+    const sections = new Set<ResumeComparisonAnnotation['section']>([
+      'personal', 'summary', 'experience', 'skills', 'education', 'projects',
+      'achievements', 'certifications', 'languages',
+    ]);
+    const haystack = this.comparable(resumeText);
+    const seen = new Set<string>();
+    return (Array.isArray(items) ? items : []).flatMap((item, index) => {
+      const quote = String(item?.quote || '').trim();
+      const message = String(item?.message || '').trim();
+      const fix = String(item?.fix || '').trim();
+      const section = sections.has(item?.section) ? item.section : undefined;
+      const normalizedQuote = this.comparable(quote);
+      if (!section || !message || !fix || normalizedQuote.length < 4 || !haystack.includes(normalizedQuote)) {
+        return [];
+      }
+      const signature = `${section}:${normalizedQuote}:${message.toLowerCase()}`;
+      if (seen.has(signature)) return [];
+      seen.add(signature);
+      const severity: AtsSeverity = item.severity === 'critical' || item.severity === 'warning'
+        ? item.severity
+        : 'info';
+      return [{
+        id: String(item.id || `agent-${index + 1}`),
+        section,
+        severity,
+        color: severity === 'critical' ? 'red' as const : severity === 'warning' ? 'amber' as const : 'blue' as const,
+        message,
         fix,
-      });
-    }
-
-    return annotations;
-  }
-
-  private sectionForFinding(code = ''): ResumeComparisonAnnotation['section'] {
-    if (/CONTACT|EMAIL|PHONE|LINKEDIN|NAME/.test(code)) return 'personal';
-    if (/SKILL/.test(code)) return 'skills';
-    if (/EXPERIENCE|DATE|BULLET/.test(code)) return 'experience';
-    if (/CERT/.test(code)) return 'certifications';
-    return 'summary';
-  }
-
-  private colorFor(severity: AtsSeverity): ResumeComparisonAnnotation['color'] {
-    return severity === 'critical' ? 'red' : severity === 'warning' ? 'amber' : 'blue';
+        quote,
+      }];
+    });
   }
 
   private resumeText(resume: Resume): string {
@@ -204,17 +216,47 @@ export class ResumeComparisonService {
       else if (typeof value === 'object') Object.values(value).forEach(walk);
     };
     walk({
+      fullName: resume.fullName,
+      email: resume.email,
+      phone: resume.phone,
+      location: resume.location,
+      linkedin: resume.linkedin,
       summary: resume.summary,
       skills: resume.skills,
       experience: resume.experience,
+      education: resume.education,
+      projects: (resume as any).projects,
       achievements: (resume as any).achievements,
       certifications: resume.certifications,
+      languages: (resume as any).languages,
+      customSections: (resume as any).customSections,
     });
     return parts.join('\n');
   }
 
-  private title(value: string): string {
-    if (/^[a-z0-9+#.]{1,4}$/i.test(value)) return value.toUpperCase();
-    return value.charAt(0).toUpperCase() + value.slice(1);
+  private async comparisonText(resume: Resume, resumeId: string, userId: string) {
+    if (!resume.source?.storageKey) return { text: this.resumeText(resume) };
+    const source = await this.getSource(resumeId, userId);
+    if (!/\.(pdf|docx)$/i.test(source.filename)) {
+      throw new BadRequestException('This source format cannot be reliably extracted for comparison. Upload a PDF or DOCX.');
+    }
+    const text = await this.parser.extractText({
+      originalname: source.filename,
+      buffer: source.buffer,
+    } as Express.Multer.File);
+    if (text.trim().length < 30) {
+      throw new BadRequestException('The original résumé contains too little selectable text to compare. Upload a text-based PDF or DOCX.');
+    }
+    return { text, originalFile: { filename: source.filename, bytes: source.buffer } };
+  }
+
+  private comparable(value: string): string {
+    return String(value || '')
+      .normalize('NFKD')
+      .toLowerCase()
+      .replace(/[\u2018\u2019]/g, "'")
+      .replace(/[\u2013\u2014]/g, '-')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 }

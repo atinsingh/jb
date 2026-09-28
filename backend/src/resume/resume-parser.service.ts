@@ -29,19 +29,31 @@ export class ResumeParserService {
     }
   }
 
-  async parseResume(file: Express.Multer.File, userId: string) {
+  async parseResume(file: Express.Multer.File, userId: string, options: { fast?: boolean } = {}) {
     this.validateFile(file);
     const text = await this.extractText(file);
 
-    // AI structuring is best-effort. If the provider is unavailable (e.g. quota
-    // exhausted / network), fall back to a deterministic heuristic parse so the
-    // import still succeeds instead of hard-failing with a 500.
+    // Compare imports use the deterministic parse immediately; their original
+    // file is also reviewed by the agent later. Other imports retain best-effort
+    // AI structuring with a deterministic fallback.
+    const deterministicSections = this.heuristicParse(text);
     let parsedData: any;
-    try {
+    if (options.fast) {
+      parsedData = deterministicSections;
+    } else try {
       parsedData = await this.resumeParserAIService.parseResume(userId, text);
-      const deterministicSections = this.heuristicParse(text);
+      const validExperience = Array.isArray(parsedData?.experience) && parsedData.experience.length > 0
+        && parsedData.experience.every((entry: any) => String(entry?.title || '').trim() && String(entry?.company || '').trim());
       parsedData = {
         ...parsedData,
+        ...(deterministicSections.summary && !parsedData?.summary?.trim()
+          ? { summary: deterministicSections.summary } : {}),
+        ...(deterministicSections.experience?.length && !validExperience
+          ? { experience: deterministicSections.experience } : {}),
+        ...(deterministicSections.education?.length && !parsedData?.education?.length
+          ? { education: deterministicSections.education } : {}),
+        ...(deterministicSections.skills?.length && !parsedData?.skills?.length
+          ? { skills: deterministicSections.skills } : {}),
         achievements: deterministicSections.achievements || [],
         certifications: deterministicSections.certifications || [],
       };
@@ -50,18 +62,20 @@ export class ResumeParserService {
         '[resume] AI parse unavailable, using heuristic fallback:',
         aiError?.message || aiError,
       );
-      parsedData = this.heuristicParse(text);
+      parsedData = deterministicSections;
     }
 
-    const filePath = await this.saveFile(file);
+    // Compare Resume attaches the original to its own storage record next;
+    // writing this temporary parser copy only duplicates I/O.
+    const filePath = options.fast ? '' : await this.saveFile(file);
     return { parsedData, filePath, originalText: text };
   }
 
   /**
    * Deterministic, no-AI resume parse. Pulls out the high-signal fields
-   * (name, email, phone, linkedin, summary, skills) from the raw text using
-   * regex + simple section detection. Experience is left to the AI path since
-   * it can't be extracted reliably without a model.
+   * (name, email, phone, linkedin, summary, skills and sectioned entries) from
+   * raw text. Only clearly delimited entries are emitted; the original file
+   * remains authoritative when a layout cannot be parsed reliably.
    */
   heuristicParse(text: string) {
     const clean = (text || '').replace(/\r/g, '');
@@ -180,7 +194,7 @@ export class ResumeParserService {
       : { startDate: '', endDate: '', current: false, raw: '' };
   }
 
-  /** Group a section's lines into entries (header lines + bullet lines) and parse each. */
+  /** Group section lines without mistaking a wrapped bullet for a new job. */
   private parseEntries(sectionLines: string[], kind: 'experience' | 'education'): any[] {
     const groups: { headers: string[]; bullets: string[] }[] = [];
     let g: { headers: string[]; bullets: string[] } | null = null;
@@ -189,8 +203,15 @@ export class ResumeParserService {
         if (!g) g = { headers: [], bullets: [] };
         g.bullets.push(line.replace(/^[•·▪◦‣∙*-]\s*/, '').trim());
       } else if (g && g.bullets.length > 0) {
-        groups.push(g);
-        g = { headers: [line], bullets: [] };
+        const isNextEntry = Boolean(this.extractDateRange(line).raw) && line.length < 150;
+        if (isNextEntry) {
+          groups.push(g);
+          g = { headers: [line], bullets: [] };
+        } else {
+          const last = g.bullets.length - 1;
+          const previous = g.bullets[last];
+          g.bullets[last] = previous.endsWith('-') ? `${previous}${line}` : `${previous} ${line}`;
+        }
       } else {
         if (!g) g = { headers: [], bullets: [] };
         g.headers.push(line);
@@ -226,10 +247,10 @@ export class ResumeParserService {
         return {
           title: title.trim(), role: title.trim(), company: company.trim(), location,
           startDate, endDate, current, dates: raw,
-          achievements: grp.bullets, bullets: grp.bullets, description: grp.bullets.join(' '),
+          achievements: grp.bullets, bullets: grp.bullets, description: '',
         };
       })
-      .filter((e: any) => (kind === 'education' ? e.degree || e.institution : e.title || e.company));
+      .filter((e: any) => (kind === 'education' ? e.degree || e.institution : e.title && e.company));
   }
 
   validateFile(file: Express.Multer.File) {
@@ -257,18 +278,22 @@ export class ResumeParserService {
 
   async extractPDFText(buffer: Buffer): Promise<string> {
     try {
-      const tempPath = path.join(this.uploadDir, `temp-${Date.now()}.pdf`);
-      await fs.writeFile(tempPath, buffer);
-
-      const data = await pdfExtract.extract(tempPath, {});
-
-      await fs.unlink(tempPath).catch(() => {});
-
-      const text = data.pages
-        .map((page) => page.content.map((item) => item.str).join(' '))
-        .join('\n');
-
-      return text;
+      const data = await pdfExtract.extractBuffer(buffer, {});
+      return data.pages.map((page) => {
+        const lines: Array<{ y: number; items: Array<{ x: number; str: string }> }> = [];
+        for (const item of page.content) {
+          if (!item.str?.trim()) continue;
+          let line = lines.find((candidate) => Math.abs(candidate.y - item.y) < 2);
+          if (!line) {
+            line = { y: item.y, items: [] };
+            lines.push(line);
+          }
+          line.items.push({ x: item.x, str: item.str });
+        }
+        return lines.sort((a, b) => a.y - b.y)
+          .map((line) => line.items.sort((a, b) => a.x - b.x).map((item) => item.str).join(' ').replace(/\s+/g, ' ').trim())
+          .join('\n');
+      }).join('\n');
     } catch (error) {
       console.error('PDF extraction error:', error);
       throw new Error('Failed to parse PDF file');

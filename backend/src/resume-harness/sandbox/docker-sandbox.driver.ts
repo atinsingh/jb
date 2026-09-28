@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { HarnessContextFile } from '../harness/harness.types';
 import { execFile } from 'child_process';
 import {
   ExecResult,
@@ -135,7 +136,7 @@ export class DockerSandboxDriver implements SandboxDriver {
 
   async putFiles(
     id: string,
-    files: { path: string; contents: string }[],
+    files: HarnessContextFile[],
   ): Promise<void> {
     if (!files.length) return;
     for (const file of files) {
@@ -148,6 +149,9 @@ export class DockerSandboxDriver implements SandboxDriver {
       ) {
         throw new Error(`Invalid sandbox file path: ${file.path}`);
       }
+      if (file.contents === undefined && !Buffer.isBuffer(file.bytes)) {
+        throw new Error(`Invalid sandbox file contents: ${file.path}`);
+      }
     }
 
     // One exec for the whole context avoids a Docker round trip per file.
@@ -155,16 +159,20 @@ export class DockerSandboxDriver implements SandboxDriver {
     // travel as JSON over stdin and are never interpreted by a shell.
     const script = [
       'import json, pathlib, sys',
+      'import base64',
       'base = pathlib.Path(sys.argv[1]).resolve()',
       'for item in json.load(sys.stdin):',
       '    target = (base / item["path"]).resolve()',
       '    if not target.is_relative_to(base): raise ValueError("invalid path")',
       '    target.parent.mkdir(parents=True, exist_ok=True)',
-      '    target.write_text(item["contents"], encoding="utf-8")',
+      '    if item.get("encoding") == "base64": target.write_bytes(base64.b64decode(item["contents"], validate=True))',
+      '    else: target.write_text(item["contents"], encoding="utf-8")',
     ].join('\n');
     const res = await this.run(
       ['exec', '-i', id, 'python3', '-c', script, this.workdir],
-      JSON.stringify(files),
+      JSON.stringify(files.map((file) => Buffer.isBuffer(file.bytes)
+        ? { path: file.path, contents: file.bytes.toString('base64'), encoding: 'base64' }
+        : { path: file.path, contents: file.contents })),
     );
     if (res.code !== 0) {
       throw new Error(`writing sandbox context failed: ${res.stderr.trim()}`);

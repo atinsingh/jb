@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -13,6 +14,7 @@ import {
 import { User, UserDocument } from '../schemas/user.schema';
 import { ModelCapability, ResolvedModelAlias } from './harness/harness.types';
 import { isOfferedHarnessAlias } from './offered-alias';
+import { BillingService } from '../billing/billing.service';
 
 /**
  * Resolves which model+effort alias a signed-in user may run a harness at.
@@ -43,10 +45,12 @@ export class ModelAliasService {
     private readonly aliasModel: Model<HarnessModelAliasDocument>,
     @InjectModel(User.name)
     private readonly userModel: Model<UserDocument>,
+    private readonly billing: BillingService,
   ) {}
 
   /** The caller's plan type, read fresh so tier changes apply immediately. */
   async tierFor(userId: string): Promise<string> {
+    await this.billing.reconcileCandidateTier(userId);
     const user = await this.userModel.findById(userId).lean().exec();
     return (user as any)?.currentPlanType || DEFAULT_TIER;
   }
@@ -132,6 +136,35 @@ export class ModelAliasService {
   ): Promise<ResolvedModelAlias> {
     const tier = await this.tierFor(userId);
     return this.resolveForTier(tier, requestedAlias);
+  }
+
+  /** Resolve the configured default for a candidate flow without a model picker. */
+  async resolveAutomaticForUser(userId: string): Promise<ResolvedModelAlias> {
+    const tier = await this.tierFor(userId);
+    return this.resolveAutomaticForTier(tier);
+  }
+
+  /** Resolve the configured default against an authoritative owner tier. */
+  async resolveAutomaticForTier(tier: string): Promise<ResolvedModelAlias> {
+    const alias = process.env.DEFAULT_AUTOMATIC_MODEL_ALIAS?.trim();
+    if (!alias) {
+      throw new InternalServerErrorException(
+        'Invalid automatic model alias configuration: DEFAULT_AUTOMATIC_MODEL_ALIAS is required for no-picker ATS reviews.',
+      );
+    }
+    if (!/^[^/\s]+\/[^/\s]+\/[^/\s]+$/.test(alias)) {
+      throw new InternalServerErrorException(
+        `Invalid automatic model alias configuration: DEFAULT_AUTOMATIC_MODEL_ALIAS must be a provider/model/effort alias (received "${alias}").`,
+      );
+    }
+    const allowed = await this.listForTier(tier);
+    const selected = allowed.find((entry) => entry.alias === alias);
+    if (!selected) {
+      throw new InternalServerErrorException(
+        `Invalid automatic model alias configuration: "${alias}" is inactive, unavailable, or not allowed for tier ${tier}.`,
+      );
+    }
+    return selected;
   }
 
   /** Pick an allowed alias without looking up a candidate User document. */

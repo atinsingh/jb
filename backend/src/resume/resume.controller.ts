@@ -6,6 +6,7 @@ import {
   UseInterceptors,
   UploadedFile,
   Request,
+  Query,
   BadRequestException,
   Logger,
 } from '@nestjs/common';
@@ -74,7 +75,7 @@ export class ResumeController {
   @ApiResponse({ status: 200, description: 'Resume parsed successfully' })
   @ApiResponse({ status: 400, description: 'Invalid file type or no file uploaded' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async parseResume(@UploadedFile() file: Express.Multer.File, @Request() req) {
+  async parseResume(@UploadedFile() file: Express.Multer.File, @Request() req, @Query('mode') mode?: string) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
@@ -85,6 +86,7 @@ export class ResumeController {
     const result = await this.resumeParserService.parseResume(
       file,
       req.user._id.toString(),
+      { fast: mode === 'compare' },
     );
     this.logger.log(`✅ Resume parsed successfully for user: ${req.user?.email || 'unknown'}`);
 

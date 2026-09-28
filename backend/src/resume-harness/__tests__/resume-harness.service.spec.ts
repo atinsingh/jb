@@ -165,7 +165,7 @@ describe('ResumeHarnessService', () => {
   };
 
   const budgetSnapshot = {
-    unit: 'USD', tier: 'FREE', limit: 0.5, spent: 0.1, remaining: 0.4,
+    unit: 'credits', tier: 'FREE', limit: 50, spent: 10, remaining: 40,
     periodStart: '2026-09-01T00:00:00.000Z',
     periodEnd: '2026-10-01T00:00:00.000Z',
     resetAt: '2026-10-01T00:00:00.000Z', status: 'healthy',

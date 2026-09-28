@@ -12,8 +12,8 @@ import { LoadingState, ErrorState, InlineError } from '@/components/employer/Emp
 // Map a live plan (from the billing API) to the card's visual model.
 function computeTiers(annual, data) {
   return data.map((t) => {
-    const custom = !t.priceMonthly && !t.priceYearly; // e.g. Enterprise
-    const dark = t.key === 'scale';
+    const custom = false;
+    const dark = t.key === 'paid';
     const price = custom ? null : annual ? t.priceYearly : t.priceMonthly;
     const formattedPrice = custom
       ? ''
@@ -108,8 +108,8 @@ export default function EmployerPlans() {
 
   const tiers = computeTiers(annual, tierData);
   const currentName = tierData.find((t) => t.current)?.name || (currentPlan ? currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1) : null);
-  const scale = tierData.find((t) => t.key === 'scale');
-  const showScaleUpsell = scale && !scale.current;
+  const paid = tierData.find((t) => t.key === 'paid');
+  const showPaidUpsell = paid && !paid.current;
 
   return (
     <>
@@ -285,19 +285,7 @@ export default function EmployerPlans() {
                     cursor: 'pointer',
                   }}
                 >
-                  Annual{' '}
-                  <span
-                    style={{
-                      fontFamily: 'var(--jb-font-mono)',
-                      fontSize: 11,
-                      background: '#1FA463',
-                      color: '#0C2C1C',
-                      padding: '2px 7px',
-                      borderRadius: 999,
-                    }}
-                  >
-                    −25%
-                  </span>
+                  Annual
                 </button>
               </div>
             </div>
@@ -315,7 +303,7 @@ export default function EmployerPlans() {
                   className="em-tier-grid"
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(4,1fr)',
+                    gridTemplateColumns: 'repeat(2,1fr)',
                     gap: 14,
                     alignItems: 'stretch',
                   }}
@@ -452,6 +440,8 @@ export default function EmployerPlans() {
                         >
                           Current plan
                         </div>
+                      ) : t.key === 'free' ? (
+                        <Link href="/employer/billing" style={{ display: 'block', textAlign: 'center', padding: 12, marginBottom: 20 }}>Manage in billing</Link>
                       ) : (
                         <button
                           onClick={() => choosePlan(t.key)}
@@ -515,8 +505,8 @@ export default function EmployerPlans() {
                   ))}
                 </div>
 
-                {/* SCALE UPSELL — built from the real Scale plan levers */}
-                {showScaleUpsell && (
+                {/* Paid upsell — built from the live plan levers. */}
+                {showPaidUpsell && (
                   <div
                     style={{
                       marginTop: 22,
@@ -543,7 +533,7 @@ export default function EmployerPlans() {
                           color: '#364FC7',
                         }}
                       >
-                        Upgrade to {scale.name} — what you&rsquo;ll unlock
+                        Upgrade to {paid.name} — what you&rsquo;ll unlock
                       </span>
                     </div>
                     <div
@@ -554,7 +544,7 @@ export default function EmployerPlans() {
                         gap: 13,
                       }}
                     >
-                      {(scale.levers || []).map((l) => (
+                      {(paid.levers || []).map((l) => (
                         <div
                           key={l[0]}
                           style={{
@@ -595,8 +585,8 @@ export default function EmployerPlans() {
                       ))}
                     </div>
                     <button
-                      onClick={() => choosePlan('scale')}
-                      disabled={choosing === 'scale'}
+                      onClick={() => choosePlan('paid')}
+                      disabled={choosing === 'paid'}
                       className="em-upgrade-cta"
                       style={{
                         display: 'inline-flex',
@@ -610,12 +600,12 @@ export default function EmployerPlans() {
                         fontWeight: 700,
                         padding: '13px 24px',
                         borderRadius: 999,
-                        cursor: choosing === 'scale' ? 'not-allowed' : 'pointer',
-                        opacity: choosing === 'scale' ? 0.7 : 1,
+                        cursor: choosing === 'paid' ? 'not-allowed' : 'pointer',
+                        opacity: choosing === 'paid' ? 0.7 : 1,
                         marginTop: 18,
                       }}
                     >
-                      {choosing === 'scale' ? 'Switching…' : `Upgrade to ${scale.name} →`}
+                      {choosing === 'paid' ? 'Switching…' : `Upgrade to ${paid.name} →`}
                     </button>
                   </div>
                 )}

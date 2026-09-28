@@ -5,6 +5,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { BillingService } from '../billing.service';
 import { PinoLogger } from 'nestjs-pino';
 import { EmployerBillingService } from '../../employer-billing/employer-billing.service';
+import { Types } from 'mongoose';
 
 describe('BillingService', () => {
   let service: BillingService;
@@ -143,6 +144,7 @@ describe('BillingService', () => {
         sort: jest.fn().mockResolvedValue(mockPlans),
       });
       (service as any).stripe = {
+        subscriptions: { list: jest.fn().mockResolvedValue({ data: [], has_more: false }) },
         prices: {
           list: jest.fn().mockResolvedValue({
             data: [
@@ -245,6 +247,21 @@ describe('BillingService', () => {
   });
 
   describe('createCheckoutSession', () => {
+    it('refuses a second paid subscription even when local webhook state is stale', async () => {
+      jest.spyOn(service, 'getPlanById').mockResolvedValue({ _id: { toString: () => 'paid-id' }, type: 'PRO', isActive: true } as any);
+      jest.spyOn(service, 'createOrGetStripeCustomer').mockResolvedValue('cus_123');
+      const create = jest.fn();
+      (service as any).stripe = {
+        subscriptions: { list: jest.fn().mockResolvedValue({ data: [{ id: 'sub_active', status: 'active' }] }) },
+        checkout: { sessions: { create } },
+      };
+
+      await expect(service.createCheckoutSession({ _id: { toString: () => 'user-id' } } as any, {
+        planId: 'paid-id', billingCycle: 'monthly',
+      })).rejects.toThrow(/already has a subscription/i);
+      expect(create).not.toHaveBeenCalled();
+    });
+
     it('rejects active legacy candidate plans before creating a customer', async () => {
       jest.spyOn(service, 'getPlanById').mockResolvedValue({
         _id: { toString: () => 'legacy-id' },
@@ -270,6 +287,7 @@ describe('BillingService', () => {
         url: 'https://stripe.test/cs_year',
       });
       (service as any).stripe = {
+        subscriptions: { list: jest.fn().mockResolvedValue({ data: [], has_more: false }) },
         prices: {
           list: jest.fn().mockResolvedValue({
             data: [
@@ -304,7 +322,7 @@ describe('BillingService', () => {
             ],
           }),
         },
-        checkout: { sessions: { create: checkoutCreate } },
+        checkout: { sessions: { create: checkoutCreate, list: jest.fn().mockResolvedValue({ data: [], has_more: false }) } },
       };
       jest.spyOn(service, 'getPlanById').mockResolvedValue({
         _id: { toString: () => 'paid-id' },
@@ -326,8 +344,53 @@ describe('BillingService', () => {
           line_items: [{ price: 'price_yearly', quantity: 1 }],
           metadata: expect.objectContaining({ billingCycle: 'yearly' }),
         }),
+        expect.objectContaining({ idempotencyKey: expect.stringContaining('candidate:user-id:paid-id:yearly:') }),
       );
     });
+  });
+
+  it('repairs a paid checkout from Stripe when its webhook was missed', async () => {
+    const userId = new Types.ObjectId('6ab40c9b08b05b370ea05250');
+    const planId = new Types.ObjectId('6aaac3bbe001ea16154ebefd');
+    const user = { _id: userId, currentPlanType: 'FREE', stripeCustomerId: 'cus_paid' } as any;
+    const subscription = {
+      id: 'sub_paid', customer: 'cus_paid', status: 'active',
+      metadata: { userId: String(userId), planId: String(planId), planType: 'PRO' },
+      items: { data: [{ price: { product: 'prod_VAue1EgKKX8FIz', recurring: { interval: 'year' } } }] },
+      current_period_start: 1760000000, current_period_end: 1790000000,
+      cancel_at_period_end: false,
+    };
+    (service as any).stripe = { subscriptions: { list: jest.fn().mockResolvedValue({ data: [subscription], has_more: false }) } };
+    mockPlanModel.findOne.mockResolvedValue({ _id: planId, type: 'PRO', isActive: true });
+    mockSubscriptionModel.findOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockReturnValueOnce({ populate: jest.fn().mockResolvedValue({ status: 'active', billingCycle: 'yearly' }) });
+    mockSubscriptionModel.create.mockResolvedValue({ _id: new Types.ObjectId() });
+    mockUserModel.findByIdAndUpdate.mockResolvedValue({});
+
+    const result = await (service as any).getReconciledSubscription(user);
+
+    expect(result.currentPlan).toBe('PRO');
+    expect(mockSubscriptionModel.create).toHaveBeenCalledWith(expect.objectContaining({ stripeSubscriptionId: 'sub_paid', billingCycle: 'yearly' }));
+    expect(mockUserModel.findByIdAndUpdate).toHaveBeenCalledWith(String(userId), expect.objectContaining({ currentPlanType: 'PRO' }));
+  });
+
+  it('keeps the surviving subscription when Stripe deletes one of two', async () => {
+    const survivor = { id: 'sub_new', status: 'active', metadata: { userId: '507f1f77bcf86cd799439011' } };
+    (service as any).stripe = {
+      subscriptions: { list: jest.fn().mockResolvedValue({ data: [survivor], has_more: false }) },
+    };
+    const apply = jest.spyOn(service as any, 'handleSubscriptionUpdated').mockResolvedValue(undefined);
+    const downgrade = jest.spyOn(service, 'downgradeToFree').mockResolvedValue(undefined);
+    mockSubscriptionModel.updateOne.mockResolvedValue({});
+
+    await (service as any).handleSubscriptionDeleted({
+      id: 'sub_old', customer: 'cus_123', metadata: { userId: '507f1f77bcf86cd799439011' },
+    });
+
+    expect(apply).toHaveBeenCalledWith(survivor);
+    expect(downgrade).not.toHaveBeenCalled();
   });
 
   describe('recordUsage', () => {

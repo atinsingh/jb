@@ -19,8 +19,8 @@ export class ResumeComparisonController {
     storage: memoryStorage(),
     limits: { fileSize: 5 * 1024 * 1024 },
     fileFilter: (_req, file, done) => {
-      const valid = ['.pdf', '.docx'].includes(extname(file.originalname).toLowerCase());
-      done(valid ? null : new BadRequestException('Only PDF and DOCX files are supported.'), valid);
+      const valid = ['.pdf', '.doc', '.docx'].includes(extname(file.originalname).toLowerCase());
+      done(valid ? null : new BadRequestException('Only PDF, DOC, and DOCX files are supported.'), valid);
     },
   }))
   async attachSource(@Param('id') id: string, @UploadedFile() file: Express.Multer.File, @Request() req: any) {
@@ -38,10 +38,10 @@ export class ResumeComparisonController {
   }
 
   @Post(':id/compare')
-  @ApiOperation({ summary: 'Compare an imported resume using ATS and AI-content signals' })
+  @ApiOperation({ summary: 'Compare an imported resume using an agent-session ATS/job review and heuristic AI-content signals' })
   compare(
     @Param('id') id: string,
-    @Body() body: { jobDescription?: string; jobUrl?: string },
+    @Body() body: { jobDescription?: string; jobUrl?: string; forceRefresh?: boolean },
     @Request() req: any,
   ) {
     return this.comparison.compare(id, req.user._id.toString(), body || {});

@@ -8,10 +8,12 @@ import { InSandboxResumeMatcherAdapter, ResumeMatcherAdapter } from './resume-ma
 import { AtsSession, AtsSessionSchema } from './schemas/ats-session.schema';
 import { AtsMatchService } from './ats-match.service';
 import { AtsParseabilityService } from './ats-parseability.service';
+import { LLMModule } from '../llm/llm.module';
 
 @Module({
   imports: [
     ResumeHarnessModule,
+    LLMModule,
     MongooseModule.forFeature([
       { name: AtsSession.name, schema: AtsSessionSchema },
       { name: ResumeHarnessSession.name, schema: ResumeHarnessSessionSchema },

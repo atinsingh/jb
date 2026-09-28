@@ -20,9 +20,9 @@ import { LiteLlmVirtualKeyClient } from './litellm-virtual-key.client';
 export interface EmployerAtsBudgetStatus {
   status: 'READY' | 'RUNNING' | 'BUDGET_EXHAUSTED' | 'CONFIGURATION_ERROR';
   reason?: string;
-  limitUsd?: number;
-  spentUsd?: number;
-  remainingUsd?: number;
+  limitCredits?: number;
+  spentCredits?: number;
+  remainingCredits?: number;
   period?: 'monthly';
   resetAt?: Date;
 }
@@ -124,8 +124,8 @@ export class EmployerAtsRuntimeService {
     }
     const limitUsd = budget.limitUsd ?? configured.maxBudgetUsd;
     const spentUsd = budget.spendUsd;
-    const budgetView = this.budgetView(limitUsd, spentUsd, budget.resetAt);
-    if (spentUsd >= limitUsd) {
+    const budgetView = this.budgetView(limitUsd, spentUsd, budget.resetAt, configured.account);
+    if (budgetView.remainingCredits <= 0) {
       await this.release(ownerId, runId, spentUsd);
       return {
         status: 'BUDGET_EXHAUSTED',
@@ -178,8 +178,11 @@ export class EmployerAtsRuntimeService {
     const ownerId = this.objectId(prepared.ownerId);
     const settled = await this.settledUsage(prepared);
     const spendAfter = settled.spendAfter;
-    const costUsd = this.money(
-      Math.max(0, spendAfter - prepared.spendBeforeUsd),
+    const rawCostUsd = Math.max(0, spendAfter - prepared.spendBeforeUsd);
+    const costUsd = this.money(rawCostUsd);
+    const creditsUsed = Math.max(
+      this.roundCredits(spendAfter),
+      (prepared.spentCredits || 0) + this.roundCredits(rawCostUsd),
     );
     const logs = settled.logs;
     const finishedAt = new Date();
@@ -254,7 +257,7 @@ export class EmployerAtsRuntimeService {
         )
         .exec();
     } finally {
-      await this.release(ownerId, prepared.runId, spendAfter);
+      await this.release(ownerId, prepared.runId, spendAfter, creditsUsed, prepared.resetAt);
     }
     return { costUsd, requestIds };
   }
@@ -267,8 +270,8 @@ export class EmployerAtsRuntimeService {
         const virtualKey = this.secrets.decrypt(configured.account.encryptedKey);
         const info = await this.keys.info(virtualKey);
         const limitUsd = info.limitUsd ?? configured.maxBudgetUsd;
-        const view = this.budgetView(limitUsd, info.spendUsd, info.resetAt);
-        const exhausted = info.spendUsd >= limitUsd;
+        const view = this.budgetView(limitUsd, info.spendUsd, info.resetAt, configured.account);
+        const exhausted = view.remainingCredits <= 0;
         return {
           status: exhausted ? 'BUDGET_EXHAUSTED' : 'READY',
           ...(exhausted ? { reason: 'EMPLOYER_BUDGET_EXHAUSTED' } : {}),
@@ -410,10 +413,10 @@ export class EmployerAtsRuntimeService {
     const plan = getEmployerPlan(subscription.plan || 'free');
     if (!plan) throw new Error('Employer ATS plan is not configured');
     const allowed = await this.aliases.listForTier(plan.modelTier);
-    const alias = await this.aliases.resolveForTier(plan.modelTier);
+    const alias = await this.aliases.resolveAutomaticForTier(plan.modelTier);
     if (!allowed.length) throw new Error('Employer ATS alias is not configured');
     const models = allowed.map((entry) => entry.alias);
-    const maxBudgetUsd = plan.limits.aiBudgetUsdLimit;
+    const maxBudgetUsd = plan.limits.aiBudgetCreditsLimit / 100;
     const keyAlias = `jobocate-employer-${ownerIdValue}`;
 
     await this.runtimeModel
@@ -672,14 +675,25 @@ export class EmployerAtsRuntimeService {
     }
   }
 
-  private budgetView(limitUsd: number, spentUsd: number, resetAt?: Date) {
+  private budgetView(limitUsd: number, spentUsd: number, resetAt?: Date, account?: any) {
+    const limitCredits = Math.round(limitUsd * 100);
+    const effectiveResetAt = resetAt || new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() + 1, 1));
+    const samePeriod = account?.creditsResetAt && new Date(account.creditsResetAt).getTime() === effectiveResetAt.getTime();
+    const spentCredits = Math.max(
+      this.roundCredits(spentUsd),
+      samePeriod ? account.creditsUsed || 0 : 0,
+    );
     return {
-      limitUsd: this.money(limitUsd),
-      spentUsd: this.money(spentUsd),
-      remainingUsd: this.money(Math.max(0, limitUsd - spentUsd)),
+      limitCredits,
+      spentCredits,
+      remainingCredits: Math.max(0, limitCredits - spentCredits),
       period: 'monthly' as const,
-      ...(resetAt ? { resetAt } : {}),
+      resetAt: effectiveResetAt,
     };
+  }
+
+  private roundCredits(usd: number): number {
+    return Math.ceil(Math.max(0, usd) * 100 - 1e-9);
   }
 
   private async settledUsage(
@@ -727,12 +741,17 @@ export class EmployerAtsRuntimeService {
     ownerId: Types.ObjectId | string,
     runId: string,
     spendUsd?: number,
+    creditsUsed?: number,
+    creditsResetAt?: Date,
   ): Promise<any> {
     return this.runtimeModel
       .updateOne(
         { ownerId, ownerType: 'employer', activeRunId: runId },
         {
-          ...(spendUsd == null ? {} : { $set: { spendUsd } }),
+          ...(spendUsd == null ? {} : { $set: {
+            spendUsd,
+            ...(creditsUsed == null ? {} : { creditsUsed, creditsResetAt }),
+          } }),
           $unset: { activeRunId: 1, runLockUntil: 1 },
         },
       )

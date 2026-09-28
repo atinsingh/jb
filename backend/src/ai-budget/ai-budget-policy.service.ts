@@ -23,7 +23,7 @@ const SERVICE_IDS = [
 
 const tierSchema = z
   .object({
-    maxBudgetUsd: z.number().positive().finite(),
+    maxBudgetCredits: z.number().int().positive().finite(),
     budgetDuration: z.literal('1mo'),
   })
   .strict();
@@ -59,7 +59,6 @@ const estimateSchema = z
     kind: z.enum(['range', 'usage_based']),
     minUsd: z.number().nonnegative().finite().optional(),
     maxUsd: z.number().positive().finite().optional(),
-    label: z.string().min(1),
   })
   .strict()
   .superRefine((estimate, context) => {
@@ -233,8 +232,13 @@ export class AiBudgetPolicyService {
       (candidate) => candidate.alias === alias && candidate.service === service,
     );
     if (!estimate) return { kind: 'usage_based', label: 'Usage based' };
-    const { kind, minUsd, maxUsd, label } = estimate;
-    return deepFreeze({ kind, minUsd, maxUsd, label });
+    const { kind, minUsd, maxUsd } = estimate;
+    if (kind === 'range' && minUsd !== undefined && maxUsd !== undefined) {
+      const minCredits = Math.ceil(minUsd * 100);
+      const maxCredits = Math.ceil(maxUsd * 100);
+      return deepFreeze({ kind, minCredits, maxCredits, label: `${minCredits}–${maxCredits} credits estimated` });
+    }
+    return deepFreeze({ kind, label: 'Usage based' });
   }
 
   stripePaid() {

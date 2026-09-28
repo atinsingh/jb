@@ -27,12 +27,12 @@ const apiCall = async (endpoint, options = {}) => {
 };
 
 // Resume Parser API
-export const uploadResume = async (file) => {
+export const uploadResume = async (file, { fastCompare = false } = {}) => {
   const token = await getAccessToken();
   const formData = new FormData();
   formData.append('resume', file);
 
-  const response = await fetch(`${API_URL}/api/resume/parse`, {
+  const response = await fetch(`${API_URL}/api/resume/parse${fastCompare ? '?mode=compare' : ''}`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,

@@ -273,7 +273,7 @@ export default function EmployerAutopilot() {
         { value: String(stats.reqsCovered), label: 'reqs covered', color: '#FBF8F1' },
         { value: String(stats.screenedToday), label: 'screened today', color: '#FBF8F1' },
         { value: String(stats.queued), label: 'actions queued', color: '#5BD08C' },
-        { value: `${stats.actionsUsed}/${stats.actionsLimit}`, label: 'AI actions used', color: '#8DA2F5' },
+        { value: String(stats.actionsUsed), label: 'recruiter actions', color: '#8DA2F5' },
       ]
     : [];
 

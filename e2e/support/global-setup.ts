@@ -32,6 +32,9 @@ async function signInAndSaveState(
 
   try {
     await page.goto(`${URLS.frontend}/app/login`, { waitUntil: 'domcontentloaded' });
+    // Filling before Next hydrates lets React replace the inputs with empty
+    // state immediately afterward, so the click submits no credentials.
+    await page.waitForLoadState('networkidle');
 
     await page.fill('input[name="email"]', user.email);
     await page.fill('input[name="password"]', user.password);

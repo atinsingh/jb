@@ -170,6 +170,17 @@ describe('DockerSandboxDriver', () => {
     expect(argv.join(' ')).not.toContain('line two');
   });
 
+  it('writes the original PDF bytes into the agent workspace without UTF-8 corruption', async () => {
+    const bytes = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x00, 0xff]);
+    await driver().putFiles('resume-sess-1', [
+      { path: 'ORIGINAL_RESUME.pdf', bytes },
+    ]);
+    expect(JSON.parse(calls[0].stdin!)[0]).toEqual({
+      path: 'ORIGINAL_RESUME.pdf', contents: bytes.toString('base64'), encoding: 'base64',
+    });
+    expect(calls[0].argv.join(' ')).toContain('base64.b64decode');
+  });
+
   it('rejects workspace escape paths before calling Docker', async () => {
     await expect(driver().putFiles('resume-sess-1', [
       { path: '../secret', contents: 'x' },

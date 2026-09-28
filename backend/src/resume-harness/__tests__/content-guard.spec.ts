@@ -167,7 +167,7 @@ describe('findContentProblems', () => {
   it('rejects a career summary when the candidate has only identity and eligibility facts', () => {
     const sparse = String.raw`\documentclass{article}
 \begin{document}
-Harkit
+John Doe
 \section*{Summary}
 IT professional focused on software engineering and technical solutions.
 \section*{Eligibility}
@@ -177,8 +177,8 @@ Sponsorship not required. Relocation not open.
 
 ## Identity
 
-- Name: Harkit
-- Email: harkit@example.com
+- Name: John Doe
+- Email: john.doe@example.com
 
 ## Eligibility
 
@@ -187,7 +187,7 @@ Sponsorship not required. Relocation not open.
 `;
     const problems = findContentProblems({
       latex: sparse,
-      candidateName: 'Harkit',
+      candidateName: 'John Doe',
       candidateMarkdown,
     });
     expect(problems.join(' ')).toMatch(/Summary.*no career evidence/i);
@@ -196,21 +196,21 @@ Sponsorship not required. Relocation not open.
   it('rejects a contact-only document when the profile has no career facts to add', () => {
     const contactOnly = String.raw`\documentclass{article}
 \begin{document}
-Harkit\\
-harkit@example.com\\
+John Doe\\
+john.doe@example.com\\
 Toronto
 \end{document}`;
     const candidateMarkdown = `# Candidate facts
 
 ## Identity
 
-- Name: Harkit
-- Email: harkit@example.com
+- Name: John Doe
+- Email: john.doe@example.com
 - Location: Toronto
 `;
     const problems = findContentProblems({
       latex: contactOnly,
-      candidateName: 'Harkit',
+      candidateName: 'John Doe',
       candidateMarkdown,
     });
 

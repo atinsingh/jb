@@ -219,10 +219,14 @@ export const employerBillingApi = {
   // GET /api/employer/billing/plans -> { currentPlan, billingCycle, plans:[...] }
   plans: () => apiCall('/api/employer/billing/plans'),
   // POST /api/employer/billing/upgrade { plan, billingCycle? }
-  upgrade: (dto) =>
-    apiCall('/api/employer/billing/upgrade', {
+    upgrade: (dto) =>
+      apiCall('/api/employer/billing/upgrade', {
+        method: 'POST',
+        body: JSON.stringify(dto),
+      }),
+    portal: () => apiCall('/api/employer/billing/portal', {
       method: 'POST',
-      body: JSON.stringify(dto),
+      body: JSON.stringify({ returnUrl: `${window.location.origin}/employer/billing` }),
     }),
 };
 

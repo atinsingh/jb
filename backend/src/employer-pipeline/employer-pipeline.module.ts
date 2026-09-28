@@ -37,6 +37,7 @@ import {
   EmployerAtsPreview,
   EmployerAtsPreviewSchema,
 } from './schemas/employer-ats-preview.schema';
+import { LLMModule } from '../llm/llm.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import {
     ResumeHarnessModule,
     ResumeModule,
     EmployerBillingModule,
+    LLMModule,
     MongooseModule.forFeature([
       { name: EmployerApplicant.name, schema: EmployerApplicantSchema },
       { name: ApplicationArtifact.name, schema: ApplicationArtifactSchema },

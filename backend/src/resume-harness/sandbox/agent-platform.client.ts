@@ -102,13 +102,13 @@ export class AgentPlatformClient {
 
   async putFiles(
     sandboxId: string,
-    files: { path: string; contents: string }[],
+    files: import('../harness/harness.types').HarnessContextFile[],
   ): Promise<void> {
     await this.request('PUT', `/v1/sandboxes/${sandboxId}/files`, {
       files: files.map((f) => ({
         path: f.path,
         // base64 so LaTeX backslashes and non-ASCII names survive transport.
-        content_base64: Buffer.from(f.contents, 'utf8').toString('base64'),
+        content_base64: f.bytes ? f.bytes.toString('base64') : Buffer.from(f.contents || '', 'utf8').toString('base64'),
       })),
     });
   }

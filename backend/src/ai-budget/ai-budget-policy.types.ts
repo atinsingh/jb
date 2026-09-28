@@ -10,7 +10,7 @@ export type AiBudgetServiceId =
   | 'ai_content_heuristic';
 
 export interface TierBudgetPolicy {
-  maxBudgetUsd: number;
+  maxBudgetCredits: number;
   budgetDuration: '1mo';
 }
 
@@ -24,14 +24,17 @@ export interface ServiceBudgetPolicy {
 
 export interface AiCostEstimate {
   kind: 'range' | 'usage_based';
-  minUsd?: number;
-  maxUsd?: number;
+  minCredits?: number;
+  maxCredits?: number;
   label: string;
 }
 
-export interface AiBudgetEstimatePolicy extends AiCostEstimate {
+export interface AiBudgetEstimatePolicy {
   alias: string;
   service: AiBudgetServiceId;
+  kind: 'range' | 'usage_based';
+  minUsd?: number;
+  maxUsd?: number;
 }
 
 export interface StripePriceAssertion {

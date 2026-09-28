@@ -1,25 +1,13 @@
 /**
- * The employer plan catalog — one source of truth for limits, display prices and
- * the Stripe price lookup keys.
- *
- * Prices live in Stripe; only the *lookup keys* live here. A lookup key is a
- * stable, account-unique alias for a price, so the code never hardcodes a
- * `price_...` id and test/live accounts can hold different prices under the same
- * key. `scripts/sync-stripe-catalog.ts` creates prices under exactly these keys.
- *
- * `annual` is the marketed per-month price when paying yearly; the Stripe yearly
- * price is that × 12 (see the sync script) — keep the two in step.
+ * Employer plan limits and capabilities. Prices and product IDs come from the
+ * configured Stripe catalog, not from this file.
  */
 export interface EmployerPlan {
   key: string;
   name: string;
   tagline: string;
-  /** Display price per month, in whole dollars. */
-  monthly: number;
-  /** Display price per month when billed annually, in whole dollars. */
-  annual: number;
   popular: boolean;
-  /** false → not purchasable through self-serve checkout (free tier, sales-led enterprise). */
+  /** false for the free tier. */
   selfServe: boolean;
   /** Alias-catalogue tier used for employer-owned ATS model selection. */
   modelTier: string;
@@ -28,8 +16,8 @@ export interface EmployerPlan {
     seatsLimit: number;
     aiActionsLimit: number;
     sourcingCreditsLimit: number;
-    /** Actual LiteLLM spend ceiling in USD for the shared employer AI pool. */
-    aiBudgetUsdLimit: number;
+    /** Monthly measured AI spend allowance. 100 credits = $1 at the LiteLLM boundary. */
+    aiBudgetCreditsLimit: number;
   };
 }
 
@@ -38,8 +26,6 @@ export const EMPLOYER_PLANS: EmployerPlan[] = [
     key: 'free',
     name: 'Free',
     tagline: 'Post your first role',
-    monthly: 0,
-    annual: 0,
     popular: false,
     selfServe: false,
     modelTier: 'FREE',
@@ -48,86 +34,31 @@ export const EMPLOYER_PLANS: EmployerPlan[] = [
       seatsLimit: 1,
       aiActionsLimit: 25,
       sourcingCreditsLimit: 10,
-      aiBudgetUsdLimit: 1,
+      aiBudgetCreditsLimit: 100,
     },
   },
   {
-    key: 'starter',
-    name: 'Starter',
-    tagline: 'For a first hire or two',
-    monthly: 99,
-    annual: 79,
-    popular: false,
+    key: 'paid',
+    name: 'Paid',
+    tagline: 'More room for your hiring team',
+    popular: true,
     selfServe: true,
-    modelTier: 'FREE',
+    modelTier: 'PRO',
     limits: {
       jobSlotsLimit: 3,
       seatsLimit: 3,
       aiActionsLimit: 200,
       sourcingCreditsLimit: 50,
-      aiBudgetUsdLimit: 10,
-    },
-  },
-  {
-    key: 'growth',
-    name: 'Growth',
-    tagline: 'For scaling teams',
-    monthly: 299,
-    annual: 249,
-    popular: true,
-    selfServe: true,
-    modelTier: 'PRO',
-    limits: {
-      jobSlotsLimit: 5,
-      seatsLimit: 6,
-      aiActionsLimit: 500,
-      sourcingCreditsLimit: 100,
-      aiBudgetUsdLimit: 30,
-    },
-  },
-  {
-    key: 'scale',
-    name: 'Scale',
-    tagline: 'High-volume recruiting',
-    monthly: 799,
-    annual: 649,
-    popular: false,
-    selfServe: true,
-    modelTier: 'PRO',
-    limits: {
-      jobSlotsLimit: 15,
-      seatsLimit: 15,
-      aiActionsLimit: 2000,
-      sourcingCreditsLimit: 500,
-      aiBudgetUsdLimit: 100,
-    },
-  },
-  {
-    key: 'enterprise',
-    name: 'Enterprise',
-    tagline: 'Security, SSO & SLAs',
-    monthly: 0,
-    annual: 0,
-    popular: false,
-    // Sales-led: an enterprise subscription is provisioned by an admin after a
-    // contract, never bought from the pricing page.
-    selfServe: false,
-    modelTier: 'ELITE',
-    limits: {
-      jobSlotsLimit: 100,
-      seatsLimit: 100,
-      aiActionsLimit: 10000,
-      sourcingCreditsLimit: 5000,
-      aiBudgetUsdLimit: 500,
+      aiBudgetCreditsLimit: 400,
     },
   },
 ];
 
+for (const plan of EMPLOYER_PLANS) {
+  if (!Number.isSafeInteger(plan.limits.aiBudgetCreditsLimit) || plan.limits.aiBudgetCreditsLimit <= 0) {
+    throw new Error(`Employer plan ${plan.key} must have a positive integer AI credit allowance`);
+  }
+}
+
 export const getEmployerPlan = (key: string): EmployerPlan | undefined =>
   EMPLOYER_PLANS.find((p) => p.key === key);
-
-/** Stable Stripe lookup key for a plan + cycle, e.g. `jobocate_employer_growth_monthly`. */
-export const employerPriceLookupKey = (
-  planKey: string,
-  billingCycle: 'monthly' | 'annual',
-): string => `jobocate_employer_${planKey}_${billingCycle}`;

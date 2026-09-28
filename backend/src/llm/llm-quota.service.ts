@@ -25,8 +25,8 @@ export interface QuotaCheckResult {
  * `PlanEntitlement` system keyed off `User.currentPlanType`), employer users
  * authenticate as ROLE_EMPLOYER and their real AI allowance lives in the
  * employer-billing `EmployerSubscription` document (`aiActionsLimit` /
- * `aiActionsUsed`, provisioned per employer plan free/starter/growth/scale/
- * enterprise). This sentinel key routes the 4 recruiter features to that
+ * `aiActionsUsed`, provisioned per current employer plan free/paid).
+ * This sentinel key routes recruiter and ATS features to that
  * subscription instead of the candidate entitlement pool.
  */
 export const EMPLOYER_AI_ENTITLEMENT = 'employer_ai_credits_per_month';
@@ -60,6 +60,8 @@ const FEATURE_TO_ENTITLEMENT: Record<LLMFeature, string> = {
   // Candidate Job-Search Copilot also consumes the candidate AI credit pool;
   // one credit per completed run (metered by AgentRuntimeService).
   [LLMFeature.JOB_SEARCH_COPILOT]: 'ai_credits_per_month',
+  [LLMFeature.CANDIDATE_ATS_REVIEW]: 'ai_credits_per_month',
+  [LLMFeature.EMPLOYER_ATS_REVIEW]: EMPLOYER_AI_ENTITLEMENT,
 };
 
 @Injectable()
@@ -196,6 +198,22 @@ export class LLMQuotaService {
     }
   }
 
+  /** Deduct one product credit when usage telemetry is recorded elsewhere. */
+  async consumeCredit(userId: string, feature: LLMFeature): Promise<void> {
+    const entitlementKey = FEATURE_TO_ENTITLEMENT[feature];
+    if (!entitlementKey) {
+      throw new ForbiddenException(`Feature ${feature} is not configured for credits`);
+    }
+    if (entitlementKey === EMPLOYER_AI_ENTITLEMENT) {
+      await this.incrementEmployerAiUsage(userId);
+      return;
+    }
+    const result = await this.entitlementService.consumeActionCredit(userId, entitlementKey);
+    if (!result.allowed) {
+      throw new ForbiddenException(result.message || 'AI credit could not be consumed');
+    }
+  }
+
   /**
    * Resolve the employer's AI Recruiter allowance from their billing
    * subscription. `aiActionsLimit === -1` means unlimited. A missing
@@ -209,6 +227,8 @@ export class LLMQuotaService {
       this.logger.warn(`Invalid employer id for AI quota check: ${userId}`);
       return { allowed: false, message: 'Invalid employer id' };
     }
+
+    await this.renewEmployerAiActions(userId);
 
     const sub = await this.employerSubscriptionModel.findOne({
       ownerId: new Types.ObjectId(userId),
@@ -254,9 +274,40 @@ export class LLMQuotaService {
       return;
     }
 
-    await this.employerSubscriptionModel.updateOne(
-      { ownerId: new Types.ObjectId(userId) },
+    await this.renewEmployerAiActions(userId);
+
+    const updated = await this.employerSubscriptionModel.updateOne(
+      {
+        ownerId: new Types.ObjectId(userId),
+        aiActionsPeriodStart: this.currentMonthStart(),
+        $or: [
+          { aiActionsLimit: -1 },
+          { $expr: { $lt: [{ $ifNull: ['$aiActionsUsed', 0] }, { $ifNull: ['$aiActionsLimit', 0] }] } },
+        ],
+      },
       { $inc: { aiActionsUsed: 1 } },
+    );
+    if (updated?.matchedCount === 0) {
+      throw new ForbiddenException('Employer AI action quota is exhausted');
+    }
+  }
+
+  private currentMonthStart(): Date {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  }
+
+  private async renewEmployerAiActions(userId: string): Promise<void> {
+    const monthStart = this.currentMonthStart();
+    await this.employerSubscriptionModel.updateOne(
+      {
+        ownerId: new Types.ObjectId(userId),
+        $or: [
+          { aiActionsPeriodStart: { $lt: monthStart } },
+          { aiActionsPeriodStart: { $exists: false } },
+        ],
+      },
+      { $set: { aiActionsPeriodStart: monthStart, aiActionsUsed: 0 } },
     );
   }
 

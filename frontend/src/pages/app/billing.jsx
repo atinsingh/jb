@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Head from 'next/head';
 import { LoadingState, EmptyState, ErrorState } from '@/components/app/AppStates';
 import { Screen, CellGrid, Label, EndRule, MonoButton, MonoSwitch, mono, HAIR } from '@/components/app/v3/kit';
-import { createCheckout, getAiBudget, getInvoices, getPlans, getSubscription } from '@/services/billingApi';
+import { createCheckout, createPortal, getAiBudget, getInvoices, getPlans, getSubscription } from '@/services/billingApi';
 
 // Best-effort mapping of an API invoice shape onto the v3 row.
 const normalizeInvoice = (i) => {
@@ -46,6 +46,7 @@ export default function AppBilling() {
   const [invoices, setInvoices] = useState([]);
   const [plans, setPlans] = useState([]);
   const [subscription, setSubscription] = useState(null);
+  const [currentPlan, setCurrentPlan] = useState('FREE');
   const [budget, setBudget] = useState(null);
   const [yearly, setYearly] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -55,12 +56,16 @@ export default function AppBilling() {
     let alive = true;
     (async () => {
       try {
-        const [invoiceData, planData, subscriptionData, budgetData] = await Promise.all([getInvoices(), getPlans(), getSubscription(), getAiBudget().catch(() => ({ status: 'unavailable' }))]);
+        const [invoiceData, planData, subscriptionData] = await Promise.all([getInvoices(), getPlans(), getSubscription()]);
+        // Subscription read reconciles Stripe after missed webhooks; fetch the
+        // AI budget only after it has applied the resulting tier.
+        const budgetData = await getAiBudget().catch(() => ({ status: 'unavailable' }));
         if (!alive) return;
         const list = invoiceData?.invoices || (Array.isArray(invoiceData) ? invoiceData : []);
         setInvoices((Array.isArray(list) ? list : []).map(normalizeInvoice));
         setPlans(Array.isArray(planData?.plans) ? planData.plans : []);
         setSubscription(subscriptionData?.subscription || null);
+        setCurrentPlan(subscriptionData?.currentPlan === 'PRO' ? 'PRO' : 'FREE');
         setBudget(budgetData || null);
       } catch (e) {
         if (alive) setError(e || new Error('Could not load your invoices'));
@@ -86,6 +91,17 @@ export default function AppBilling() {
 
   const paidTotal = useMemo(() => invoices.filter((i) => i.status === 'paid').length, [invoices]);
 
+  const managePlan = async () => {
+    setError(null);
+    try {
+      const result = await createPortal();
+      if (!result?.url) throw new Error('Billing portal did not return a URL');
+      window.location.assign(result.url);
+    } catch (e) {
+      setError(e);
+    }
+  };
+
   return (
     <>
       <Head>
@@ -103,6 +119,10 @@ export default function AppBilling() {
           }}
         >
           <div>
+            <div data-testid="candidate-current-plan" style={{ ...mono(11, '0'), marginBottom: 12 }}>
+              Current plan: {currentPlan === 'PRO' ? 'Paid' : 'Free'}
+              {currentPlan === 'PRO' && subscription?.billingCycle ? ` · ${subscription.billingCycle}` : ''}
+            </div>
             <div style={{ ...mono(), marginBottom: 10 }}>Invoices paid</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
               <span
@@ -128,13 +148,15 @@ export default function AppBilling() {
 
         {budget && (
           <div data-testid="billing-budget" style={{ ...mono(11, '0'), marginBottom: 18 }}>
-            {budget.status === 'unavailable' ? 'AI budget unavailable · model-running actions are paused' : `AI budget: $${Number(budget.remaining || 0).toFixed(2)} of $${Number(budget.limit || 0).toFixed(2)} remaining · ${budget.status} · renews monthly`}
+            {budget.status === 'unavailable' ? 'AI credits unavailable · model-running actions are paused' : `AI credits: ${Number(budget.remaining || 0)} of ${Number(budget.limit || 0)} remaining · ${budget.status} · renews monthly`}
           </div>
         )}
 
+        {currentPlan === 'PRO' && <MonoButton onClick={managePlan} style={{ marginBottom: 18 }}>Manage subscription</MonoButton>}
+
         <CellGrid cols={Math.max(plans.length, 1)} style={{ marginBottom: 34 }}>
           {plans.map((p) => {
-            const current = subscription?.planId?._id === p._id || subscription?.planId === p._id;
+            const current = currentPlan === p.type;
             const amount = yearly ? p.priceYearly : p.priceMonthly;
             return (
               <div

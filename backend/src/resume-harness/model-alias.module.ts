@@ -6,9 +6,11 @@ import {
   HarnessModelAliasSchema,
 } from './schemas/harness-model-alias.schema';
 import { ModelAliasService } from './model-alias.service';
+import { BillingModule } from '../billing/billing.module';
 
 @Module({
   imports: [
+    BillingModule,
     MongooseModule.forFeature([
       { name: HarnessModelAlias.name, schema: HarnessModelAliasSchema },
       { name: User.name, schema: UserSchema },

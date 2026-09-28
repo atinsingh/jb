@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
+import { currentPaidSubscription, existingPaidSubscription, rejectExistingSubscription, reusableCheckout } from './stripe-checkout-guard';
 import { User, UserDocument } from '../schemas/user.schema';
 import { SubscriptionPlan, SubscriptionPlanDocument } from '../schemas/subscription-plan.schema';
 import { UserSubscription, UserSubscriptionDocument } from '../schemas/user-subscription.schema';
@@ -13,12 +14,13 @@ import {
   buildLiveStripeTiers,
   fetchConfiguredStripePrices,
   LiveStripeTier,
+  configuredStripeProductIds,
 } from './stripe-catalog';
 
 // Define types locally to avoid dependency on contracts package initially
 type BillingCycle = 'monthly' | 'yearly';
 type SubscriptionStatus = 'active' | 'canceled' | 'past_due' | 'incomplete' | 'incomplete_expired' | 'trialing' | 'unpaid' | 'paused';
-type PlanType = 'FREE' | 'PRO' | 'ELITE' | 'INTERVIEW';
+type PlanType = 'FREE' | 'PRO';
 
 @Injectable()
 export class BillingService {
@@ -92,6 +94,65 @@ export class BillingService {
     return this.subscriptionModel.findOne({ userId: new Types.ObjectId(userId) }).populate('planId');
   }
 
+  /** Repair missed or delayed webhooks from Stripe before showing an account tier. */
+  async getReconciledSubscription(user: UserDocument): Promise<{
+    subscription: UserSubscriptionDocument | null;
+    currentPlan: 'FREE' | 'PRO';
+  }> {
+    const userId = user._id.toString();
+    if (!user.stripeCustomerId) {
+      return { subscription: await this.getUserSubscription(userId), currentPlan: 'FREE' };
+    }
+
+    const productIds = new Set(configuredStripeProductIds('candidate'));
+    let startingAfter: string | undefined;
+    let paid: Stripe.Subscription | undefined;
+    do {
+      const page = await this.stripe.subscriptions.list({
+        customer: user.stripeCustomerId,
+        status: 'all',
+        limit: 100,
+        ...(startingAfter ? { starting_after: startingAfter } : {}),
+      });
+      paid = page.data.find((subscription) =>
+        ['active', 'trialing'].includes(subscription.status) &&
+        subscription.metadata?.userId === userId &&
+        subscription.metadata?.planType === 'PRO' &&
+        subscription.items.data.some((item) =>
+          productIds.has(typeof item.price.product === 'string' ? item.price.product : item.price.product?.id),
+        ),
+      );
+      if (paid) break;
+      startingAfter = page.has_more ? page.data.at(-1)?.id : undefined;
+    } while (startingAfter);
+
+    const existing = await this.subscriptionModel.findOne({ userId: new Types.ObjectId(userId) });
+    if (paid) {
+      const proPlan = await this.getPlanByType('PRO');
+      if (!proPlan || paid.metadata.planId !== proPlan._id.toString()) {
+        throw new InternalServerErrorException('Paid Stripe subscription does not match the active Paid plan');
+      }
+      if (existing?.stripeSubscriptionId !== paid.id || existing.status !== paid.status || user.currentPlanType !== 'PRO') {
+        await this.handleSubscriptionUpdated(paid);
+      }
+      return { subscription: await this.getUserSubscription(userId), currentPlan: 'PRO' };
+    }
+
+    if (user.currentPlanType === 'PRO' || (existing && ['active', 'trialing'].includes(existing.status))) {
+      await this.downgradeToFree(userId);
+      if (existing) {
+        await this.subscriptionModel.updateOne({ _id: existing._id }, { status: 'canceled', canceledAt: new Date() });
+      }
+    }
+    return { subscription: await this.getUserSubscription(userId), currentPlan: 'FREE' };
+  }
+
+  async reconcileCandidateTier(userId: string): Promise<'FREE' | 'PRO'> {
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+    return (await this.getReconciledSubscription(user)).currentPlan;
+  }
+
   /**
    * The candidate's billing history, read straight from Stripe rather than a
    * local table. Stripe is already the source of truth for the subscription
@@ -156,6 +217,15 @@ export class BillingService {
 
     const customerId = await this.createOrGetStripeCustomer(user);
 
+    if (await existingPaidSubscription(this.stripe, customerId)) rejectExistingSubscription();
+    const pending = await reusableCheckout(
+      this.stripe,
+      customerId,
+      (session) => session.metadata?.userId === user._id.toString(),
+      (session) => session.metadata?.planId === plan._id.toString() && session.metadata?.billingCycle === dto.billingCycle,
+    );
+    if (pending) return { sessionId: pending.id, url: pending.url! };
+
     const paid = (await this.getCandidateStripeTiers()).find((tier) => tier.key === 'paid');
     const priceId = dto.billingCycle === 'yearly' ? paid?.stripePriceIdYearly : paid?.stripePriceIdMonthly;
 
@@ -173,8 +243,8 @@ export class BillingService {
           quantity: 1,
         },
       ],
-      success_url: dto.successUrl || `${this.frontendUrl}/billing?success=true`,
-      cancel_url: dto.cancelUrl || `${this.frontendUrl}/billing?canceled=true`,
+      success_url: dto.successUrl || `${this.frontendUrl}/app/billing?success=true`,
+      cancel_url: dto.cancelUrl || `${this.frontendUrl}/app/billing?canceled=true`,
       metadata: {
         userId: user._id.toString(),
         planId: plan._id.toString(),
@@ -188,7 +258,7 @@ export class BillingService {
           planType: plan.type,
         },
       },
-    });
+    }, { idempotencyKey: `candidate:${user._id}:${plan._id}:${dto.billingCycle}:${Math.floor(Date.now() / 600000)}` });
 
     this.logger.log({ userId: user._id, planId: plan._id, sessionId: session.id }, 'Checkout session created');
 
@@ -205,7 +275,7 @@ export class BillingService {
 
     const session = await this.stripe.billingPortal.sessions.create({
       customer: user.stripeCustomerId,
-      return_url: returnUrl || `${this.frontendUrl}/billing`,
+      return_url: returnUrl || `${this.frontendUrl}/app/billing`,
     });
 
     return { url: session.url };
@@ -461,6 +531,12 @@ export class BillingService {
         canceledAt: new Date(),
       },
     );
+
+    const surviving = await currentPaidSubscription(this.stripe, String(subscription.customer));
+    if (surviving && surviving.id !== subscription.id) {
+      await this.handleSubscriptionUpdated(surviving);
+      return;
+    }
 
     await this.downgradeToFree(userId);
 

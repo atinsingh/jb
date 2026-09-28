@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { InjectModel } from '@nestjs/mongoose';
 import { createHash } from 'crypto';
 import { Model } from 'mongoose';
+import { LLMQuotaService } from '../llm/llm-quota.service';
 import { ResumeHarnessSession, ResumeHarnessSessionDocument } from '../resume-harness/schemas/resume-harness-session.schema';
 import { AtsSession, AtsSessionDocument } from './schemas/ats-session.schema';
 import { ResumeMatcherAdapter } from './resume-matcher.adapter';
@@ -18,6 +19,7 @@ export class AtsSessionService {
     @InjectModel(AtsSession.name) private readonly atsModel: Model<AtsSessionDocument>,
     @InjectModel(ResumeHarnessSession.name) private readonly resumeModel: Model<ResumeHarnessSessionDocument>,
     private readonly adapter: ResumeMatcherAdapter,
+    private readonly quota: LLMQuotaService,
   ) {}
 
   async start(userId: string, input: StartAtsSessionInput) {

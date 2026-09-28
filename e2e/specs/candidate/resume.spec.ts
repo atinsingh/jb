@@ -28,8 +28,8 @@ const OPTIONS = {
       label: "Claude Sonnet 4.5",
       efforts: ["high", "low"],
       estimates: {
-        high: { kind: "range", minUsd: 0.03, maxUsd: 0.4, label: "$0.03-$0.40 estimated" },
-        low: { kind: "range", minUsd: 0.01, maxUsd: 0.15, label: "$0.01-$0.15 estimated" },
+        high: { kind: "range", minCredits: 3, maxCredits: 40, label: "3–40 credits estimated" },
+        low: { kind: "range", minCredits: 1, maxCredits: 15, label: "1–15 credits estimated" },
       },
     },
     {
@@ -234,11 +234,11 @@ async function stubHarnessApi(page: Page) {
   await page.route("**/api/resume-harness/budget", (route: Route) =>
     route.fulfill({
       json: {
-        unit: "USD",
+        unit: "credits",
         tier: "PRO",
-        limit: 4,
-        spent: 0.75,
-        remaining: 3.25,
+        limit: 400,
+        spent: 75,
+        remaining: 325,
         periodStart: "2026-09-01T00:00:00.000Z",
         periodEnd: "2026-10-01T00:00:00.000Z",
         resetAt: "2026-10-01T00:00:00.000Z",
@@ -493,8 +493,8 @@ test.describe("résumé AI budget", () => {
     await stubHarnessApi(page);
     await page.goto("/app/resume");
 
-    await expect(page.getByTestId("ai-budget")).toContainText("$3.25 of $4.00 remaining");
-    await expect(page.getByTestId("ai-budget")).toContainText("$0.03-$0.40 estimated");
+    await expect(page.getByTestId("ai-budget")).toContainText("325 of 400 remaining");
+    await expect(page.getByTestId("ai-budget")).toContainText("3–40 credits estimated");
     await expect(page.getByTestId("ai-budget")).toContainText("resets");
   });
 
@@ -503,7 +503,7 @@ test.describe("résumé AI budget", () => {
     await page.route("**/api/resume-harness/budget", (route: Route) =>
       route.fulfill({
         json: {
-          unit: "USD", tier: "FREE", limit: 0.5, spent: 0.5, remaining: 0,
+          unit: "credits", tier: "FREE", limit: 50, spent: 50, remaining: 0,
           periodStart: "2026-09-01T00:00:00.000Z", periodEnd: "2026-10-01T00:00:00.000Z",
           resetAt: "2026-10-01T00:00:00.000Z", status: "exhausted",
           lastRefreshedAt: "2026-09-21T00:00:00.000Z",
@@ -518,6 +518,54 @@ test.describe("résumé AI budget", () => {
 });
 
 test.describe("Compare Resume manual workflow", () => {
+  test("keeps comparison results and extracted fields in a loading state until the agent response arrives", async ({ page }) => {
+    await stubHarnessApi(page);
+    const { PDFDocument } = require("../../../backend/node_modules/pdf-lib");
+    const pdf = await PDFDocument.create();
+    pdf.addPage([600, 800]).drawText("Jordan Reyes", { x: 50, y: 700, size: 12 });
+    const source = Buffer.from(await pdf.save());
+    let releaseComparison!: () => void;
+    const comparisonHeld = new Promise<void>((resolve) => { releaseComparison = resolve; });
+    const imported = {
+      id: "pending-compare", name: "Imported profile", creationMethod: "imported",
+      fullName: "Jordan Reyes", summary: "", skills: [],
+      experience: [], certifications: [], achievements: [],
+      source: { originalFilename: "resume.pdf", fileExtension: ".pdf", jobDescription: "TypeScript engineer" },
+    };
+    await page.route("**/api/resume-builder/pending-compare/compare/source", (route: Route) =>
+      route.fulfill({ body: source, contentType: "application/pdf" }),
+    );
+    await page.route("**/api/resume-builder/pending-compare/compare", async (route: Route) => {
+      await comparisonHeld;
+      await route.fulfill({ json: {
+        resumeId: imported.id, ats: { score: 72, findings: [], missingSections: ["skills", "education", "achievements"] }, match: { coverage: 61 },
+        aiContent: { composite: 47, signals: {} }, annotations: [],
+        details: { summary: "Backend engineer building containerised services.", experience: [{ title: "Engineer", company: "Example Co", description: "Built services.", achievements: ["Built services."] }] },
+      } });
+    });
+    await page.route("**/api/resume-builder/pending-compare", (route: Route) => route.fulfill({ json: imported }));
+
+    await page.goto("/app/resume?mode=compare&id=pending-compare", { waitUntil: "domcontentloaded" });
+    await expect(page.getByTestId("comparison-pending")).toBeVisible();
+    await expect(page.getByTestId("comparison-fields-loading")).toBeVisible();
+    await expect(page.getByLabel("Summary")).toHaveCount(0);
+    await expect(page.getByTestId("comparison-score-loading")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Save Resume Details" })).toBeDisabled();
+    await expect(page.getByLabel("Job description")).toBeDisabled();
+    expect(await page.getByTestId("compare-ats-score").count()).toBe(0);
+
+    releaseComparison();
+    await expect(page.getByTestId("comparison-pending")).toHaveCount(0);
+    await expect(page.getByLabel("Summary")).toBeEnabled();
+    await expect(page.getByLabel("Summary")).toHaveValue("Backend engineer building containerised services.");
+    await expect(page.getByLabel("Company 1")).toHaveValue("Example Co");
+    await expect(page.getByLabel("Role description 1")).toHaveValue("");
+    await expect(page.getByLabel("Role achievements 1")).toHaveValue("Built services.");
+    await expect(page.getByTestId("comparison-missing-sections")).toContainText("Skills, Education, Achievements");
+    await expect(page.getByTestId("compare-ats-score")).toHaveText("72");
+    await expect(page.getByTestId("compare-match-score")).toHaveText("61");
+  });
+
   test("opens a library-imported PDF before job context and compares after it is added", async ({ page }) => {
     const { PDFDocument } = require("../../../backend/node_modules/pdf-lib");
     const pdf = await PDFDocument.create();
@@ -528,7 +576,7 @@ test.describe("Compare Resume manual workflow", () => {
     let comparisons = 0;
 
     await stubHarnessApi(page);
-    await page.route("**/api/resume/parse", (route: Route) => route.fulfill({ json: {
+    await page.route("**/api/resume/parse*", (route: Route) => route.fulfill({ json: {
       parsedData: { fullName: "Jordan Reyes", email: "jordan@example.com", summary: "Backend engineer", skills: ["TypeScript"] },
     } }));
     await page.route("**/api/resume-builder/import", (route: Route) => {
@@ -563,13 +611,14 @@ test.describe("Compare Resume manual workflow", () => {
     expect(sourceRetained).toBe(true);
 
     await page.getByTestId("resume-library-import-1").getByRole("button", { name: "Open resume" }).click();
-    await expect(page.getByTestId("compare-document-preview")).toBeVisible();
+    await expect(page.getByTestId("compare-document-preview")).toHaveCount(0);
     await expect(page.getByLabel("Full name")).toHaveValue("Jordan Reyes");
     await expect(page.getByTestId("compare-ats-score")).toHaveText("—");
     expect(comparisons).toBe(0);
     await page.getByLabel("Job description").fill("TypeScript engineer wanted");
     await page.getByRole("button", { name: "Refresh comparison" }).click();
     await expect(page.getByTestId("compare-ats-score")).toHaveText("72");
+    await expect(page.getByTestId("compare-document-preview")).toBeVisible();
     expect(comparisons).toBe(1);
   });
 
@@ -596,10 +645,19 @@ test.describe("Compare Resume manual workflow", () => {
         ? route.fulfill({ body: source, contentType: "application/pdf" })
         : route.fulfill({ status: 404, json: { message: "Source file not found" } });
     });
+    await page.route("**/api/resume-builder/legacy-import/compare", (route: Route) => route.fulfill({ json: {
+      resumeId: "legacy-import", ats: { score: 72, findings: [] },
+      match: { coverage: 60, matched: [], missing: [] },
+      aiContent: { composite: 70, signals: {} }, annotations: [],
+    } }));
     await page.route("**/api/resume-builder/legacy-import", (route: Route) => route.fulfill({ json: imported }));
 
     await page.goto("/app/resume?id=legacy-import", { waitUntil: "domcontentloaded" });
     await page.getByLabel("Re-upload original résumé").setInputFiles({ name: "older.pdf", mimeType: "application/pdf", buffer: source });
+    await expect.poll(() => retained).toBe(true);
+    await expect(page.getByTestId("compare-document-preview")).toHaveCount(0);
+    await page.getByLabel("Job description").fill("Backend engineer wanted");
+    await page.getByRole("button", { name: "Refresh comparison" }).click();
     await expect(page.getByTestId("compare-document-preview")).toBeVisible();
     await expect(page.getByTestId("compare-document-preview").locator("canvas").first()).toBeVisible();
     expect(retained).toBe(true);
@@ -676,22 +734,76 @@ test.describe("Compare Resume manual workflow", () => {
     await expect(page.getByRole("tooltip")).toContainText("Add a measured outcome.");
   });
 
-  test("highlights a source PDF phrase with a repair comment", async ({ page }) => {
+  test("highlights comments in the structured fallback for legacy DOC files", async ({ page }) => {
+    const imported = {
+      _id: "imported-doc", id: "imported-doc", name: "resume", creationMethod: "imported",
+      fullName: "Jordan Reyes", summary: "Backend engineer focused on payments.", skills: ["TypeScript"],
+      experience: [{ title: "Engineer", company: "Acme", achievements: ["Built payment services for clients."] }],
+      education: [], projects: [], achievements: [], certifications: [], languages: [],
+      source: { originalFilename: "resume.doc", fileExtension: ".doc", jobDescription: "Backend engineer" },
+    };
+    await stubHarnessApi(page);
+    await page.route("**/api/resume-builder/imported-doc/compare/source", (route: Route) => route.fulfill({
+      body: Buffer.from("legacy-doc-binary"), contentType: "application/msword",
+    }));
+    await page.route("**/api/resume-builder/imported-doc/compare", (route: Route) => route.fulfill({ json: {
+      resumeId: "imported-doc", ats: { score: 76, findings: [] }, match: { coverage: 68, matched: ["typescript"], missing: [] },
+      review: { source: "agent-session", sessionId: "candidate-ats-session-doc", harness: "opencode", modelAlias: "bedrock/nova-2-lite/low" },
+      aiContent: { composite: 31, signals: {} },
+      annotations: [{ id: "doc-agent-1", section: "experience", severity: "warning", color: "amber",
+        quote: "Built payment services for clients.", message: "Impact is unclear", fix: "Add a truthful measured result." }],
+    } }));
+    await page.route("**/api/resume-builder/imported-doc", (route: Route) => route.fulfill({ json: imported }));
+
+    await page.goto("/app/resume?mode=compare&id=imported-doc", { waitUntil: "domcontentloaded" });
+
+    await expect(page.getByTestId("structured-document-fallback")).toBeVisible();
+    const highlight = page.getByTestId("document-highlight-doc-agent-1");
+    await expect(highlight).toBeVisible();
+    await highlight.hover();
+    await expect(page.getByRole("tooltip")).toContainText("Add a truthful measured result.");
+  });
+
+  test("highlights every grounded agent comment across the source PDF", async ({ page }) => {
     const { PDFDocument, StandardFonts } = require("../../../backend/node_modules/pdf-lib");
     const pdf = await PDFDocument.create();
     const pageOne = pdf.addPage([600, 800]);
     pageOne.drawText("Jordan Reyes", { x: 50, y: 740, size: 16, font: await pdf.embedFont(StandardFonts.Helvetica) });
     pageOne.drawText("Results-", { x: 50, y: 700, size: 12 });
     pageOne.drawText("driven engineer", { x: 94, y: 700, size: 12 });
+    pageOne.drawText("Built payment APIs for 40 clients.", { x: 50, y: 670, size: 12 });
+    pageOne.drawText("Reduced deployment time by 35 percent.", { x: 50, y: 645, size: 12 });
+    pageOne.drawText("Created Kubernetes release automation.", { x: 50, y: 620, size: 12 });
+    pageOne.drawText("Mentored three engineers across two teams.", { x: 50, y: 595, size: 12 });
+    pageOne.drawText("Documented six production support workflows.", { x: 50, y: 570, size: 12 });
     const source = Buffer.from(await pdf.save());
     await stubHarnessApi(page);
     const imported = {
       _id: "imported-preview", id: "imported-preview", name: "resume", creationMethod: "imported",
-      fullName: "Jordan Reyes", summary: "Results-driven engineer", skills: ["TypeScript"],
-      experience: [], achievements: [], certifications: [],
+      fullName: "Jordan Reyes", summary: "Results driven engineer", skills: ["TypeScript"],
+      experience: [{ title: "Engineer", company: "Acme", achievements: [
+        "Built payment APIs for 40 clients.",
+        "Reduced deployment time by 35 percent.",
+        "Created Kubernetes release automation.",
+        "Mentored three engineers across two teams.",
+        "Documented six production support workflows.",
+      ] }], achievements: [], certifications: [],
       source: { originalFilename: "resume.pdf", fileExtension: ".pdf", jobDescription: "TypeScript engineer" },
     };
-    await page.route("**/api/resume/parse", (route: Route) => route.fulfill({ json: {
+    const groundedAnnotations = [
+      ["summary", "Results driven", "Replace the generic opener with your backend specialty."],
+      ["experience", "Built payment APIs for 40 clients.", "Name the API domain and the outcome for those clients."],
+      ["experience", "Reduced deployment time by 35 percent.", "Explain which automation produced this measured reduction."],
+      ["experience", "Created Kubernetes release automation.", "Add scale and reliability impact while staying truthful."],
+      ["experience", "Mentored three engineers across two teams.", "Describe the concrete result of the mentoring."],
+      ["experience", "Documented six production support workflows.", "State how the workflows changed support performance."],
+    ].map(([section, quote, fix], index) => ({
+      id: `agent-${index + 1}`, section, quote, fix,
+      severity: index === 0 ? "critical" : "warning",
+      color: index === 0 ? "red" : "amber",
+      message: `Agent review comment ${index + 1}`,
+    }));
+    await page.route("**/api/resume/parse*", (route: Route) => route.fulfill({ json: {
       parsedData: { fullName: "Jordan Reyes", summary: "Results-driven engineer", skills: ["TypeScript"] },
     } }));
     await page.route("**/api/resume-builder/import", (route: Route) => route.fulfill({ json: imported }));
@@ -700,13 +812,14 @@ test.describe("Compare Resume manual workflow", () => {
       return route.fulfill({ body: source, contentType: "application/pdf" });
     });
     await page.route("**/api/resume-builder/imported-preview/compare", (route: Route) => route.fulfill({ json: {
-      resumeId: "imported-preview", ats: { score: 72, findings: [] },
-      match: { coverage: 50, matched: ["typescript"], missing: [] },
-      aiContent: { composite: 78, signals: {} },
-      annotations: [{ id: "ai-stock-phrases", section: "summary", severity: "critical", color: "red",
-        quote: "Results-driven", message: "Generic language", fix: "Use a concrete result instead." },
-      { id: "ats-summary", section: "summary", severity: "warning", color: "amber",
-        message: "Needs job evidence", fix: "Mention relevant TypeScript work." }],
+      resumeId: "imported-preview", ats: { score: 45, findings: [] },
+      match: { coverage: 61, matched: ["typescript"], missing: [], explanation: "The resume shows TypeScript but not all role requirements." },
+      review: { source: "agent-session", sessionId: "candidate-ats-session-1", harness: "opencode", modelAlias: "bedrock/nova-2-lite/low" },
+      aiContent: { composite: 47, signals: {
+        sentenceLengthVariance: { likelihood: 42, explanation: "Sentence lengths vary naturally." },
+        stockPhrases: { likelihood: 81, explanation: "A stock phrase was found." },
+      } },
+      annotations: groundedAnnotations,
     } }));
     await page.route("**/api/resume-builder/imported-preview", (route: Route) => route.fulfill({ json: imported }));
 
@@ -715,11 +828,24 @@ test.describe("Compare Resume manual workflow", () => {
     await page.getByLabel("Existing resume").setInputFiles({ name: "resume.pdf", mimeType: "application/pdf", buffer: source });
     await page.getByLabel("Job description").fill("TypeScript engineer");
     await page.getByRole("button", { name: "Import and compare" }).click();
-    const highlight = page.getByTestId("document-highlight-ai-stock-phrases");
+    const highlight = page.getByTestId("document-highlight-agent-1");
     await expect(highlight).toBeVisible();
     await highlight.hover();
-    await expect(page.getByRole("tooltip")).toContainText("Use a concrete result instead.");
-    await expect(page.getByRole("tooltip")).toContainText("Mention relevant TypeScript work.");
+    await expect(page.getByRole("tooltip")).toContainText("Replace the generic opener");
+    await expect(page.locator('[data-testid^="document-highlight-agent-"]')).toHaveCount(6);
+    await expect(page.getByTestId("compare-ats-score")).toHaveText("45");
+    await expect(page.getByTestId("compare-match-score")).toHaveText("61");
+    await expect(page.getByTestId("compare-ai-score")).toHaveText("47%");
+    await expect(page.getByTestId("comparison-suggestion")).toHaveCount(6);
+    await expect(page.getByTestId("comparison-suggestions")).toContainText(
+      "State how the workflows changed support performance.",
+    );
+    await expect(page.getByTestId("comparison-review-source")).toContainText("bedrock/nova-2-lite/low");
+    await expect(page.getByTestId("compare-ats-card")).toContainText("Higher is better");
+    await expect(page.getByTestId("compare-ai-card")).toContainText("Lower is better");
+    await page.getByTestId("ai-pattern-breakdown").getByText("Why 47%?").click();
+    await expect(page.getByTestId("ai-pattern-breakdown")).toContainText("Stock phrases");
+    await expect(page.getByTestId("ai-pattern-breakdown")).toContainText("81%");
     const canvas = page.getByTestId("compare-document-preview").locator("canvas").first();
     await canvas.evaluate((element) => element.setAttribute("data-render-token", "kept"));
     await page.getByLabel("Summary").fill("More specific summary");
@@ -762,6 +888,8 @@ test.describe("Compare Resume manual workflow", () => {
       sessionStorage.setItem("jobocate.resumeHarness.activeSessionId", "resume-session-e2e"),
     );
     const updates: any[] = [];
+    let comparisons = 0;
+    const comparisonRequests: any[] = [];
     const { PDFDocument } = require("../../../backend/node_modules/pdf-lib");
     const sourcePdf = await PDFDocument.create();
     sourcePdf.addPage([600, 800]).drawText("Results-driven engineer.", { x: 50, y: 700, size: 12 });
@@ -776,22 +904,29 @@ test.describe("Compare Resume manual workflow", () => {
       summary: "Results-driven engineer.",
       skills: ["TypeScript"],
       experience: [{
+        _id: "mongoose-experience-id",
         title: "Engineer",
+        role: "Engineer",
         company: "Example Co",
         startDate: "2023",
         endDate: "Present",
+        dates: "2023 – Present",
         description: "Built the customer API.",
         achievements: [],
+        bullets: ["Built the customer API."],
       }],
+      education: [{ _id: "mongoose-education-id", degree: "BSc", institution: "Example University", startDate: "2019", endDate: "2023", gpa: "3.8", internalNote: "not editable" }],
       achievements: [],
-      certifications: [],
+      certifications: [{ _id: "mongoose-certification-id", name: "Cloud Certificate", issuer: "Example Institute", date: "2024", internalNote: "not editable" }],
       source: { originalFilename: "resume.pdf", fileExtension: ".pdf", jobDescription: "Backend engineer" },
     };
     await page.route("**/api/resume-builder/imported-1/compare/source", (route: Route) =>
       route.fulfill({ body: sourceBytes, contentType: "application/pdf" }),
     );
-    await page.route("**/api/resume-builder/imported-1/compare", (route: Route) =>
-      route.fulfill({
+    await page.route("**/api/resume-builder/imported-1/compare", (route: Route) => {
+      comparisons += 1;
+      comparisonRequests.push(route.request().postDataJSON());
+      return route.fulfill({
         json: {
           resumeId: "imported-1",
           ats: { score: 72, findings: [] },
@@ -809,8 +944,8 @@ test.describe("Compare Resume manual workflow", () => {
             },
           ],
         },
-      }),
-    );
+      });
+    });
     await page.route("**/api/resume-builder/imported-1", async (route: Route) => {
       if (route.request().method() === "PATCH") {
         updates.push(route.request().postDataJSON());
@@ -832,7 +967,9 @@ test.describe("Compare Resume manual workflow", () => {
     });
     await expect(page.getByRole("heading", { name: "Compare Resume" })).toBeVisible();
     await expect(page.getByTestId("compare-ats-score")).toHaveText("72");
-    await expect(page.getByTestId("compare-ai-score")).toHaveText("78");
+    await expect(page.getByTestId("compare-ai-score")).toHaveText("78%");
+    expect(comparisons).toBe(1);
+    expect(comparisonRequests[0]?.forceRefresh).toBeUndefined();
 
     const summaryAnnotation = page.getByTestId("annotation-summary");
     await summaryAnnotation.hover();
@@ -848,14 +985,35 @@ test.describe("Compare Resume manual workflow", () => {
     await page.getByRole("button", { name: "Save Resume Details" }).click();
     await expect(page.getByRole("alert").filter({ hasText: "Certification name" })).toBeVisible();
     expect(updates).toHaveLength(0);
-    await page.getByLabel("name 1").fill("AWS Certified");
-    await page.getByLabel("issuer 1").fill("AWS");
+    await page.getByLabel("name 2").fill("AWS Certified");
+    await page.getByLabel("issuer 2").fill("AWS");
     await page.getByLabel("Achievements", { exact: true }).fill("Conference speaker");
     await page.getByRole("button", { name: "Save Resume Details" }).click();
+    await expect(page.getByRole("alert").filter({ hasText: "Resume details saved." })).toBeVisible();
+    await expect(page.getByTestId("comparison-pending")).toHaveCount(0);
+    await expect(page.getByTestId("compare-ats-score")).toHaveText("72");
+    expect(comparisons).toBe(1);
+    expect(Object.keys(updates.at(-1)).sort()).toEqual([
+      "fullName", "email", "phone", "location", "linkedin", "summary", "skills",
+      "experience", "education", "achievements", "certifications",
+    ].sort());
     expect(updates.at(-1).achievements).toEqual(["Conference speaker"]);
     expect(updates.at(-1).experience[0].description).toBe(
       "Built and owned the customer API.",
     );
+    expect(updates.at(-1).experience[0]).toEqual({
+      title: "Engineer", company: "Example Co", startDate: "2023", endDate: "Present",
+      description: "Built and owned the customer API.", achievements: [],
+    });
+    expect(updates.at(-1).education[0]).toEqual({
+      degree: "BSc", institution: "Example University", startDate: "2019", endDate: "2023", gpa: "3.8",
+    });
+    expect(updates.at(-1).certifications[0]).toEqual({
+      name: "Cloud Certificate", issuer: "Example Institute", date: "2024",
+    });
+    await page.getByRole("button", { name: "Refresh comparison" }).click();
+    await expect.poll(() => comparisons).toBe(2);
+    expect(comparisonRequests[1]?.forceRefresh).toBe(true);
   });
 });
 

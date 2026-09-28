@@ -41,6 +41,11 @@ export const createCheckout = async (planId, billingCycle) =>
     body: JSON.stringify({ planId, billingCycle }),
   });
 
+export const createPortal = async () => apiCall('/api/billing/portal', {
+  method: 'POST',
+  body: JSON.stringify({ returnUrl: `${window.location.origin}/app/billing` }),
+});
+
 // GET /api/users/entitlements — current plan entitlements (used to derive the
 // "next charge" summary). Returns whatever the backend provides; the page
 // normalizes and falls back when it is unavailable.

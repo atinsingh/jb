@@ -11,8 +11,8 @@ const COMPLETE_POLICY = {
   currency: 'USD',
   lowRemainingRatio: 0.2,
   tiers: {
-    FREE: { maxBudgetUsd: 0.5, budgetDuration: '1mo' },
-    PRO: { maxBudgetUsd: 4, budgetDuration: '1mo' },
+    FREE: { maxBudgetCredits: 50, budgetDuration: '1mo' },
+    PRO: { maxBudgetCredits: 400, budgetDuration: '1mo' },
   },
   services: [
     {
@@ -31,14 +31,14 @@ const COMPLETE_POLICY = {
     },
     {
       id: 'candidate_ats_review',
-      enabled: false,
+      enabled: true,
       metered: true,
       ownerType: 'candidate',
       pool: 'candidate-ai',
     },
     {
       id: 'employer_ats_review',
-      enabled: false,
+      enabled: true,
       metered: true,
       ownerType: 'employer',
       pool: 'employer-ai',
@@ -56,13 +56,11 @@ const COMPLETE_POLICY = {
       kind: 'range',
       minUsd: 0.01,
       maxUsd: 0.08,
-      label: '$0.01-$0.08 estimated',
     },
     {
       alias: 'anthropic/claude-sonnet-4-6/high',
       service: 'resume_agent_turn',
       kind: 'usage_based',
-      label: 'Usage based',
     },
   ],
   stripe: {
@@ -84,19 +82,24 @@ const COMPLETE_POLICY = {
 const clonePolicy = () => structuredClone(COMPLETE_POLICY) as any;
 
 describe('AI budget policy', () => {
+  it('derives credit estimate labels without a second configured USD label', () => {
+    const policy = clonePolicy();
+    expect(parseAiBudgetPolicy(policy).estimates).toHaveLength(2);
+  });
   it('normalizes the approved tiers, service map, and Stripe catalogue', () => {
     const policy = parseAiBudgetPolicy(COMPLETE_POLICY);
 
     expect(policy.tiers.FREE).toEqual({
-      maxBudgetUsd: 0.5,
+      maxBudgetCredits: 50,
       budgetDuration: '1mo',
     });
     expect(policy.tiers.PRO).toEqual({
-      maxBudgetUsd: 4,
+      maxBudgetCredits: 400,
       budgetDuration: '1mo',
     });
     expect(policy.services.ai_content_heuristic.metered).toBe(false);
-    expect(policy.services.candidate_ats_review.enabled).toBe(false);
+    expect(policy.services.candidate_ats_review.enabled).toBe(true);
+    expect(policy.services.employer_ats_review.enabled).toBe(true);
     expect(policy.stripe.paid.yearly.priceId).toBe(
       'price_1UAYoyGD4YhJNu0gFPMaEQZH',
     );
@@ -104,8 +107,9 @@ describe('AI budget policy', () => {
 
   it.each([
     ['non-USD currency', (p: any) => (p.currency = 'CAD')],
-    ['zero tier limit', (p: any) => (p.tiers.FREE.maxBudgetUsd = 0)],
-    ['negative tier limit', (p: any) => (p.tiers.PRO.maxBudgetUsd = -1)],
+    ['zero tier limit', (p: any) => (p.tiers.FREE.maxBudgetCredits = 0)],
+    ['negative tier limit', (p: any) => (p.tiers.PRO.maxBudgetCredits = -1)],
+    ['fractional tier limit', (p: any) => (p.tiers.PRO.maxBudgetCredits = 1.5)],
     ['duplicate service id', (p: any) => p.services.push({ ...p.services[0] })],
     ['missing service id', (p: any) => delete p.services[0].id],
     [
@@ -158,20 +162,20 @@ describe('AI budget policy', () => {
       const service = new AiBudgetPolicyService(policyPath);
 
       expect(service.lowRemainingRatio()).toBe(0.2);
-      expect(service.tier('FREE').maxBudgetUsd).toBe(0.5);
+      expect(service.tier('FREE').maxBudgetCredits).toBe(50);
       expect(service.service('resume_agent_turn').pool).toBe('candidate-ai');
       expect(
         service.estimate('bedrock/nova-2-lite/low', 'resume_agent_turn'),
       ).toEqual({
         kind: 'range',
-        minUsd: 0.01,
-        maxUsd: 0.08,
-        label: '$0.01-$0.08 estimated',
+        minCredits: 1,
+        maxCredits: 8,
+        label: '1–8 credits estimated',
       });
       expect(
         service.estimate('openai/gpt-5.6-luna/medium', 'resume_agent_turn'),
       ).toEqual({ kind: 'usage_based', label: 'Usage based' });
-      expect(() => ((service.tier('FREE') as any).maxBudgetUsd = 99)).toThrow();
+      expect(() => ((service.tier('FREE') as any).maxBudgetCredits = 99)).toThrow();
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }

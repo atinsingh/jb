@@ -9,7 +9,7 @@ import { EntitlementService } from './entitlement.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UserDocument } from '../schemas/user.schema';
 
-type PlanType = 'FREE' | 'PRO' | 'ELITE' | 'INTERVIEW';
+type PlanType = 'FREE' | 'PRO';
 
 @ApiTags('entitlements')
 @Controller('entitlements')

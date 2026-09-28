@@ -14,7 +14,7 @@ import { UsageRecord, UsageRecordDocument } from '../schemas/usage-record.schema
 import { UserSubscription, UserSubscriptionDocument } from '../schemas/user-subscription.schema';
 
 // Define types locally
-type PlanType = 'FREE' | 'PRO' | 'ELITE' | 'INTERVIEW';
+type PlanType = 'FREE' | 'PRO';
 
 export interface EntitlementCheckOptions {
   featureKey: string;
@@ -156,6 +156,51 @@ export class EntitlementService {
     }
   }
 
+  /** Atomically consume one plan action, including when reviews finish concurrently. */
+  async consumeActionCredit(userId: string, featureKey: string): Promise<EntitlementCheckResponse> {
+    const available = await this.checkEntitlement(userId, { featureKey });
+    if (!available.allowed) return available;
+    const limit = available.limit;
+    if (typeof limit !== 'number') {
+      return { allowed: false, message: `Action credit limit is not configured for ${featureKey}` };
+    }
+    if (limit === -1) {
+      await this.incrementUsage(userId, featureKey);
+      return available;
+    }
+
+    const userObjectId = new Types.ObjectId(userId);
+    const subscription = await this.subscriptionModel.findOne({ userId: userObjectId });
+    const periodStart = featureKey.endsWith('_per_month') ? this.getMonthStart() : subscription?.currentPeriodStart || this.getMonthStart();
+    const periodEnd = featureKey.endsWith('_per_month') ? this.getMonthEnd() : subscription?.currentPeriodEnd || this.getMonthEnd();
+    const identity = { userId: userObjectId, featureKey, periodStart, periodEnd };
+    const increment = { $inc: { count: 1 }, $set: { lastUsedAt: new Date() } };
+    const options = { new: true };
+    let updated = await this.usageModel.findOneAndUpdate(
+      { ...identity, count: { $lt: limit } }, increment, options,
+    );
+
+    if (!updated) {
+      const existing = await this.usageModel.findOne(identity);
+      if (!existing) {
+        try {
+          updated = await this.usageModel.create({ ...identity, count: 1, lastUsedAt: new Date() });
+        } catch (error) {
+          if ((error as any)?.code !== 11000) throw error;
+          // Another review created this period's row first. Recheck the limit atomically.
+          updated = await this.usageModel.findOneAndUpdate(
+            { ...identity, count: { $lt: limit } }, increment, options,
+          );
+        }
+      }
+    }
+
+    if (!updated) {
+      return { allowed: false, limit, remaining: 0, message: 'AI action quota is exhausted' };
+    }
+    return { allowed: true, limit, usage: updated.count, remaining: Math.max(0, limit - updated.count) };
+  }
+
   private checkBooleanEntitlement(
     entitlement: PlanEntitlementDocument,
     planName: string,
@@ -195,8 +240,8 @@ export class EntitlementService {
     const subscription = await this.subscriptionModel.findOne({
       userId: user._id,
     });
-    const periodStart = subscription?.currentPeriodStart || this.getMonthStart();
-    const periodEnd = subscription?.currentPeriodEnd || this.getMonthEnd();
+    const periodStart = entitlement.featureKey.endsWith('_per_month') ? this.getMonthStart() : subscription?.currentPeriodStart || this.getMonthStart();
+    const periodEnd = entitlement.featureKey.endsWith('_per_month') ? this.getMonthEnd() : subscription?.currentPeriodEnd || this.getMonthEnd();
 
     const usageRecord = await this.usageModel.findOne({
       userId: user._id,

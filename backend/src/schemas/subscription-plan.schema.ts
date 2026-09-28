@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, HydratedDocument } from 'mongoose';
 
-export type PlanType = 'FREE' | 'PRO' | 'ELITE' | 'INTERVIEW';
+export type PlanType = 'FREE' | 'PRO';
 export type SubscriptionPlanDocument = HydratedDocument<SubscriptionPlan>;
 
 @Schema({ timestamps: true, collection: 'subscription_plans' })
@@ -9,7 +9,7 @@ export class SubscriptionPlan {
   @Prop({ required: true, unique: true })
   name: string;
 
-  @Prop({ required: true, enum: ['FREE', 'PRO', 'ELITE', 'INTERVIEW'], unique: true })
+  @Prop({ required: true, enum: ['FREE', 'PRO'], unique: true })
   type: PlanType;
 
   @Prop({ required: true })

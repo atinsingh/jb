@@ -33,7 +33,7 @@ describe('AiBudgetService', () => {
     keySequence = 0;
     policy = {
       tier: jest.fn((value: string) => ({
-        maxBudgetUsd: value === 'PRO' ? 4 : 0.5,
+        maxBudgetCredits: value === 'PRO' ? 400 : 50,
         budgetDuration: '1mo',
       })),
       lowRemainingRatio: jest.fn(() => 0.2),
@@ -135,6 +135,7 @@ describe('AiBudgetService', () => {
     );
   });
 
+
   it('updates the existing key when the candidate tier changes', async () => {
     accountStore.account = existingAccount();
     tier = 'PRO';
@@ -154,17 +155,19 @@ describe('AiBudgetService', () => {
     });
     expect(access.snapshot).toMatchObject({
       tier: 'PRO',
-      limit: 4,
-      spent: 1.25,
-      remaining: 2.75,
+      unit: 'credits',
+      limit: 400,
+      spent: 125,
+      remaining: 275,
       status: 'healthy',
     });
   });
 
   it.each([
-    [0.123456789, 'healthy', 0.123457, 0.376543],
-    [0.4, 'low', 0.4, 0.1],
-    [0.500001, 'exhausted', 0.500001, 0],
+    [0.123456789, 'healthy', 13, 37],
+    [0.4, 'low', 40, 10],
+    [0.495, 'exhausted', 50, 0],
+    [0.500001, 'exhausted', 51, 0],
   ])(
     'normalizes authoritative spend %s as %s without exposing a secret',
     async (spend, expectedStatus, expectedSpent, expectedRemaining) => {
@@ -174,9 +177,9 @@ describe('AiBudgetService', () => {
       const snapshot = await service.statusCandidate('candidate-1');
 
       expect(snapshot).toEqual({
-        unit: 'USD',
+        unit: 'credits',
         tier: 'FREE',
-        limit: 0.5,
+        limit: 50,
         spent: expectedSpent,
         remaining: expectedRemaining,
         periodStart: '2026-09-01T00:00:00.000Z',
@@ -199,9 +202,9 @@ describe('AiBudgetService', () => {
     ).rejects.toBeInstanceOf(AiBudgetUnavailableException);
     await expect(service.statusCandidate('candidate-1')).resolves.toMatchObject(
       {
-        unit: 'USD',
+        unit: 'credits',
         tier: 'FREE',
-        limit: 0.5,
+        limit: 50,
         spent: 0,
         remaining: 0,
         status: 'unavailable',
@@ -272,6 +275,22 @@ describe('AiBudgetService', () => {
         async () => 'recovered',
       ),
     ).resolves.toBe('recovered');
+  });
+
+  it('deducts whole credits once per logical run, rounding a sub-cent run up', async () => {
+    accountStore.account = existingAccount();
+    await service.withCandidateLease('candidate-1', 'resume_agent_turn', attribution('first'), async () => {
+      spendUsd = 0.101;
+      return 'first';
+    });
+    expect((await service.statusCandidate('candidate-1')).spent).toBe(11);
+
+    await service.withCandidateLease('candidate-1', 'resume_agent_turn', attribution('second'), async () => {
+      spendUsd = 0.102;
+      return 'second';
+    });
+    expect((await service.statusCandidate('candidate-1')).spent).toBe(12);
+    expect(accountStore.account?.creditsUsed).toBe(12);
   });
 
   function existingAccount() {

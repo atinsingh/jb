@@ -36,6 +36,8 @@ export enum LLMFeature {
   // runtime (find matches → cover letter → apply → track → follow up). Has its
   // own feature so it can be routed/metered independently of the generic runtime.
   JOB_SEARCH_COPILOT = 'jobSearchCopilot',
+  CANDIDATE_ATS_REVIEW = 'candidateAtsReview',
+  EMPLOYER_ATS_REVIEW = 'employerAtsReview',
 }
 
 export interface FeatureModelConfig {

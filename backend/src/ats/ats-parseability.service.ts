@@ -112,7 +112,12 @@ export class AtsParseabilityService {
         if (Array.isArray(v)) return v.forEach(walk);
         if (typeof v === 'object') Object.values(v).forEach(walk);
       };
-      const resume = input.structured as Record<string, unknown>;
+      // Mongoose documents contain circular bookkeeping objects. Flatten only
+      // their plain résumé fields, never the document's internal state.
+      const structured = input.structured as AtsStructuredResume & { toObject?: () => Record<string, unknown> };
+      const resume = typeof structured.toObject === 'function'
+        ? structured.toObject()
+        : structured as Record<string, unknown>;
       for (const key of [
         'fullName', 'email', 'phone', 'location', 'linkedin', 'website', 'github',
         'headline', 'summary', 'profileSummary', 'skills', 'experience',

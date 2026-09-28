@@ -32,11 +32,10 @@ export type HarnessId = (typeof HARNESS_IDS)[number];
 export const LITELLM_TAG_HEADER = 'x-litellm-tags';
 
 /** A file dropped into the sandbox workspace before the harness runs. */
-export interface HarnessContextFile {
-  /** Path relative to the sandbox workdir. */
-  path: string;
-  contents: string;
-}
+export type HarnessContextFile = { path: string } & (
+  | { contents: string; bytes?: never }
+  | { bytes: Buffer; contents?: never }
+);
 
 /**
  * A model+effort alias as configured on the LiteLLM proxy, after the caller's
