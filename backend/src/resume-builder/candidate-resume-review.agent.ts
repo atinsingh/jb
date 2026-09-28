@@ -274,6 +274,7 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
       'Every suggested rewrite must use only facts already present in RESUME.txt. Never invent metrics, dates, customers, achievements, qualifications, tools or technologies, even as examples. Do not add a missing job keyword as a candidate skill. Ask the candidate to add evidence only if it is true; otherwise suggest learning it separately. Do not infer a current employer or school location from contact details.',
       'Do not provide sample replacement bullets, fictional examples, or fill-in-the-blank placeholders such as X%, X team, or [result]. Instead, ask a concise specific question for the missing factual detail or suggest a factual formatting improvement.',
       'Do not put proposed candidate claims in quotation marks. Quoted phrases in a fix must already appear verbatim in RESUME.txt. For missing collaboration evidence, ask what collaboration actually occurred; never supply a code-review, mentoring, or leadership achievement.',
+      'Do not calculate new ratios, percentages, or metrics in messages or fixes. Cite the original measurements only. JOB.txt is the authority for requirements: never describe an inferred ATS keyword as a job requirement unless JOB.txt actually states it.',
       'Use sections personal, summary, experience, skills, education, projects, achievements, certifications, or languages.',
       'Produce 8-20 useful annotations when enough résumé material exists. Cover different bullets and sections.',
       'AI-written-content detection is outside this session. Do not score it or create AI-detection comments.',
@@ -422,7 +423,7 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
       return sections.has(item.section) && Boolean(item.message?.trim()) && Boolean(item.fix?.trim())
         && proposedClaims.every(claim => haystack.includes(this.comparable(claim)))
         && !/\bX(?:%|\s+(?:team|customers|users|percent))|\[[^\]]+\]|\be\.g\.|\bexample\s*:/i.test(item.fix)
-        && (item.fix.match(/\d+(?:[.,]\d+)*/g) || []).every(number => sourceNumbers.has(number))
+        && (`${item.message} ${item.fix}`.match(/\d+(?:[.,]\d+)*/g) || []).every(number => sourceNumbers.has(number))
         && quote.length >= 4 && haystack.includes(quote);
     });
   }

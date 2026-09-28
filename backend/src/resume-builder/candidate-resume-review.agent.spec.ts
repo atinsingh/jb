@@ -126,6 +126,15 @@ describe('LiteLlmCandidateResumeReviewAgent session runtime', () => {
     expect(rules).toMatch(/only if.*true/i);
   });
 
+  it('rejects unsupported derived metrics in the review explanation', async () => {
+    sandbox.exec.mockResolvedValueOnce({ exitCode: 0, stdout: reviewJson([
+      { id: 'bad', section: 'experience', message: 'The optimization is a 6x speedup', fix: 'Describe the business impact', quote: 'Built payment services for clients' },
+    ]) });
+    const result = await agent.review({ userId: 'user-1', resumeId: 'resume-1', resumeText: 'Built payment services for clients', jobDescription: 'Reliable backend services' });
+    expect(result.annotations.map(a => a.message).join(' ')).not.toContain('6x');
+    expect(sandbox.exec).toHaveBeenCalledTimes(2);
+  });
+
   it('rejects invented replacement claims without numeric metrics', async () => {
     sandbox.exec.mockResolvedValueOnce({ exitCode: 0, stdout: reviewJson([
       { id: 'bad', section: 'experience', message: 'Missing collaboration', fix: "Add a collaboration-focused bullet: 'Led code reviews and contributed to team standardization on TypeScript patterns, improving code quality and reducing onboarding time for junior engineers.'", quote: 'Built payment services for clients' },
