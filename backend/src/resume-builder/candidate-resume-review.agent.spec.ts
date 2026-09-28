@@ -126,6 +126,20 @@ describe('LiteLlmCandidateResumeReviewAgent session runtime', () => {
     expect(rules).toMatch(/only if.*true/i);
   });
 
+  it('does not infer current employment from a closed date range', async () => {
+    sandbox.exec.mockResolvedValueOnce({ exitCode: 0, stdout: reviewJson([
+      { id: 'bad', section: 'experience', message: 'The candidate is currently employed', fix: 'Clarify team context', quote: 'Built payment services for clients' },
+    ]) });
+    const result = await agent.review({ userId: 'user-1', resumeId: 'resume-1', resumeText: 'Built payment services for clients', jobDescription: 'Backend engineer' });
+    expect(result.annotations.map(a => a.message).join(' ')).not.toContain('currently employed');
+  });
+
+  it('assigns unique highlight identifiers when the model repeats an id', async () => {
+    sandbox.exec.mockResolvedValue({ exitCode: 0, stdout: reviewJson(['Built payment services for clients', 'Reduced deployment time with automation'].map(quote => ({ id: 'same', section: 'experience', message: 'Clarify impact', fix: 'Ask about the outcome', quote }))) });
+    const result = await agent.review({ userId: 'user-1', resumeId: 'resume-1', resumeText: 'Built payment services for clients\nReduced deployment time with automation', jobDescription: 'Backend engineer' });
+    expect(new Set(result.annotations.map(a => a.id)).size).toBe(2);
+  });
+
   it('rejects unsupported derived metrics in the review explanation', async () => {
     sandbox.exec.mockResolvedValueOnce({ exitCode: 0, stdout: reviewJson([
       { id: 'bad', section: 'experience', message: 'The optimization is a 6x speedup', fix: 'Describe the business impact', quote: 'Built payment services for clients' },

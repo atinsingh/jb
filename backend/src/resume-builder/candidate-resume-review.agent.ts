@@ -255,7 +255,7 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
         missing,
         keywordCount,
       },
-      annotations,
+      annotations: annotations.map((annotation, index) => ({ ...annotation, id: `agent-${index + 1}` })),
     };
   }
 
@@ -275,6 +275,7 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
       'Do not provide sample replacement bullets, fictional examples, or fill-in-the-blank placeholders such as X%, X team, or [result]. Instead, ask a concise specific question for the missing factual detail or suggest a factual formatting improvement.',
       'Do not put proposed candidate claims in quotation marks. Quoted phrases in a fix must already appear verbatim in RESUME.txt. For missing collaboration evidence, ask what collaboration actually occurred; never supply a code-review, mentoring, or leadership achievement.',
       'Do not calculate new ratios, percentages, or metrics in messages or fixes. Cite the original measurements only. JOB.txt is the authority for requirements: never describe an inferred ATS keyword as a job requirement unless JOB.txt actually states it.',
+      'A closed employment date range is not current employment. Do not call a role current unless the source explicitly says Present or Current.',
       'Use sections personal, summary, experience, skills, education, projects, achievements, certifications, or languages.',
       'Produce 8-20 useful annotations when enough résumé material exists. Cover different bullets and sections.',
       'AI-written-content detection is outside this session. Do not score it or create AI-detection comments.',
@@ -421,6 +422,8 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
       const proposedClaims = [...item.fix.matchAll(/["'“‘]([^"'”’\n]{12,})["'”’]/g)]
         .map(match => match[1]).filter(claim => claim.trim().split(/\s+/).length >= 4);
       return sections.has(item.section) && Boolean(item.message?.trim()) && Boolean(item.fix?.trim())
+        && (!/currently employed|current (?:role|employer|employment)/i.test(`${item.message} ${item.fix}`)
+          || /\b(?:present|current|now)\b/i.test(resumeText))
         && proposedClaims.every(claim => haystack.includes(this.comparable(claim)))
         && !/\bX(?:%|\s+(?:team|customers|users|percent))|\[[^\]]+\]|\be\.g\.|\bexample\s*:/i.test(item.fix)
         && (`${item.message} ${item.fix}`.match(/\d+(?:[.,]\d+)*/g) || []).every(number => sourceNumbers.has(number))
