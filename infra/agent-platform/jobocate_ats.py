@@ -4,12 +4,15 @@
 This file deliberately contains no scoring weights or recommendation logic.
 It prepares the current LaTeX revision for Resume-Matcher and prints that
 project's response unchanged for the Nest adapter to map into API field names.
+Extracted keywords are grounded in the supplied posting before scoring.
 """
 
 import asyncio
 import json
 import os
+import re
 import sys
+import unicodedata
 from pathlib import Path
 
 
@@ -55,6 +58,19 @@ async def analyze(payload: dict) -> dict:
     # the second call hit the proxy limit and enter a costly retry delay.
     resume = await parse_resume_to_json(payload["latex"])
     job_keywords = await extract_job_keywords(payload["jobDescription"])
+    # The upstream extraction prompt includes example skills. Models can copy
+    # those into an unrelated posting, creating invented gaps and score penalties.
+    # Keep only extracted terms actually stated in this job, before *all* scoring.
+    def normalized(value):
+        return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", value).casefold()).strip()
+
+    job_text = normalized(payload["jobDescription"])
+    for field in ("required_skills", "preferred_skills", "keywords"):
+        job_keywords[field] = [
+            keyword for keyword in job_keywords.get(field, [])
+            if isinstance(keyword, str) and normalized(keyword)
+            and re.search(r"(?<!\w)" + re.escape(normalized(keyword)) + r"(?!\w)", job_text)
+        ]
     gaps = analyze_keyword_gaps(job_keywords, resume, resume)
     match = calculate_keyword_match(resume, job_keywords)
     return compute_ats_score(

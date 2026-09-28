@@ -26,13 +26,17 @@ class AtsTransportTest(unittest.TestCase):
             peak = max(peak, active)
             await asyncio.sleep(0)
             active -= 1
-            return {}
+            return {"required_skills": ["Node.js", "Go"], "preferred_skills": ["Kubernetes"], "keywords": ["microservices", "payment services"]}
 
         llm = types.ModuleType("app.llm")
         llm.get_router = lambda: (router, None)
 
         ats = types.ModuleType("app.services.ats")
-        ats.compute_ats_score = lambda **kwargs: {"overall_score": 100}
+        scored = {}
+        def compute(**kwargs):
+            scored.update(kwargs)
+            return {"overall_score": 100}
+        ats.compute_ats_score = compute
         improver = types.ModuleType("app.services.improver")
         improver.extract_job_keywords = lambda _jd: independent_model_call("job")
         parser = types.ModuleType("app.services.parser")
@@ -62,7 +66,7 @@ class AtsTransportTest(unittest.TestCase):
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
             asyncio.run(asyncio.wait_for(
-                module.analyze({"latex": "resume", "jobDescription": "job", "tags": ["ownerType=candidate", "logicalRunId=run-1"]}),
+                module.analyze({"latex": "resume", "jobDescription": "Build Node.js payment services. Kubernetes is desirable; ongoing reliability work.", "tags": ["ownerType=candidate", "logicalRunId=run-1"]}),
                 timeout=1,
             ))
         finally:
@@ -82,6 +86,9 @@ class AtsTransportTest(unittest.TestCase):
         )
         self.assertEqual(started, {"resume", "job"})
         self.assertEqual(peak, 1)
+        self.assertEqual(scored["job_keywords"]["required_skills"], ["Node.js"])
+        self.assertEqual(scored["job_keywords"]["preferred_skills"], ["Kubernetes"])
+        self.assertEqual(scored["job_keywords"]["keywords"], ["payment services"])
         self.assertEqual(router.model_list[0]["litellm_params"]["extra_headers"]["x-litellm-tags"], "ownerType=candidate,logicalRunId=run-1")
 
 
