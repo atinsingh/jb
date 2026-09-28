@@ -52,7 +52,7 @@ export class JobIngestionService {
 
     if (input.jobDescription) {
       // Parse from job description using LLM
-      const llmParsed = await this.parseFromJobDescription(input.jobDescription);
+      const llmParsed = await this.parseFromJobDescription(userId, input.jobDescription);
       // Merge with URL parsed data if available
       parsedData = { ...parsedData, ...llmParsed };
     }
@@ -126,10 +126,11 @@ export class JobIngestionService {
    * Parse job data from job description using LLM
    */
   private async parseFromJobDescription(
+    userId: string,
     jobDescription: string,
   ): Promise<ParsedJobData> {
     const provider = this.llmRoutingService.getProviderForFeature(
-      LLMFeature.PARSE_RESUME, // Reuse parse resume feature for now
+      LLMFeature.PARSE_RESUME, userId, // Reuse parse resume feature for now
     );
     const config = this.llmRoutingService.getFeatureConfig(LLMFeature.PARSE_RESUME);
 

@@ -91,6 +91,17 @@ describe('LiteLlmCandidateResumeReviewAgent session runtime', () => {
     expect(sandbox.destroy).toHaveBeenCalledWith('candidate-ats-box-1');
   });
 
+  it('preserves a valid saved review when usage reconciliation is temporarily unavailable', async () => {
+    budget.withCandidateLease.mockImplementation(async (_u, _s, _a, run) => {
+      await run({ apiKey: 'candidate-key' }, []);
+      throw Object.assign(new Error('Usage is being reconciled'), { code: 'AI_USAGE_RECONCILING' });
+    });
+    const result = await agent.review({ userId: 'user-1', resumeId: 'resume-1', resumeText: 'Built payment services for clients', jobDescription: 'TypeScript' });
+    expect(result.annotations).toHaveLength(1);
+    expect(session.status).toBe('completed');
+    expect(sandbox.destroy).toHaveBeenCalled();
+  });
+
   it('places an original binary PDF in the temporary agent workspace', async () => {
     const bytes = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x00, 0xff]);
     await agent.review({
@@ -102,6 +113,35 @@ describe('LiteLlmCandidateResumeReviewAgent session runtime', () => {
         { path: 'ORIGINAL_RESUME.pdf', bytes },
       ]),
     }));
+  });
+
+  it('rejects invented metrics in a fix even when its quotation is grounded', async () => {
+    sandbox.exec.mockResolvedValueOnce({ exitCode: 0, stderr: '', stdout: reviewJson([
+      { id: 'bad', section: 'experience', severity: 'warning', message: 'Add reliability', fix: 'Achieved 99.95% uptime for 500 customers', quote: 'Built payment services for clients' },
+    ]) });
+    const result = await agent.review({ userId: 'user-1', resumeId: 'resume-1', resumeText: 'Built payment services for clients', jobDescription: 'Reliable backend services' });
+    expect(result.annotations.map(a => a.fix).join(' ')).not.toMatch(/99\.95|500/);
+    expect(sandbox.exec).toHaveBeenCalledTimes(2);
+    const rules = adapter.bootstrap.mock.calls[0][0].contextFiles.find((file: any) => file.path === 'AGENTS.md').contents;
+    expect(rules).toMatch(/only if.*true/i);
+  });
+
+  it('rejects invented replacement claims without numeric metrics', async () => {
+    sandbox.exec.mockResolvedValueOnce({ exitCode: 0, stdout: reviewJson([
+      { id: 'bad', section: 'experience', message: 'Missing collaboration', fix: "Add a collaboration-focused bullet: 'Led code reviews and contributed to team standardization on TypeScript patterns, improving code quality and reducing onboarding time for junior engineers.'", quote: 'Built payment services for clients' },
+    ]) });
+    const result = await agent.review({ userId: 'user-1', resumeId: 'resume-1', resumeText: 'Built payment services for clients', jobDescription: 'Reliable backend services' });
+    expect(result.annotations.map(a => a.fix).join(' ')).not.toContain('Led code reviews');
+    expect(sandbox.exec).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects fill-in-the-blank achievements instead of presenting them as fixes', async () => {
+    sandbox.exec.mockResolvedValueOnce({ exitCode: 0, stderr: '', stdout: reviewJson([
+      { id: 'bad', section: 'experience', severity: 'warning', message: 'Clarify impact', fix: 'Improved throughput by X% and enabled daily reconciliation cycles.', quote: 'Built payment services for clients' },
+    ]) });
+    const result = await agent.review({ userId: 'user-1', resumeId: 'resume-1', resumeText: 'Built payment services for clients', jobDescription: 'Reliable backend services' });
+    expect(result.annotations.map(a => a.fix).join(' ')).not.toContain('X%');
+    expect(sandbox.exec).toHaveBeenCalledTimes(2);
   });
 
   it('rejects a contact-only verdict when source text visibly contains professional sections', async () => {
@@ -147,6 +187,17 @@ describe('LiteLlmCandidateResumeReviewAgent session runtime', () => {
     expect(result.sessionId).toBe('compare-session-1');
     expect(sessionModel.findOne).not.toHaveBeenCalled();
     expect(quota.consumeCredit).not.toHaveBeenCalled();
+  });
+
+  it('uses remaining configured turns to complete grounded coverage', async () => {
+    const lines = ['Built payment services for clients', 'Reduced deployment time with automation', 'Documented production support workflows'];
+    const item = (quote: string, i: number) => ({ id: 'item-' + i, section: 'experience', message: 'Clarify impact', fix: 'Describe the factual outcome', quote });
+    sandbox.exec.mockResolvedValueOnce({ exitCode: 0, stdout: reviewJson([item(lines[0], 0)]) })
+      .mockResolvedValueOnce({ exitCode: 0, stdout: reviewJson([item(lines[1], 1)]) })
+      .mockResolvedValueOnce({ exitCode: 0, stdout: reviewJson([item(lines[2], 2)]) });
+    const result = await agent.review({ userId: 'user-1', resumeId: 'resume-1', resumeText: lines.join('\n'), jobDescription: 'Backend engineer' });
+    expect(result.annotations).toHaveLength(3);
+    expect(sandbox.exec).toHaveBeenCalledTimes(3);
   });
 
   it('continues the same sandbox session when exact quote coverage needs repair', async () => {
@@ -208,7 +259,7 @@ describe('LiteLlmCandidateResumeReviewAgent session runtime', () => {
       resumeText: 'Built payment services for clients\nReduced deployment time with automation\nDocumented production support workflows',
       jobDescription: 'Backend engineer',
     })).rejects.toThrow(/grounded comments/);
-    expect(sandbox.exec).toHaveBeenCalledTimes(2);
+    expect(sandbox.exec).toHaveBeenCalledTimes(3);
     expect(quota.consumeCredit).not.toHaveBeenCalled();
     expect(session.status).toBe('failed');
   });

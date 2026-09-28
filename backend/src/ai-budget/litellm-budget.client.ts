@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { createHash } from 'crypto';
 import { AiBudgetUnavailableException } from './ai-budget.errors';
 import { AiBudgetOwnerType } from './ai-budget-policy.types';
 
@@ -92,6 +93,65 @@ export class LiteLlmBudgetClient {
     });
   }
 
+  /** Recompute whole-operation credits from authoritative request attribution.
+   * Late logs stay with their original operation instead of becoming a delta
+   * on whichever request happens to run next. Reads never increment a balance.
+   */
+  async usage(
+    key: string,
+    from: Date,
+    to: Date,
+  ): Promise<{ spendUsd: number; credits: number }> {
+    const operations = new Map<string, number>();
+    const seen = new Set<string>();
+    let pages = 1;
+    for (let page = 1; page <= pages; page++) {
+      const timestamp = (date: Date) =>
+        date.toISOString().slice(0, 19).replace('T', ' ');
+      const params = new URLSearchParams({
+        api_key: createHash('sha256').update(key).digest('hex'),
+        start_date: timestamp(from),
+        end_date: timestamp(to),
+        page: String(page),
+        page_size: '1000',
+        sort_order: 'asc',
+      });
+      const body = await this.request(`/spend/logs/v2?${params}`);
+      if (
+        !Array.isArray(body?.data) ||
+        !Number.isInteger(body.total_pages) ||
+        body.total_pages < 0 ||
+        body.total_pages > 1000
+      )
+        throw new AiBudgetUnavailableException();
+      pages = body.total_pages;
+      for (const entry of body.data) {
+        const id = this.nonEmptyString(entry.request_id);
+        const cost = this.nonNegativeNumber(entry.spend);
+        if (!id || cost === undefined) throw new AiBudgetUnavailableException();
+        if (seen.has(id)) continue;
+        seen.add(id);
+        if (cost === 0) continue;
+        const run =
+          Array.isArray(entry.request_tags) &&
+          entry.request_tags.find(
+            (tag: unknown) =>
+              typeof tag === 'string' && /^logicalRunId=.+/.test(tag),
+          );
+        if (!run) throw new AiBudgetUnavailableException();
+        operations.set(run, (operations.get(run) || 0) + cost);
+      }
+    }
+    const costs = [...operations.values()];
+    return {
+      spendUsd: costs.reduce((sum, value) => sum + value, 0),
+      credits: costs.reduce(
+        (sum, value) => sum + Math.ceil(value * 100 - 1e-9),
+        0,
+      ),
+    };
+  }
+
   private async request(path: string, init: RequestInit = {}): Promise<any> {
     const masterKey = this.config.get<string>('LITELLM_MASTER_KEY', '') || '';
     if (!masterKey) throw new AiBudgetUnavailableException();
@@ -104,6 +164,7 @@ export class LiteLlmBudgetClient {
     try {
       const response = await fetch(`${base}${path}`, {
         ...init,
+        signal: AbortSignal.timeout(15_000),
         headers: {
           Authorization: `Bearer ${masterKey}`,
           'Content-Type': 'application/json',
@@ -123,6 +184,11 @@ export class LiteLlmBudgetClient {
   }
 
   private nonNegativeNumber(value: unknown): number | undefined {
+    if (
+      typeof value !== 'number' &&
+      (typeof value !== 'string' || !value.trim())
+    )
+      return undefined;
     const number = typeof value === 'number' ? value : Number(value);
     return Number.isFinite(number) && number >= 0 ? number : undefined;
   }

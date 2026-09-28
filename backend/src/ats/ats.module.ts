@@ -9,9 +9,11 @@ import { AtsSession, AtsSessionSchema } from './schemas/ats-session.schema';
 import { AtsMatchService } from './ats-match.service';
 import { AtsParseabilityService } from './ats-parseability.service';
 import { LLMModule } from '../llm/llm.module';
+import { AiBudgetModule } from '../ai-budget/ai-budget.module';
 
 @Module({
   imports: [
+    AiBudgetModule,
     ResumeHarnessModule,
     LLMModule,
     MongooseModule.forFeature([

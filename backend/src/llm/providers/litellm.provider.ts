@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import OpenAI from 'openai';
 import {
   LLMProvider,
@@ -11,46 +11,9 @@ import {
   LLMUsage,
 } from '../interfaces/llm-provider.interface';
 
-/**
- * LiteLLMProvider
- *
- * LiteLLM is an OpenAI-compatible proxy that fronts whatever models the
- * operator has configured behind stable aliases. Because the wire format is
- * OpenAI's, this provider is the `openai` SDK pointed at a different baseURL —
- * the same trick `OpenRouterProvider` uses.
- *
- * What makes it different from the other gateways, and why it is preferred on
- * fallback:
- *
- * 1. **It is self-hosted.** Requests do not leave the operator's network and
- *    cost nothing per token, so there is no spend decision attached to turning
- *    a feature on. That is the opposite trade-off from OpenRouter's `:free`
- *    slugs, which are free but shared, rate-limited and prone to 429.
- *
- * 2. **Model names are operator-defined aliases**, not provider-native ids.
- *    `perfectum-fast-v1` means whatever the gateway maps it to. So a feature
- *    pinned to, say, an Anthropic model id CANNOT have that id forwarded here —
- *    the routing layer substitutes the configured LiteLLM alias instead.
- *
- * 3. **Capability is per-alias.** A gateway typically exposes a cheap
- *    general-purpose alias alongside ones provisioned for tool-calling or
- *    structured output. A tool-calling turn sent to a general alias may simply
- *    ignore the tools, so `chatWithTools` prefers `LITELLM_TOOLS_MODEL` when the
- *    caller has not pinned a model itself.
- *
- * Configure with `LITELLM_API_KEY` (or `LITELLM_MASTER_KEY`) and, if not running
- * on the default local port, `LITELLM_BASE_URL`.
+/** Model calls require an explicit owner virtual key and validated alias.
+ * The management master key is never accepted as a model credential.
  */
-
-/** Default alias for general chat. Override with `LITELLM_MODEL`. */
-export const DEFAULT_LITELLM_MODEL = 'perfectum-fast-v1';
-
-/**
- * Default alias for tool-calling turns. Override with `LITELLM_TOOLS_MODEL`, or
- * set it equal to `LITELLM_MODEL` if the gateway's general alias handles tools.
- */
-export const DEFAULT_LITELLM_TOOLS_MODEL = 'perfectum-tools-v1';
-
 /** Default base URL for a LiteLLM proxy running locally. */
 export const DEFAULT_LITELLM_BASE_URL = 'http://localhost:4000/v1';
 
@@ -61,27 +24,29 @@ export class LiteLLMProvider implements LLMProvider {
 
   private readonly defaultModel: string;
   private readonly toolsModel: string;
+  private readonly requestTags: readonly string[];
 
-  constructor() {
-    // A LiteLLM proxy is usually started with a master key that doubles as the
-    // client key in single-tenant setups, so accept either name rather than
-    // making the operator remember which one this codebase wanted.
-    const apiKey =
-      process.env.LITELLM_API_KEY || process.env.LITELLM_MASTER_KEY;
-    this.defaultModel = process.env.LITELLM_MODEL || DEFAULT_LITELLM_MODEL;
+  static forOwner(apiKey: string, alias: string, tags: readonly string[]): LiteLLMProvider {
+    if (!apiKey || !alias) throw new Error('An owner key and model alias are required');
+    return new LiteLLMProvider({ apiKey, alias, tags });
+  }
+
+  constructor(@Optional() @Inject('LITELLM_OWNER_OPTIONS') owner?: { apiKey: string; alias: string; tags: readonly string[] }) {
+    const apiKey = owner?.apiKey;
+    this.requestTags = owner?.tags || [];
+    this.defaultModel = owner?.alias || '';
     this.toolsModel =
-      process.env.LITELLM_TOOLS_MODEL || DEFAULT_LITELLM_TOOLS_MODEL;
+      owner?.alias || '';
 
     if (!apiKey) {
-      // Not a warning: an unconfigured self-hosted gateway is the normal state
-      // for most environments, and the routing layer simply skips this provider.
-      this.logger.log('LiteLLM not configured (no LITELLM_API_KEY) — skipping');
       return;
     }
 
     this.client = new OpenAI({
       apiKey,
-      baseURL: process.env.LITELLM_BASE_URL || DEFAULT_LITELLM_BASE_URL,
+      baseURL: (process.env.LITELLM_BASE_URL || DEFAULT_LITELLM_BASE_URL).replace(/\/v1\/?$/, '').replace(/\/$/, '') + '/v1',
+      maxRetries: 0,
+      timeout: 120_000,
     });
     this.logger.log(
       `✅ LiteLLM provider initialized (model: ${this.defaultModel}, tools: ${this.toolsModel})`,
@@ -189,6 +154,7 @@ export class LiteLLMProvider implements LLMProvider {
       presence_penalty: options.presencePenalty,
       stop: options.stop,
       stream: false,
+      ...(this.requestTags.length ? { metadata: { tags: this.requestTags } } : {}),
     };
   }
 

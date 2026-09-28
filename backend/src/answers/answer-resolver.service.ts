@@ -175,7 +175,7 @@ export class AnswerResolverService {
 
         // PROSE: the one class a model may author.
         if (allowsModelDraft(questionClass)) {
-          const draft = await this.draftProse(field, context);
+          const draft = await this.draftProse(userId, field, context);
           if (draft) {
             answers.push({
               fieldName: field.name,
@@ -258,9 +258,9 @@ export class AnswerResolverService {
    * Draft a prose answer. Called ONLY for {@link QuestionClass.PROSE} — the
    * single entry point to a model in this service.
    */
-  private async draftProse(field: FormField, context: ResolveContext): Promise<string | null> {
+  private async draftProse(userId: string, field: FormField, context: ResolveContext): Promise<string | null> {
     try {
-      const provider = this.llm.getProviderForFeature(LLMFeature.GENERATE_COVER_LETTER);
+      const provider = this.llm.getProviderForFeature(LLMFeature.GENERATE_COVER_LETTER, userId);
       const config = this.llm.getFeatureConfig(LLMFeature.GENERATE_COVER_LETTER);
 
       const limit = field.maxLength && field.maxLength > 0 ? field.maxLength : 900;

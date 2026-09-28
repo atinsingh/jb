@@ -23,6 +23,8 @@ export interface ResumeMatcherInput {
   jobDescription: string;
   sourceRevision: number;
   alias: string;
+  tags?: readonly string[];
+  apiKey?: string;
 }
 
 export interface ResumeMatcherResult {
@@ -60,7 +62,7 @@ export class InSandboxResumeMatcherAdapter extends ResumeMatcherAdapter {
           jobDescription: input.jobDescription,
           sourceRevision: input.sourceRevision,
           alias: input.alias,
-          tags: ['harness=ats'],
+          tags: input.tags?.length ? input.tags : ['harness=ats'],
         }),
       }]);
     } catch (error) {
@@ -73,7 +75,7 @@ export class InSandboxResumeMatcherAdapter extends ResumeMatcherAdapter {
     const executed = await this.sandbox.exec(
       input.sandboxId,
       ['python', '/opt/resume-matcher/jobocate_ats.py', `/workspace/${path}`],
-      { timeoutSeconds: 240 },
+      { timeoutSeconds: 240, ...(input.apiKey ? { env: { JOBOCATE_LITELLM_API_KEY: input.apiKey } } : {}) },
     );
     if (executed.exitCode !== 0) {
       if (sandboxWasReleased(`${executed.stderr || ''} ${executed.stdout || ''}`)) {

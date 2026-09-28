@@ -29,7 +29,7 @@ describe('JobDescriptionGeneratorService', () => {
     };
     const quotaService: any = {
       enforceQuota: jest.fn(),
-      recordUsageAndIncrement: jest.fn(),
+      recordUsage: jest.fn(),
     };
     const configService = {
       get: jest.fn().mockReturnValue('false'), // LLM_ENFORCE_QUOTA off by default
@@ -62,6 +62,7 @@ describe('JobDescriptionGeneratorService', () => {
 
     expect(routingService.getProviderForFeature).toHaveBeenCalledWith(
       LLMFeature.GENERATE_JOB_DESCRIPTION,
+      'user-1',
     );
     expect(routingService.getFeatureConfig).toHaveBeenCalledWith(
       LLMFeature.GENERATE_JOB_DESCRIPTION,
@@ -162,7 +163,7 @@ describe('JobDescriptionGeneratorService', () => {
       companyName: 'Hopper Labs',
     });
 
-    expect(quotaService.recordUsageAndIncrement).toHaveBeenCalledWith(
+    expect(quotaService.recordUsage).toHaveBeenCalledWith(
       'user-1',
       LLMFeature.GENERATE_JOB_DESCRIPTION,
       'mock',

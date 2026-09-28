@@ -69,7 +69,7 @@ describe('ResumeBuilderService — generate() / generateSection()', () => {
   const mockProvider = { chat: jest.fn(), getName: () => 'mock', isAvailable: () => true };
   const llmQuota = {
     enforceQuota: jest.fn().mockResolvedValue(undefined),
-    recordUsageAndIncrement: jest.fn().mockResolvedValue(undefined),
+    recordUsage: jest.fn().mockResolvedValue(undefined),
   };
 
   const mockResumeFindOne = (result: any) => {
@@ -88,7 +88,7 @@ describe('ResumeBuilderService — generate() / generateSection()', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     llmQuota.enforceQuota.mockResolvedValue(undefined);
-    llmQuota.recordUsageAndIncrement.mockResolvedValue(undefined);
+    llmQuota.recordUsage.mockResolvedValue(undefined);
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
@@ -372,7 +372,7 @@ describe('ResumeBuilderService — generate() / generateSection()', () => {
       await service.generate(USER_ID, { role: 'Engineer' } as any);
 
       expect(llmQuota.enforceQuota).toHaveBeenCalledWith(USER_ID, LLMFeature.TAILOR_RESUME);
-      expect(llmQuota.recordUsageAndIncrement).toHaveBeenCalledWith(
+      expect(llmQuota.recordUsage).toHaveBeenCalledWith(
         USER_ID,
         LLMFeature.TAILOR_RESUME,
         'mock',

@@ -24,17 +24,7 @@ import { z } from 'zod';
 export class MatchCalculatorService {
   private readonly logger = new Logger(MatchCalculatorService.name);
 
-  /**
-   * Whether to gate LLM calls on the candidate/employer quota system.
-   *
-   * The legacy flows this service replaces had NO quota and worked for ALL
-   * users including FREE, which seeded `ai_credits_per_month = 0` until the
-   * allowance landed (now 25) — so unconditional `enforceQuota` would once have
-   * handed every FREE user a `ForbiddenException`. Enforcement stays opt-in via
-   * `LLM_ENFORCE_QUOTA`
-   * (default `false`). When disabled we SKIP `enforceQuota` but still record
-   * usage best-effort for accounting (wrapped so it never throws).
-   */
+  // Optional early balance check; owner routing always enforces measured credits.
   private readonly enforceQuotaEnabled: boolean;
 
   constructor(
@@ -65,7 +55,7 @@ export class MatchCalculatorService {
     }
 
     const provider = this.routingService.getProviderForFeature(
-      LLMFeature.CALCULATE_MATCH,
+      LLMFeature.CALCULATE_MATCH, userId,
     );
     const config = this.routingService.getFeatureConfig(
       LLMFeature.CALCULATE_MATCH,
@@ -153,7 +143,7 @@ Provide a match score (0-100) and detailed analysis.`;
     metadata: Record<string, any>,
   ): Promise<void> {
     try {
-      await this.quotaService.recordUsageAndIncrement(
+      await this.quotaService.recordUsage(
         userId,
         LLMFeature.CALCULATE_MATCH,
         provider,
@@ -163,7 +153,7 @@ Provide a match score (0-100) and detailed analysis.`;
       );
     } catch (err) {
       this.logger.warn(
-        `recordUsageAndIncrement failed (non-fatal) for calculateMatch: ${
+        `recordUsage failed (non-fatal) for calculateMatch: ${
           (err as Error)?.message
         }`,
       );

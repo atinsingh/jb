@@ -14,13 +14,14 @@ function makeDoc(init: any) {
 
 function buildService(queue?: any) {
   const routing: any = {
+    withOwnerOperation: jest.fn(async (_owner, _feature, task) => task()),
     getProviderForFeature: jest.fn(),
     getFeatureConfig: jest.fn(),
   };
   const accounting: any = { recordUsage: jest.fn() };
   const quota: any = {
     enforceQuota: jest.fn(),
-    recordUsageAndIncrement: jest.fn(),
+    recordUsage: jest.fn(),
   };
   const toolRegistry = new ToolRegistry();
   const defRegistry = new AgentDefinitionRegistry();

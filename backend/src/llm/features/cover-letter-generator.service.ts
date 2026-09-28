@@ -13,11 +13,7 @@ import { z } from 'zod';
 export class CoverLetterGeneratorService {
   private readonly logger = new Logger(CoverLetterGeneratorService.name);
 
-  // Quota is opt-in via LLM_ENFORCE_QUOTA (default false), matching the sibling
-  // feature-services. Legacy cover-letter generation (now routed here from
-  // matching/job-matching) had no quota. FREE now seeds a real allowance
-  // (ai_credits_per_month=25), so enforcement no longer locks FREE users out —
-  // but it stays opt-in until the per-feature costs are tuned against it.
+  // Optional early balance check; owner routing always enforces measured credits.
   private readonly enforceQuotaEnabled: boolean;
 
   constructor(
@@ -56,7 +52,7 @@ export class CoverLetterGeneratorService {
     }
 
     const provider = this.routingService.getProviderForFeature(
-      LLMFeature.GENERATE_COVER_LETTER,
+      LLMFeature.GENERATE_COVER_LETTER, userId,
     );
     const config = this.routingService.getFeatureConfig(
       LLMFeature.GENERATE_COVER_LETTER,
@@ -129,7 +125,7 @@ export class CoverLetterGeneratorService {
       }
 
       // Record usage
-      await this.quotaService.recordUsageAndIncrement(
+      await this.quotaService.recordUsage(
         userId,
         LLMFeature.GENERATE_COVER_LETTER,
         provider.getName(),

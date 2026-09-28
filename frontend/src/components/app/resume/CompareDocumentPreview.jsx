@@ -28,7 +28,7 @@ function textNodes(root) {
   const nodes = [];
   while (walker.nextNode()) {
     const node = walker.currentNode;
-    if (node.parentElement?.closest('mark, style, script')) continue;
+    if (node.parentElement?.closest('style, script')) continue;
     if (node.textContent?.trim()) nodes.push(node);
   }
   return nodes;
@@ -99,6 +99,7 @@ function annotate(root, annotations, resume, showTooltip, hideTooltip) {
         range.setStart(segment.node, segment.start);
         range.setEnd(segment.node, segment.end);
         const mark = document.createElement('mark');
+        mark.dataset.compareHighlight = 'true';
         const tone = tones[annotation.color] || tones.blue;
         mark.tabIndex = 0;
         mark.style.cssText = `background:${tone.background};border-bottom:2px solid ${tone.border};border-radius:2px;cursor:help;color:inherit`;
@@ -110,7 +111,14 @@ function annotate(root, annotations, resume, showTooltip, hideTooltip) {
       marks[0].dataset.section = annotation.section;
       grouped.set(marks[0], comments);
       for (const mark of marks) {
-        const reveal = () => showTooltip(comments, mark.getBoundingClientRect());
+        mark.compareAnnotations = comments;
+        const reveal = () => {
+          const related = new Map(comments.map((comment) => [comment.id, comment]));
+          for (let ancestor = mark.parentElement; ancestor && ancestor !== root; ancestor = ancestor.parentElement) {
+            for (const comment of ancestor.compareAnnotations || []) related.set(comment.id, comment);
+          }
+          showTooltip([...related.values()], mark.getBoundingClientRect());
+        };
         mark.addEventListener('mouseenter', reveal);
         mark.addEventListener('focus', reveal);
         mark.addEventListener('mouseleave', hideTooltip);
@@ -271,7 +279,7 @@ export default function CompareDocumentPreview({ blob, filename, annotations, re
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !renderVersion) return;
-    container.querySelectorAll('mark[data-testid^="document-highlight-"]').forEach((mark) => {
+    [...container.querySelectorAll('mark[data-compare-highlight]')].reverse().forEach((mark) => {
       mark.replaceWith(...mark.childNodes);
     });
     setTooltip(null);

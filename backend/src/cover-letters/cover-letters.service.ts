@@ -69,6 +69,7 @@ export class CoverLettersService {
 
     // Generate cover letter with AI based on template
     const coverLetterContent = await this.generateCoverLetterWithTemplate(
+      userId,
       candidateInfo,
       jobInfo,
       generateDto.template,
@@ -102,6 +103,7 @@ export class CoverLettersService {
   }
 
   private async generateCoverLetterWithTemplate(
+    userId: string,
     candidateInfo: any,
     jobInfo: any,
     template: string,
@@ -195,7 +197,7 @@ Write a storytelling cover letter (300-400 words) that narrates the candidate's 
       // configured provider (or MockProvider when no API key is present), so the
       // template prompts run against the same primitive the feature-services use.
       const provider = this.llmRoutingService.getProviderForFeature(
-        LLMFeature.GENERATE_COVER_LETTER,
+        LLMFeature.GENERATE_COVER_LETTER, userId,
       );
       const config = this.llmRoutingService.getFeatureConfig(
         LLMFeature.GENERATE_COVER_LETTER,

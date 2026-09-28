@@ -15,6 +15,9 @@ import { JobDescriptionGeneratorService } from './features/job-description-gener
 import { LLMRoutingService } from './llm-routing.service';
 import { LLMAccountingService } from './llm-accounting.service';
 import { LLMQuotaService } from './llm-quota.service';
+import { OwnerLlmService } from './owner-llm.service';
+import { AiBudgetModule } from '../ai-budget/ai-budget.module';
+import { ModelAliasModule } from '../resume-harness/model-alias.module';
 import { ClaimsReviewService } from './claims-review.service';
 import { BulletRewriteService } from './features/bullet-rewrite.service';
 import { ResumeTailoringService } from './features/resume-tailoring.service';
@@ -37,6 +40,8 @@ import {
       { name: EmployerSubscription.name, schema: EmployerSubscriptionSchema },
     ]),
     ConfigModule,
+    AiBudgetModule,
+    ModelAliasModule,
     EntitlementModule,
   ],
   providers: [
@@ -48,6 +53,7 @@ import {
     LLMRoutingService,
     LLMAccountingService,
     LLMQuotaService,
+    OwnerLlmService,
     ClaimsReviewService,
     BulletRewriteService,
     ResumeTailoringService,
@@ -59,6 +65,7 @@ import {
   ],
   controllers: [LLMController],
   exports: [
+    OwnerLlmService,
     LLMRoutingService,
     LLMAccountingService,
     LLMQuotaService,

@@ -34,6 +34,7 @@ export class CoachingService {
   ) {}
 
   async generateCoaching(
+    userId: string,
     contextPack: SessionContextPack,
     questionText: string,
   ): Promise<CoachingOutput> {
@@ -46,7 +47,7 @@ export class CoachingService {
 
       // Call LLM
       const response = await this.llmRouting.getProviderForFeature(
-        LLMFeature.INTERVIEW_COACHING,
+        LLMFeature.INTERVIEW_COACHING, userId,
       ).chat({
         messages: [
           {

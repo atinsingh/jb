@@ -22,7 +22,7 @@ describe('InterviewPrepService', () => {
     };
     const quotaService: any = {
       enforceQuota: jest.fn(),
-      recordUsageAndIncrement: jest.fn(),
+      recordUsage: jest.fn(),
     };
 
     const session: any = {
@@ -63,7 +63,7 @@ describe('InterviewPrepService', () => {
 
       const result = await service.submitAnswer('session-1', 'user-1', 'Q?', 'A.');
 
-      expect(routingService.getProviderForFeature).toHaveBeenCalledWith(LLMFeature.MOCK_INTERVIEW);
+      expect(routingService.getProviderForFeature).toHaveBeenCalledWith(LLMFeature.MOCK_INTERVIEW, 'user-1');
       expect(result).toEqual({ score: 82, feedback: 'Strong structure, clear outcome.' });
     });
 
@@ -115,7 +115,7 @@ describe('InterviewPrepService', () => {
 
       await service.submitAnswer('session-1', 'user-1', 'Q?', 'A.');
 
-      expect(quotaService.recordUsageAndIncrement).toHaveBeenCalledWith(
+      expect(quotaService.recordUsage).toHaveBeenCalledWith(
         'user-1',
         LLMFeature.MOCK_INTERVIEW,
         'mock',

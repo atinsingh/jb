@@ -68,7 +68,7 @@ export class AssistedApplyService {
 
     // Get LLM provider
     const provider = this.llmRoutingService.getProviderForFeature(
-      LLMFeature.GENERATE_COVER_LETTER,
+      LLMFeature.GENERATE_COVER_LETTER, userId,
     );
     const config = this.llmRoutingService.getFeatureConfig(LLMFeature.GENERATE_COVER_LETTER);
 
@@ -123,7 +123,7 @@ export class AssistedApplyService {
       );
 
       // Record usage
-      await this.quotaService.recordUsageAndIncrement(
+      await this.quotaService.recordUsage(
         userId,
         LLMFeature.GENERATE_COVER_LETTER,
         provider.getName(),

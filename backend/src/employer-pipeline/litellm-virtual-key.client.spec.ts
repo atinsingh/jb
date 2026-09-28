@@ -139,7 +139,7 @@ describe('LiteLlmVirtualKeyClient', () => {
     );
   });
 
-  it('uses the harness LiteLLM key when virtual-key provisioning is not configured', async () => {
+  it('fails closed when virtual-key provisioning is not configured, even with a shared key', async () => {
     config.get.mockImplementation((key: string, fallback?: string) => {
       if (key === 'LITELLM_BASE_URL') return 'http://litellm.test:4000';
       if (key === 'LITELLM_MASTER_KEY') return '';
@@ -148,28 +148,22 @@ describe('LiteLlmVirtualKeyClient', () => {
     });
     client = new LiteLlmVirtualKeyClient(config as any);
 
-    const generated = await client.generate({
+    await expect(client.generate({
       ownerId: 'employer-1',
       keyAlias: 'jobocate-employer-employer-1',
       models: ['bedrock/nova-2-lite/low'],
       maxBudgetUsd: 1,
-    });
-    const spend = await client.info(generated.key);
-    await client.update(generated.key, {
+    })).rejects.toThrow();
+    await expect(client.info('sk-employer')).rejects.toThrow();
+    await expect(client.update('sk-employer', {
       models: ['bedrock/nova-2-lite/low'],
       maxBudgetUsd: 1,
-    });
-
-    expect(generated).toEqual({
-      key: 'sk-harness-shared',
-      keyHash: 'shared-proxy-key',
-    });
-    expect(spend).toEqual({ spendUsd: 0 });
-    expect(await client.spendLogs(new Date(), new Date())).toEqual([]);
+    })).rejects.toThrow();
+    await expect(client.spendLogs(new Date(), new Date())).rejects.toThrow();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('falls back to the harness LiteLLM key when /key/generate is unavailable', async () => {
+  it('fails closed when management rejects a request, even with a shared key', async () => {
     config.get.mockImplementation((key: string, fallback?: string) => {
       if (key === 'LITELLM_BASE_URL') return 'http://litellm.test:4000';
       if (key === 'LITELLM_MASTER_KEY') return 'sk-master-test';
@@ -179,13 +173,20 @@ describe('LiteLlmVirtualKeyClient', () => {
     fetchMock.mockResolvedValue({ ok: false, status: 401, json: async () => ({}) });
     client = new LiteLlmVirtualKeyClient(config as any);
 
-    const generated = await client.generate({
+    await expect(client.generate({
       ownerId: 'employer-1',
       keyAlias: 'jobocate-employer-employer-1',
       models: ['bedrock/nova-2-lite/low'],
       maxBudgetUsd: 1,
-    });
+    })).rejects.toThrow();
+    await expect(client.info('sk-employer')).rejects.toThrow();
+    await expect(client.update('sk-employer', { models: ['model'], maxBudgetUsd: 1 })).rejects.toThrow();
+    await expect(client.spendLogs(new Date(), new Date())).rejects.toThrow();
+  });
 
-    expect(generated.key).toBe('sk-harness-shared');
+  it.each([null, '', -1, 'garbage'])('rejects invalid measured spend %s instead of reporting free usage', async (spend) => {
+    config.get.mockImplementation((key: string, fallback?: string) => key === 'LITELLM_MASTER_KEY' ? 'sk-master-test' : fallback);
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ info: { spend, max_budget: 1 } }) });
+    await expect(client.info('sk-employer')).rejects.toThrow();
   });
 });

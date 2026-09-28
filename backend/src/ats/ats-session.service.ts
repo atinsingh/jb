@@ -1,8 +1,8 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { Model } from 'mongoose';
-import { LLMQuotaService } from '../llm/llm-quota.service';
+import { AiBudgetService } from '../ai-budget/ai-budget.service';
 import { ResumeHarnessSession, ResumeHarnessSessionDocument } from '../resume-harness/schemas/resume-harness-session.schema';
 import { AtsSession, AtsSessionDocument } from './schemas/ats-session.schema';
 import { ResumeMatcherAdapter } from './resume-matcher.adapter';
@@ -19,7 +19,7 @@ export class AtsSessionService {
     @InjectModel(AtsSession.name) private readonly atsModel: Model<AtsSessionDocument>,
     @InjectModel(ResumeHarnessSession.name) private readonly resumeModel: Model<ResumeHarnessSessionDocument>,
     private readonly adapter: ResumeMatcherAdapter,
-    private readonly quota: LLMQuotaService,
+    private readonly budget: AiBudgetService,
   ) {}
 
   async start(userId: string, input: StartAtsSessionInput) {
@@ -57,18 +57,28 @@ export class AtsSessionService {
     row.status = 'running';
     row.unavailableReason = undefined;
     await row.save();
+    let completed = false;
     try {
+      return await this.budget.withCandidateLease(userId, 'candidate_ats_review', {
+        harness: resume.harness, alias: resume.alias, model: resume.model || resume.alias,
+        effort: resume.effort || '', sessionId: String(row._id), runId: randomUUID(),
+      }, async (access, tags) => {
       const result = await this.adapter.analyze({
         sandboxId: resume.sandboxId,
         latex: this.latexFor(resume, row.sourceRevision),
         jobDescription: row.jobDescription,
         sourceRevision: row.sourceRevision,
         alias: resume.alias,
+        apiKey: access.apiKey,
+        tags,
       });
       Object.assign(row, result, { status: 'completed', analyzedAt: new Date() });
       await row.save();
+      completed = true;
       return this.view(row, resume.revision);
+      });
     } catch (error: any) {
+      if (error?.code === 'AI_USAGE_RECONCILING' && completed) return this.view(row, resume.revision);
       row.status = 'failed';
       row.unavailableReason = error?.message || 'ATS analysis is temporarily unavailable.';
       await row.save();

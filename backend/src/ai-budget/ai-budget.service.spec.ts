@@ -63,6 +63,7 @@ describe('AiBudgetService', () => {
         };
       }),
       revoke: jest.fn(async () => undefined),
+      usage: jest.fn(async () => ({ spendUsd, credits: Math.ceil(spendUsd * 100 - 1e-9) })),
     };
     codec = {
       encrypt: jest.fn((value: string) => `encrypted:${value}`),
@@ -78,7 +79,9 @@ describe('AiBudgetService', () => {
       client,
       codec,
       modelAliases,
+      { getOrCreateSubscription: jest.fn().mockResolvedValue({ plan: 'free' }) } as any,
     );
+    jest.spyOn(service as any, 'waitForUsage').mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -161,6 +164,12 @@ describe('AiBudgetService', () => {
       remaining: 275,
       status: 'healthy',
     });
+  });
+
+  it('reports low allowance from rounded operation credits', async () => {
+    accountStore.account = existingAccount(); spendUsd = .30;
+    client.usage.mockResolvedValue({ spendUsd: .30, credits: 41 });
+    expect(await service.statusCandidate('candidate-1')).toMatchObject({ spent: 41, remaining: 9, status: 'low' });
   });
 
   it.each([
@@ -277,20 +286,151 @@ describe('AiBudgetService', () => {
     ).resolves.toBe('recovered');
   });
 
+  it('retains the operation lock while LiteLLM flushes its final usage batch', async () => {
+    (service as any).waitForUsage.mockRestore();
+    accountStore.account = existingAccount();
+    let entered!: () => void;
+    const ready = new Promise<void>(resolve => { entered = resolve; });
+    const operation = service.withCandidateLease('candidate-1', 'resume_agent_turn', attribution('flush'), async () => { entered(); });
+    await ready;
+    await jest.advanceTimersByTimeAsync(1_000);
+    expect(accountStore.account?.activeRunId).toBe('flush');
+    await jest.advanceTimersByTimeAsync(15_000);
+    await operation;
+    expect(accountStore.account?.activeRunId).toBeUndefined();
+  });
+
+  it('renews a long-running operation so another request cannot steal its lease', async () => {
+    accountStore.account = existingAccount();
+    let started!: () => void;
+    const ready = new Promise<void>(resolve => { started = resolve; });
+    let finish!: () => void;
+    const held = new Promise<void>(resolve => { finish = resolve; });
+    const first = service.withCandidateLease('candidate-1', 'resume_agent_turn', attribution('long'), async () => { started(); await held; });
+    await ready;
+    await jest.advanceTimersByTimeAsync(16 * 60 * 1000);
+    await expect(service.withCandidateLease('candidate-1', 'resume_agent_turn', attribution('second'), async () => 'wrong')).rejects.toBeInstanceOf(AiBudgetOperationInProgressException);
+    finish();
+    await first;
+  });
+
   it('deducts whole credits once per logical run, rounding a sub-cent run up', async () => {
     accountStore.account = existingAccount();
     await service.withCandidateLease('candidate-1', 'resume_agent_turn', attribution('first'), async () => {
       spendUsd = 0.101;
+      client.usage.mockResolvedValue({ spendUsd, credits: 11 });
       return 'first';
     });
     expect((await service.statusCandidate('candidate-1')).spent).toBe(11);
 
     await service.withCandidateLease('candidate-1', 'resume_agent_turn', attribution('second'), async () => {
       spendUsd = 0.102;
+      client.usage.mockResolvedValue({ spendUsd, credits: 12 });
       return 'second';
     });
     expect((await service.statusCandidate('candidate-1')).spent).toBe(12);
     expect(accountStore.account?.creditsUsed).toBe(12);
+  });
+
+  it('assigns delayed spend to its original logical operation rather than the following run', async () => {
+    accountStore.account = existingAccount();
+    spendUsd = .06;
+    client.usage.mockResolvedValue({ spendUsd: .06, credits: 6 });
+    await service.withCandidateLease('candidate-1', 'resume_agent_turn', attribution('first'), async () => undefined);
+    spendUsd = .07;
+    client.usage.mockResolvedValue({ spendUsd: .07, credits: 7 });
+    await service.withCandidateLease('candidate-1', 'resume_agent_turn', attribution('second'), async () => {
+      spendUsd = .14;
+      client.usage.mockResolvedValue({ spendUsd: .14, credits: 14 });
+    });
+    expect((await service.statusCandidate('candidate-1')).spent).toBe(14);
+    expect(client.usage).toHaveBeenCalled();
+  });
+
+  it('settles provider spend even when the logical operation fails', async () => {
+    accountStore.account = existingAccount();
+    await expect(service.withCandidateLease('candidate-1', 'resume_agent_turn', attribution('failed'), async () => {
+      spendUsd += 0.021;
+      throw new Error('provider interrupted');
+    })).rejects.toThrow('provider interrupted');
+    expect((await service.statusCandidate('candidate-1')).spent).toBe(13);
+  });
+
+  it('does not write a stale balance during a read-only status request', async () => {
+    accountStore.account = existingAccount();
+    await service.ensureCandidateAccess('candidate-1');
+    accountStore.model.updateOne.mockClear();
+    await service.statusCandidate('candidate-1');
+    expect(accountStore.model.updateOne).not.toHaveBeenCalled();
+  });
+
+  it('reports reconciliation pending when its completion marker cannot be saved', async () => {
+    accountStore.account = existingAccount();
+    const update = accountStore.model.updateOne.getMockImplementation()!;
+    accountStore.model.updateOne.mockImplementation((filter: any, change: any) => {
+      if (change.$set?.settlementPending) return { exec: async () => { throw new Error('database unavailable'); } } as any;
+      return update(filter, change);
+    });
+    await expect(service.withCandidateLease('candidate-1', 'resume_agent_turn', attribution('marker-failed'), async () => 'saved result')).rejects.toMatchObject({ code: 'AI_USAGE_RECONCILING' });
+    expect(accountStore.account?.activeRunId).toBe('marker-failed');
+  });
+
+  it('preserves unresolved settlement so another run cannot start unaccounted', async () => {
+    accountStore.account = existingAccount();
+    await expect(service.withCandidateLease('candidate-1', 'resume_agent_turn', attribution('pending'), async () => {
+      infoFailure = true;
+      return 'generated';
+    })).rejects.toThrow();
+    expect(accountStore.account?.activeRunId).toBe('pending');
+    expect(accountStore.account?.settlementPending).toBe(true);
+  });
+
+  it('recovers a pending settlement once without losing per-operation rounding', async () => {
+    accountStore.account = existingAccount();
+    await expect(service.withCandidateLease('candidate-1', 'resume_agent_turn', attribution('recover'), async () => {
+      spendUsd = 0.101;
+      infoFailure = true;
+    })).rejects.toThrow();
+    infoFailure = false;
+    expect((await service.statusCandidate('candidate-1')).spent).toBe(11);
+    expect((await service.statusCandidate('candidate-1')).spent).toBe(11);
+    expect(accountStore.account?.activeRunId).toBeUndefined();
+  });
+
+  it('uses the new period spend when a run crosses the monthly reset', async () => {
+    accountStore.account = existingAccount();
+    await service.withCandidateLease('candidate-1', 'resume_agent_turn', attribution('reset'), async () => {
+      client.info.mockResolvedValue({ spendUsd: 0.015, limitUsd: 0.5, resetAt: new Date('2026-11-01T00:00:00Z') });
+      client.usage.mockResolvedValue({ spendUsd: 0.015, credits: 2 });
+    });
+    expect((await service.statusCandidate('candidate-1')).spent).toBe(2);
+  });
+
+  it('creates an employer key and allowance without consulting the candidate tier', async () => {
+    (service as any).employerBilling = { getOrCreateSubscription: jest.fn().mockResolvedValue({ plan: 'free' }) };
+    client.info.mockResolvedValue({ spendUsd: 0, limitUsd: 1 });
+    await (service as any).ensureOwnerAccess('employer', 'employer-1');
+    expect(modelAliases.tierFor).not.toHaveBeenCalled();
+    expect(client.generate).toHaveBeenCalledWith(expect.objectContaining({
+      ownerType: 'employer', ownerId: 'employer-1', pool: 'employer-ai', maxBudgetUsd: 1,
+    }));
+    expect(accountStore.model.findOne).toHaveBeenCalledWith({ ownerType: 'employer', ownerId: 'employer-1' });
+  });
+
+  it('keeps the employer allowance when management is temporarily unavailable', async () => {
+    infoFailure = true;
+    expect(await service.statusOwner('employer', 'employer-1')).toMatchObject({ limit: 100, remaining: 0, status: 'unavailable' });
+  });
+
+  it('revokes a losing provisioning key and reuses the concurrently created account', async () => {
+    const winning = existingAccount();
+    const q = (value: any) => ({ select: () => ({ exec: async () => value }) });
+    accountStore.model.findOne.mockReturnValueOnce(q(null) as any).mockReturnValue(q(winning) as any);
+    accountStore.model.create.mockRejectedValueOnce({ code: 11000 });
+    const access = await service.ensureCandidateAccess('candidate-1');
+    expect(access.apiKey).toBe('sk-existing');
+    expect(client.revoke).toHaveBeenCalledWith('sk-candidate-1');
+    expect(client.generate).toHaveBeenCalledTimes(1);
   });
 
   function existingAccount() {
@@ -333,7 +473,7 @@ function createAccountStore() {
     for (const key of Object.keys(update.$unset || {})) delete target[key];
   };
   const model = {
-    findOne: jest.fn(() => query(() => account || null)),
+    findOne: jest.fn(() => query(() => account ? structuredClone(account) : null)),
     create: jest.fn(async (value: any) => {
       account = { _id: 'account-1', ...value };
       return account;
@@ -359,7 +499,7 @@ function createAccountStore() {
           account.runLockUntil.getTime() < Date.now();
         if (!account || !lockExpired) return null;
         applyUpdate(account, update);
-        return account;
+        return structuredClone(account);
       }),
     ),
   };

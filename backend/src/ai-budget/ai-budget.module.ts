@@ -10,10 +10,12 @@ import {
 } from './schemas/ai-budget-account.schema';
 import { ModelAliasModule } from '../resume-harness/model-alias.module';
 import { AiBudgetService } from './ai-budget.service';
+import { EmployerBillingModule } from '../employer-billing/employer-billing.module';
 
 @Module({
   imports: [
     ConfigModule,
+    EmployerBillingModule,
     ModelAliasModule,
     MongooseModule.forFeature([
       { name: AiBudgetAccount.name, schema: AiBudgetAccountSchema },

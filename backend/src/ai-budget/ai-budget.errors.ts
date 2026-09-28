@@ -18,6 +18,15 @@ export class AiBudgetUnavailableException extends ServiceUnavailableException {
   }
 }
 
+export class AiBudgetSettlementPendingException extends ServiceUnavailableException {
+  readonly code = 'AI_USAGE_RECONCILING';
+
+  constructor(cause?: unknown) {
+    super({ statusCode: 503, code: 'AI_USAGE_RECONCILING', message: 'AI usage is being reconciled. Your saved result is retained; reopen it before starting another paid operation.' });
+    if (cause !== undefined) (this as Error & { cause?: unknown }).cause = cause;
+  }
+}
+
 export class AiBudgetExhaustedException extends HttpException {
   readonly code = 'AI_BUDGET_EXHAUSTED';
 

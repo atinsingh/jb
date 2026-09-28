@@ -74,6 +74,7 @@ describe('candidate plan catalogue reconciliation', () => {
     expect(plans.get('ELITE').isActive).toBe(false);
     expect(plans.get('INTERVIEW').isActive).toBe(false);
     expect(entitlements.has('free-id:stale_feature')).toBe(false);
+    expect([...entitlements.values()].some(item => item.featureKey === 'ai_credits_per_month')).toBe(false);
     expect(new Set(entitlements.keys()).size).toBe(entitlements.size);
     expect(planModel.findOneAndUpdate).toHaveBeenCalledTimes(4);
   });

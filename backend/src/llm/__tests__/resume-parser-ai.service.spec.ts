@@ -67,7 +67,7 @@ describe('ResumeParserAIService', () => {
           provide: LLMQuotaService,
           useValue: {
             enforceQuota: jest.fn(),
-            recordUsageAndIncrement: jest.fn(),
+            recordUsage: jest.fn(),
           },
         },
         {
@@ -107,7 +107,7 @@ describe('ResumeParserAIService', () => {
     await service.parseResume('user123', 'resume text');
 
     expect(quotaService.enforceQuota).not.toHaveBeenCalled();
-    expect(quotaService.recordUsageAndIncrement).toHaveBeenCalledWith(
+    expect(quotaService.recordUsage).toHaveBeenCalledWith(
       'user123',
       LLMFeature.PARSE_RESUME,
       'mock',

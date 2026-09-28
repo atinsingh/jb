@@ -48,6 +48,15 @@ export class AiBudgetAccount {
 
   @Prop()
   runLockUntil?: Date;
+
+  @Prop()
+  settlementPending?: boolean;
+
+  @Prop({ min: 0 })
+  runSpendBeforeUsd?: number;
+
+  @Prop({ min: 0 })
+  runCreditsBefore?: number;
 }
 
 export const AiBudgetAccountSchema =

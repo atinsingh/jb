@@ -556,7 +556,7 @@ export class ResumeHarnessService {
 
     await this.claimActiveSandbox(session);
 
-    return this.aiBudget.withCandidateLease(
+    return this.withBudgetedResult(
       userId,
       'resume_agent_turn',
       this.budgetAttribution(session, randomUUID()),
@@ -570,6 +570,24 @@ export class ResumeHarnessService {
           onEvent,
         ),
     );
+  }
+
+  private async withBudgetedResult(
+    userId: string,
+    service: Parameters<AiBudgetService['withCandidateLease']>[1],
+    attribution: AiBudgetAttribution,
+    run: (access: CandidateBudgetAccess, tags: readonly string[]) => Promise<TurnResult>,
+  ): Promise<TurnResult> {
+    let completed: TurnResult | undefined;
+    try {
+      return await this.aiBudget.withCandidateLease(userId, service, attribution, async (access, tags) => {
+        completed = await run(access, tags);
+        return completed;
+      });
+    } catch (error) {
+      if (completed && (error as { code?: string }).code === 'AI_USAGE_RECONCILING') return completed;
+      throw error;
+    }
   }
 
   // ------------------------------------------------------ template and look ---
@@ -684,7 +702,7 @@ export class ResumeHarnessService {
     }
 
     const instruction = this.lookInstruction(changes);
-    return this.aiBudget.withCandidateLease(
+    return this.withBudgetedResult(
       userId,
       'resume_look_change',
       this.budgetAttribution(session, randomUUID()),

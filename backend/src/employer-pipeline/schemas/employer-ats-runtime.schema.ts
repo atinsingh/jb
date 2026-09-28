@@ -16,46 +16,13 @@ export class EmployerAtsRuntime {
   ownerType: 'employer';
 
   @Prop()
-  encryptedKey?: string;
-
-  @Prop()
-  keyHash?: string;
-
-  @Prop()
-  keyAlias?: string;
-
-  @Prop({ type: [String], default: [] })
-  models: string[];
-
-  @Prop()
-  plan?: string;
-
-  @Prop()
-  modelTier?: string;
-
-  @Prop({ default: 0 })
-  maxBudgetUsd: number;
-
-  @Prop({ default: 0 })
-  spendUsd: number;
-
-  @Prop({ default: 0, min: 0 })
-  creditsUsed: number;
-
-  @Prop()
-  creditsResetAt?: Date;
-
-  @Prop()
   sandboxId?: string;
 
   @Prop()
+  sandboxKeyHash?: string;
+
+  @Prop()
   sandboxLeaseId?: string;
-
-  @Prop()
-  provisioningToken?: string;
-
-  @Prop()
-  provisioningUntil?: Date;
 
   @Prop()
   sandboxProvisioningToken?: string;

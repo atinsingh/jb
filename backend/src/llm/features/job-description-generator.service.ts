@@ -56,9 +56,7 @@ export interface JobDescriptionSeed {
 export class JobDescriptionGeneratorService {
   private readonly logger = new Logger(JobDescriptionGeneratorService.name);
 
-  // Matches the sibling feature-services: quota is opt-in via LLM_ENFORCE_QUOTA
-  // until per-feature costs are tuned, so this cannot lock an employer out
-  // before that decision is made deliberately.
+  // Optional early balance check; owner routing always enforces measured credits.
   private readonly enforceQuotaEnabled: boolean;
 
   constructor(
@@ -83,7 +81,7 @@ export class JobDescriptionGeneratorService {
     }
 
     const provider = this.routingService.getProviderForFeature(
-      LLMFeature.GENERATE_JOB_DESCRIPTION,
+      LLMFeature.GENERATE_JOB_DESCRIPTION, userId,
     );
     const config = this.routingService.getFeatureConfig(
       LLMFeature.GENERATE_JOB_DESCRIPTION,
@@ -128,7 +126,7 @@ export class JobDescriptionGeneratorService {
 
       const validated = JobDescriptionResponseSchema.parse(parsed);
 
-      await this.quotaService.recordUsageAndIncrement(
+      await this.quotaService.recordUsage(
         userId,
         LLMFeature.GENERATE_JOB_DESCRIPTION,
         provider.getName(),

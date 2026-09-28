@@ -22,6 +22,7 @@ describe('EmployerAtsGateway', () => {
   };
   const matcher = { analyze: jest.fn() };
   const quota = {
+    run: jest.fn(async (_owner, _feature, task) => task()),
     enforceQuota: jest.fn(),
     consumeCredit: jest.fn(),
   };
@@ -65,6 +66,8 @@ describe('EmployerAtsGateway', () => {
 
   it('runs Resume-Matcher inside the employer sandbox and preserves its 0-100 scores', async () => {
     const result = await gateway.assess(input);
+
+    expect(quota.run).toHaveBeenCalledWith(input.ownerId, 'employerAtsReview', expect.any(Function));
 
     expect(matcher.analyze).toHaveBeenCalledWith({
       sandboxId: 'employer-box-1',
@@ -207,15 +210,17 @@ describe('EmployerAtsGateway', () => {
     const result = await gateway.assess(input);
 
     expect(runtime.finish).toHaveBeenCalledTimes(1);
-    expect(result).toEqual({
-      status: 'ATS_FAILED',
-      reason: 'EMPLOYER_ATS_ACCOUNTING_FAILED',
-      modelAlias: 'bedrock/nova-2-lite/low',
-      effort: 'low',
-      harness: 'ats',
-      sourceRunId: 'assessment-1',
-    });
+    expect(result).toMatchObject({ status: 'COMPLETE', semanticMatch: 78, reason: 'AI_USAGE_RECONCILING' });
     expect(quota.consumeCredit).not.toHaveBeenCalled();
+  });
+
+  it('preserves a completed assessment when shared-credit settlement is pending', async () => {
+    quota.run.mockImplementationOnce(async (_owner, _feature, task) => {
+      await task();
+      throw Object.assign(new Error('pending'), { code: 'AI_USAGE_RECONCILING' });
+    });
+    await expect(gateway.assess(input)).resolves.toMatchObject({ status: 'COMPLETE', semanticMatch: 78, reason: 'AI_USAGE_RECONCILING' });
+    expect(matcher.analyze).toHaveBeenCalledTimes(1);
   });
 
   it('does not double-charge a completed ATS run through the legacy counter', async () => {

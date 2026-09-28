@@ -83,7 +83,8 @@ export class ResumeParserService {
 
     // ---- contact ----
     const email = (clean.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i) || [''])[0];
-    const phone = (clean.match(/(\+?\d[\d\s().-]{7,}\d)/) || [''])[0].trim();
+    const phoneCandidates: string[] = clean.match(/\+?\d[\d \t().-]{7,}\d/g) || [];
+    const phone = phoneCandidates.find(value => !/^(?:19|20)\d{2}\s*[-–—]\s*(?:19|20)\d{2}$/.test(value.trim()))?.trim() || '';
     const linkedin = (clean.match(/(?:https?:\/\/)?(?:www\.)?linkedin\.com\/[^\s|,)]+/i) || [''])[0];
     const github = (clean.match(/(?:https?:\/\/)?(?:www\.)?github\.com\/[^\s|,)]+/i) || [''])[0];
 
@@ -149,10 +150,10 @@ export class ResumeParserService {
     const experience = this.parseEntries(sections.experience || [], 'experience');
     const education = this.parseEntries(sections.education || [], 'education');
     const achievements = (sections.achievements || [])
-      .map((line) => line.replace(/^[•·▪◦‣∙*-]\s*/, '').trim())
+      .map((line) => line.replace(/^[\u0088•·▪◦‣∙*-]\s*/, '').trim())
       .filter(Boolean);
     const certifications = (sections.certifications || [])
-      .map((line) => ({ name: line.replace(/^[•·▪◦‣∙*-]\s*/, '').trim(), issuer: '' }))
+      .map((line) => ({ name: line.replace(/^[\u0088•·▪◦‣∙*-]\s*/, '').trim(), issuer: '' }))
       .filter((item) => item.name);
 
     return {
@@ -162,7 +163,7 @@ export class ResumeParserService {
   }
 
   private isBullet(l: string): boolean {
-    return /^[•·▪◦‣∙*]\s*/.test(l) || /^[-]\s+/.test(l);
+    return /^[\u0088•·▪◦‣∙*]\s*/.test(l) || /^[-]\s+/.test(l);
   }
 
   private isDateLine(l: string): boolean {
@@ -201,7 +202,9 @@ export class ResumeParserService {
     for (const line of sectionLines) {
       if (this.isBullet(line)) {
         if (!g) g = { headers: [], bullets: [] };
-        g.bullets.push(line.replace(/^[•·▪◦‣∙*-]\s*/, '').trim());
+        g.bullets.push(line.replace(/^[\u0088•·▪◦‣∙*-]\s*/, '').trim());
+      } else if (kind === 'experience' && g && g.headers.some(header => this.extractDateRange(header).raw) && line.length > 80 && !this.extractDateRange(line).raw) {
+        g.bullets.push(line);
       } else if (g && g.bullets.length > 0) {
         const isNextEntry = Boolean(this.extractDateRange(line).raw) && line.length < 150;
         if (isNextEntry) {
@@ -222,12 +225,13 @@ export class ResumeParserService {
     return groups
       .map((grp) => {
         const { startDate, endDate, current, raw } = this.extractDateRange(grp.headers.join('  '));
-        let full = grp.headers.filter((h) => !this.isDateLine(h)).join('  ');
+        const headerLines = grp.headers.map((h) => h.replace(raw, '').replace(/[,|–—-]\s*$/, '').trim()).filter(Boolean);
+        let full = headerLines.join('  ');
         if (raw) full = full.replace(raw, '');
         full = full.replace(/\s{2,}/g, ' ').replace(/[|,–—-]\s*$/, '').trim();
 
         if (kind === 'education') {
-          const parts = full.split(/\s*[–—|]\s*|\s+at\s+/i);
+          const parts = headerLines.length === 2 ? headerLines : full.split(/\s*[–—|]\s*|\s+-\s+|\s+at\s+/i);
           const degree = (parts[0] || full).trim();
           const institution = parts.length >= 2 ? parts.slice(1).join(' ').trim() : '';
           return { degree, institution, location: '', startDate, endDate, description: '', dates: raw };
@@ -236,14 +240,15 @@ export class ResumeParserService {
         // experience: pull a trailing location, then split title / company
         let location = '';
         const locM = full.match(
-          /[–—-]\s*(Remote|Hybrid|On-?site|[A-Z][A-Za-z.]+(?:,?\s*[A-Z]{2})?(?:,\s*[A-Za-z]+)?)\s*$/,
+          /[–—-]\s*(Remote|Hybrid|On-?site|[A-Z][A-Za-z.]+,\s*[A-Z]{2})\s*$/,
         );
         if (locM) { location = locM[1].trim(); full = full.slice(0, locM.index).trim(); }
         let title = full;
         let company = '';
-        if (/\s+at\s+/i.test(full)) { const p = full.split(/\s+at\s+/i); title = p[0]; company = p.slice(1).join(' at '); }
+        if (headerLines.length === 2 && !/[|–—]|\s+-\s+|\s+at\s/i.test(headerLines[0])) { title = headerLines[0]; company = headerLines[1]; }
+        else if (/\s+at\s+/i.test(full)) { const p = full.split(/\s+at\s+/i); title = p[0]; company = p.slice(1).join(' at '); }
         else if (full.includes(', ')) { const p = full.split(', '); title = p[0]; company = p.slice(1).join(', '); }
-        else if (/[–—|]/.test(full)) { const p = full.split(/\s*[–—|]\s*/); title = p[0]; company = p.slice(1).join(' '); }
+        else if (/[–—|]|\s+-\s+/.test(full)) { const p = full.split(/\s*[–—|]\s*|\s+-\s+/); title = p[0]; company = p.slice(1).join(' '); }
         return {
           title: title.trim(), role: title.trim(), company: company.trim(), location,
           startDate, endDate, current, dates: raw,

@@ -55,7 +55,7 @@ export class InterviewChatService {
     }
 
     const provider = this.routingService.getProviderForFeature(
-      LLMFeature.INTERVIEW_COACHING,
+      LLMFeature.INTERVIEW_COACHING, userId,
     );
     const config = this.routingService.getFeatureConfig(
       LLMFeature.INTERVIEW_COACHING,
@@ -92,7 +92,7 @@ export class InterviewChatService {
     metadata: Record<string, any>,
   ): Promise<void> {
     try {
-      await this.quotaService.recordUsageAndIncrement(
+      await this.quotaService.recordUsage(
         userId,
         LLMFeature.INTERVIEW_COACHING,
         provider,
@@ -102,7 +102,7 @@ export class InterviewChatService {
       );
     } catch (err) {
       this.logger.warn(
-        `recordUsageAndIncrement failed (non-fatal) for interview chat: ${
+        `recordUsage failed (non-fatal) for interview chat: ${
           (err as Error)?.message
         }`,
       );

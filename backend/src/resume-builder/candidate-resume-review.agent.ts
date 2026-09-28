@@ -152,6 +152,8 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
             jobDescription: input.jobDescription,
             sourceRevision: 1,
             alias: alias.alias,
+            tags,
+            apiKey: access.apiKey,
           });
           if (ats.subScores.sectionCompleteness <= 0 &&
             /^\s*(summary|professional summary)\s*$/im.test(input.resumeText) &&
@@ -171,25 +173,25 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
           const firstGrounded = this.grounded(first.review.annotations, input.resumeText);
           let detailed = first.review;
           let annotations = firstGrounded;
-          if (firstGrounded.length < desired) {
+          while (annotations.length < desired && reviewTurns.count < reviewTurns.max) {
             const repaired = await this.requestReview(
               adapter,
               boot,
               sandboxId,
-              `REPAIR REQUIRED: only ${firstGrounded.length} annotations quoted exact text from RESUME.txt. Return the full JSON contract again with at least ${desired} distinct, character-for-character quotes from different résumé lines. Do not paraphrase quote.`,
+              `REPAIR REQUIRED: only ${annotations.length} annotations had exact source quotes and factual fixes. Return the full JSON contract again with at least ${desired} distinct, character-for-character quotes from different résumé lines. Do not paraphrase quotes or invent metrics in fixes. Ask for missing facts without supplying fictional examples.`,
               reviewTurns,
             );
             detailed = repaired.review;
             session.reviewAttempts = reviewTurns.count;
             annotations = this.mergeGrounded(
-              firstGrounded,
+              annotations,
               this.grounded(detailed.annotations, input.resumeText),
             );
           }
 
           if (annotations.length < desired) {
             throw new ServiceUnavailableException(
-              `ATS review session produced only ${annotations.length} of ${desired} grounded comments. Retry the comparison; model usage may still have consumed credits.`,
+              `ATS review session produced only ${annotations.length} of ${desired} grounded comments after its ${reviewTurns.max}-turn retry limit. Retry the comparison; model usage may still have consumed credits.`,
             );
           }
 
@@ -203,12 +205,15 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
         },
       );
     } catch (error) {
+      if ((error as any)?.code === 'AI_USAGE_RECONCILING' && session.status === 'completed' && session.result) {
+        return session.result as CandidateResumeReviewResult;
+      }
       session.status = 'failed';
       session.reviewAttempts = reviewTurns.count;
       const failure = error instanceof Error ? error.message : '';
       session.failureReason = failure.includes('invalid JSON') ? 'INVALID_REVIEW_JSON'
-        : failure.includes('grounded comments') ? 'INSUFFICIENT_GROUNDED_COMMENTS'
         : failure.includes('retry limit') ? 'REVIEW_RETRY_LIMIT_EXHAUSTED'
+        : failure.includes('grounded comments') ? 'INSUFFICIENT_GROUNDED_COMMENTS'
         : failure.includes('returned no review') ? 'EMPTY_HARNESS_REVIEW'
         : failure.includes('review session failed') ? 'HARNESS_EXECUTION_FAILED'
         : 'CANDIDATE_ATS_AGENT_SESSION_FAILED';
@@ -266,6 +271,9 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
       'Return JSON only with: atsExplanation, matchExplanation, matched, missing, annotations.',
       'Read MISSING_SECTIONS.json. Explicitly address absent sections in the ATS explanation; do not fabricate them or quote text that does not exist.',
       'Each annotation needs id, section, severity, message, fix, and an exact consecutive quote copied from RESUME.txt.',
+      'Every suggested rewrite must use only facts already present in RESUME.txt. Never invent metrics, dates, customers, achievements, qualifications, tools or technologies, even as examples. Do not add a missing job keyword as a candidate skill. Ask the candidate to add evidence only if it is true; otherwise suggest learning it separately. Do not infer a current employer or school location from contact details.',
+      'Do not provide sample replacement bullets, fictional examples, or fill-in-the-blank placeholders such as X%, X team, or [result]. Instead, ask a concise specific question for the missing factual detail or suggest a factual formatting improvement.',
+      'Do not put proposed candidate claims in quotation marks. Quoted phrases in a fix must already appear verbatim in RESUME.txt. For missing collaboration evidence, ask what collaboration actually occurred; never supply a code-review, mentoring, or leadership achievement.',
       'Use sections personal, summary, experience, skills, education, projects, achievements, certifications, or languages.',
       'Produce 8-20 useful annotations when enough résumé material exists. Cover different bullets and sections.',
       'AI-written-content detection is outside this session. Do not score it or create AI-detection comments.',
@@ -402,10 +410,16 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
 
   private grounded(items: ResumeComparisonAnnotation[], resumeText: string) {
     const haystack = this.comparable(resumeText);
+    const sourceNumbers = new Set(resumeText.match(/\d+(?:[.,]\d+)*/g) || []);
     const sections = new Set(['personal', 'summary', 'experience', 'skills', 'education', 'projects', 'achievements', 'certifications', 'languages']);
     return items.filter((item) => {
       const quote = this.comparable(item.quote || '');
+      const proposedClaims = [...item.fix.matchAll(/["'“‘]([^"'”’\n]{12,})["'”’]/g)]
+        .map(match => match[1]).filter(claim => claim.trim().split(/\s+/).length >= 4);
       return sections.has(item.section) && Boolean(item.message?.trim()) && Boolean(item.fix?.trim())
+        && proposedClaims.every(claim => haystack.includes(this.comparable(claim)))
+        && !/\bX(?:%|\s+(?:team|customers|users|percent))|\[[^\]]+\]|\be\.g\.|\bexample\s*:/i.test(item.fix)
+        && (item.fix.match(/\d+(?:[.,]\d+)*/g) || []).every(number => sourceNumbers.has(number))
         && quote.length >= 4 && haystack.includes(quote);
     });
   }

@@ -38,10 +38,12 @@ import {
   EmployerAtsPreviewSchema,
 } from './schemas/employer-ats-preview.schema';
 import { LLMModule } from '../llm/llm.module';
+import { AiBudgetModule } from '../ai-budget/ai-budget.module';
 
 @Module({
   imports: [
     ConfigModule,
+    AiBudgetModule,
     AtsModule,
     ResumeHarnessModule,
     ResumeModule,

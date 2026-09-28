@@ -51,9 +51,9 @@ test.describe('Employer screening resume assessment', () => {
         contentType: 'application/json',
         body: JSON.stringify({
           status: 'READY',
-          spentUsd: 0.25,
-          limitUsd: 1,
-          remainingUsd: 0.75,
+          spentCredits: 25,
+          limitCredits: 100,
+          remainingCredits: 75,
           period: 'monthly',
           resetAt: '2026-10-01T00:00:00.000Z',
           ...overrides,
@@ -102,9 +102,9 @@ test.describe('Employer screening resume assessment', () => {
     await page.goto('/employer/screening');
     await page.getByText('Ada Lovelace').click();
     await expect(page.getByText('Assessment has not run.')).toBeVisible();
-    await expect(page.getByText(/\$0\.75 of \$1\.00 remaining/i)).toBeVisible();
+    await expect(page.getByText(/75 of 100 remaining/i)).toBeVisible();
     await expect(page.getByText(/resets Oct 1/i)).toBeVisible();
-    await expect(page.getByText(/does not use this budget/i)).toBeVisible();
+    await expect(page.getByText(/local AI-content heuristic uses none/i)).toBeVisible();
     await page.getByRole('button', { name: 'Run resume assessment' }).click();
 
     await expect(page.getByText('ATS semantic match')).toBeVisible();
@@ -161,8 +161,8 @@ test.describe('Employer screening resume assessment', () => {
     await mockScreening(page);
     await mockBudget(page, {
       status: 'BUDGET_EXHAUSTED',
-      spentUsd: 1,
-      remainingUsd: 0,
+      spentCredits: 100,
+      remainingCredits: 0,
       reason: 'EMPLOYER_BUDGET_EXHAUSTED',
     });
     await page.route(
@@ -176,9 +176,9 @@ test.describe('Employer screening resume assessment', () => {
             ats: {
               status: 'BUDGET_EXHAUSTED',
               reason: 'EMPLOYER_BUDGET_EXHAUSTED',
-              spentUsd: 1,
-              limitUsd: 1,
-              remainingUsd: 0,
+              spentCredits: 100,
+              limitCredits: 100,
+              remainingCredits: 0,
               period: 'monthly',
             },
             aiContent: {
@@ -200,12 +200,12 @@ test.describe('Employer screening resume assessment', () => {
 
     await page.goto('/employer/screening');
     await page.getByText('Ada Lovelace').click();
-    await expect(page.getByText(/ATS budget is exhausted/i)).toBeVisible();
+    await expect(page.getByText(/AI credits exhausted/i)).toBeVisible();
     await page.getByRole('button', { name: 'Run resume assessment' }).click();
 
     await expect(page.getByText('Partial assessment')).toBeVisible();
     await expect(page.getByText('63/100')).toBeVisible();
-    await expect(page.getByText(/does not use this budget/i)).toBeVisible();
+    await expect(page.getByText(/local AI-content heuristic uses none/i)).toBeVisible();
     await expect(page.getByText(/ATS match was not run because/i)).toBeVisible();
   });
 
@@ -440,7 +440,7 @@ test.describe('Employer screening resume assessment', () => {
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify(sandboxReady
-          ? { status: 'READY', spentUsd: 0, limitUsd: 1, remainingUsd: 1 }
+          ? { status: 'READY', spentCredits: 0, limitCredits: 100, remainingCredits: 100 }
           : { status: 'CONFIGURATION_ERROR', reason: 'EMPLOYER_ATS_CONFIGURATION_ERROR' }),
       });
     });
@@ -450,7 +450,7 @@ test.describe('Employer screening resume assessment', () => {
 
     await page.goto(`/employer/jobs/${jobId}/applications`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: 'Backend Engineer' })).toBeVisible();
-    await expect(page.getByText('ATS budget: $1.00 of $1.00 remaining this month.')).toBeVisible();
+    await expect(page.getByText('AI credits: 100 of 100 remaining this month.')).toBeVisible();
     expect(budgetBeforeReady).toBe(false);
   });
 

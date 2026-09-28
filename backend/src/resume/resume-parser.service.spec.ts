@@ -128,4 +128,17 @@ describe('ResumeParserService (llm migration)', () => {
     expect(result.parsedData.summary).toContain('containerised services');
     expect(result.parsedData.experience[0].company).toBe('Example Co');
   });
+  it('preserves a role and employer on separate PDF lines', () => {
+    const result = service.heuristicParse('Jordan Reyes\nExperience\nBackend Engineer 2022–2025\nExample Payments\n• Built payment services for clients\nEducation\nBSc Computer Science 2021\nExample University');
+    expect(result.experience).toEqual([expect.objectContaining({ title: 'Backend Engineer', company: 'Example Payments', startDate: '2022', endDate: '2025', achievements: ['Built payment services for clients'] })]);
+    expect(result.education).toEqual([expect.objectContaining({ degree: 'BSc Computer Science', institution: 'Example University' })]);
+  });
+  it.each([
+    'Experience\nBackend Engineer 2022–2025\nExample Payments\n\u0088 Built a TypeScript payment reconciliation service that processed 2 million transactions each month.',
+    'Experience\nBackend Engineer - Example Payments, 2022-2025\nBuilt a TypeScript payment reconciliation service that processed 2 million transactions each month.',
+  ])('preserves experience from native source extraction: %s', (text) => {
+    const result = service.heuristicParse('Jordan Reyes\njordan@example.test | Example City\n' + text);
+    expect(result.experience).toEqual([expect.objectContaining({ title: 'Backend Engineer', company: 'Example Payments', achievements: [expect.stringContaining('processed 2 million')] })]);
+    expect(result.phone).toBe('');
+  });
 });

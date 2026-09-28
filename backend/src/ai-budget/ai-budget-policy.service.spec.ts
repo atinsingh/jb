@@ -15,6 +15,8 @@ const COMPLETE_POLICY = {
     PRO: { maxBudgetCredits: 400, budgetDuration: '1mo' },
   },
   services: [
+    { id: 'candidate_model_call', enabled: true, metered: true, ownerType: 'candidate', pool: 'candidate-ai' },
+    { id: 'employer_model_call', enabled: true, metered: true, ownerType: 'employer', pool: 'employer-ai' },
     {
       id: 'resume_agent_turn',
       enabled: true,

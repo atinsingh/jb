@@ -14,7 +14,6 @@ export interface EmployerPlan {
   limits: {
     jobSlotsLimit: number;
     seatsLimit: number;
-    aiActionsLimit: number;
     sourcingCreditsLimit: number;
     /** Monthly measured AI spend allowance. 100 credits = $1 at the LiteLLM boundary. */
     aiBudgetCreditsLimit: number;
@@ -32,7 +31,6 @@ export const EMPLOYER_PLANS: EmployerPlan[] = [
     limits: {
       jobSlotsLimit: 1,
       seatsLimit: 1,
-      aiActionsLimit: 25,
       sourcingCreditsLimit: 10,
       aiBudgetCreditsLimit: 100,
     },
@@ -47,7 +45,6 @@ export const EMPLOYER_PLANS: EmployerPlan[] = [
     limits: {
       jobSlotsLimit: 3,
       seatsLimit: 3,
-      aiActionsLimit: 200,
       sourcingCreditsLimit: 50,
       aiBudgetCreditsLimit: 400,
     },

@@ -236,6 +236,8 @@ litellm_settings:
   num_retries: 2
 
 general_settings:
+  # Keep this aligned with AiBudgetService's settlement grace period (16s).
+  proxy_batch_write_at: 10
   master_key: os.environ/LITELLM_MASTER_KEY
   # Required for durable virtual keys, monthly budgets, and tagged spend logs.
   # Compose provides a nonblank in-network URL; host-run proxies must set it.

@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { Types } from 'mongoose';
 import { EmployerAtsRuntimeService } from './employer-ats-runtime.service';
 
@@ -35,6 +36,7 @@ describe('EmployerAtsRuntimeService', () => {
     encrypt: jest.fn((value: string) => `encrypted:${value}`),
     decrypt: jest.fn((value: string) => value.replace('encrypted:', '')),
   };
+  const budget = { ensureOwnerAccess: jest.fn(), statusOwner: jest.fn() };
   let service: EmployerAtsRuntimeService;
 
   const account = (overrides: any = {}) => ({
@@ -46,7 +48,8 @@ describe('EmployerAtsRuntimeService', () => {
     maxBudgetUsd: 1,
     keyAlias: `jobocate-employer-${OWNER}`,
     encryptedKey: 'encrypted:sk-employer-only',
-    keyHash: 'hash',
+    keyHash: createHash('sha256').update('sk-employer-only').digest('hex'),
+    sandboxKeyHash: createHash('sha256').update('sk-employer-only').digest('hex'),
     sandboxLeaseId: 'page-lease-1',
     ...overrides,
   });
@@ -85,6 +88,9 @@ describe('EmployerAtsRuntimeService', () => {
     sandbox.exec.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' });
     sandbox.provision.mockResolvedValue({ sandboxId: 'employer-box-1' });
     sandbox.destroy.mockResolvedValue(undefined);
+    budget.ensureOwnerAccess.mockResolvedValue({ apiKey: 'sk-employer-only', keyAlias: 'jobocate-employer-' + OWNER,
+      snapshot: { tier: 'FREE', limit: 100, spent: 25, remaining: 75, resetAt: '2026-10-01T00:00:00Z' } });
+    budget.statusOwner.mockResolvedValue({ tier: 'FREE', limit: 100, spent: 25, remaining: 75, status: 'healthy', resetAt: '2026-10-01T00:00:00Z' });
     service = new EmployerAtsRuntimeService(
       runtimeModel as any,
       usageModel as any,
@@ -93,7 +99,9 @@ describe('EmployerAtsRuntimeService', () => {
       keys as any,
       sandbox as any,
       secrets as any,
+      budget as any,
     );
+    jest.spyOn(service as any, 'waitForUsage').mockResolvedValue(undefined);
   });
 
   it('scopes every runtime lookup to the employer owner type and reuses its existing sandbox', async () => {
@@ -189,19 +197,40 @@ describe('EmployerAtsRuntimeService', () => {
     );
   });
 
-  it('charges one whole credit for a positive sub-cent ATS run', async () => {
-    keys.info
-      .mockResolvedValueOnce({ spendUsd: 0.25, limitUsd: 1, resetAt: new Date('2026-10-01T00:00:00Z') })
-      .mockResolvedValueOnce({ spendUsd: 0.251, limitUsd: 1, resetAt: new Date('2026-10-01T00:00:00Z') });
-    const prepared = await service.prepare(OWNER, 'subcent-run');
-    await service.finish(prepared as any, { succeeded: true });
-    expect(runtimeModel.updateOne).toHaveBeenCalledWith(
-      expect.objectContaining({ ownerType: 'employer' }),
-      expect.objectContaining({ $set: expect.objectContaining({ creditsUsed: expect.any(Number) }) }),
-    );
+  it('reads the shared employer credit account used by every employer model feature', async () => {
+    const budget = { statusOwner: jest.fn().mockResolvedValue({ tier: 'FREE', limit: 100, spent: 41, remaining: 59, status: 'healthy', resetAt: '2026-10-01T00:00:00Z' }) };
+    (service as any).budget = budget;
+    expect(await service.budgetStatus(OWNER)).toMatchObject({ limitCredits: 100, spentCredits: 41, remainingCredits: 59 });
+    expect(budget.statusOwner).toHaveBeenCalledWith('employer', OWNER);
   });
 
-  it('serializes budget lookup with first-visit sandbox acquisition for the same employer', async () => {
+  it('waits for the final usage batch rather than recording a partial request total', async () => {
+    jest.useFakeTimers();
+    (service as any).waitForUsage.mockRestore();
+    try {
+      const prepared: any = await service.prepare(OWNER, 'delayed-batch');
+      keys.spendLogs.mockResolvedValue([{ keyAlias: prepared.keyAlias, requestId: 'first', costUsd: 0.004 }]);
+      let result: any;
+      const pending = service.finish(prepared, { succeeded: true }).then(value => { result = value; });
+      await jest.advanceTimersByTimeAsync(1000);
+      expect(result).toBeUndefined();
+      keys.spendLogs.mockResolvedValue([
+        { keyAlias: prepared.keyAlias, requestId: 'first', costUsd: 0.004 },
+        { keyAlias: prepared.keyAlias, requestId: 'second', costUsd: 0.003 },
+      ]);
+      await jest.advanceTimersByTimeAsync(15000);
+      await pending;
+      expect(result).toEqual({ costUsd: 0.007, requestIds: ['first', 'second'] });
+    } finally { jest.useRealTimers(); }
+  });
+
+  it('does not maintain a second rounded balance in the ATS runtime', async () => {
+    const prepared = await service.prepare(OWNER, 'subcent-run');
+    await service.finish(prepared as any, { succeeded: true });
+    expect(runtimeModel.updateOne.mock.calls.some(([, update]) => update.$set?.creditsUsed !== undefined)).toBe(false);
+  });
+
+  it('can read the shared balance while the first sandbox is provisioning', async () => {
     let startProvisioning!: () => void;
     let completeProvisioning!: () => void;
     const started = new Promise<void>((resolve) => { startProvisioning = resolve; });
@@ -228,7 +257,7 @@ describe('EmployerAtsRuntimeService', () => {
 
     await expect(acquire).resolves.toEqual({ ready: true, sandboxId: 'employer-box-1' });
     await expect(budget).resolves.toEqual(expect.objectContaining({ status: 'READY' }));
-    expect(ensureAccount).toHaveBeenCalledTimes(2);
+    expect(ensureAccount).toHaveBeenCalledTimes(1);
   });
 
   it('reaps an idle ATS sandbox but leaves an active assessment running', async () => {
@@ -276,66 +305,20 @@ describe('EmployerAtsRuntimeService', () => {
     expect(sandbox.destroy).not.toHaveBeenCalled();
   });
 
-  it('creates one encrypted employer virtual key when the owner has no account key', async () => {
-    runtimeModel.findOne.mockReturnValue(
-      q(account({ encryptedKey: undefined, keyAlias: undefined, sandboxId: undefined })),
-    );
-    runtimeModel.findOneAndUpdate
-      .mockReturnValueOnce(q(account({ encryptedKey: undefined, sandboxId: undefined })))
-      .mockReturnValueOnce(q(account({ sandboxId: undefined })))
-      .mockReturnValueOnce(q(account({ sandboxId: undefined })));
-    keys.generate.mockResolvedValue({
-      key: 'sk-generated-employer',
-      keyHash: 'generated-hash',
-    });
-
-    const result = await service.prepare(OWNER, 'run-new-key');
-
-    expect(result).toEqual(expect.objectContaining({ status: 'READY' }));
-    expect(keys.generate).toHaveBeenCalledTimes(1);
-    expect(keys.generate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        ownerId: OWNER,
-        keyAlias: `jobocate-employer-${OWNER}`,
-        maxBudgetUsd: 1,
-      }),
-    );
-    const writes = JSON.stringify(runtimeModel.updateOne.mock.calls);
-    expect(writes).toContain('encrypted:sk-generated-employer');
-    expect(writes).not.toContain('"encryptedKey":"sk-generated-employer"');
+  it('uses the common owner key without creating another ATS key', async () => {
+    const result = await service.prepare(OWNER, 'shared-key');
+    expect(result).toMatchObject({ status: 'READY', virtualKey: 'sk-employer-only' });
+    expect(budget.ensureOwnerAccess).toHaveBeenCalledWith('employer', OWNER);
+    expect(keys.generate).not.toHaveBeenCalled();
+    expect(JSON.stringify(runtimeModel.updateOne.mock.calls)).not.toContain('sk-employer-only');
   });
 
-  it('updates the same owner key when the employer plan changes', async () => {
-    billing.getOrCreateSubscription.mockResolvedValue({ plan: 'paid' });
-    aliases.listForTier.mockResolvedValue([
-      {
-        alias: 'anthropic/claude-sonnet-4-5/high',
-        provider: 'anthropic',
-        model: 'claude-sonnet-4-5',
-        effort: 'high',
-        tier: 'PRO',
-      },
-    ]);
-    aliases.resolveAutomaticForTier.mockResolvedValue({
-      alias: 'anthropic/claude-sonnet-4-5/high',
-      provider: 'anthropic',
-      model: 'claude-sonnet-4-5',
-      effort: 'high',
-      tier: 'PRO',
-    });
-
-    await service.prepare(OWNER, 'run-upgraded');
-
-    expect(keys.update).toHaveBeenCalledWith('sk-employer-only', {
-      models: ['anthropic/claude-sonnet-4-5/high'],
-      maxBudgetUsd: 4,
-    });
-    expect(runtimeModel.updateOne).toHaveBeenCalledWith(
-      { ownerId: new Types.ObjectId(OWNER), ownerType: 'employer' },
-      expect.objectContaining({
-        $set: expect.objectContaining({ plan: 'paid', modelTier: 'PRO' }),
-      }),
-    );
+  it('resolves the automatic alias against the current employer tier', async () => {
+    budget.ensureOwnerAccess.mockResolvedValue({ apiKey: 'sk-employer-only', keyAlias: 'jobocate-employer-' + OWNER,
+      snapshot: { tier: 'PRO', limit: 400, spent: 25, remaining: 375, resetAt: '2026-10-01T00:00:00Z' } });
+    await service.prepare(OWNER, 'upgraded');
+    expect(aliases.resolveAutomaticForTier).toHaveBeenCalledWith('PRO');
+    expect(keys.update).not.toHaveBeenCalled();
   });
 
   it('records only the actual LiteLLM spend delta once for a logical run', async () => {
@@ -451,7 +434,6 @@ describe('EmployerAtsRuntimeService', () => {
         activeRunId: 'run-usage-failure',
       },
       {
-        $set: { spendUsd: 0.3, creditsUsed: 30, creditsResetAt: expect.any(Date) },
         $unset: { activeRunId: 1, runLockUntil: 1 },
       },
     );

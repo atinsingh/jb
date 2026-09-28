@@ -738,6 +738,16 @@ describe('ResumeHarnessService', () => {
     expect(new Set(execTargets)).toEqual(new Set(['sbx-1']));
   });
 
+  it('returns a saved generated document when only credit reconciliation is pending', async () => {
+    const session = await start();
+    sandbox.readFile.mockResolvedValueOnce(resumeDoc('saved'));
+    aiBudget.withCandidateLease.mockImplementationOnce(async (_u, _s, _a, run) => {
+      await run(candidateAccess, ['logicalRunId=settlement-test']);
+      throw Object.assign(new Error('Usage pending'), { code: 'AI_USAGE_RECONCILING' });
+    });
+    await expect(service.runTurn('u1', session.id, { instruction: 'Build my resume' })).resolves.toMatchObject({ revision: 1, latex: resumeDoc('saved') });
+  });
+
   it('records a conversational answer without creating a document revision', async () => {
     const session = await start('opencode');
     sandbox.readFile.mockResolvedValueOnce(resumeDoc('v1'));

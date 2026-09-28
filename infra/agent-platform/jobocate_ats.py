@@ -25,7 +25,7 @@ def configure(payload: dict) -> None:
     os.environ["LLM_MODEL"] = f"openai/{payload['alias']}"
     os.environ["LLM_API_BASE"] = base if base.endswith("/v1") else f"{base}/v1"
     os.environ["LLM_API_KEY"] = key
-    os.environ["LITELLM_TAGS"] = "harness=ats"
+    os.environ["LITELLM_TAGS"] = ",".join(payload.get("tags") or ["harness=ats"])
     # The pinned image defaults its SQLite/config directory to the installed
     # package tree, which is intentionally read-only for the sandbox user.
     os.environ.setdefault("DATA_DIR", "/workspace/.resume-matcher")
@@ -48,15 +48,13 @@ async def analyze(payload: dict) -> dict:
         # per-user virtual key already supplied to the résumé harness.
         params["api_key"] = os.environ["JOBOCATE_LITELLM_API_KEY"]
         headers = dict(params.get("extra_headers") or {})
-        headers["x-litellm-tags"] = "harness=ats"
+        headers["x-litellm-tags"] = ",".join(payload.get("tags") or ["harness=ats"])
         params["extra_headers"] = headers
 
-    # These model calls use independent inputs. Run them together so preview
-    # latency is bounded by the slower call instead of their sum.
-    resume, job_keywords = await asyncio.gather(
-        parse_resume_to_json(payload["latex"]),
-        extract_job_keywords(payload["jobDescription"]),
-    )
+    # Owner keys permit one request at a time. Parallel dispatch would make
+    # the second call hit the proxy limit and enter a costly retry delay.
+    resume = await parse_resume_to_json(payload["latex"])
+    job_keywords = await extract_job_keywords(payload["jobDescription"])
     gaps = analyze_keyword_gaps(job_keywords, resume, resume)
     match = calculate_keyword_match(resume, job_keywords)
     return compute_ats_score(

@@ -7,6 +7,8 @@ export type AiBudgetServiceId =
   | 'resume_look_change'
   | 'candidate_ats_review'
   | 'employer_ats_review'
+  | 'candidate_model_call'
+  | 'employer_model_call'
   | 'ai_content_heuristic';
 
 export interface TierBudgetPolicy {

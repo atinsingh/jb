@@ -10,6 +10,7 @@ describe('AtsSessionService', () => {
   let adapter: jest.Mocked<ResumeMatcherAdapter>;
   let quota: { enforceQuota: jest.Mock; consumeCredit: jest.Mock };
   let service: AtsSessionService;
+  let budget: any;
 
   const query = (value: any) => ({ exec: async () => value });
 
@@ -66,7 +67,8 @@ describe('AtsSessionService', () => {
       enforceQuota: jest.fn().mockResolvedValue(undefined),
       consumeCredit: jest.fn().mockResolvedValue(undefined),
     };
-    service = new AtsSessionService(atsModel, resumeModel, adapter, quota as any);
+    budget = { withCandidateLease: jest.fn(async (_owner, _service, _attribution, task) => task({ apiKey: 'sk-candidate' }, ['logicalRunId=ats-test'])) };
+    service = new AtsSessionService(atsModel, resumeModel, adapter, budget);
   });
 
   it('runs Resume-Matcher in the existing resume sandbox and persists its values unchanged', async () => {
@@ -90,6 +92,7 @@ describe('AtsSessionService', () => {
       sourceRevision: 2,
       stale: false,
     }));
+    expect(budget.withCandidateLease).toHaveBeenCalledWith(USER_ID, 'candidate_ats_review', expect.objectContaining({ alias: 'openai/gpt-5/high' }), expect.any(Function));
     expect(quota.enforceQuota).not.toHaveBeenCalled();
     expect(quota.consumeCredit).not.toHaveBeenCalled();
   });
@@ -111,6 +114,13 @@ describe('AtsSessionService', () => {
       }),
     );
     expect(quota.consumeCredit).not.toHaveBeenCalled();
+  });
+
+  it('fails closed before ATS dispatch when measured credits are exhausted', async () => {
+    const started = await service.start(USER_ID, { resumeSessionId: resumeRows[0]._id, sourceRevision: 2, jobDescription: 'Engineer' });
+    budget.withCandidateLease.mockRejectedValueOnce(new Error('AI credits exhausted'));
+    await expect(service.run(USER_ID, started.id)).resolves.toMatchObject({ status: 'failed', unavailableReason: 'AI credits exhausted' });
+    expect(adapter.analyze).not.toHaveBeenCalled();
   });
 
   it('does not use the legacy action counter for ATS', async () => {

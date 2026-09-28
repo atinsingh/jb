@@ -34,7 +34,7 @@ import {
  * a guaranteed deterministic/heuristic fallback. Every LLM-augmented method
  * follows the canonical pipeline (enforceQuota → getProviderForFeature →
  * getFeatureConfig → provider.chat → JSON.parse → Zod.parse →
- * recordUsageAndIncrement) wrapped in a try/catch that returns the
+ * recordUsage) wrapped in a try/catch that returns the
  * deterministic result on any quota / API / parse / validation failure.
  *
  * The deterministic layer also serves as the *score prior*: model output is
@@ -337,7 +337,7 @@ export class AiRecruiterService {
         LLMFeature.SCREEN_APPLICANTS,
       );
       const provider = this.routingService.getProviderForFeature(
-        LLMFeature.SCREEN_APPLICANTS,
+        LLMFeature.SCREEN_APPLICANTS, ownerId,
       );
       const config = this.routingService.getFeatureConfig(
         LLMFeature.SCREEN_APPLICANTS,
@@ -400,7 +400,7 @@ Include every applicant exactly once, keyed by their "id".`,
         })
         .sort((x, y) => y.score - x.score);
 
-      await this.quotaService.recordUsageAndIncrement(
+      await this.quotaService.recordUsage(
         ownerId,
         LLMFeature.SCREEN_APPLICANTS,
         provider.getName(),
@@ -458,7 +458,7 @@ Include every applicant exactly once, keyed by their "id".`,
         LLMFeature.RECRUITER_COPILOT,
       );
       const provider = this.routingService.getProviderForFeature(
-        LLMFeature.RECRUITER_COPILOT,
+        LLMFeature.RECRUITER_COPILOT, userId,
       );
       const config = this.routingService.getFeatureConfig(
         LLMFeature.RECRUITER_COPILOT,
@@ -480,7 +480,7 @@ Include every applicant exactly once, keyed by their "id".`,
       const parsed = this.parseLlmJson(response.content);
       const validated = RecruiterCopilotResponseSchema.parse(parsed);
 
-      await this.quotaService.recordUsageAndIncrement(
+      await this.quotaService.recordUsage(
         userId,
         LLMFeature.RECRUITER_COPILOT,
         provider.getName(),
@@ -599,7 +599,7 @@ Include every applicant exactly once, keyed by their "id".`,
         LLMFeature.SOURCE_CANDIDATES,
       );
       const provider = this.routingService.getProviderForFeature(
-        LLMFeature.SOURCE_CANDIDATES,
+        LLMFeature.SOURCE_CANDIDATES, employerId,
       );
       const config = this.routingService.getFeatureConfig(
         LLMFeature.SOURCE_CANDIDATES,
@@ -655,7 +655,7 @@ Include every candidate exactly once, keyed by their "id".`,
         })
         .sort((x, y) => y.matchScore - x.matchScore);
 
-      await this.quotaService.recordUsageAndIncrement(
+      await this.quotaService.recordUsage(
         employerId,
         LLMFeature.SOURCE_CANDIDATES,
         provider.getName(),
@@ -797,7 +797,7 @@ Include every candidate exactly once, keyed by their "id".`,
         LLMFeature.INTERVIEW_SCORECARD,
       );
       const provider = this.routingService.getProviderForFeature(
-        LLMFeature.INTERVIEW_SCORECARD,
+        LLMFeature.INTERVIEW_SCORECARD, userId,
       );
       const config = this.routingService.getFeatureConfig(
         LLMFeature.INTERVIEW_SCORECARD,
@@ -829,7 +829,7 @@ Include every candidate exactly once, keyed by their "id".`,
       const parsed = this.parseLlmJson(response.content);
       const validated = RecruiterScorecardResponseSchema.parse(parsed);
 
-      await this.quotaService.recordUsageAndIncrement(
+      await this.quotaService.recordUsage(
         userId,
         LLMFeature.INTERVIEW_SCORECARD,
         provider.getName(),

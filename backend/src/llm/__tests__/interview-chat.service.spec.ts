@@ -52,7 +52,7 @@ describe('InterviewChatService', () => {
           provide: LLMQuotaService,
           useValue: {
             enforceQuota: jest.fn(),
-            recordUsageAndIncrement: jest.fn(),
+            recordUsage: jest.fn(),
           },
         },
         {
@@ -88,7 +88,7 @@ describe('InterviewChatService', () => {
     await service.chat('user123', messages);
 
     expect(quotaService.enforceQuota).not.toHaveBeenCalled();
-    expect(quotaService.recordUsageAndIncrement).toHaveBeenCalledWith(
+    expect(quotaService.recordUsage).toHaveBeenCalledWith(
       'user123',
       LLMFeature.INTERVIEW_COACHING,
       'mock',
@@ -123,7 +123,7 @@ describe('InterviewChatService', () => {
   it('does not throw if best-effort usage recording fails', async () => {
     await build();
     (mockProvider.chat as jest.Mock).mockResolvedValue(makeResponse('reply'));
-    (quotaService.recordUsageAndIncrement as jest.Mock).mockRejectedValue(
+    (quotaService.recordUsage as jest.Mock).mockRejectedValue(
       new Error('db down'),
     );
 

@@ -30,7 +30,7 @@ export class BulletRewriteService {
     await this.quotaService.enforceQuota(userId, LLMFeature.REWRITE_BULLETS);
 
     const provider = this.routingService.getProviderForFeature(
-      LLMFeature.REWRITE_BULLETS,
+      LLMFeature.REWRITE_BULLETS, userId,
     );
     const config = this.routingService.getFeatureConfig(LLMFeature.REWRITE_BULLETS);
 
@@ -105,7 +105,7 @@ export class BulletRewriteService {
       }
 
       // Record usage
-      await this.quotaService.recordUsageAndIncrement(
+      await this.quotaService.recordUsage(
         userId,
         LLMFeature.REWRITE_BULLETS,
         provider.getName(),

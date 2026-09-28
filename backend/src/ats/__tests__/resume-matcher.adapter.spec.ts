@@ -14,6 +14,14 @@ describe('InSandboxResumeMatcherAdapter', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
+  it('forwards owner attribution and the current virtual key without writing the key to disk', async () => {
+    sandbox.exec.mockResolvedValue({ exitCode: 0, stdout: JSON.stringify({ overall_score: 70, sub_scores: { keyword_match: 70, skills_coverage: 70, section_completeness: 70 }, missing_keywords: [], injectable_keywords: [], recommendations: [] }), stderr: '' });
+    await new InSandboxResumeMatcherAdapter(sandbox).analyze({ sandboxId: 'box', latex: 'resume', jobDescription: 'job', sourceRevision: 1, alias: 'selected', apiKey: 'sk-current-owner', tags: ['logicalRunId=run-1'] } as any);
+    expect(JSON.parse(sandbox.writeFiles.mock.calls[0][1][0].contents).tags).toContain('logicalRunId=run-1');
+    expect(JSON.stringify(sandbox.writeFiles.mock.calls)).not.toContain('sk-current-owner');
+    expect(sandbox.exec).toHaveBeenCalledWith('box', expect.any(Array), expect.objectContaining({ env: { JOBOCATE_LITELLM_API_KEY: 'sk-current-owner' } }));
+  });
+
   it('returns Resume-Matcher score semantics unchanged and reuses the supplied sandbox', async () => {
     sandbox.exec.mockResolvedValue({
       exitCode: 0,

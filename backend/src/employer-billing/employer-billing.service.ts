@@ -45,8 +45,6 @@ export class EmployerBillingService {
     jobSlotsUsed: number;
     seatsLimit: number;
     seatsUsed: number;
-    aiActionsLimit: number;
-    aiActionsUsed: number;
     sourcingCreditsLimit: number;
     sourcingCreditsUsed: number;
   }> {
@@ -56,8 +54,6 @@ export class EmployerBillingService {
       jobSlotsUsed: sub.jobSlotsUsed,
       seatsLimit: sub.seatsLimit,
       seatsUsed: sub.seatsUsed,
-      aiActionsLimit: sub.aiActionsLimit,
-      aiActionsUsed: sub.aiActionsUsed,
       sourcingCreditsLimit: sub.sourcingCreditsLimit,
       sourcingCreditsUsed: sub.sourcingCreditsUsed,
     };
@@ -200,7 +196,6 @@ export class EmployerBillingService {
     sub.billingCycle = subscription.items.data[0]?.price?.recurring?.interval === 'year' ? 'annual' : 'monthly';
     sub.jobSlotsLimit = effective.limits.jobSlotsLimit;
     sub.seatsLimit = effective.limits.seatsLimit;
-    sub.aiActionsLimit = effective.limits.aiActionsLimit;
     sub.sourcingCreditsLimit = effective.limits.sourcingCreditsLimit;
     sub.stripeSubscriptionId = subscription.id;
     sub.stripeCustomerId = String(subscription.customer);

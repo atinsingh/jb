@@ -39,7 +39,7 @@ describe('BulletRewriteService', () => {
           provide: LLMQuotaService,
           useValue: {
             enforceQuota: jest.fn(),
-            recordUsageAndIncrement: jest.fn(),
+            recordUsage: jest.fn(),
           },
         },
         {
@@ -97,7 +97,7 @@ describe('BulletRewriteService', () => {
     expect(result.confidence).toBeGreaterThanOrEqual(0);
     expect(result.confidence).toBeLessThanOrEqual(1);
     expect(quotaService.enforceQuota).toHaveBeenCalled();
-    expect(quotaService.recordUsageAndIncrement).toHaveBeenCalled();
+    expect(quotaService.recordUsage).toHaveBeenCalled();
   });
 
   it('should handle Zod validation errors', async () => {

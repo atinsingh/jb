@@ -27,15 +27,6 @@ export class EmployerSubscription {
   @Prop({ default: 1 })
   seatsUsed: number;
 
-  @Prop({ default: 25 })
-  aiActionsLimit: number;
-
-  @Prop({ default: 0 })
-  aiActionsUsed: number;
-
-  @Prop({ type: Date })
-  aiActionsPeriodStart?: Date;
-
   @Prop({ default: 10 })
   sourcingCreditsLimit: number;
 

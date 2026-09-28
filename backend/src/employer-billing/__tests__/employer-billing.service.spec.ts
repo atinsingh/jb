@@ -36,7 +36,6 @@ describe('EmployerBillingService', () => {
       status: 'active',
       jobSlotsLimit: 1,
       seatsLimit: 1,
-      aiActionsLimit: 25,
       sourcingCreditsLimit: 10,
       invoices: [],
       save: jest.fn().mockImplementation(function (this: any) {
@@ -69,7 +68,7 @@ describe('EmployerBillingService', () => {
       await service.applyStripeSubscription(stripeSubscription());
 
       expect(doc.plan).toBe('paid');
-      expect(doc.aiActionsLimit).toBe(200);
+      expect(doc).not.toHaveProperty('aiActionsLimit');
       expect(doc.jobSlotsLimit).toBe(3);
       expect(doc.seatsLimit).toBe(3);
       expect(doc.stripeSubscriptionId).toBe('sub_test_123');
@@ -91,7 +90,7 @@ describe('EmployerBillingService', () => {
       await service.applyStripeSubscription(stripeSubscription({ status: 'past_due' }));
 
       expect(doc.plan).toBe('free');
-      expect(doc.aiActionsLimit).toBe(25);
+      expect(doc).not.toHaveProperty('aiActionsLimit');
       expect(doc.status).toBe('past_due');
     });
 
@@ -99,7 +98,7 @@ describe('EmployerBillingService', () => {
       await service.applyStripeSubscription(stripeSubscription({ status: 'canceled' }));
 
       expect(doc.plan).toBe('free');
-      expect(doc.aiActionsLimit).toBe(25);
+      expect(doc).not.toHaveProperty('aiActionsLimit');
     });
 
     it('keeps a trialing employer on the paid tier', async () => {
@@ -111,7 +110,7 @@ describe('EmployerBillingService', () => {
       );
 
       expect(doc.plan).toBe('paid');
-      expect(doc.aiActionsLimit).toBe(200);
+      expect(doc).not.toHaveProperty('aiActionsLimit');
     });
 
     it('ignores a subscription with no ownerId rather than guessing', async () => {
@@ -172,7 +171,7 @@ describe('EmployerBillingService', () => {
       await expect(service.upgrade(OWNER_ID, { plan: 'paid' })).rejects.toBeDefined();
 
       expect(doc.plan).toBe('free');
-      expect(doc.aiActionsLimit).toBe(25);
+      expect(doc).not.toHaveProperty('aiActionsLimit');
       expect(doc.invoices).toEqual([]);
     });
   });

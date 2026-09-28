@@ -28,6 +28,7 @@ export class ScoringService {
   ) {}
 
   async scoreAnswer(
+    userId: string,
     contextPack: SessionContextPack,
     questionText: string,
     answerText: string,
@@ -41,7 +42,7 @@ export class ScoringService {
 
       // Call LLM
       const response = await this.llmRouting.getProviderForFeature(
-        LLMFeature.INTERVIEW_SCORING,
+        LLMFeature.INTERVIEW_SCORING, userId,
       ).chat({
         messages: [
           {

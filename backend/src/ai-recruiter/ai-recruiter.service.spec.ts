@@ -120,7 +120,7 @@ describe('AiRecruiterService', () => {
     };
     quota = {
       enforceQuota: jest.fn(() => Promise.resolve()),
-      recordUsageAndIncrement: jest.fn(() => Promise.resolve()),
+      recordUsage: jest.fn(() => Promise.resolve()),
     };
     autopilotConfigModel = makeAutopilotConfigModel();
     proposedActionModel = makeProposedActionModel();
@@ -301,7 +301,7 @@ describe('AiRecruiterService', () => {
       const r = await service.screen(USER, 'job1');
       screenShape(r);
       expect(r.ranked[0].applicantId).toBe('a1');
-      expect(quota.recordUsageAndIncrement).toHaveBeenCalled();
+      expect(quota.recordUsage).toHaveBeenCalled();
     });
 
     it('falls back to deterministic on quota ForbiddenException', async () => {
@@ -311,7 +311,7 @@ describe('AiRecruiterService', () => {
       const r = await service.screen(USER, 'job1');
       screenShape(r);
       expect(provider.chat).not.toHaveBeenCalled();
-      expect(quota.recordUsageAndIncrement).not.toHaveBeenCalled();
+      expect(quota.recordUsage).not.toHaveBeenCalled();
     });
 
     it('falls back to deterministic on invalid JSON', async () => {
@@ -324,7 +324,7 @@ describe('AiRecruiterService', () => {
 
       const r = await service.screen(USER, 'job1');
       screenShape(r);
-      expect(quota.recordUsageAndIncrement).not.toHaveBeenCalled();
+      expect(quota.recordUsage).not.toHaveBeenCalled();
     });
 
     it('falls back to deterministic on Zod validation failure', async () => {
@@ -333,7 +333,7 @@ describe('AiRecruiterService', () => {
 
       const r = await service.screen(USER, 'job1');
       screenShape(r);
-      expect(quota.recordUsageAndIncrement).not.toHaveBeenCalled();
+      expect(quota.recordUsage).not.toHaveBeenCalled();
     });
 
     it('deterministic path is stable across calls', async () => {
@@ -378,7 +378,7 @@ describe('AiRecruiterService', () => {
       expect(r.reply).toBe('Sure, I can schedule interviews for you.');
       // action type stays machine-valid from the deterministic regex path
       expect(r.actions[0].type).toBe('propose_interview_slots');
-      expect(quota.recordUsageAndIncrement).toHaveBeenCalled();
+      expect(quota.recordUsage).toHaveBeenCalled();
     });
 
     it('falls back to deterministic on quota ForbiddenException', async () => {
@@ -396,14 +396,14 @@ describe('AiRecruiterService', () => {
       });
       const r = await service.copilot(USER, 'help');
       copilotShape(r);
-      expect(quota.recordUsageAndIncrement).not.toHaveBeenCalled();
+      expect(quota.recordUsage).not.toHaveBeenCalled();
     });
 
     it('falls back to deterministic on Zod validation failure', async () => {
       provider.chat.mockResolvedValue(llmResponse({ notReply: 1 }));
       const r = await service.copilot(USER, 'help');
       copilotShape(r);
-      expect(quota.recordUsageAndIncrement).not.toHaveBeenCalled();
+      expect(quota.recordUsage).not.toHaveBeenCalled();
     });
 
     it('deterministic path is stable across calls', async () => {
@@ -459,7 +459,7 @@ describe('AiRecruiterService', () => {
       sourcingShape(r);
       expect(r.candidates[0].outreach).toBe('Hi Ada, keen to chat!');
       expect(r.role).toBe('engineer');
-      expect(quota.recordUsageAndIncrement).toHaveBeenCalled();
+      expect(quota.recordUsage).toHaveBeenCalled();
     });
 
     it('returns an empty deterministic result (no LLM) when pool is empty', async () => {
@@ -488,7 +488,7 @@ describe('AiRecruiterService', () => {
       });
       const r = await service.sourcing('engineer', USER);
       sourcingShape(r);
-      expect(quota.recordUsageAndIncrement).not.toHaveBeenCalled();
+      expect(quota.recordUsage).not.toHaveBeenCalled();
     });
 
     it('falls back to deterministic on Zod validation failure', async () => {
@@ -498,7 +498,7 @@ describe('AiRecruiterService', () => {
       );
       const r = await service.sourcing('engineer', USER);
       sourcingShape(r);
-      expect(quota.recordUsageAndIncrement).not.toHaveBeenCalled();
+      expect(quota.recordUsage).not.toHaveBeenCalled();
     });
 
     it('deterministic path is stable across calls', async () => {
@@ -553,7 +553,7 @@ describe('AiRecruiterService', () => {
       scorecardShape(r);
       expect(r.hasContent).toBe(true);
       expect(r.recommendation).toBe('hire');
-      expect(quota.recordUsageAndIncrement).toHaveBeenCalled();
+      expect(quota.recordUsage).toHaveBeenCalled();
     });
 
     it('returns deterministic baseline (no LLM) when there is no content', async () => {
@@ -579,7 +579,7 @@ describe('AiRecruiterService', () => {
       });
       const r = await service.scorecard(USER, 'transcript');
       scorecardShape(r);
-      expect(quota.recordUsageAndIncrement).not.toHaveBeenCalled();
+      expect(quota.recordUsage).not.toHaveBeenCalled();
     });
 
     it('falls back to deterministic on Zod validation failure', async () => {
@@ -588,7 +588,7 @@ describe('AiRecruiterService', () => {
       );
       const r = await service.scorecard(USER, 'transcript');
       scorecardShape(r);
-      expect(quota.recordUsageAndIncrement).not.toHaveBeenCalled();
+      expect(quota.recordUsage).not.toHaveBeenCalled();
     });
 
     it('deterministic path is stable across calls', async () => {

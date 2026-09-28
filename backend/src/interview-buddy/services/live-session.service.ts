@@ -212,7 +212,7 @@ export class LiveSessionService {
     emit({ type: 'coaching-pending', question: questionText });
 
     try {
-      const output = await this.coaching.generateCoaching(live.contextPack, questionText);
+      const output = await this.coaching.generateCoaching(live.userId, live.contextPack, questionText);
       emit({ type: 'coaching', question: questionText, output });
     } catch (err) {
       this.logger.warn(

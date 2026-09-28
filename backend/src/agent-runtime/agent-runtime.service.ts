@@ -43,7 +43,7 @@ export interface AgentRunJobData {
  * tool-use provider support. Resolves an {@link AgentDefinition}, drives a
  * tool-calling conversation against the routed LLM provider, records each step
  * to an {@link AgentRun}, enforces step/token budgets and a tool allow-list,
- * and meters exactly one credit per completed run.
+ * and settles measured credits once across all turns, including failed runs.
  *
  * This is the generic `agent-runtime` domain — NOT the human-concierge
  * `agents/` / `application-agent` domain.
@@ -111,6 +111,16 @@ export class AgentRuntimeService {
       return this.failRun(run, `Unknown agent type: ${agentType}`);
     }
 
+    try {
+      return await this.routingService.withOwnerOperation(userId, def.feature, () => this.runOwned(run, def, userId, input));
+    } catch (error) {
+      if ((error as any)?.code === 'AI_USAGE_RECONCILING' && run.status === 'completed') return run;
+      return this.failRun(run, this.errorMessage(error));
+    }
+  }
+
+  private async runOwned(run: AgentRunDocument, def: AgentDefinition, userId: string, input: any): Promise<AgentRunDocument> {
+    const agentType = def.agentType;
     // 1) Quota — enforced ONCE at run start. A ForbiddenException fails the run
     //    cleanly (no 500, no credit charged) rather than propagating.
     try {
@@ -123,7 +133,7 @@ export class AgentRuntimeService {
     }
 
     // 2) Provider must support tool use.
-    const provider = this.routingService.getProviderForFeature(def.feature);
+    const provider = this.routingService.getProviderForFeature(def.feature, userId);
     if (!provider.chatWithTools) {
       return this.failRun(
         run,
@@ -218,8 +228,6 @@ export class AgentRuntimeService {
       return this.finish(run, 'stopped', 'Budget exhausted before completion');
     }
 
-    // 3) Charge exactly ONE credit for the whole run — only on success.
-    await this.chargeOneCredit(run, def, userId);
     return this.finish(run, 'completed');
   }
 
@@ -331,25 +339,6 @@ export class AgentRuntimeService {
 
   private async persist(run: AgentRunDocument): Promise<void> {
     await run.save();
-  }
-
-  /** Charge exactly one credit (increment path) with aggregated telemetry. */
-  private async chargeOneCredit(
-    run: AgentRunDocument,
-    def: AgentDefinition,
-    userId: string,
-  ): Promise<void> {
-    // The per-turn telemetry rows already captured real token usage; this single
-    // increment-path call bumps the credit counter exactly once for the whole
-    // N-step run (zero-token marker to avoid double-counting tokens).
-    await this.quotaService.recordUsageAndIncrement(
-      userId,
-      def.feature,
-      'agent-runtime',
-      def.agentType,
-      { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
-      { agentType: def.agentType, runId: String(run._id), aggregatedTokens: run.tokensUsed },
-    );
   }
 
   /** Terminal helper for the failure fast-paths (no credit charged). */

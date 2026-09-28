@@ -23,13 +23,7 @@ import { z } from 'zod';
 export class ResumeParserAIService {
   private readonly logger = new Logger(ResumeParserAIService.name);
 
-  /**
-   * Opt-in quota gate. Résumé parsing had no quota in the legacy flow, and FREE
-   * seeded `ai_credits_per_month = 0` until the allowance landed (now 25), so
-   * enforcing here would once have locked every FREE user out. Defaults OFF —
-   * turning it on is now safe but changes onboarding cost. When off we skip
-   * `enforceQuota` and only record usage best-effort.
-   */
+  // Optional early balance check; owner routing always enforces measured credits.
   private readonly enforceQuotaEnabled: boolean;
 
   constructor(
@@ -55,7 +49,7 @@ export class ResumeParserAIService {
     }
 
     const provider = this.routingService.getProviderForFeature(
-      LLMFeature.PARSE_RESUME,
+      LLMFeature.PARSE_RESUME, userId,
     );
     const config = this.routingService.getFeatureConfig(
       LLMFeature.PARSE_RESUME,
@@ -156,7 +150,7 @@ ${text}`;
     metadata: Record<string, any>,
   ): Promise<void> {
     try {
-      await this.quotaService.recordUsageAndIncrement(
+      await this.quotaService.recordUsage(
         userId,
         LLMFeature.PARSE_RESUME,
         provider,
@@ -166,7 +160,7 @@ ${text}`;
       );
     } catch (err) {
       this.logger.warn(
-        `recordUsageAndIncrement failed (non-fatal) for parseResume: ${
+        `recordUsage failed (non-fatal) for parseResume: ${
           (err as Error)?.message
         }`,
       );

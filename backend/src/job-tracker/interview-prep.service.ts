@@ -96,7 +96,7 @@ export class InterviewPrepService {
     const previousQuestions = session.questions.map((q) => q.question);
 
     const provider = this.llmRoutingService.getProviderForFeature(
-      LLMFeature.MOCK_INTERVIEW,
+      LLMFeature.MOCK_INTERVIEW, userId,
     );
     const config = this.llmRoutingService.getFeatureConfig(LLMFeature.MOCK_INTERVIEW);
 
@@ -120,7 +120,7 @@ export class InterviewPrepService {
       const question = response.content.trim();
 
       // Record usage
-      await this.quotaService.recordUsageAndIncrement(
+      await this.quotaService.recordUsage(
         userId,
         LLMFeature.MOCK_INTERVIEW,
         provider.getName(),
@@ -158,7 +158,7 @@ export class InterviewPrepService {
     await this.quotaService.enforceQuota(userId, LLMFeature.MOCK_INTERVIEW);
 
     const provider = this.llmRoutingService.getProviderForFeature(
-      LLMFeature.MOCK_INTERVIEW,
+      LLMFeature.MOCK_INTERVIEW, userId,
     );
     const config = this.llmRoutingService.getFeatureConfig(LLMFeature.MOCK_INTERVIEW);
 
@@ -213,7 +213,7 @@ export class InterviewPrepService {
       await session.save();
 
       // Record usage
-      await this.quotaService.recordUsageAndIncrement(
+      await this.quotaService.recordUsage(
         userId,
         LLMFeature.MOCK_INTERVIEW,
         provider.getName(),
@@ -306,7 +306,7 @@ export class InterviewPrepService {
 
     await this.quotaService.enforceQuota(userId, LLMFeature.MOCK_INTERVIEW);
 
-    const provider = this.llmRoutingService.getProviderForFeature(LLMFeature.MOCK_INTERVIEW);
+    const provider = this.llmRoutingService.getProviderForFeature(LLMFeature.MOCK_INTERVIEW, userId);
     const config = this.llmRoutingService.getFeatureConfig(LLMFeature.MOCK_INTERVIEW);
 
     let job: JobDocument | null = null;
@@ -346,7 +346,7 @@ export class InterviewPrepService {
 
       const validated = InterviewRubricResponseSchema.parse(parsed);
 
-      await this.quotaService.recordUsageAndIncrement(
+      await this.quotaService.recordUsage(
         userId,
         LLMFeature.MOCK_INTERVIEW,
         provider.getName(),
@@ -381,7 +381,7 @@ export class InterviewPrepService {
 
     await this.quotaService.enforceQuota(userId, LLMFeature.MOCK_INTERVIEW);
 
-    const provider = this.llmRoutingService.getProviderForFeature(LLMFeature.MOCK_INTERVIEW);
+    const provider = this.llmRoutingService.getProviderForFeature(LLMFeature.MOCK_INTERVIEW, userId);
     const config = this.llmRoutingService.getFeatureConfig(LLMFeature.MOCK_INTERVIEW);
 
     let job: JobDocument | null = null;
@@ -422,7 +422,7 @@ export class InterviewPrepService {
 
       const validated = InterviewSummaryResponseSchema.parse(parsed);
 
-      await this.quotaService.recordUsageAndIncrement(
+      await this.quotaService.recordUsage(
         userId,
         LLMFeature.MOCK_INTERVIEW,
         provider.getName(),

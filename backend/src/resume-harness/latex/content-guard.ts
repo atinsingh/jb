@@ -128,6 +128,20 @@ export function findContentProblems(input: ContentGuardInput): string[] {
   }
 
   const words = prose(latex);
+  // A descriptive label is fine; a displayed web address must identify the
+  // same site as the actual destination. Models sometimes invent LinkedIn
+  // labels even when the supplied profile is hosted elsewhere.
+  for (const link of latex.matchAll(/\\href\{(https?:\/\/[^{}]+)\}\{([^{}]+)\}/g)) {
+    const label = link[2].trim();
+    if (!/^(?:https?:\/\/)?(?:[a-z0-9-]+\.)+[a-z]{2,}(?:[/:]|$)/i.test(label)) continue;
+    try {
+      const displayed = new URL(/^https?:\/\//i.test(label) ? label : `https://${label}`);
+      const destination = new URL(link[1]);
+      if (displayed.hostname.replace(/^www\./, '') !== destination.hostname.replace(/^www\./, '')) {
+        problems.push(`the link label "${label}" does not match its destination; display the supplied address or a descriptive label`);
+      }
+    } catch { /* Other syntax is checked by the LaTeX compiler. */ }
+  }
   const candidateHasCareerEvidence = hasCareerEvidence(candidateMarkdown);
 
   // Identity alone can typeset into a technically valid PDF, but it is not a

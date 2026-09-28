@@ -13,14 +13,19 @@ class FakeRouter:
 
 
 class AtsTransportTest(unittest.TestCase):
-    def test_analyze_puts_the_shared_proxy_key_on_the_in_memory_router(self):
+    def test_owner_key_tags_and_serial_model_calls(self):
         router = FakeRouter()
         started = set()
+        active = 0
+        peak = 0
 
         async def independent_model_call(name):
+            nonlocal active, peak
             started.add(name)
-            while len(started) < 2:
-                await asyncio.sleep(0)
+            active += 1
+            peak = max(peak, active)
+            await asyncio.sleep(0)
+            active -= 1
             return {}
 
         llm = types.ModuleType("app.llm")
@@ -50,14 +55,14 @@ class AtsTransportTest(unittest.TestCase):
         previous = {name: sys.modules.get(name) for name in modules}
         sys.modules.update(modules)
         old_key = os.environ.get("JOBOCATE_LITELLM_API_KEY")
-        os.environ["JOBOCATE_LITELLM_API_KEY"] = "sk-shared-user-key"
+        os.environ["JOBOCATE_LITELLM_API_KEY"] = "sk-owner-key"
         try:
             path = Path(__file__).with_name("jobocate_ats.py")
             spec = importlib.util.spec_from_file_location("jobocate_ats_tested", path)
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
             asyncio.run(asyncio.wait_for(
-                module.analyze({"latex": "resume", "jobDescription": "job"}),
+                module.analyze({"latex": "resume", "jobDescription": "job", "tags": ["ownerType=candidate", "logicalRunId=run-1"]}),
                 timeout=1,
             ))
         finally:
@@ -73,9 +78,11 @@ class AtsTransportTest(unittest.TestCase):
 
         self.assertEqual(
             router.model_list[0]["litellm_params"]["api_key"],
-            "sk-shared-user-key",
+            "sk-owner-key",
         )
         self.assertEqual(started, {"resume", "job"})
+        self.assertEqual(peak, 1)
+        self.assertEqual(router.model_list[0]["litellm_params"]["extra_headers"]["x-litellm-tags"], "ownerType=candidate,logicalRunId=run-1")
 
 
 if __name__ == "__main__":

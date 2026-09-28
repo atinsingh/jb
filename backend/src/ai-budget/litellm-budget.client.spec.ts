@@ -19,6 +19,11 @@ describe('LiteLlmBudgetClient', () => {
     fetchMock = jest.fn();
     global.fetch = fetchMock as any;
     config.get.mockClear();
+    config.get.mockImplementation((key: string, fallback?: string) => {
+      if (key === 'LITELLM_BASE_URL') return 'http://litellm.test:4000/v1';
+      if (key === 'LITELLM_MASTER_KEY') return 'sk-master-test';
+      return fallback;
+    });
     client = new LiteLlmBudgetClient(config as any);
   });
 
@@ -66,6 +71,19 @@ describe('LiteLlmBudgetClient', () => {
         }),
       }),
     );
+  });
+
+  it.each([null, '', ' ', false, [], -1, 'invalid'])('rejects invalid authoritative spend %j', async (spend) => {
+    fetchMock.mockResolvedValue(response({ info: { spend, max_budget: 1 } }));
+    await expect(client.info('sk-owner')).rejects.toBeInstanceOf(AiBudgetUnavailableException);
+  });
+
+  it('groups paginated requests by logical operation, including late and failed-call spend', async () => {
+    const row = (id: string, run: string, spend: number) => ({ request_id: id, spend, request_tags: [`logicalRunId=${run}`] });
+    fetchMock.mockResolvedValueOnce(response({ data: [row('a', 'first', .004), row('b', 'second', .006)], total_pages: 2 }))
+      .mockResolvedValueOnce(response({ data: [row('c', 'first', .005), row('d', 'second', .005)], total_pages: 2 }));
+    expect(await (client as any).usage('sk-owner', new Date('2026-09-01Z'), new Date('2026-10-01Z'))).toMatchObject({ spendUsd: .02, credits: 3 });
+    expect(fetchMock.mock.calls[1][0]).toContain('page=2');
   });
 
   it('updates, reads, and revokes only the supplied virtual key', async () => {

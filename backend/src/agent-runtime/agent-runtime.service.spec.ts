@@ -31,9 +31,10 @@ function toolCall(name: string, args: any = {}, id = 'c1'): LLMToolCall {
 }
 
 interface Harness {
+  routing: any;
   service: AgentRuntimeService;
   provider: MockProvider;
-  quota: { enforceQuota: jest.Mock; recordUsageAndIncrement: jest.Mock };
+  quota: { enforceQuota: jest.Mock; recordUsage: jest.Mock };
   accounting: { recordUsage: jest.Mock };
   toolRegistry: ToolRegistry;
   defRegistry: AgentDefinitionRegistry;
@@ -44,6 +45,7 @@ interface Harness {
 function build(): Harness {
   const provider = new MockProvider();
   const routing: any = {
+    withOwnerOperation: jest.fn(async (_owner, _feature, task) => task()),
     getProviderForFeature: jest.fn().mockReturnValue(provider),
     getFeatureConfig: jest
       .fn()
@@ -52,7 +54,7 @@ function build(): Harness {
   const accounting = { recordUsage: jest.fn().mockResolvedValue(undefined) };
   const quota = {
     enforceQuota: jest.fn().mockResolvedValue(undefined),
-    recordUsageAndIncrement: jest.fn().mockResolvedValue(undefined),
+    recordUsage: jest.fn().mockResolvedValue(undefined),
   };
   const toolRegistry = new ToolRegistry();
   const defRegistry = new AgentDefinitionRegistry();
@@ -74,6 +76,7 @@ function build(): Harness {
   );
 
   return {
+    routing,
     service,
     provider,
     quota,
@@ -104,6 +107,19 @@ const echoTool: AgentTool = {
 describe('AgentRuntimeService.run', () => {
   beforeEach(() => jest.clearAllMocks());
 
+  it('keeps completed output when only usage settlement is pending', async () => {
+    const h = build();
+    h.defRegistry.register(AGENT);
+    h.provider.setScriptedToolTurns([], 'Saved result');
+    h.routing.withOwnerOperation.mockImplementationOnce(async (_owner, _feature, task) => {
+      await task();
+      throw Object.assign(new Error('pending'), { code: 'AI_USAGE_RECONCILING' });
+    });
+    const run = await h.service.run('demo', 'user1', { goal: 'finish' });
+    expect(run.status).toBe('completed');
+    expect(run.result).toBe('Saved result');
+  });
+
   it('executes a scripted tool call then terminates → completed with steps persisted', async () => {
     const h = build();
     h.toolRegistry.register(echoTool);
@@ -125,9 +141,10 @@ describe('AgentRuntimeService.run', () => {
     expect(run.stepsUsed).toBe(1);
     expect(run.save).toHaveBeenCalled();
 
-    // Per-turn telemetry recorded (2 LLM turns), credit charged exactly once.
+    // All turns share one measured operation; telemetry cannot deduct another allowance.
+    expect(h.routing.withOwnerOperation).toHaveBeenCalledTimes(1);
     expect(h.accounting.recordUsage).toHaveBeenCalledTimes(2);
-    expect(h.quota.recordUsageAndIncrement).toHaveBeenCalledTimes(1);
+    expect(h.quota.recordUsage).not.toHaveBeenCalled();
   });
 
   it('rejects a disallowed/unknown tool without executing its handler', async () => {
@@ -173,7 +190,7 @@ describe('AgentRuntimeService.run', () => {
     expect(run.stepsUsed).toBe(2);
     expect(run.steps.some((s: any) => s.type === 'final')).toBe(false);
     // No credit charged for a partial run.
-    expect(h.quota.recordUsageAndIncrement).not.toHaveBeenCalled();
+    expect(h.quota.recordUsage).not.toHaveBeenCalled();
   });
 
   it('fails cleanly (no crash) when quota enforcement throws ForbiddenException', async () => {
@@ -191,7 +208,7 @@ describe('AgentRuntimeService.run', () => {
     expect(run.error).toContain('Quota exceeded');
     expect(chatSpy).not.toHaveBeenCalled();
     // Failed-on-quota must NOT charge a credit.
-    expect(h.quota.recordUsageAndIncrement).not.toHaveBeenCalled();
+    expect(h.quota.recordUsage).not.toHaveBeenCalled();
     expect(run.steps.some((s: any) => s.type === 'error')).toBe(true);
   });
 
@@ -203,11 +220,11 @@ describe('AgentRuntimeService.run', () => {
     expect(h.quota.enforceQuota).not.toHaveBeenCalled();
   });
 
-  it('charges exactly one credit on completion (metering charges once per run)', async () => {
+  it('uses one measured operation across multiple tool turns', async () => {
     const h = build();
     h.toolRegistry.register(echoTool);
     h.defRegistry.register(AGENT);
-    // Two tool turns then terminal — still a single credit.
+    // Two tool turns and the terminal response share one operation.
     h.provider.setScriptedToolTurns(
       [[toolCall('echo', {})], [toolCall('echo', {})]],
       'done',
@@ -216,6 +233,7 @@ describe('AgentRuntimeService.run', () => {
     const run: any = await h.service.run('demo', 'user1', {});
 
     expect(run.status).toBe('completed');
-    expect(h.quota.recordUsageAndIncrement).toHaveBeenCalledTimes(1);
+    expect(h.routing.withOwnerOperation).toHaveBeenCalledTimes(1);
+    expect(h.quota.recordUsage).not.toHaveBeenCalled();
   });
 });

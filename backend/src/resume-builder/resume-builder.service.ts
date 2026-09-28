@@ -491,7 +491,7 @@ Provide enhanced education entries with:
       // config. `getProviderForFeature` returns the configured provider (or
       // MockProvider when no API key is present).
       const provider = this.llmRoutingService.getProviderForFeature(
-        LLMFeature.REWRITE_BULLETS,
+        LLMFeature.REWRITE_BULLETS, userId,
       );
       const config = this.llmRoutingService.getFeatureConfig(
         LLMFeature.REWRITE_BULLETS,
@@ -630,7 +630,7 @@ Rewrite the summary and each experience entry's bullets to foreground what is re
       );
     }
 
-    const provider = this.llmRoutingService.getProviderForFeature(LLMFeature.TAILOR_RESUME);
+    const provider = this.llmRoutingService.getProviderForFeature(LLMFeature.TAILOR_RESUME, userId);
     const config = this.llmRoutingService.getFeatureConfig(LLMFeature.TAILOR_RESUME);
     const knownOrgs = new Set(facts.experience.map((e) => e.company.trim().toLowerCase()));
 
@@ -660,7 +660,7 @@ Rewrite the summary and each experience entry's bullets to foreground what is re
       });
       parsed = parseModelJson(response?.content);
 
-      await this.llmQuotaService.recordUsageAndIncrement(
+      await this.llmQuotaService.recordUsage(
         userId,
         LLMFeature.TAILOR_RESUME,
         provider.getName(),
@@ -770,7 +770,7 @@ ${
       );
     }
 
-    const provider = this.llmRoutingService.getProviderForFeature(LLMFeature.REWRITE_BULLETS);
+    const provider = this.llmRoutingService.getProviderForFeature(LLMFeature.REWRITE_BULLETS, userId);
     const config = this.llmRoutingService.getFeatureConfig(LLMFeature.REWRITE_BULLETS);
     const knownOrgs = new Set(facts.experience.map((e) => e.company.trim().toLowerCase()));
 
@@ -787,7 +787,7 @@ ${
       });
       parsed = parseModelJson(response?.content);
 
-      await this.llmQuotaService.recordUsageAndIncrement(
+      await this.llmQuotaService.recordUsage(
         userId,
         LLMFeature.REWRITE_BULLETS,
         provider.getName(),

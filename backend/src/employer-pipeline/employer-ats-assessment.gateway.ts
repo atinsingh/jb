@@ -7,7 +7,12 @@ import {
   EmployerAtsRuntimeService,
   PreparedEmployerAtsRun,
 } from './employer-ats-runtime.service';
-import { LLMQuotaService } from '../llm/llm-quota.service';
+import { OwnerLlmService } from '../llm/owner-llm.service';
+import { LLMFeature } from '../llm/llm-routing.service';
+import {
+  AiBudgetExhaustedException,
+  AiBudgetOperationInProgressException,
+} from '../ai-budget/ai-budget.errors';
 
 export type AtsAssessmentStatus =
   | 'NOT_RUN'
@@ -58,9 +63,7 @@ export abstract class EmployerAtsAssessmentGateway {
   ): Promise<EmployerAtsAssessmentResult>;
 }
 
-export class EmployerAtsUnavailableGateway
-  implements EmployerAtsAssessmentGateway
-{
+export class EmployerAtsUnavailableGateway implements EmployerAtsAssessmentGateway {
   async assess(): Promise<EmployerAtsAssessmentResult> {
     return {
       status: 'NOT_RUN',
@@ -75,11 +78,51 @@ export class EmployerAtsGateway implements EmployerAtsAssessmentGateway {
   constructor(
     private readonly runtime: EmployerAtsRuntimeService,
     private readonly matcher: ResumeMatcherAdapter,
-    private readonly quota: LLMQuotaService,
+    private readonly owners: OwnerLlmService,
   ) {}
 
   async assess(
     input: EmployerAtsAssessmentInput,
+  ): Promise<EmployerAtsAssessmentResult> {
+    let completed: EmployerAtsAssessmentResult | undefined;
+    try {
+      return await this.owners.run(
+        input.ownerId,
+        LLMFeature.EMPLOYER_ATS_REVIEW,
+        async (context) => {
+          completed = await this.assessOwned(input, context?.tags);
+          return completed;
+        },
+      );
+    } catch (error) {
+      if (
+        (error as any)?.code === 'AI_USAGE_RECONCILING' &&
+        completed?.status === 'COMPLETE'
+      ) {
+        return { ...completed, reason: 'AI_USAGE_RECONCILING' };
+      }
+      return {
+        status:
+          error instanceof AiBudgetExhaustedException
+            ? 'BUDGET_EXHAUSTED'
+            : error instanceof AiBudgetOperationInProgressException
+              ? 'RUNNING'
+              : 'CONFIGURATION_ERROR',
+        reason:
+          error instanceof AiBudgetExhaustedException
+            ? 'EMPLOYER_BUDGET_EXHAUSTED'
+            : error instanceof AiBudgetOperationInProgressException
+              ? 'EMPLOYER_AI_RUN_IN_PROGRESS'
+              : 'EMPLOYER_AI_ACCOUNTING_UNAVAILABLE',
+        harness: 'ats',
+        sourceRunId: input.runId,
+      };
+    }
+  }
+
+  private async assessOwned(
+    input: EmployerAtsAssessmentInput,
+    tags?: readonly string[],
   ): Promise<EmployerAtsAssessmentResult> {
     let prepared;
     try {
@@ -88,7 +131,9 @@ export class EmployerAtsGateway implements EmployerAtsAssessmentGateway {
       const released = error instanceof AtsSandboxReleasedException;
       return {
         status: released ? 'ATS_INTERRUPTED' : 'CONFIGURATION_ERROR',
-        reason: released ? 'EMPLOYER_ATS_SANDBOX_RELEASED' : 'EMPLOYER_ATS_CONFIGURATION_ERROR',
+        reason: released
+          ? 'EMPLOYER_ATS_SANDBOX_RELEASED'
+          : 'EMPLOYER_ATS_CONFIGURATION_ERROR',
         harness: 'ats',
         sourceRunId: input.runId,
       };
@@ -96,10 +141,7 @@ export class EmployerAtsGateway implements EmployerAtsAssessmentGateway {
     if (prepared.status !== 'READY') {
       return {
         ...prepared,
-        status:
-          prepared.status === 'RUNNING'
-            ? 'NOT_RUN'
-            : prepared.status,
+        status: prepared.status === 'RUNNING' ? 'NOT_RUN' : prepared.status,
         harness: 'ats',
         sourceRunId: input.runId,
       };
@@ -114,6 +156,7 @@ export class EmployerAtsGateway implements EmployerAtsAssessmentGateway {
         jobDescription: input.jobDescription,
         sourceRevision: input.resumeVersion,
         alias: run.alias,
+        ...(tags?.length ? { tags } : {}),
       });
     } catch (error) {
       let usage = { costUsd: 0, requestIds: [] as string[] };
@@ -138,18 +181,11 @@ export class EmployerAtsGateway implements EmployerAtsAssessmentGateway {
       };
     }
 
-    let usage;
+    let usage: Partial<EmployerAtsAssessmentResult>;
     try {
       usage = await this.runtime.finish(run, { succeeded: true });
     } catch {
-      return {
-        status: 'ATS_FAILED',
-        reason: 'EMPLOYER_ATS_ACCOUNTING_FAILED',
-        modelAlias: run.alias,
-        effort: run.effort,
-        harness: 'ats',
-        sourceRunId: input.runId,
-      };
+      usage = { reason: 'AI_USAGE_RECONCILING' };
     }
     return {
       status: 'COMPLETE',

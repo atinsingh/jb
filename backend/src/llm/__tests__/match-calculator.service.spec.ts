@@ -61,7 +61,7 @@ describe('MatchCalculatorService', () => {
           provide: LLMQuotaService,
           useValue: {
             enforceQuota: jest.fn(),
-            recordUsageAndIncrement: jest.fn(),
+            recordUsage: jest.fn(),
           },
         },
         { provide: ConfigService, useValue: { get: configGet } },
@@ -117,7 +117,7 @@ describe('MatchCalculatorService', () => {
 
     expect(quotaService.enforceQuota).not.toHaveBeenCalled();
     // usage is still recorded best-effort for accounting
-    expect(quotaService.recordUsageAndIncrement).toHaveBeenCalledWith(
+    expect(quotaService.recordUsage).toHaveBeenCalledWith(
       'user123',
       LLMFeature.CALCULATE_MATCH,
       'mock',
@@ -167,7 +167,7 @@ describe('MatchCalculatorService', () => {
     (mockProvider.chat as jest.Mock).mockResolvedValue(
       makeResponse(JSON.stringify(validPayload)),
     );
-    (quotaService.recordUsageAndIncrement as jest.Mock).mockRejectedValue(
+    (quotaService.recordUsage as jest.Mock).mockRejectedValue(
       new Error('db down'),
     );
 

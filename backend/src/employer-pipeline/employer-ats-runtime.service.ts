@@ -1,3 +1,4 @@
+import { AiBudgetService } from '../ai-budget/ai-budget.service';
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -58,6 +59,7 @@ export class EmployerAtsRuntimeService {
     private readonly keys: LiteLlmVirtualKeyClient,
     private readonly sandbox: SandboxService,
     private readonly secrets: EmployerAtsSecretCodec,
+    private readonly budget: AiBudgetService,
   ) {}
 
   async prepare(
@@ -126,7 +128,7 @@ export class EmployerAtsRuntimeService {
     const spentUsd = budget.spendUsd;
     const budgetView = this.budgetView(limitUsd, spentUsd, budget.resetAt, configured.account);
     if (budgetView.remainingCredits <= 0) {
-      await this.release(ownerId, runId, spentUsd);
+      await this.release(ownerId, runId);
       return {
         status: 'BUDGET_EXHAUSTED',
         reason: 'EMPLOYER_BUDGET_EXHAUSTED',
@@ -180,10 +182,6 @@ export class EmployerAtsRuntimeService {
     const spendAfter = settled.spendAfter;
     const rawCostUsd = Math.max(0, spendAfter - prepared.spendBeforeUsd);
     const costUsd = this.money(rawCostUsd);
-    const creditsUsed = Math.max(
-      this.roundCredits(spendAfter),
-      (prepared.spentCredits || 0) + this.roundCredits(rawCostUsd),
-    );
     const logs = settled.logs;
     const finishedAt = new Date();
     const attributed = logs.filter(
@@ -257,32 +255,20 @@ export class EmployerAtsRuntimeService {
         )
         .exec();
     } finally {
-      await this.release(ownerId, prepared.runId, spendAfter, creditsUsed, prepared.resetAt);
+      await this.release(ownerId, prepared.runId);
     }
     return { costUsd, requestIds };
   }
 
-  async budgetStatus(ownerIdValue: string): Promise<EmployerAtsBudgetStatus> {
+  async budgetStatus(ownerId: string): Promise<EmployerAtsBudgetStatus> {
     try {
-      return await this.withSandboxLifecycle(ownerIdValue, async () => {
-        const ownerId = this.objectId(ownerIdValue);
-        const configured = await this.ensureAccount(ownerIdValue, ownerId);
-        const virtualKey = this.secrets.decrypt(configured.account.encryptedKey);
-        const info = await this.keys.info(virtualKey);
-        const limitUsd = info.limitUsd ?? configured.maxBudgetUsd;
-        const view = this.budgetView(limitUsd, info.spendUsd, info.resetAt, configured.account);
-        const exhausted = view.remainingCredits <= 0;
-        return {
-          status: exhausted ? 'BUDGET_EXHAUSTED' : 'READY',
-          ...(exhausted ? { reason: 'EMPLOYER_BUDGET_EXHAUSTED' } : {}),
-          ...view,
-        };
-      });
+      const snapshot = await this.budget.statusOwner('employer', ownerId);
+      if (snapshot.status === 'unavailable') return { status: 'CONFIGURATION_ERROR', reason: 'EMPLOYER_AI_CREDITS_UNAVAILABLE' };
+      return { status: snapshot.remaining <= 0 ? 'BUDGET_EXHAUSTED' : 'READY',
+        limitCredits: snapshot.limit, spentCredits: snapshot.spent, remainingCredits: snapshot.remaining,
+        period: 'monthly', resetAt: new Date(snapshot.resetAt) };
     } catch {
-      return {
-        status: 'CONFIGURATION_ERROR',
-        reason: 'EMPLOYER_ATS_CONFIGURATION_ERROR',
-      };
+      return { status: 'CONFIGURATION_ERROR', reason: 'EMPLOYER_AI_CREDITS_UNAVAILABLE' };
     }
   }
 
@@ -399,148 +385,21 @@ export class EmployerAtsRuntimeService {
     return Boolean(runId) && account?.interruptedRunId === runId;
   }
 
-  private async ensureAccount(
-    ownerIdValue: string,
-    ownerId: Types.ObjectId | string,
-  ): Promise<{
-    account: any;
-    alias: ResolvedModelAlias;
-    maxBudgetUsd: number;
+  private async ensureAccount(ownerIdValue: string, ownerId: Types.ObjectId | string): Promise<{
+    account: any; alias: ResolvedModelAlias; maxBudgetUsd: number;
   }> {
-    const subscription: any = await this.billing.getOrCreateSubscription(
-      ownerIdValue,
-    );
-    const plan = getEmployerPlan(subscription.plan || 'free');
-    if (!plan) throw new Error('Employer ATS plan is not configured');
-    const allowed = await this.aliases.listForTier(plan.modelTier);
-    const alias = await this.aliases.resolveAutomaticForTier(plan.modelTier);
-    if (!allowed.length) throw new Error('Employer ATS alias is not configured');
-    const models = allowed.map((entry) => entry.alias);
-    const maxBudgetUsd = plan.limits.aiBudgetCreditsLimit / 100;
-    const keyAlias = `jobocate-employer-${ownerIdValue}`;
-
-    await this.runtimeModel
-      .updateOne(
-        { ownerId, ownerType: 'employer' },
-        {
-          $setOnInsert: {
-            ownerId,
-            ownerType: 'employer',
-            models: [],
-            maxBudgetUsd: 0,
-            spendUsd: 0,
-          },
-        },
-        { upsert: true },
-      )
-      .exec();
-    let account: any = await this.runtimeModel
-      .findOne({ ownerId, ownerType: 'employer' })
-      .lean()
-      .exec();
-
-    if (!account?.encryptedKey) {
-      const token = randomUUID();
-      const claim: any = await this.runtimeModel
-        .findOneAndUpdate(
-          {
-            ownerId,
-            ownerType: 'employer',
-            encryptedKey: { $exists: false },
-            $or: [
-              { provisioningToken: { $exists: false } },
-              { provisioningUntil: { $lt: new Date() } },
-            ],
-          },
-          {
-            $set: {
-              provisioningToken: token,
-              provisioningUntil: new Date(
-                Date.now() + EmployerAtsRuntimeService.LOCK_MS,
-              ),
-            },
-          },
-          { new: true },
-        )
-        .lean()
-        .exec();
-      if (!claim) throw new Error('Employer ATS key provisioning is in progress');
-      try {
-        const generated = await this.keys.generate({
-          ownerId: ownerIdValue,
-          keyAlias,
-          models,
-          maxBudgetUsd,
-        });
-        const encryptedKey = this.secrets.encrypt(generated.key);
-        await this.runtimeModel
-          .updateOne(
-            { ownerId, ownerType: 'employer', provisioningToken: token },
-            {
-              $set: {
-                encryptedKey,
-                keyHash: createHash('sha256')
-                  .update(generated.key)
-                  .digest('hex'),
-                keyAlias,
-                plan: plan.key,
-                modelTier: plan.modelTier,
-                models,
-                maxBudgetUsd,
-              },
-              $unset: { provisioningToken: 1, provisioningUntil: 1 },
-            },
-          )
-          .exec();
-        account = {
-          ...account,
-          encryptedKey,
-          keyHash: createHash('sha256').update(generated.key).digest('hex'),
-          keyAlias,
-          plan: plan.key,
-          modelTier: plan.modelTier,
-          models,
-          maxBudgetUsd,
-        };
-      } catch (error) {
-        await this.runtimeModel
-          .updateOne(
-            { ownerId, ownerType: 'employer', provisioningToken: token },
-            { $unset: { provisioningToken: 1, provisioningUntil: 1 } },
-          )
-          .exec();
-        throw error;
-      }
-    } else if (
-      account.plan !== plan.key ||
-      account.maxBudgetUsd !== maxBudgetUsd ||
-      JSON.stringify(account.models || []) !== JSON.stringify(models)
-    ) {
-      const virtualKey = this.secrets.decrypt(account.encryptedKey);
-      await this.keys.update(virtualKey, { models, maxBudgetUsd });
-      await this.runtimeModel
-        .updateOne(
-          { ownerId, ownerType: 'employer' },
-          {
-            $set: {
-              plan: plan.key,
-              modelTier: plan.modelTier,
-              models,
-              maxBudgetUsd,
-            },
-          },
-        )
-        .exec();
-      account = {
-        ...account,
-        plan: plan.key,
-        modelTier: plan.modelTier,
-        models,
-        maxBudgetUsd,
-      };
-    }
-
-    return { account, alias, maxBudgetUsd };
+    const access = await this.budget.ensureOwnerAccess('employer', ownerIdValue);
+    const alias = await this.aliases.resolveAutomaticForTier(access.snapshot.tier);
+    await this.runtimeModel.updateOne({ ownerId, ownerType: 'employer' }, {
+      $setOnInsert: { ownerId, ownerType: 'employer' },
+    }, { upsert: true }).exec();
+    const runtime = await this.runtimeModel.findOne({ ownerId, ownerType: 'employer' }).lean().exec();
+    return {
+      alias, maxBudgetUsd: access.snapshot.limit / 100,
+      account: { ...runtime, encryptedKey: this.secrets.encrypt(access.apiKey),
+        keyHash: createHash('sha256').update(access.apiKey).digest('hex'), keyAlias: access.keyAlias,
+        creditsUsed: access.snapshot.spent, creditsResetAt: new Date(access.snapshot.resetAt) },
+    };
   }
 
   private async ensureSandbox(
@@ -551,7 +410,7 @@ export class EmployerAtsRuntimeService {
   ): Promise<string> {
     let stoppedSandboxId: string | undefined;
     if (account.sandboxId) {
-      if (await this.sandboxIsRunning(account.sandboxId)) return account.sandboxId;
+      if (account.sandboxKeyHash === account.keyHash && await this.sandboxIsRunning(account.sandboxId)) return account.sandboxId;
       stoppedSandboxId = account.sandboxId;
     }
 
@@ -603,7 +462,7 @@ export class EmployerAtsRuntimeService {
             sandboxProvisioningToken: token,
           },
           {
-            $set: { sandboxId: provisioned.sandboxId },
+            $set: { sandboxId: provisioned.sandboxId, sandboxKeyHash: account.keyHash },
             $unset: {
               sandboxProvisioningToken: 1,
               sandboxProvisioningUntil: 1,
@@ -699,6 +558,7 @@ export class EmployerAtsRuntimeService {
   private async settledUsage(
     prepared: PreparedEmployerAtsRun,
   ): Promise<{ spendAfter: number; logs: any[] }> {
+    await this.waitForUsage();
     let spendAfter = prepared.spendBeforeUsd;
     let logs: any[] = [];
     for (let attempt = 0; attempt < 10; attempt += 1) {
@@ -737,21 +597,20 @@ export class EmployerAtsRuntimeService {
     return { spendAfter, logs };
   }
 
+  private async waitForUsage(): Promise<void> {
+    // LiteLLM flushes in 10-second batches with up to 5 seconds of jitter.
+    // An early request log is not evidence that the last request has settled.
+    await new Promise(resolve => setTimeout(resolve, 16_000));
+  }
+
   private release(
     ownerId: Types.ObjectId | string,
     runId: string,
-    spendUsd?: number,
-    creditsUsed?: number,
-    creditsResetAt?: Date,
   ): Promise<any> {
     return this.runtimeModel
       .updateOne(
         { ownerId, ownerType: 'employer', activeRunId: runId },
         {
-          ...(spendUsd == null ? {} : { $set: {
-            spendUsd,
-            ...(creditsUsed == null ? {} : { creditsUsed, creditsResetAt }),
-          } }),
           $unset: { activeRunId: 1, runLockUntil: 1 },
         },
       )

@@ -37,6 +37,12 @@ const PLACEHOLDERS = [
 ];
 
 describe('findContentProblems', () => {
+  it('rejects a link label that invents a different contact address', () => {
+    const latex = REAL.replace('jordan@example.com', String.raw`\href{https://example.test/jordan-reyes}{linkedin.com/in/jordan-reyes}`);
+    expect(findContentProblems({ latex }).join(' ')).toMatch(/link label.*destination/i);
+    expect(findContentProblems({ latex: latex.replace('linkedin.com/in/jordan-reyes', 'example.test/jordan-reyes') })).toEqual([]);
+    expect(findContentProblems({ latex: latex.replace('linkedin.com/in/jordan-reyes', 'Profile') })).toEqual([]);
+  });
   it('passes a résumé that carries the candidate’s own facts', () => {
     expect(
       findContentProblems({

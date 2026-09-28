@@ -141,6 +141,7 @@ describe('LiveSessionService', () => {
       await new Promise((r) => setImmediate(r));
 
       expect(coaching.generateCoaching).toHaveBeenCalledWith(
+        USER,
         { role: 'Engineer' },
         'What was your hardest technical decision?',
       );

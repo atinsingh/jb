@@ -30,7 +30,7 @@ export class ResumeTailoringService {
     await this.quotaService.enforceQuota(userId, LLMFeature.TAILOR_RESUME);
 
     const provider = this.routingService.getProviderForFeature(
-      LLMFeature.TAILOR_RESUME,
+      LLMFeature.TAILOR_RESUME, userId,
     );
     const config = this.routingService.getFeatureConfig(LLMFeature.TAILOR_RESUME);
 
@@ -109,7 +109,7 @@ export class ResumeTailoringService {
       }
 
       // Record usage
-      await this.quotaService.recordUsageAndIncrement(
+      await this.quotaService.recordUsage(
         userId,
         LLMFeature.TAILOR_RESUME,
         provider.getName(),

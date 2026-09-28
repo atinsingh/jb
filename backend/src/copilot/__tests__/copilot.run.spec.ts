@@ -29,13 +29,14 @@ describe('Job-Search Copilot run (integration over the agent runtime)', () => {
   it('drives find_matches → apply → terminal; AgentRun completed with steps', async () => {
     const provider = new MockProvider();
     const routing: any = {
+      withOwnerOperation: jest.fn(async (_owner, _feature, task) => task()),
       getProviderForFeature: jest.fn().mockReturnValue(provider),
       getFeatureConfig: jest.fn().mockReturnValue({ model: 'claude-opus-4-8', temperature: 0.4, maxTokens: 4000 }),
     };
     const accounting = { recordUsage: jest.fn().mockResolvedValue(undefined) };
     const quota = {
       enforceQuota: jest.fn().mockResolvedValue(undefined),
-      recordUsageAndIncrement: jest.fn().mockResolvedValue(undefined),
+      recordUsage: jest.fn().mockResolvedValue(undefined),
     };
     const toolRegistry = new ToolRegistry();
     const defRegistry = new AgentDefinitionRegistry();
@@ -114,7 +115,7 @@ describe('Job-Search Copilot run (integration over the agent runtime)', () => {
     expect(applyResult.output).toMatchObject({ applied: true, status: 'submitted' });
     expect(run.steps.some((s: any) => s.type === 'final')).toBe(true);
 
-    // Exactly one credit charged for the whole run.
-    expect(quota.recordUsageAndIncrement).toHaveBeenCalledTimes(1);
+    expect(routing.withOwnerOperation).toHaveBeenCalledTimes(1);
+    expect(quota.recordUsage).not.toHaveBeenCalled();
   });
 });

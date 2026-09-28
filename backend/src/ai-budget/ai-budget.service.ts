@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { randomUUID } from 'crypto';
 import { Model } from 'mongoose';
@@ -6,13 +6,19 @@ import { ModelAliasService } from '../resume-harness/model-alias.service';
 import {
   AiBudgetExhaustedException,
   AiBudgetOperationInProgressException,
+  AiBudgetSettlementPendingException,
   AiBudgetUnavailableException,
 } from './ai-budget.errors';
 import {
   AiBudgetConfigurationError,
   AiBudgetPolicyService,
 } from './ai-budget-policy.service';
-import { AiBudgetServiceId } from './ai-budget-policy.types';
+import { EmployerBillingService } from '../employer-billing/employer-billing.service';
+import {
+  EMPLOYER_PLANS,
+  getEmployerPlan,
+} from '../employer-billing/employer-plans';
+import { AiBudgetOwnerType, AiBudgetServiceId } from './ai-budget-policy.types';
 import { AiBudgetSecretCodec } from './ai-budget-secret.codec';
 import { LiteLlmBudgetClient, LiteLlmKeyInfo } from './litellm-budget.client';
 import {
@@ -61,6 +67,7 @@ const LEASE_MILLISECONDS = 15 * 60 * 1000;
 
 @Injectable()
 export class AiBudgetService {
+  private readonly logger = new Logger(AiBudgetService.name);
   constructor(
     @InjectModel(AiBudgetAccount.name)
     private readonly accountModel: Model<AiBudgetAccountDocument>,
@@ -68,13 +75,36 @@ export class AiBudgetService {
     private readonly client: LiteLlmBudgetClient,
     private readonly codec: AiBudgetSecretCodec,
     private readonly aliases: ModelAliasService,
+    private readonly employerBilling: EmployerBillingService,
   ) {}
 
   async statusCandidate(userId: string): Promise<AiBudgetSnapshot> {
+    return this.statusOwner('candidate', userId);
+  }
+
+  async ownerTier(
+    ownerType: AiBudgetOwnerType,
+    userId: string,
+  ): Promise<string> {
+    if (ownerType === 'candidate') return this.aliases.tierFor(userId);
+    const subscription =
+      await this.employerBilling.getOrCreateSubscription(userId);
+    const plan = getEmployerPlan(subscription.plan);
+    if (!plan)
+      throw new AiBudgetConfigurationError(
+        'Employer AI plan is not configured',
+      );
+    return plan.modelTier;
+  }
+
+  async statusOwner(
+    ownerType: AiBudgetOwnerType,
+    userId: string,
+  ): Promise<AiBudgetSnapshot> {
     let tier = 'FREE';
     try {
-      tier = await this.aliases.tierFor(userId);
-      const context = await this.prepareCandidate(userId, tier);
+      tier = await this.ownerTier(ownerType, userId);
+      const context = await this.prepareOwner(ownerType, userId, tier);
       return (await this.refreshAccess(context, false)).snapshot;
     } catch (error) {
       if (
@@ -83,13 +113,20 @@ export class AiBudgetService {
       ) {
         throw error;
       }
-      return this.unavailableSnapshot(tier);
+      return this.unavailableSnapshot(tier, ownerType);
     }
   }
 
   async ensureCandidateAccess(userId: string): Promise<CandidateBudgetAccess> {
-    const tier = await this.aliases.tierFor(userId);
-    const context = await this.prepareCandidate(userId, tier);
+    return this.ensureOwnerAccess('candidate', userId);
+  }
+
+  async ensureOwnerAccess(
+    ownerType: AiBudgetOwnerType,
+    userId: string,
+  ): Promise<CandidateBudgetAccess> {
+    const tier = await this.ownerTier(ownerType, userId);
+    const context = await this.prepareOwner(ownerType, userId, tier);
     return this.refreshAccess(context, true);
   }
 
@@ -99,21 +136,35 @@ export class AiBudgetService {
     attribution: AiBudgetAttribution,
     run: (access: CandidateBudgetAccess, tags: readonly string[]) => Promise<T>,
   ): Promise<T> {
+    return this.withOwnerLease('candidate', userId, service, attribution, run);
+  }
+
+  async withOwnerLease<T>(
+    ownerType: AiBudgetOwnerType,
+    userId: string,
+    service: AiBudgetServiceId,
+    attribution: AiBudgetAttribution,
+    run: (access: CandidateBudgetAccess, tags: readonly string[]) => Promise<T>,
+  ): Promise<T> {
     const servicePolicy = this.policy.service(service);
-    if (!servicePolicy.enabled || !servicePolicy.metered) {
+    if (
+      !servicePolicy.enabled ||
+      !servicePolicy.metered ||
+      servicePolicy.ownerType !== ownerType
+    ) {
       throw new AiBudgetConfigurationError(
         `AI budget service is not active and metered: ${service}`,
       );
     }
 
-    const tier = await this.aliases.tierFor(userId);
-    const context = await this.prepareCandidate(userId, tier);
+    const tier = await this.ownerTier(ownerType, userId);
+    const context = await this.prepareOwner(ownerType, userId, tier);
     const runId = attribution.runId || randomUUID();
     const now = new Date();
     const claimed = await this.accountModel
       .findOneAndUpdate(
         {
-          ownerType: 'candidate',
+          ownerType,
           ownerId: userId,
           $or: [
             { activeRunId: { $exists: false } },
@@ -133,37 +184,106 @@ export class AiBudgetService {
       .exec();
     if (!claimed) throw new AiBudgetOperationInProgressException();
 
+    const heartbeat = setInterval(() => {
+      void this.accountModel
+        .updateOne(
+          { _id: claimed._id, activeRunId: runId },
+          {
+            $set: { runLockUntil: new Date(Date.now() + LEASE_MILLISECONDS) },
+          },
+        )
+        .exec()
+        .catch(() => this.logger.warn('AI operation lease renewal failed'));
+    }, LEASE_MILLISECONDS / 3);
+    heartbeat.unref();
+
     const claimedContext = { ...context, account: claimed };
     let ran = false;
+    let settled = false;
     let startingSpendUsd = 0;
     let startingCredits = 0;
     try {
       const access = await this.refreshAccess(claimedContext, true);
       startingSpendUsd = access.measuredSpendUsd;
       startingCredits = access.snapshot.spent;
+      await this.accountModel
+        .updateOne(
+          { _id: claimed._id, activeRunId: runId },
+          {
+            $set: {
+              runSpendBeforeUsd: startingSpendUsd,
+              runCreditsBefore: startingCredits,
+            },
+          },
+        )
+        .exec();
       ran = true;
-      return await run(access, this.tags(userId, service, attribution, runId));
+      return await run(
+        access,
+        this.tags(ownerType, userId, service, attribution, runId),
+      );
     } finally {
       try {
-        if (ran) await this.settleCandidateRun(claimedContext, startingSpendUsd, startingCredits);
+        if (ran) {
+          try {
+            await this.waitForUsage();
+            await this.accountModel
+              .updateOne(
+                { _id: claimed._id, activeRunId: runId },
+                {
+                  $set: { settlementPending: true },
+                },
+              )
+              .exec();
+            await this.settleCandidateRun(
+              claimedContext,
+              startingSpendUsd,
+              startingCredits,
+            );
+          } catch (error) {
+            throw new AiBudgetSettlementPendingException(error);
+          }
+          settled = true;
+        }
       } finally {
-        await this.accountModel
-          .updateOne(
-            { _id: claimed._id, activeRunId: runId },
-            { $unset: { activeRunId: 1, runLockUntil: 1 } },
-          )
-          .exec();
+        clearInterval(heartbeat);
+        if (!ran || settled)
+          await this.accountModel
+            .updateOne(
+              { _id: claimed._id, activeRunId: runId },
+              {
+                $unset: {
+                  activeRunId: 1,
+                  runLockUntil: 1,
+                  settlementPending: 1,
+                  runSpendBeforeUsd: 1,
+                  runCreditsBefore: 1,
+                },
+              },
+            )
+            .exec();
       }
     }
   }
 
-  private async prepareCandidate(
+  private async prepareOwner(
+    ownerType: AiBudgetOwnerType,
     userId: string,
     tier: string,
   ): Promise<CandidateAccountContext> {
     try {
       const tierPolicy = this.policy.tier(tier);
-      const maxBudgetUsd = tierPolicy.maxBudgetCredits / 100;
+      let limitCredits = tierPolicy.maxBudgetCredits;
+      if (ownerType === 'employer') {
+        const sub = await this.employerBilling.getOrCreateSubscription(userId);
+        const plan = getEmployerPlan(sub.plan);
+        if (!plan)
+          throw new AiBudgetConfigurationError(
+            'Employer AI plan is not configured',
+          );
+        limitCredits = plan.limits.aiBudgetCreditsLimit;
+      }
+      const maxBudgetUsd = limitCredits / 100;
       const offered = await this.aliases.listForTier(tier);
       const models = offered.map((model) => model.alias);
       if (!models.length) {
@@ -173,33 +293,69 @@ export class AiBudgetService {
       }
 
       let account = await this.accountModel
-        .findOne({ ownerType: 'candidate', ownerId: userId })
+        .findOne({ ownerType, ownerId: userId })
         .select('+encryptedKey')
         .exec();
       if (!account) {
-        const keyAlias = `candidate:${userId}`;
+        const keyAlias = `${ownerType}:${userId}`;
         const generated = await this.client.generate({
-          ownerType: 'candidate',
+          ownerType,
           ownerId: userId,
-          pool: 'candidate-ai',
+          pool: `${ownerType}-ai`,
           keyAlias,
           models,
           maxBudgetUsd,
         });
-        account = await this.accountModel.create({
-          ownerType: 'candidate',
-          ownerId: userId,
-          keyId: generated.keyId,
-          keyAlias,
-          encryptedKey: this.codec.encrypt(generated.key),
-          appliedTier: tier,
-          appliedLimitUsd: maxBudgetUsd,
-          budgetDuration: tierPolicy.budgetDuration,
-        });
+        try {
+          account = await this.accountModel.create({
+            ownerType,
+            ownerId: userId,
+            keyId: generated.keyId,
+            keyAlias,
+            encryptedKey: this.codec.encrypt(generated.key),
+            appliedTier: tier,
+            appliedLimitUsd: maxBudgetUsd,
+            budgetDuration: tierPolicy.budgetDuration,
+          });
+        } catch (error) {
+          await this.client.revoke(generated.key);
+          if ((error as any)?.code !== 11000) throw error;
+          const winner = await this.accountModel
+            .findOne({ ownerType, ownerId: userId })
+            .select('+encryptedKey')
+            .exec();
+          if (!winner) throw error;
+          return {
+            account: winner,
+            apiKey: this.codec.decrypt(winner.encryptedKey),
+            tier,
+          };
+        }
         return { account, apiKey: generated.key, tier };
       }
 
       const apiKey = this.codec.decrypt(account.encryptedKey);
+      if (account.settlementPending) {
+        await this.settleCandidateRun(
+          { account, apiKey, tier },
+          account.runSpendBeforeUsd || 0,
+          account.runCreditsBefore || 0,
+        );
+        await this.accountModel
+          .updateOne(
+            { _id: account._id, activeRunId: account.activeRunId },
+            {
+              $unset: {
+                activeRunId: 1,
+                runLockUntil: 1,
+                settlementPending: 1,
+                runSpendBeforeUsd: 1,
+                runCreditsBefore: 1,
+              },
+            },
+          )
+          .exec();
+      }
       const changed =
         account.appliedTier !== tier ||
         account.appliedLimitUsd !== maxBudgetUsd ||
@@ -239,21 +395,23 @@ export class AiBudgetService {
       const info = await this.client.info(context.apiKey);
       const refreshedAt = new Date();
       const resetAt = info.resetAt || this.nextUtcMonth(refreshedAt);
-      const samePeriod = context.account.creditsResetAt?.getTime() === resetAt.getTime();
-      const creditsUsed = Math.max(
-        samePeriod ? context.account.creditsUsed || 0 : 0,
-        this.roundCredits(info.spendUsd),
+      const usage = await this.client.usage(
+        context.apiKey,
+        this.previousUtcMonth(resetAt),
+        resetAt,
       );
-      await this.accountModel
-        .updateOne(
-          { _id: context.account._id },
-          { $set: { lastSyncedAt: refreshedAt, creditsUsed, creditsResetAt: resetAt } },
-        )
-        .exec();
+      if (usage.spendUsd + 1e-8 < info.spendUsd)
+        throw new AiBudgetUnavailableException();
+      const creditsUsed = usage.credits;
       context.account.lastSyncedAt = refreshedAt;
       context.account.creditsUsed = creditsUsed;
       context.account.creditsResetAt = resetAt;
-      const snapshot = this.snapshot(context.tier, info, refreshedAt, creditsUsed);
+      const snapshot = this.snapshot(
+        context.tier,
+        info,
+        refreshedAt,
+        creditsUsed,
+      );
       if (blockExhausted && snapshot.status === 'exhausted') {
         throw new AiBudgetExhaustedException(snapshot);
       }
@@ -275,18 +433,26 @@ export class AiBudgetService {
     }
   }
 
-  private async settleCandidateRun(context: CandidateAccountContext, beforeUsd: number, beforeCredits: number): Promise<void> {
-    const info = await this.client.info(context.apiKey);
-    const resetAt = info.resetAt || this.nextUtcMonth(new Date());
-    const samePeriod = context.account.creditsResetAt?.getTime() === resetAt.getTime();
-    const costUsd = Math.max(0, info.spendUsd - beforeUsd);
-    const creditsUsed = Math.max(
-      this.roundCredits(info.spendUsd),
-      (samePeriod ? beforeCredits : 0) + this.roundCredits(costUsd),
-    );
-    await this.accountModel.updateOne({ _id: context.account._id }, {
-      $set: { creditsUsed, creditsResetAt: resetAt, lastSyncedAt: new Date() },
-    }).exec();
+  private async settleCandidateRun(
+    context: CandidateAccountContext,
+    beforeUsd: number,
+    beforeCredits: number,
+  ): Promise<void> {
+    const access = await this.refreshAccess(context, false);
+    const resetAt = new Date(access.snapshot.resetAt);
+    const creditsUsed = access.snapshot.spent;
+    await this.accountModel
+      .updateOne(
+        { _id: context.account._id, activeRunId: context.account.activeRunId },
+        {
+          $set: {
+            creditsUsed,
+            creditsResetAt: resetAt,
+            lastSyncedAt: new Date(),
+          },
+        },
+      )
+      .exec();
     context.account.creditsUsed = creditsUsed;
     context.account.creditsResetAt = resetAt;
   }
@@ -295,13 +461,20 @@ export class AiBudgetService {
     return Math.ceil(Math.max(0, usd) * 100 - 1e-9);
   }
 
+  private async waitForUsage(): Promise<void> {
+    // The deployed LiteLLM configuration flushes every 10 seconds with up to
+    // 5 seconds of jitter. Keep the owner lease until the final batch can land.
+    // Later reads still recompute by operation, so delayed logs never migrate
+    // into a subsequent operation's rounded charge.
+    await new Promise((resolve) => setTimeout(resolve, 16_000));
+  }
+
   private snapshot(
     tier: string,
     info: LiteLlmKeyInfo,
     refreshedAt: Date,
     usedCredits: number,
   ): AiBudgetSnapshot {
-    const rawRemaining = info.limitUsd - info.spendUsd;
     const limitCredits = Math.round(info.limitUsd * 100);
     const spentCredits = usedCredits;
     const remainingCredits = Math.max(0, limitCredits - spentCredits);
@@ -309,7 +482,7 @@ export class AiBudgetService {
     const status =
       remainingCredits <= 0
         ? 'exhausted'
-        : rawRemaining / info.limitUsd <= this.policy.lowRemainingRatio()
+        : remainingCredits / limitCredits <= this.policy.lowRemainingRatio()
           ? 'low'
           : 'healthy';
     return {
@@ -326,7 +499,10 @@ export class AiBudgetService {
     };
   }
 
-  private unavailableSnapshot(tier: string): AiBudgetSnapshot {
+  private unavailableSnapshot(
+    tier: string,
+    ownerType: AiBudgetOwnerType,
+  ): AiBudgetSnapshot {
     const now = new Date();
     const periodEnd = this.nextUtcMonth(now);
     let limit = 0;
@@ -336,6 +512,10 @@ export class AiBudgetService {
       tier = 'FREE';
       limit = this.policy.tier(tier).maxBudgetCredits;
     }
+    if (ownerType === 'employer')
+      limit =
+        EMPLOYER_PLANS.find((plan) => plan.modelTier === tier)?.limits
+          .aiBudgetCreditsLimit || 0;
     return {
       unit: 'credits',
       tier,
@@ -351,13 +531,14 @@ export class AiBudgetService {
   }
 
   private tags(
+    ownerType: AiBudgetOwnerType,
     userId: string,
     service: AiBudgetServiceId,
     attribution: AiBudgetAttribution,
     runId: string,
   ): readonly string[] {
     return [
-      'ownerType=candidate',
+      `ownerType=${ownerType}`,
       `ownerId=${userId}`,
       `usageContext=${service}`,
       `harness=${attribution.harness}`,
