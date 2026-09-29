@@ -125,6 +125,7 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
         },
         async (access, tags) => {
           const boot = adapter.bootstrap({
+            purpose: 'resume-review',
             sessionId,
             workdir: SANDBOX_WORKDIR,
             proxy: this.candidateProxy(access.apiKey),
@@ -277,7 +278,8 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
       'Do not calculate new ratios, percentages, or metrics in messages or fixes. Cite the original measurements only. JOB.txt is the authority for requirements: never describe an inferred ATS keyword as a job requirement unless JOB.txt actually states it.',
       'A closed employment date range is not current employment. Do not call a role current unless the source explicitly says Present or Current.',
       'Use sections personal, summary, experience, skills, education, projects, achievements, certifications, or languages.',
-      'Produce 8-20 useful annotations when enough résumé material exists. Cover different bullets and sections.',
+      `Produce ${this.desiredAnnotationCount(input.resumeText)}-${Math.max(10, this.desiredAnnotationCount(input.resumeText))} useful annotations. Cover different bullets and sections; do not repeat the same issue.`,
+      'Keep each explanation under 80 words, each annotation message under 35 words, and each fix under 45 words. Quote only the shortest consecutive source passage that identifies the issue. Return compact JSON without a reasoning narrative. Read the required context together where practical; do not repeatedly read unchanged files.',
       'AI-written-content detection is outside this session. Do not score it or create AI-detection comments.',
     ].join('\n');
     const files: HarnessContextFile[] = [

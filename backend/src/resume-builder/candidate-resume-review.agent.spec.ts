@@ -80,6 +80,7 @@ describe('LiteLlmCandidateResumeReviewAgent session runtime', () => {
     expect(matcher.analyze).toHaveBeenCalledWith(expect.objectContaining({
       sandboxId: 'candidate-ats-box-1', alias: 'bedrock/nova-2-lite/low',
     }));
+    expect(adapter.bootstrap).toHaveBeenCalledWith(expect.objectContaining({ purpose: 'resume-review' }));
     expect(adapter.turnCommand).toHaveBeenCalled();
     expect(result).toEqual(expect.objectContaining({
       source: 'agent-session', sessionId: 'compare-session-1', harness: 'opencode',

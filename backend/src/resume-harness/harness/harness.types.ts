@@ -75,6 +75,8 @@ export interface HarnessProxyAuth {
 }
 
 export interface HarnessBootstrapInput {
+  /** Read-only comparison can omit the general coding-agent instructions. */
+  purpose?: 'resume-review';
   sessionId: string;
   /** Absolute path of the workspace inside the sandbox. */
   workdir: string;

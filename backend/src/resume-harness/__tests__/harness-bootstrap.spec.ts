@@ -167,6 +167,17 @@ describe('harness bootstrap', () => {
     ].join('\n'))?.error).toBeUndefined();
   });
 
+  it('uses a compact read-only tool profile for comparison without changing generation', () => {
+    const adapter = registry.get('claude-code');
+    const boot = adapter.bootstrap({ ...bootstrapInput(), purpose: 'resume-review' } as any);
+    expect(boot.command).toEqual(expect.arrayContaining(['--system-prompt', '--tools', 'Read,Bash']));
+    expect(adapter.turnCommand(boot, 'Review this resume').slice(-4)).toEqual([
+      '--tools', 'Read,Bash', '--', 'Review this resume',
+    ]);
+    expect(Number(boot.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS)).toBeLessThanOrEqual(6000);
+    expect(adapter.bootstrap(bootstrapInput()).command).not.toContain('--system-prompt');
+  });
+
   it('uses structured Claude output and normalizes live text and tool lifecycle', () => {
     const adapter = registry.get('claude-code');
     const boot = adapter.bootstrap(bootstrapInput());
