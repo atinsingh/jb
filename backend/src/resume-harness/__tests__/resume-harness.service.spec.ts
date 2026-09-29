@@ -716,6 +716,24 @@ describe('ResumeHarnessService', () => {
     expect(sandbox.provision).toHaveBeenCalledTimes(1);
   });
 
+  it('tells a first generation turn to use the saved session context before asking for it again', async () => {
+    const session = await start('claude-code', {
+      targetRole: 'Cloud Engineer',
+      jobUrl: 'https://jobs.example.com/cloud-engineer',
+    });
+    sandbox.readFile.mockResolvedValueOnce(resumeDoc('first draft'));
+
+    await service.runTurn('u1', session.id, {
+      instruction: 'Generate the resume using the added job description URL.',
+    });
+
+    const command = JSON.stringify(sandbox.exec.mock.calls[0][1]);
+    expect(command).toMatch(/read AGENTS\.md, CANDIDATE\.md, and TEMPLATE\.tex/i);
+    expect(command).toContain('already contains the saved target role and job description');
+    expect(command).toContain('Do not ask the candidate to resend');
+    expect(command).toContain('resume.tex is expected to be absent');
+  });
+
   it('updates the same artifact in place rather than regenerating from zero', async () => {
     const session = await start();
 

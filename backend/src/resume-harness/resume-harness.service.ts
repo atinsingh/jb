@@ -1539,6 +1539,13 @@ export class ResumeHarnessService {
             'convert job-description requirements into candidate facts.',
           ].join('\n')
         : '';
+    const savedJobContextInstruction = session.jobDescription
+      ? [
+          'CANDIDATE.md already contains the saved target role and job description',
+          'for this session. Use that saved context when the candidate refers to',
+          'the added job or URL. Do not ask the candidate to resend it.',
+        ].join('\n')
+      : '';
     return [
       'First decide whether the instruction requests a résumé document change.',
       `Answer a question or general chat request directly without editing ${TEX_PATH} or running the build.`,
@@ -1546,7 +1553,10 @@ export class ResumeHarnessService {
       '',
       mode === 'create'
         ? [
-            `Only when asked to create a résumé, create ${TEX_PATH} from the skeleton in TEMPLATE.tex.`,
+            'When the instruction requests a résumé, read AGENTS.md, CANDIDATE.md, and TEMPLATE.tex before responding.',
+            savedJobContextInstruction,
+            `${TEX_PATH} is expected to be absent on a first generation turn. Its absence is not a reason to ask for more input.`,
+            `Create ${TEX_PATH} from the skeleton in TEMPLATE.tex, tailor it using the saved context in CANDIDATE.md, and finish the requested work in this turn.`,
             // Naming the look here rather than trusting the harness to act on a
             // section it merely read: verified against Nova Lite, which copied
             // the skeleton's own default accent and ignored the selected one on
