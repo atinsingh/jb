@@ -1,3 +1,5 @@
+import { Optional } from '@nestjs/common';
+import { AiOperationService } from '../ai-budget/ai-operation.service';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { createHash, randomUUID } from 'crypto';
@@ -20,6 +22,7 @@ export class AtsSessionService {
     @InjectModel(ResumeHarnessSession.name) private readonly resumeModel: Model<ResumeHarnessSessionDocument>,
     private readonly adapter: ResumeMatcherAdapter,
     private readonly budget: AiBudgetService,
+    @Optional() private readonly operations?: AiOperationService,
   ) {}
 
   async start(userId: string, input: StartAtsSessionInput) {
@@ -54,6 +57,10 @@ export class AtsSessionService {
     if (resume.revision !== row.sourceRevision) {
       row.sourceRevision = resume.revision;
     }
+    this.operations?.onCancelled(String(resume._id), () => this.resumeModel.updateOne(
+      { _id: resume._id, userId },
+      { $set: { status: 'ended', endedAt: new Date() }, $unset: { sandboxId: 1 } },
+    ).exec());
     row.status = 'running';
     row.unavailableReason = undefined;
     await row.save();

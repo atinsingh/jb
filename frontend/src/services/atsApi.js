@@ -33,8 +33,8 @@ export const startAtsSession = (payload) =>
     body: JSON.stringify(payload),
   });
 
-export const runAtsSession = (id) =>
-  apiCall(`/api/ats/sessions/${id}/run`, { method: 'POST' });
+export const runAtsSession = (id, headers = {}) =>
+  apiCall(`/api/ats/sessions/${id}/run`, { method: 'POST', headers });
 
 export const checkAts = (resumeId) =>
   apiCall(`/api/resume-builder/${resumeId}/ats-check`, { method: 'POST' });

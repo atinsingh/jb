@@ -1,4 +1,5 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { AiOperationService } from '../../ai-budget/ai-operation.service';
 import {
   ExecResult,
   ReapedSandbox,
@@ -41,6 +42,7 @@ export class SandboxService {
 
   constructor(
     @Inject(SANDBOX_DRIVER) private readonly client: SandboxDriver,
+    @Optional() private readonly operations?: AiOperationService,
   ) {}
 
   /**
@@ -67,6 +69,7 @@ export class SandboxService {
   }
 
   async provision(input: ProvisionInput): Promise<{ sandboxId: string }> {
+    this.operations?.checkpoint();
     // Both candidate and employer sandboxes use idle cleanup. Docker's sleep
     // is only a safety backstop if the backend cannot run its reaper.
     const ttlSeconds = this.ttlSeconds;
@@ -88,8 +91,14 @@ export class SandboxService {
       },
     });
 
-    if (input.files.length) {
-      await this.client.putFiles(sandboxId, input.files);
+    try {
+      await this.operations?.resource(sandboxId, () => this.destroy(sandboxId));
+      this.operations?.checkpoint();
+      if (input.files.length) await this.client.putFiles(sandboxId, input.files);
+      this.operations?.checkpoint();
+    } catch (error) {
+      await this.destroy(sandboxId);
+      throw error;
     }
 
     this.logger.log(
@@ -98,16 +107,24 @@ export class SandboxService {
     return { sandboxId };
   }
 
+  private async cancellable<T>(sandboxId: string, work: () => Promise<T>): Promise<T> {
+    await this.operations?.resource(sandboxId, () => this.destroy(sandboxId));
+    this.operations?.checkpoint();
+    const result = await work();
+    this.operations?.checkpoint();
+    return result;
+  }
+
   writeFiles(sandboxId: string, files: HarnessContextFile[]): Promise<void> {
-    return this.client.putFiles(sandboxId, files);
+    return this.cancellable(sandboxId, () => this.client.putFiles(sandboxId, files));
   }
 
   readFile(sandboxId: string, path: string): Promise<string | null> {
-    return this.client.readFile(sandboxId, path);
+    return this.cancellable(sandboxId, () => this.client.readFile(sandboxId, path));
   }
 
   readFileBase64(sandboxId: string, path: string): Promise<string | null> {
-    return this.client.readFileBase64(sandboxId, path);
+    return this.cancellable(sandboxId, () => this.client.readFileBase64(sandboxId, path));
   }
 
   exec(
@@ -115,10 +132,10 @@ export class SandboxService {
     command: string[],
     opts: Omit<SandboxExecOptions, 'cwd'> = {},
   ): Promise<ExecResult> {
-    return this.client.exec(sandboxId, command, {
+    return this.cancellable(sandboxId, () => this.client.exec(sandboxId, command, {
       ...opts,
       cwd: SANDBOX_WORKDIR,
-    });
+    }));
   }
 
   /**
@@ -132,10 +149,10 @@ export class SandboxService {
     opts: Omit<SandboxExecOptions, 'cwd'> = {},
   ): Promise<ExecResult> {
     if (this.client.execStream) {
-      return this.client.execStream(sandboxId, command, onChunk, {
+      return this.cancellable(sandboxId, () => this.client.execStream!(sandboxId, command, onChunk, {
         ...opts,
         cwd: SANDBOX_WORKDIR,
-      });
+      }));
     }
     const res = await this.exec(sandboxId, command, opts);
     if (res.stdout) onChunk(res.stdout);

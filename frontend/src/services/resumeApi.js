@@ -59,8 +59,9 @@ export const regenerateSection = async (id, payload) =>
   });
 
 // POST /api/resume-builder/:id/compare -> ATS, AI-content signals and annotations
-export const compareResume = async (id, payload = {}) =>
+export const compareResume = async (id, payload = {}, headers = {}) =>
   apiCall(`/api/resume-builder/${id}/compare`, {
+    headers,
     method: 'POST',
     body: JSON.stringify(payload),
   });

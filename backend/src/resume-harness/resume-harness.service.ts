@@ -8,6 +8,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { AiOperationService } from '../ai-budget/ai-operation.service';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import {
@@ -173,6 +174,7 @@ export class ResumeHarnessService {
     private readonly aiBudgetPolicy: AiBudgetPolicyService,
     @Optional()
     private readonly jobDescriptions?: JobDescriptionResolverService,
+    @Optional() private readonly operations?: AiOperationService,
   ) {}
 
   /** Candidate-facing model choices. Runtime and provider stay server-side. */
@@ -1081,7 +1083,14 @@ export class ResumeHarnessService {
     // Mongo ObjectId strings are case-insensitive; equivalent URLs must share
     // the same queue.
     const key = `${userId.toLowerCase()}:${sessionId.toLowerCase()}`;
-    return this.withLock(this.mutationTails, key, operation);
+    return this.withLock(this.mutationTails, key, async () => {
+      this.operations?.checkpoint();
+      this.operations?.onCancelled(key, () => this.sessionModel.updateOne(
+        { _id: sessionId, userId },
+        { $set: { status: 'ended', endedAt: new Date() }, $unset: { sandboxId: 1 } },
+      ).exec());
+      return operation();
+    });
   }
 
   private async withLock<T>(

@@ -1,3 +1,4 @@
+import { AiOperationModule } from './ai-budget/ai-operation.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -72,6 +73,7 @@ function getEnvFilePath(): string[] {
 
 @Module({
   imports: [
+    AiOperationModule,
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: getEnvFilePath(),

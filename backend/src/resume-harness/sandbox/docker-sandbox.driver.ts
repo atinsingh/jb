@@ -246,10 +246,10 @@ export class DockerSandboxDriver implements SandboxDriver {
   }
 
   async destroy(id: string): Promise<void> {
-    // Best effort: a container already gone is the desired end state.
+    // A missing container is already stopped; a daemon failure is not.
     const res = await this.run(['rm', '-f', id]);
-    if (res.code !== 0) {
-      this.logger.warn(`Sandbox ${id} teardown: ${res.stderr.trim()}`);
+    if (res.code !== 0 && !/no such container/i.test(res.stderr)) {
+      throw new Error(`Could not stop sandbox ${id}`);
     }
   }
 

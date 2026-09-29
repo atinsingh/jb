@@ -1,3 +1,4 @@
+import { AiOperationInterceptor } from '../ai-budget/ai-operation.module';
 import { BadRequestException, Body, Controller, Get, Param, Post, Request, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -11,6 +12,7 @@ import { ResumeComparisonService } from './resume-comparison.service';
 @ApiBearerAuth()
 @Controller('resume-builder')
 @UseGuards(JwtAuthGuard)
+@UseInterceptors(AiOperationInterceptor)
 export class ResumeComparisonController {
   constructor(private readonly comparison: ResumeComparisonService) {}
 

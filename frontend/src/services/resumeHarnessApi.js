@@ -68,8 +68,9 @@ export const getResumeTemplates = () =>
  *
  * `carryFromSessionId` copies the résumé into a new server-routed session.
  */
-export const startHarnessSession = (payload) =>
+export const startHarnessSession = (payload, headers = {}) =>
   apiCall("/api/resume-harness/sessions", {
+    headers,
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -119,12 +120,13 @@ export const runHarnessTurn = (id, payload) =>
  * Uses fetch + a stream reader rather than EventSource, because EventSource
  * cannot POST a body or set an Authorization header.
  */
-const streamPost = async (path, payload, onEvent) => {
+const streamPost = async (path, payload, onEvent, headers = {}) => {
   const token = await getAccessToken();
   const res = await fetch(`${API_URL}${path}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...headers,
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify(payload),
@@ -172,11 +174,12 @@ const streamPost = async (path, payload, onEvent) => {
   if (buffer.trim()) dispatch(buffer);
 };
 
-export const streamHarnessTurn = (id, payload, onEvent) =>
+export const streamHarnessTurn = (id, payload, onEvent, headers) =>
   streamPost(
     `/api/resume-harness/sessions/${id}/turns/stream`,
     payload,
     onEvent,
+    headers,
   );
 
 /**
@@ -187,19 +190,21 @@ export const streamHarnessTurn = (id, payload, onEvent) =>
  * it streams like any other turn — the harness is doing the same amount of work
  * and the screen should show it.
  */
-export const streamTemplateChange = (id, payload, onEvent) =>
+export const streamTemplateChange = (id, payload, onEvent, headers) =>
   streamPost(
     `/api/resume-harness/sessions/${id}/template/stream`,
     payload,
     onEvent,
+    headers,
   );
 
 /** POST /api/resume-harness/sessions/:id/vibe/stream — { vibe } */
-export const streamVibeChange = (id, payload, onEvent) =>
+export const streamVibeChange = (id, payload, onEvent, headers) =>
   streamPost(
     `/api/resume-harness/sessions/${id}/vibe/stream`,
     payload,
     onEvent,
+    headers,
   );
 
 /**

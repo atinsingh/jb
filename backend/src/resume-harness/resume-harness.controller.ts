@@ -1,3 +1,5 @@
+import { UseInterceptors } from '@nestjs/common';
+import { AiOperationInterceptor } from '../ai-budget/ai-operation.module';
 import {
   Body,
   Controller,
@@ -40,6 +42,7 @@ import {
 @ApiBearerAuth()
 @Controller('resume-harness')
 @UseGuards(JwtAuthGuard)
+@UseInterceptors(AiOperationInterceptor)
 export class ResumeHarnessController {
   constructor(private readonly service: ResumeHarnessService) {}
 

@@ -225,6 +225,11 @@ describe('DockerSandboxDriver', () => {
     await expect(driver().destroy('ghost')).resolves.toBeUndefined();
   });
 
+  it('does not acknowledge cancellation when Docker cannot stop the container', async () => {
+    nextResult = { code: 1, stdout: '', stderr: 'Cannot connect to the Docker daemon' };
+    await expect(driver().destroy('running')).rejects.toThrow('Could not stop sandbox');
+  });
+
   it('reaps only expired resume-harness containers selected by both ownership labels', async () => {
     run.mockImplementation(async (argv: string[]) => {
       calls.push({ argv });

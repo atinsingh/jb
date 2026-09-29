@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useAiOperation } from "@/hooks/useAiOperation";
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
@@ -384,7 +385,8 @@ export default function AppResume() {
    * as a 403 after committing to a session.
    */
   const blocked = profile?.ready !== true;
-  const busy = phase === "provisioning" || phase === "working";
+  const operation = useAiOperation();
+  const busy = operation.active || operation.cancelling || phase === "provisioning" || phase === "working";
   const platformDown = options && options.sandboxAvailable === false;
   const sessionOver = session && session.status !== "active";
   const budgetBlocked =
@@ -395,7 +397,7 @@ export default function AppResume() {
     setError(null);
     setPhase("provisioning");
     try {
-      const next = await startHarnessSession({
+      const next = await operation.run(headers => startHarnessSession({
         model: selectedModel,
         effort,
         ...(targetRole.trim() ? { targetRole: targetRole.trim() } : {}),
@@ -408,7 +410,7 @@ export default function AppResume() {
         // session's look, and any visible setup change must be honoured.
         ...(templateKey ? { templateKey } : {}),
         ...(Object.keys(vibe).length ? { vibe } : {}),
-      });
+      }, headers));
       sessionRef.current = next;
       setSession(next);
       setCarryFromSessionId("");
@@ -493,7 +495,7 @@ export default function AppResume() {
     };
 
     try {
-      await streamHarnessTurn(session.id, { instruction: text }, (event) => {
+      await operation.run(headers => streamHarnessTurn(session.id, { instruction: text }, (event) => {
         if (event.type === "phase") setLivePhase(event.phase);
         else if (event.type === "token") {
           setLiveText((current) => (current + event.text).slice(-12000));
@@ -517,7 +519,7 @@ export default function AppResume() {
           streamedError = err;
           setError(err);
         }
-      });
+      }, headers));
       if (!receivedResult && !(await recoverSavedTurn())) {
         throw streamedError || new Error(
           "The response ended before the saved turn was available. Reload to check this session.",
@@ -618,16 +620,17 @@ export default function AppResume() {
 
     try {
       if (changingTemplate) {
-        await streamTemplateChange(
+        await operation.run(headers => streamTemplateChange(
           session.id,
           {
             templateKey: next.templateKey,
             ...(next.vibe ? { vibe: next.vibe } : {}),
           },
           handle,
-        );
+          headers,
+        ));
       } else {
-        await streamVibeChange(session.id, { vibe: next.vibe }, handle);
+        await operation.run(headers => streamVibeChange(session.id, { vibe: next.vibe }, handle, headers));
       }
     } catch (e) {
       if (e?.budget) setBudget(e.budget);
@@ -684,7 +687,7 @@ export default function AppResume() {
   };
 
   const runAts = async () => {
-    if (!session?.revision || sessionOver || atsBusy) return;
+    if (!session?.revision || sessionOver || atsBusy || busy) return;
     const description = (session.jobDescription || jobDescription).trim();
     if (!description) return;
     setAtsBusy(true);
@@ -698,7 +701,7 @@ export default function AppResume() {
           jobDescription: description,
         }));
       setAts(logicalSession);
-      const analysis = await runAtsSession(logicalSession.id);
+      const analysis = await operation.run(headers => runAtsSession(logicalSession.id, headers));
       setAts(analysis);
       if (analysis.status === "failed") {
         setAtsWarning(
@@ -874,6 +877,14 @@ export default function AppResume() {
             }
           />
         </div>
+        {operation.cancelError && <div role="alert">{operation.cancelError}</div>}
+        {operation.active && <button type="button" disabled={operation.cancelling} onClick={async () => {
+          const stopped = await operation.cancel();
+          if (stopped && sessionRef.current?.id) {
+            try { acceptSession(await getHarnessSession(sessionRef.current.id)); } catch (e) { setError(e); }
+          }
+          void loadBudget();
+        }} style={primaryBtn}>{operation.cancelling ? "Stopping and reconciling usage…" : "Cancel AI operation"}</button>}
         {!session && (
           <EntryPaths active={compareMode ? "compare" : generateMode ? "ai" : null} onCompare={() => router.push({ pathname: "/app/resume", query: { mode: "compare", ...(importedResumeId ? { id: importedResumeId } : {}) } }, undefined, { scroll: false })} onGenerate={() => router.push("/app/resume?mode=generate", undefined, { scroll: false })} />
         )}

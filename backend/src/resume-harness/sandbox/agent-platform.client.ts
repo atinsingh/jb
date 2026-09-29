@@ -161,17 +161,10 @@ export class AgentPlatformClient {
   }
 
   async destroy(sandboxId: string): Promise<void> {
-    // Teardown is best-effort: the TTL reaps anything a failed delete leaves
-    // behind, and a 404 means someone already got there.
-    try {
-      await this.request('DELETE', `/v1/sandboxes/${sandboxId}`, undefined, {
-        allowNotFound: true,
-      });
-    } catch (err: any) {
-      this.logger.warn(
-        `Sandbox ${sandboxId} teardown failed (TTL will reap it): ${err?.message}`,
-      );
-    }
+    // A 404 is already stopped; other failures must not acknowledge Cancel.
+    await this.request('DELETE', `/v1/sandboxes/${sandboxId}`, undefined, {
+      allowNotFound: true,
+    });
   }
 
   async sweepExpired(): Promise<ReapedSandbox[]> {

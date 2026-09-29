@@ -1,3 +1,5 @@
+import { UseInterceptors } from '@nestjs/common';
+import { AiOperationInterceptor } from '../ai-budget/ai-operation.module';
 import { Body, Controller, Delete, Get, Param, Post, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -24,6 +26,7 @@ export class AtsSessionController {
   }
 
   @Post('sessions/:id/run')
+  @UseInterceptors(AiOperationInterceptor)
   @ApiOperation({ summary: 'Run or refresh ATS analysis in the shared user sandbox' })
   run(@Request() req, @Param('id') id: string) {
     return this.service.run(this.userId(req), id);

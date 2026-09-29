@@ -1658,6 +1658,7 @@ test.describe("LaTeX résumé — agent harness", () => {
     await page.route("**/api/resume-harness/options", (route: Route) =>
       route.fulfill({ json: { ...OPTIONS, sandboxAvailable: false } }),
     );
+    await expect(page).toHaveURL(/mode=generate/);
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.getByTestId("platform-unavailable")).toBeVisible({
       timeout: 20_000,
@@ -2177,4 +2178,62 @@ test.describe("résumé — templates and vibe", () => {
     await expect(page.getByTestId("template-picker")).toHaveCount(0);
     await expect(page.getByTestId("start-session")).toBeEnabled();
   });
+});
+
+test('cancels a running comparison and permits another comparison', async ({ page, guards }) => {
+  await stubHarnessApi(page);
+  guards.allowFailures(/\/compare$/);
+  guards.allowConsoleErrors();
+  let release!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  let operationId = '';
+  let calls = 0;
+  await page.route('**/api/resume-builder/cancel-compare', r => r.fulfill({ json: {
+    id: 'cancel-compare', fullName: 'Jordan Reyes', creationMethod: 'imported',
+    source: { fileExtension: '.pdf', jobDescription: 'Backend engineer' },
+  } }));
+  await page.route('**/api/resume-builder/cancel-compare/compare/source', r => r.fulfill({ body: Buffer.from(PDF, 'base64'), contentType: 'application/pdf' }));
+  await page.route('**/api/resume-builder/cancel-compare/compare', async r => {
+    operationId = r.request().headers()['x-ai-operation-id'];
+    calls++;
+    if (calls === 1) await held;
+    await r.fulfill({ status: 409, json: { code: 'AI_OPERATION_CANCELLED', message: 'Operation cancelled.' } });
+  });
+  await page.route('**/api/ai-operations/*/cancel', async r => {
+    expect(operationId).toBeTruthy();
+    expect(r.request().url()).toContain(operationId);
+    release();
+    await r.fulfill({ json: { status: 'cancelled' } });
+  });
+  await page.goto('/app/resume?mode=compare&id=cancel-compare');
+  await page.getByRole('button', { name: 'Cancel comparison', exact: true }).click();
+  await expect(page.getByTestId('comparison-pending')).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Refresh comparison' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Refresh comparison' }).click();
+  await expect.poll(() => calls).toBe(2);
+});
+
+test('cancels a running agent turn and keeps the saved session available', async ({ page }) => {
+  await stubHarnessApi(page);
+  let release!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  let operationId = '';
+  await page.route(`**/api/resume-harness/sessions/${SESSION.id}/turns/stream`, async r => {
+    operationId = r.request().headers()['x-ai-operation-id'];
+    await held;
+    await r.fulfill({ contentType: 'text/event-stream', body: 'data: {"type":"error","code":"AI_OPERATION_CANCELLED","message":"Operation cancelled."}\n\n' });
+  });
+  await page.route('**/api/ai-operations/*/cancel', async r => {
+    expect(operationId).toBeTruthy();
+    expect(r.request().url()).toContain(operationId);
+    release();
+    await r.fulfill({ json: { status: 'cancelled' } });
+  });
+  await page.goto('/app/resume?mode=generate');
+  await page.getByTestId('start-session').click();
+  await page.getByTestId('instruction').fill('Build my résumé');
+  await page.getByTestId('send-instruction').click();
+  await page.getByRole('button', { name: 'Cancel AI operation', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Cancel AI operation', exact: true })).toBeHidden();
+  await expect(page.getByTestId('instruction')).toBeVisible();
 });

@@ -1,5 +1,6 @@
 'use client';
 
+import { useAiOperation } from '@/hooks/useAiOperation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   compareResume,
@@ -369,6 +370,8 @@ function validateDetails(resume) {
 }
 
 export default function CompareResumeWorkspace({ resumeId, onOpen }) {
+  const operation = useAiOperation();
+  const runOperation = operation.run;
   const [resume, setResume] = useState(null);
   const [assessment, setAssessment] = useState(null);
   const [jobDescription, setJobDescription] = useState('');
@@ -393,7 +396,7 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
         const updated = await updateResume(id, { source: { ...resume.source, ...context } });
         setResume(withoutDuplicatedExperienceText(updated));
       }
-      const result = await compareResume(id, { ...context, forceRefresh: true });
+      const result = await runOperation(headers => compareResume(id, { ...context, forceRefresh: true }, headers));
       if (Object.keys(result.details || {}).length) setResume((current) => withoutDuplicatedExperienceText({ ...current, ...result.details }));
       setAssessment(result);
     } catch (cause) {
@@ -421,7 +424,7 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
           setComparing(false);
           return null;
         }
-        return compareResume(resumeId, {});
+        return runOperation(headers => compareResume(resumeId, {}, headers));
       })
       .then((result) => {
         if (cancelled || !result) return;
@@ -436,7 +439,7 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
         }
       });
     return () => { cancelled = true; };
-  }, [resumeId]);
+  }, [resumeId, runOperation]);
 
   useEffect(() => {
     if (!resumeId) return;
@@ -552,11 +555,13 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
         </button>
       </div>
 
+      {operation.cancelError && <div role="alert">{operation.cancelError}</div>}
       {message && <div role="alert" style={{ marginBottom: 14, color: message.startsWith('Resume details saved.') ? 'var(--jb-v3-fg-2)' : 'var(--jb-v3-danger)' }}>{message}</div>}
       {comparing && (
         <div role="status" aria-live="polite" data-testid="comparison-pending" style={{ marginBottom: 14, padding: '13px 15px', border: '1px solid var(--jb-v3-accent-line)', background: 'var(--jb-v3-panel)' }}>
           <div style={{ fontSize: 13, fontWeight: 700 }}>Comparing your résumé with the job…</div>
           <div style={{ fontSize: 11.5, color: 'var(--jb-v3-fg-3)', marginTop: 4 }}>The agent is reviewing the original file. Scores, comments, and highlights will appear together when it finishes.</div>
+          {operation.active && <button type="button" onClick={operation.cancel} disabled={operation.cancelling} style={{ ...button, marginTop: 10 }}>{operation.cancelling ? 'Stopping and reconciling usage…' : 'Cancel comparison'}</button>}
           <div className="compare-loading-track" aria-hidden="true" />
         </div>
       )}
