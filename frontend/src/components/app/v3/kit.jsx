@@ -34,7 +34,7 @@ export function Screen({ width = 1360, pad = '34px 28px 80px', children }) {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--jb-v3-bg)', color: 'var(--jb-v3-fg)' }}>
       <AppTopNav />
-      <div style={{ maxWidth: width, margin: '0 auto', padding: pad }}>{children}</div>
+      <div className="candidate-screen-content" style={{ width: "100%", maxWidth: width, margin: '0 auto', padding: pad }}>{children}</div>
     </div>
   );
 }

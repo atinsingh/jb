@@ -554,3 +554,17 @@ html:not(.dark) {
 .theme-transition * {
   transition: none !important;
 }
+/* Candidate v1: content owns its height; menus escape card clipping. */
+html:has(.candidate-nav-row), body:has(.candidate-nav-row) { background: #0b0b0c; }
+html[data-jb-theme="light"]:has(.candidate-nav-row), html[data-jb-theme="light"] body:has(.candidate-nav-row) { background: #e8e4da; }
+.candidate-screen-content { min-width: 0; }
+.candidate-screen-content input, .candidate-screen-content select, .candidate-screen-content textarea { min-width: 0; max-width: 100%; }
+.resume-action-item[data-focus] { background: var(--jb-v3-line); outline: none; }
+.resume-action-item[data-disabled] { opacity: .45; cursor: default !important; }
+@media (max-width: 600px) {
+  .candidate-screen-content { padding: 24px 16px 40px !important; }
+  .candidate-setting-row { grid-template-columns: minmax(0, 1fr) !important; gap: 8px !important; }
+  .candidate-preference-row { grid-template-columns: minmax(0, 1fr) auto !important; gap: 6px 12px !important; }
+  .candidate-preference-row > span:first-child { grid-column: 1 / -1; }
+  .candidate-invoice-row { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+}

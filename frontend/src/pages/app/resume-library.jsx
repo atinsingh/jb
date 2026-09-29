@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Head from "next/head";
+import { Menu, MenuButton, MenuItems, MenuItem } from "@headlessui/react";
 import { useRouter } from "next/router";
 import { motion, AnimatePresence } from "framer-motion";
 import AppTopNav from "@/components/app/AppTopNav";
@@ -444,7 +445,7 @@ export default function ResumeLibrary() {
             style={{
               position: "relative",
 
-              padding: "18px 32px 16px",
+              padding: "18px clamp(16px, 3vw, 32px) 16px",
               background:
                 "color-mix(in srgb, var(--jb-v3-bg) 88%, transparent)",
               backdropFilter: "blur(10px)",
@@ -492,8 +493,7 @@ export default function ResumeLibrary() {
                     maxWidth: 560,
                   }}
                 >
-                  Create with the résumé agent or import a file. Conversations,
-                  revisions, and PDFs stay with the résumé they produced.
+                  Your imported résumés, AI drafts, and saved versions.
                 </p>
               </div>
               <div style={{ display: "flex", gap: 10 }}>
@@ -518,7 +518,7 @@ export default function ResumeLibrary() {
             </div>
           </header>
 
-          <div style={{ padding: "22px 32px 60px", flex: 1 }}>
+          <div style={{ padding: "22px clamp(16px, 3vw, 32px) 40px", flex: 1 }}>
             {actionError && <InlineError error={actionError} />}
             {error && (
               <div
@@ -562,7 +562,7 @@ export default function ResumeLibrary() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
+                gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))",
                 gap: 14,
                 marginBottom: 22,
               }}
@@ -622,7 +622,7 @@ export default function ResumeLibrary() {
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search name, role, company, filename…"
+                  placeholder="Search résumés…"
                   aria-label="Search resumes"
                   style={{
                     width: "100%",
@@ -637,7 +637,7 @@ export default function ResumeLibrary() {
                 />
               </div>
               <div
-                style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: 1 }}
+                style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: "1 1 310px" }}
               >
                 {FILTERS.map((f) => {
                   const on = filter === f.key;
@@ -707,7 +707,7 @@ export default function ResumeLibrary() {
                       fontSize: 13,
                       background:
                         view === v ? "var(--jb-v3-fg)" : "var(--jb-v3-panel)",
-                      color: view === v ? "#fff" : "var(--jb-v3-fg-3)",
+                      color: view === v ? "var(--jb-v3-bg)" : "var(--jb-v3-fg-3)",
                     }}
                   >
                     {v === "grid" ? "▦" : "☰"}
@@ -721,7 +721,7 @@ export default function ResumeLibrary() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill,minmax(268px,1fr))",
+                  gridTemplateColumns: "repeat(auto-fill,minmax(min(268px,100%),1fr))",
                   gap: 16,
                 }}
               >
@@ -765,7 +765,7 @@ export default function ResumeLibrary() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill,minmax(268px,1fr))",
+                  gridTemplateColumns: "repeat(auto-fill,minmax(min(268px,100%),1fr))",
                   gap: 16,
                 }}
               >
@@ -928,15 +928,6 @@ function Thumbnail({ r, h = 132 }) {
 }
 
 function ActionsMenu({ r, actions }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-  useEffect(() => {
-    const onDoc = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, []);
   const isArchived = r.status === "archived";
   const items =
     r.libraryKind === "agent"
@@ -964,79 +955,12 @@ function ActionsMenu({ r, actions }) {
           { label: "Delete", fn: actions.onDelete, danger: true },
         ];
   return (
-    <div ref={ref} style={{ position: "relative" }}>
-      <button
-        type="button"
-        aria-label="More actions"
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen((o) => !o);
-        }}
-        style={{
-          width: 30,
-          height: 30,
-          borderRadius: 2,
-          border: "1px solid var(--jb-v3-line)",
-          background: "var(--jb-v3-panel)",
-          cursor: "pointer",
-          color: "var(--jb-v3-fg-2)",
-          fontSize: 16,
-          lineHeight: 1,
-        }}
-      >
-        ⋯
-      </button>
-      {open && (
-        <div
-          style={{
-            position: "absolute",
-            right: 0,
-            top: 36,
-            zIndex: 30,
-            width: 190,
-            background: "var(--jb-v3-panel)",
-            border: "1px solid var(--jb-v3-line)",
-            borderRadius: 2,
-            boxShadow:
-              "0 20px 44px -20px color-mix(in srgb, var(--jb-v3-invert) 40%, transparent)",
-            padding: 6,
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {items.map((it, i) => (
-            <button
-              key={i}
-              type="button"
-              className="jb-menu-item"
-              disabled={!it.fn}
-              onClick={() => {
-                setOpen(false);
-                it.fn && it.fn();
-              }}
-              style={{
-                display: "block",
-                width: "100%",
-                textAlign: "left",
-                padding: "8px 10px",
-                borderRadius: 2,
-                border: "none",
-                background: "none",
-                cursor: it.fn ? "pointer" : "default",
-                fontFamily: "inherit",
-                fontSize: 13,
-                color: it.danger
-                  ? "var(--jb-v3-danger)"
-                  : !it.fn
-                    ? "var(--jb-v3-fg-3)"
-                    : "var(--jb-v3-invert)",
-              }}
-            >
-              {it.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <Menu as="div">
+      <MenuButton aria-label="More actions" style={{ width: 36, height: 36, border: '1px solid var(--jb-v3-line)', borderRadius: 4, background: 'var(--jb-v3-panel)', color: 'var(--jb-v3-fg)', cursor: 'pointer' }}>⋯</MenuButton>
+      <MenuItems anchor={{ to: 'bottom end', gap: 6, padding: 12 }} portal className="jbv3 resume-actions-menu" style={{ zIndex: 100, width: 200, maxWidth: 'calc(100vw - 24px)', overflowY: 'auto', padding: 6, border: '1px solid var(--jb-v3-line-2)', borderRadius: 6, background: 'var(--jb-v3-panel)', color: 'var(--jb-v3-fg)', boxShadow: '0 12px 30px #0003' }}>
+        {items.map(it => <MenuItem key={it.label} as="button" disabled={!it.fn} onClick={it.fn} className="resume-action-item" style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 12px', fontSize: 13, color: it.danger ? 'var(--jb-v3-danger)' : 'inherit', cursor: 'pointer' }}>{it.label}</MenuItem>)}
+      </MenuItems>
+    </Menu>
   );
 }
 

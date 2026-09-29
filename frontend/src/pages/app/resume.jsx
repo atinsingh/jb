@@ -132,10 +132,10 @@ const ACTIVE_SESSION_KEY = "jobocate.resumeHarness.activeSessionId";
 
 export default function AppResume() {
   const router = useRouter();
-  const [entryMode, setEntryMode] = useState(null);
   const importedResumeId =
     router.isReady && typeof router.query.id === "string" ? router.query.id : "";
-  const compareMode = entryMode === "compare" || router.query.mode === "compare" || !!importedResumeId;
+  const compareMode = router.query.mode === "compare" || !!importedResumeId;
+  const generateMode = router.query.mode === "generate" || !!router.query.session;
   const [options, setOptions] = useState(null);
   const [optionsError, setOptionsError] = useState(null);
   const [budget, setBudget] = useState(null);
@@ -292,7 +292,8 @@ export default function AppResume() {
       return undefined;
     }
     const requestedSessionId =
-      typeof router.query.session === "string" ? router.query.session : "";
+      typeof router.query.session === "string" ? router.query.session
+        : generateMode ? window.sessionStorage.getItem(ACTIVE_SESSION_KEY) || "" : "";
     if (!requestedSessionId) {
       setSessionRestoreDone(true);
       return undefined;
@@ -331,7 +332,7 @@ export default function AppResume() {
     return () => {
       cancelled = true;
     };
-  }, [router.isReady, router.query.session, compareMode, selectSession, loadPdf]);
+  }, [router.isReady, router.query.session, compareMode, generateMode, selectSession, loadPdf]);
 
   useEffect(() => {
     if (!session?.id || !session.revision) {
@@ -442,7 +443,7 @@ export default function AppResume() {
       }
       setCarryFromSessionId(session.id);
       window.sessionStorage.removeItem(ACTIVE_SESSION_KEY);
-      await router.replace({ pathname: "/app/resume" }, undefined, { shallow: true });
+      await router.replace({ pathname: "/app/resume", query: { mode: "generate" } }, undefined, { shallow: true });
       setSession(null);
       setPdfBase64("");
     } catch (e) {
@@ -673,6 +674,7 @@ export default function AppResume() {
       lifecycleEnded.current.add(session.id);
       acceptSession(await endHarnessSession(session.id));
       window.sessionStorage.removeItem(ACTIVE_SESSION_KEY);
+      await router.replace({ pathname: "/app/resume", query: { mode: "generate" } }, undefined, { shallow: true });
     } catch (e) {
       lifecycleEnded.current.delete(session.id);
       setError(e);
@@ -745,14 +747,6 @@ export default function AppResume() {
     URL.revokeObjectURL(url);
   };
 
-  if (optionsError) {
-    return (
-      <Shell>
-        <ErrorState error={optionsError} onRetry={loadOptions} />
-      </Shell>
-    );
-  }
-
   return (
     <Shell>
       <style jsx global>{`
@@ -775,6 +769,10 @@ export default function AppResume() {
             transform: none;
           }
         }
+        .resume-mode-choice { text-align: left; padding: 22px; border: 1px solid var(--jb-v3-line-2); border-radius: 8px; background: var(--jb-v3-panel); color: var(--jb-v3-fg); cursor: pointer; }
+        .resume-mode-choice:hover, .resume-mode-choice[aria-pressed="true"] { border-color: var(--jb-v3-accent); background: color-mix(in srgb, var(--jb-v3-accent) 8%, var(--jb-v3-panel)); }
+        .resume-mode-choice:focus-visible { outline: 2px solid var(--jb-v3-accent); outline-offset: 3px; }
+        @media(max-width: 900px) { .resume-live-workspace { grid-template-columns: minmax(0, 1fr) !important; } }
         #jbres input:focus,
         #jbres textarea:focus,
         #jbres select:focus {
@@ -839,7 +837,7 @@ export default function AppResume() {
 
       <div
         id="jbres"
-        style={{ padding: "28px 32px 64px", maxWidth: 1240, margin: "0 auto" }}
+        style={{ padding: "28px clamp(16px, 3vw, 32px) 48px", maxWidth: 1440, margin: "0 auto" }}
       >
         <div style={{ maxWidth: 720 }}>
           <div style={{ ...label, color: T.accent, marginBottom: 10 }}>
@@ -855,7 +853,7 @@ export default function AppResume() {
               margin: "0 0 10px",
             }}
           >
-            Write it with an agent.
+            Your résumé, ready for the next role.
           </h1>
           <p
             style={{
@@ -865,8 +863,7 @@ export default function AppResume() {
               lineHeight: 1.55,
             }}
           >
-            Your details come straight from your account — you never retype them
-            here. Give it a target, then shape the result in conversation.
+            Review an existing résumé or create one with AI.
           </p>
           <BudgetSummary
             budget={budget}
@@ -877,16 +874,16 @@ export default function AppResume() {
             }
           />
         </div>
-        {!session && !compareMode && (
-          <EntryPaths onCompare={() => setEntryMode("compare")} onGenerate={() => setEntryMode("ai")} />
+        {!session && (
+          <EntryPaths active={compareMode ? "compare" : generateMode ? "ai" : null} onCompare={() => router.push({ pathname: "/app/resume", query: { mode: "compare", ...(importedResumeId ? { id: importedResumeId } : {}) } }, undefined, { scroll: false })} onGenerate={() => router.push("/app/resume?mode=generate", undefined, { scroll: false })} />
         )}
         {!session && compareMode ? (
           <CompareResumeWorkspace
             resumeId={importedResumeId}
             onOpen={(id) => router.replace({ pathname: "/app/resume", query: { mode: "compare", id } })}
           />
-        ) : !session ? (
-          <Setup
+        ) : !session && generateMode ? (
+          optionsError ? <ErrorState error={optionsError} onRetry={loadOptions} /> : <Setup
             {...{
               options,
               profile,
@@ -917,7 +914,7 @@ export default function AppResume() {
               start,
             }}
           />
-        ) : (
+        ) : session ? (
           <Workspace
             {...{
               session,
@@ -952,7 +949,7 @@ export default function AppResume() {
               jobContextWarning: session.jobContextWarning,
             }}
           />
-        )}
+        ) : null}
       </div>
     </Shell>
   );
@@ -988,19 +985,19 @@ function BudgetSummary({ budget, estimate }) {
   );
 }
 
-function EntryPaths({ onCompare, onGenerate }) {
+function EntryPaths({ active, onCompare, onGenerate }) {
   return (
-    <div className="compare-entry-paths" style={{ display: "grid", gap: 12, maxWidth: 720, marginBottom: 22 }}>
-      <button type="button" onClick={onCompare} style={{ ...ghostBtn, textAlign: "left", padding: 16 }}>
+    <div className="compare-entry-paths" style={{ display: "grid", gap: 12, marginBottom: 24 }}>
+      <button type="button" aria-pressed={active === "compare"} onClick={onCompare} className="resume-mode-choice">
         <span style={{ display: "block", fontSize: 15, marginBottom: 4 }}>Compare Resume</span>
         <span style={{ display: "block", color: T.fg3, fontWeight: 400, lineHeight: 1.45 }}>
-          Import, assess, highlight, and manually improve an existing résumé.
+          Upload a résumé for scores and actionable feedback. →
         </span>
       </button>
-      <button type="button" onClick={onGenerate} style={{ ...ghostBtn, textAlign: "left", padding: 16 }}>
+      <button type="button" aria-pressed={active === "ai"} onClick={onGenerate} className="resume-mode-choice">
         <span style={{ display: "block", fontSize: 15, marginBottom: 4 }}>AI Generate Resume</span>
         <span style={{ display: "block", color: T.fg3, fontWeight: 400, lineHeight: 1.45 }}>
-          Start or continue the existing AI résumé session workflow.
+          Build and refine a résumé with your profile. →
         </span>
       </button>
     </div>
@@ -1399,7 +1396,7 @@ function SetupForm(p) {
 
         <Field
           title="The job you're applying to"
-          hint="All optional. Pasted text carries the most detail — the links mainly tell the agent who you're writing for."
+          hint="Optional: paste the job description or add a link."
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <input
@@ -1421,7 +1418,7 @@ function SetupForm(p) {
               value={p.jobDescription}
               onChange={(e) => p.setJobDescription(e.target.value)}
               rows={5}
-              placeholder="Paste the job description. It shapes emphasis and wording — it never adds experience you don't have."
+              placeholder="Paste the job description"
               style={{ ...field, resize: "vertical", lineHeight: 1.55 }}
             />
           </div>
@@ -1632,10 +1629,10 @@ function Workspace(p) {
         run={p.runAts}
       />
 
-      <div
+      <div className="resume-live-workspace"
         style={{
           display: "grid",
-          gridTemplateColumns: "minmax(360px, 5fr) minmax(0, 7fr)",
+          gridTemplateColumns: "minmax(0, 5fr) minmax(0, 7fr)",
           gap: 18,
           alignItems: "start",
         }}

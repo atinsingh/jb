@@ -258,6 +258,7 @@ export default function AppBilling() {
             {invoices.map((i) => (
               <div
                 key={i.id}
+                className="candidate-invoice-row"
                 style={{
                   borderTop: HAIR,
                   padding: '13px 4px',

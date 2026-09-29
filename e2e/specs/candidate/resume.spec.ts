@@ -491,7 +491,7 @@ async function stubHarnessApi(page: Page) {
 test.describe("résumé AI budget", () => {
   test("shows remaining allowance, reset, and the selected effort estimate", async ({ page }) => {
     await stubHarnessApi(page);
-    await page.goto("/app/resume");
+    await page.goto("/app/resume?mode=generate");
 
     await expect(page.getByTestId("ai-budget")).toContainText("325 of 400 remaining");
     await expect(page.getByTestId("ai-budget")).toContainText("3–40 credits estimated");
@@ -510,7 +510,7 @@ test.describe("résumé AI budget", () => {
         },
       }),
     );
-    await page.goto("/app/resume");
+    await page.goto("/app/resume?mode=generate");
 
     await expect(page.getByTestId("ai-budget")).toContainText("exhausted");
     await expect(page.getByTestId("start-session")).toBeDisabled();
@@ -1035,7 +1035,7 @@ test.describe("résumé session operation integrity", () => {
         } })}`.replace(/\n/g, "\r\n"),
       }),
     );
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
     await page.getByTestId("start-session").click();
     await page.getByTestId("instruction").fill("Explain my résumé");
     await page.getByTestId("send-instruction").click();
@@ -1072,7 +1072,7 @@ test.describe("résumé session operation integrity", () => {
         ].join(""),
       });
     });
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
     await page.getByTestId("start-session").click();
     await page.getByTestId("instruction").fill("Update my résumé");
     await page.getByTestId("send-instruction").click();
@@ -1100,7 +1100,7 @@ test.describe("résumé session operation integrity", () => {
         }),
       }),
     );
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
     await page.getByTestId("start-session").click();
     await page.getByTestId("instruction").fill("What can you do?");
     await page.getByTestId("send-instruction").click();
@@ -1142,7 +1142,7 @@ test.describe("résumé session operation integrity", () => {
       }),
     );
 
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
     await page.getByTestId("start-session").click();
     await page.getByTestId("instruction").fill(instruction);
     await page.getByTestId("send-instruction").click();
@@ -1155,7 +1155,7 @@ test.describe("résumé session operation integrity", () => {
     page,
   }) => {
     await stubHarnessApi(page);
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
     await page.getByTestId("start-session").click();
     await page
       .getByTestId("instruction")
@@ -1197,8 +1197,9 @@ test.describe("résumé session history", () => {
       }),
     );
 
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
     await expect(page.getByTestId("past-sessions")).toHaveCount(0);
+    await page.getByRole("button", { name: /AI Generate Resume/ }).click();
     await page.getByTestId("start-session").click();
     await page.getByTestId("instruction").fill("Build my résumé.");
     await page.getByTestId("send-instruction").click();
@@ -1229,13 +1230,13 @@ test.describe("résumé session history", () => {
 
     const downloaded = page.waitForEvent("download");
     await generated.getByRole("button", { name: "More actions" }).click();
-    await generated.getByRole("button", { name: "Download PDF" }).click();
+    await page.getByRole("menuitem", { name: "Download PDF" }).click();
     expect((await downloaded).suggestedFilename()).toBe(
       "Backend engineer résumé.pdf",
     );
 
     await generated.getByRole("button", { name: "More actions" }).click();
-    await page.getByRole("button", { name: "Rename" }).click();
+    await page.getByRole("menuitem", { name: "Rename" }).click();
     await page
       .getByRole("textbox", { name: "Resume name" })
       .fill("Platform résumé");
@@ -1244,16 +1245,16 @@ test.describe("résumé session history", () => {
     await expect(generated).toContainText("Platform résumé");
 
     await generated.getByRole("button", { name: "More actions" }).click();
-    await generated
-      .getByRole("button", { name: "Archive", exact: true })
+    await page
+      .getByRole("menuitem", { name: "Archive", exact: true })
       .click();
     await expect(generated).toHaveCount(0);
     await page.getByRole("button", { name: "Archived", exact: true }).click();
     generated = page.getByTestId(`resume-session-${SESSION.id}`);
     await expect(generated).toBeVisible();
     await generated.getByRole("button", { name: "More actions" }).click();
-    await generated
-      .getByRole("button", { name: "Restore", exact: true })
+    await page
+      .getByRole("menuitem", { name: "Restore", exact: true })
       .click();
     await page.getByRole("button", { name: "All", exact: true }).click();
 
@@ -1265,7 +1266,7 @@ test.describe("résumé session history", () => {
     await page.goto("/app/resume-library", { waitUntil: "domcontentloaded" });
     generated = page.getByTestId(`resume-session-${SESSION.id}`);
     await generated.getByRole("button", { name: "More actions" }).click();
-    await page.getByRole("button", { name: "Delete" }).click();
+    await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
     await page.getByRole("button", { name: "Delete resume & session" }).click();
     await expect(generated).toHaveCount(0);
   });
@@ -1274,7 +1275,8 @@ test.describe("résumé session history", () => {
     page,
   }) => {
     await stubHarnessApi(page);
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: /AI Generate Resume/ }).click();
     await page.getByTestId("start-session").click();
     await page.getByTestId("instruction").fill("Build my résumé.");
     await page.getByTestId("send-instruction").click();
@@ -1343,6 +1345,7 @@ test.describe("résumé session history", () => {
     await page
       .getByRole("button", { name: "Create Resume", exact: true })
       .click();
+    await page.getByRole("button", { name: /AI Generate Resume/ }).click();
     await page.getByTestId("start-session").click();
     await page.getByTestId("instruction").fill("Build my résumé.");
     await page.getByTestId("send-instruction").click();
@@ -1356,7 +1359,8 @@ test.describe("résumé session history", () => {
     guards.allowFailures(/\/api\/resume-builder$/);
     guards.allowConsoleErrors();
     await stubHarnessApi(page);
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: /AI Generate Resume/ }).click();
     await page.getByTestId("start-session").click();
     await page.getByTestId("instruction").fill("Build my résumé.");
     await page.getByTestId("send-instruction").click();
@@ -1388,7 +1392,7 @@ test.describe("résumé session history", () => {
       if (request.url().endsWith(`/${SESSION.id}/end`)) ends.push(request);
       if (request.method() === "DELETE") deletes.push(request.url());
     });
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
     await page.getByTestId("start-session").click();
     await expect(page.getByTestId("session-bar")).toBeVisible();
     await page.evaluate(() => {
@@ -1404,7 +1408,7 @@ test.describe("résumé session history", () => {
     await expect(
       page.getByTestId(`resume-session-${SESSION.id}`),
     ).toBeVisible();
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
     await expect(page.getByTestId("session-bar")).toBeVisible();
     expect(ends).toHaveLength(0);
     expect(deletes).toHaveLength(0);
@@ -1416,7 +1420,7 @@ test.describe("LaTeX résumé — agent harness", () => {
     page,
   }) => {
     await stubHarnessApi(page);
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
 
     // Runtime/provider routing is server-owned and never shown to candidates.
     await expect(page.getByTestId("harness-picker")).toBeVisible({
@@ -1474,7 +1478,7 @@ test.describe("LaTeX résumé — agent harness", () => {
     page,
   }) => {
     await stubHarnessApi(page);
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
 
     await page
       .getByTestId("job-description")
@@ -1506,7 +1510,7 @@ test.describe("LaTeX résumé — agent harness", () => {
     await page.route("**/api/ats/resume-sessions/*/latest", (route: Route) =>
       route.fulfill({ status: 200, body: "" }),
     );
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
 
     await page
       .getByTestId("job-description")
@@ -1535,7 +1539,7 @@ test.describe("LaTeX résumé — agent harness", () => {
         startBody = route.request().postDataJSON();
       await route.fallback();
     });
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
 
     await page
       .getByTestId("job-url")
@@ -1565,7 +1569,7 @@ test.describe("LaTeX résumé — agent harness", () => {
         json: { message: "ATS service unavailable" },
       }),
     );
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
 
     await page.getByTestId("start-session").click();
     await page.getByTestId("instruction").fill("Build the résumé.");
@@ -1583,7 +1587,7 @@ test.describe("LaTeX résumé — agent harness", () => {
     page,
   }) => {
     await stubHarnessApi(page);
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
     await page.getByTestId("start-session").click();
     await page.getByTestId("instruction").fill("Build the résumé.");
     await page.getByTestId("send-instruction").click();
@@ -1605,7 +1609,7 @@ test.describe("LaTeX résumé — agent harness", () => {
     page,
   }) => {
     await stubHarnessApi(page);
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
     await page.getByTestId("start-session").click();
     await page.getByTestId("instruction").fill("Build the résumé.");
     await page.getByTestId("send-instruction").click();
@@ -1632,7 +1636,7 @@ test.describe("LaTeX résumé — agent harness", () => {
     page,
   }) => {
     await stubHarnessApi(page);
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
 
     await page.getByTestId("start-session").click();
     await expect(page.getByTestId("session-bar")).toBeVisible();
@@ -1687,7 +1691,7 @@ test.describe("résumé — profile-sourced facts", () => {
         },
       }),
     );
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
 
     // The blocker is the page, not a footnote under it.
     const gate = page.getByTestId("required-gate");
@@ -1731,7 +1735,7 @@ test.describe("résumé — profile-sourced facts", () => {
         },
       }),
     );
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
 
     // A thin résumé beats a blocked one — the gap is a nudge, not a gate.
     await expect(page.getByTestId("profile-gaps")).toContainText(
@@ -1744,7 +1748,7 @@ test.describe("résumé — profile-sourced facts", () => {
     page,
   }) => {
     await stubHarnessApi(page);
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
 
     await expect(page.getByTestId("target-role")).toBeVisible();
     await expect(page.getByTestId("job-description")).toBeVisible();
@@ -1770,7 +1774,7 @@ test.describe("résumé — model and effort selection", () => {
     page,
   }) => {
     await stubHarnessApi(page);
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
 
     await expect(page.getByTestId("model-select")).toHaveValue(
       "claude-sonnet-4-5",
@@ -1811,7 +1815,7 @@ test.describe("résumé — model and effort selection", () => {
       await route.fulfill({ status: 201, json: SESSION });
     });
 
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
     await page.getByTestId("model-select").selectOption("gpt-5.6-luna");
     await page.getByTestId("effort-select").selectOption("xhigh");
     await page.getByTestId("start-session").click();
@@ -1842,7 +1846,7 @@ test.describe("résumé — the required-field gate fails closed", () => {
     await page.route("**/api/resume-harness/options", (route: Route) =>
       route.fulfill({ json }),
     );
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
   };
 
   test("blocks when the response carries no profile block at all", async ({
@@ -1874,7 +1878,7 @@ test.describe("résumé — the required-field gate fails closed", () => {
     await stubHarnessApi(page);
     // Never resolves: the pre-response state must not be an open form.
     await page.route("**/api/resume-harness/options", () => {});
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
 
     await expect(page.getByTestId("start-session")).toHaveCount(0);
   });
@@ -1914,7 +1918,7 @@ test.describe("résumé — templates and vibe", () => {
       });
     });
 
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
 
     await expect(page.getByTestId("template-picker")).toBeVisible({
       timeout: 20_000,
@@ -1951,10 +1955,11 @@ test.describe("résumé — templates and vibe", () => {
     await page.route("**/api/resume-harness/sessions/*/end", (route) =>
       route.fulfill({ json: SESSION }),
     );
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
 
     await page.getByTestId("template-card-modern-sans").click();
     await page.getByTestId("setup-knob-accent").selectOption("navy");
+    await page.getByRole("button", { name: /AI Generate Resume/ }).click();
     await page.getByTestId("start-session").click();
     await page.getByTestId("instruction").fill("Build my résumé.");
     await page.getByTestId("send-instruction").click();
@@ -1979,7 +1984,7 @@ test.describe("résumé — templates and vibe", () => {
     await page.route("**/api/resume-harness/sessions/*/end", (route) =>
       route.fulfill({ json: SESSION }),
     );
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
     await page.getByTestId("start-session").click();
 
     let releaseRestore!: () => void;
@@ -2011,7 +2016,8 @@ test.describe("résumé — templates and vibe", () => {
     await page.route("**/api/resume-harness/sessions/*/end", (route) =>
       route.fulfill({ json: SESSION }),
     );
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: /AI Generate Resume/ }).click();
     await page.getByTestId("start-session").click();
     await page.getByTestId("instruction").fill("Build my résumé.");
     await page.getByTestId("send-instruction").click();
@@ -2051,7 +2057,7 @@ test.describe("résumé — templates and vibe", () => {
       });
     });
 
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
     await page.getByTestId("start-session").click();
     const ending = page.waitForRequest(
       (request) =>
@@ -2079,7 +2085,7 @@ test.describe("résumé — templates and vibe", () => {
     page,
   }) => {
     await stubHarnessApi(page);
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
 
     await page.getByTestId("start-session").click();
     await page
@@ -2117,8 +2123,9 @@ test.describe("résumé — templates and vibe", () => {
     page,
   }) => {
     await stubHarnessApi(page);
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
 
+    await page.getByRole("button", { name: /AI Generate Resume/ }).click();
     await page.getByTestId("start-session").click();
     await page.getByTestId("instruction").fill("Build my résumé.");
     await page.getByTestId("send-instruction").click();
@@ -2160,7 +2167,7 @@ test.describe("résumé — templates and vibe", () => {
     await page.route("**/api/resume-harness/templates", (route: Route) =>
       route.fulfill({ json: [] }),
     );
-    await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
+    await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
 
     // A missing catalogue is a note, not a blocker: the agent has its own
     // layout, and refusing to write a résumé over typography would be absurd.

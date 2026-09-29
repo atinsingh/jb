@@ -29,14 +29,14 @@ import {
  * 170px / 1fr / 70px grid, a 24-bar completion meter, hairlines only.
  */
 
-const ROW = '170px 1fr 70px';
+const ROW = 'minmax(100px, 170px) minmax(0, 1fr) 50px';
 
 /* One row of the profile list. Collapsed it is key / value / Edit; expanded it
    drops the editor underneath, still inside the same hairline band. */
 function PrefRow({ label, value, open, onToggle, children, tone }) {
   return (
     <div style={{ borderTop: HAIR }}>
-      <div
+      <div className="candidate-preference-row"
         style={{
           display: 'grid',
           gridTemplateColumns: ROW,
@@ -202,10 +202,10 @@ export default function JobPreferences() {
               }}
             >
               {r.missingCritical.length
-                ? `Add your ${r.missingCritical[0]} so Jobocate can confirm which roles you are eligible for. Auto-apply stays off until it can.`
+                ? `Add your ${r.missingCritical[0]} to complete your profile.`
                 : noResults
-                  ? 'Nothing in the current pool clears your filters. Widening your locations or lowering the minimum match score will surface more.'
-                  : 'These decide which roles you see, and which ones Jobocate may apply to on your behalf. Nothing is submitted without your approval.'}
+                  ? 'No roles match these filters yet.'
+                  : 'Set your role, location, and work preferences.'}
             </p>
 
             {/* Live pool counts. Four figures on hairlines — no tiles. */}
@@ -218,7 +218,7 @@ export default function JobPreferences() {
             >
               Matching impact
             </Label>
-            <div style={{ display: 'flex', gap: 40, borderTop: HAIR, padding: '16px 4px 20px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24, borderTop: HAIR, padding: '16px 4px 20px' }}>
               {[
                 ['Recommended', preview?.recommended, 'var(--jb-v3-accent)'],
                 ['Eligible', preview?.eligible],

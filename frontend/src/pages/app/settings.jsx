@@ -79,11 +79,12 @@ function TextRow({ label, value, onChange, readOnly, required }) {
   const empty = required && !String(value || '').trim();
   return (
     <div
+      className="candidate-setting-row"
       style={{
         borderBottom: HAIR,
         padding: '15px 4px',
         display: 'grid',
-        gridTemplateColumns: '170px 1fr',
+        gridTemplateColumns: 'minmax(100px, 170px) minmax(0, 1fr)',
         gap: 20,
         alignItems: 'center',
       }}
@@ -306,7 +307,7 @@ export default function AppSettings() {
       </Head>
 
       <Screen width={860} pad="40px 28px 80px">
-        <div style={{ display: 'flex', gap: 22, borderBottom: HAIR, marginBottom: 24 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, borderBottom: HAIR, marginBottom: 24 }}>
           {TABS.map((t) => {
             const on = t.id === tab;
             return (
