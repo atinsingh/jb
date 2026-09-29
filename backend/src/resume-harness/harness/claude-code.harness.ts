@@ -57,9 +57,6 @@ export class ClaudeCodeHarness implements HarnessAdapter {
         ...(alias.maxOutputTokens
           ? { CLAUDE_CODE_MAX_OUTPUT_TOKENS: String(alias.maxOutputTokens) }
           : {}),
-        ...(review ? {
-          CLAUDE_CODE_MAX_OUTPUT_TOKENS: String(Math.min(alias.maxOutputTokens || 6000, 6000)),
-        } : {}),
         CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
         DISABLE_TELEMETRY: '1',
         HOME: workdir,

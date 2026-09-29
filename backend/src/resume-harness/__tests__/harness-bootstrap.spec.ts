@@ -174,7 +174,12 @@ describe('harness bootstrap', () => {
     expect(adapter.turnCommand(boot, 'Review this resume').slice(-4)).toEqual([
       '--tools', 'Read,Bash', '--', 'Review this resume',
     ]);
-    expect(Number(boot.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS)).toBeLessThanOrEqual(6000);
+    expect(boot.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS).toBeUndefined();
+    const configured = adapter.bootstrap({
+      ...bootstrapInput(), purpose: 'resume-review',
+      alias: { ...bootstrapInput().alias, maxOutputTokens: 32768 },
+    });
+    expect(configured.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS).toBe('32768');
     expect(adapter.bootstrap(bootstrapInput()).command).not.toContain('--system-prompt');
   });
 
