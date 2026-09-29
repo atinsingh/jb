@@ -43,6 +43,20 @@ export class AiBudgetExhaustedException extends HttpException {
   }
 }
 
+export class AiBudgetInsufficientException extends HttpException {
+  readonly code = 'AI_BUDGET_INSUFFICIENT';
+
+  constructor(snapshot: AiBudgetSnapshot, requiredCredits: number) {
+    super({
+      statusCode: 402,
+      code: 'AI_BUDGET_INSUFFICIENT',
+      message: `This run may need ${requiredCredits} credits; ${snapshot.remaining} remain. Add credits before starting it.`,
+      budget: snapshot,
+      requiredCredits,
+    }, 402);
+  }
+}
+
 export class AiBudgetOperationInProgressException extends HttpException {
   readonly code = 'AI_BUDGET_OPERATION_IN_PROGRESS';
 

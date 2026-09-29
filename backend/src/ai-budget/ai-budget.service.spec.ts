@@ -38,6 +38,7 @@ describe('AiBudgetService', () => {
         budgetDuration: '1mo',
       })),
       lowRemainingRatio: jest.fn(() => 0.2),
+      estimate: jest.fn(() => ({ kind: 'usage_based' })),
       service: jest.fn(() => ({
         id: 'resume_agent_turn',
         enabled: true,
@@ -137,6 +138,27 @@ describe('AiBudgetService', () => {
     expect(JSON.stringify(accountStore.account)).not.toContain(
       '"encryptedKey":"sk-candidate-1"',
     );
+  });
+
+  it('keeps a one-period credit grant in the provider limit across access refreshes', async () => {
+    accountStore.account = {
+      ...existingAccount(), bonusCredits: 500,
+      bonusPeriodEnd: new Date('2026-10-01T00:00:00.000Z'),
+    };
+    await service.ensureCandidateAccess('candidate-1');
+    expect(client.update).toHaveBeenCalledWith('sk-existing', expect.objectContaining({ maxBudgetUsd: 5.5 }));
+    expect(accountStore.account?.appliedLimitUsd).toBe(5.5);
+  });
+
+  it('refuses an agent turn that may exceed the remaining credits before calling the model', async () => {
+    accountStore.account = existingAccount();
+    spendUsd = 0.4;
+    policy.estimate.mockReturnValue({ kind: 'range', maxCredits: 30 });
+    const run = jest.fn();
+    await expect(service.withCandidateLease('candidate-1', 'resume_agent_turn', attribution('low-balance'), run))
+      .rejects.toMatchObject({ code: 'AI_BUDGET_INSUFFICIENT' });
+    expect(run).not.toHaveBeenCalled();
+    expect(accountStore.account?.activeRunId).toBeUndefined();
   });
 
 

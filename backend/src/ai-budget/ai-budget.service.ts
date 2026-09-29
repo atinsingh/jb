@@ -8,6 +8,7 @@ import { Model } from 'mongoose';
 import { ModelAliasService } from '../resume-harness/model-alias.service';
 import {
   AiBudgetExhaustedException,
+  AiBudgetInsufficientException,
   AiBudgetOperationInProgressException,
   AiBudgetSettlementPendingException,
   AiBudgetUnavailableException,
@@ -211,6 +212,10 @@ export class AiBudgetService {
     let startingCredits = 0;
     try {
       const access = await this.refreshAccess(claimedContext, true);
+      const estimate = this.policy.estimate(attribution.alias, service);
+      if (estimate.kind === 'range' && estimate.maxCredits! > access.snapshot.remaining) {
+        throw new AiBudgetInsufficientException(access.snapshot, estimate.maxCredits!);
+      }
       startingSpendUsd = access.measuredSpendUsd;
       startingCredits = access.snapshot.spent;
       await this.accountModel
@@ -300,7 +305,7 @@ export class AiBudgetService {
           );
         limitCredits = plan.limits.aiBudgetCreditsLimit;
       }
-      const maxBudgetUsd = limitCredits / 100;
+      const baseBudgetUsd = limitCredits / 100;
       const offered = await this.aliases.listForTier(tier);
       const models = offered.map((model) => model.alias);
       if (!models.length) {
@@ -321,7 +326,7 @@ export class AiBudgetService {
           pool: `${ownerType}-ai`,
           keyAlias,
           models,
-          maxBudgetUsd,
+          maxBudgetUsd: baseBudgetUsd,
         });
         try {
           account = await this.accountModel.create({
@@ -331,7 +336,7 @@ export class AiBudgetService {
             keyAlias,
             encryptedKey: this.codec.encrypt(generated.key),
             appliedTier: tier,
-            appliedLimitUsd: maxBudgetUsd,
+            appliedLimitUsd: baseBudgetUsd,
             budgetDuration: tierPolicy.budgetDuration,
           });
         } catch (error) {
@@ -352,6 +357,10 @@ export class AiBudgetService {
       }
 
       const apiKey = this.codec.decrypt(account.encryptedKey);
+      const bonusCredits = ownerType === 'candidate' && account.bonusPeriodEnd && account.bonusPeriodEnd > new Date()
+        ? account.bonusCredits || 0
+        : 0;
+      const maxBudgetUsd = (limitCredits + bonusCredits) / 100;
       if (account.activeRunId && hasStoppedBudgetWorker(account)) {
         await this.stopAbandonedSandboxes(account);
         await this.waitForUsage();

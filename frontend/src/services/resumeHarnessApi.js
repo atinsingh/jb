@@ -120,7 +120,7 @@ export const runHarnessTurn = (id, payload) =>
  * Uses fetch + a stream reader rather than EventSource, because EventSource
  * cannot POST a body or set an Authorization header.
  */
-const streamPost = async (path, payload, onEvent, headers = {}) => {
+const streamPost = async (path, payload, onEvent, headers = {}, idleTimeoutMs = 150000) => {
   const token = await getAccessToken();
   const res = await fetch(`${API_URL}${path}`, {
     method: "POST",
@@ -144,6 +144,7 @@ const streamPost = async (path, payload, onEvent, headers = {}) => {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let terminal = false;
   const dispatch = (frame) => {
     const data = frame.split(/\r?\n/)
       .filter((line) => line.startsWith("data:"))
@@ -157,21 +158,37 @@ const streamPost = async (path, payload, onEvent, headers = {}) => {
       return;
     }
     onEvent(event);
+    if (event.type === "result" || event.type === "error") terminal = true;
   };
 
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
+  try {
+    while (!terminal) {
+      let timer;
+      const { done, value } = await Promise.race([
+        reader.read(),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error("The AI stream stopped responding. Reopen the session to check its saved state.")), idleTimeoutMs);
+        }),
+      ]).finally(() => clearTimeout(timer));
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
 
-    // SSE frames are separated by a blank line; a partial frame stays in the
-    // buffer until its terminator arrives.
-    const frames = buffer.split(/\r?\n\r?\n/);
-    buffer = frames.pop() ?? "";
-    for (const frame of frames) dispatch(frame);
+      // A proxy may leave the socket open after a terminal event. Stop reading
+      // immediately so the screen can clear its busy state.
+      const frames = buffer.split(/\r?\n\r?\n/);
+      buffer = frames.pop() ?? "";
+      for (const frame of frames) {
+        dispatch(frame);
+        if (terminal) break;
+      }
+    }
+    if (!terminal) {
+      buffer += decoder.decode();
+      if (buffer.trim()) dispatch(buffer);
+    }
+  } finally {
+    await reader.cancel().catch(() => {});
   }
-  buffer += decoder.decode();
-  if (buffer.trim()) dispatch(buffer);
 };
 
 export const streamHarnessTurn = (id, payload, onEvent, headers) =>

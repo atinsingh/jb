@@ -31,6 +31,13 @@ export class AiBudgetAccount {
   @Prop({ required: true, min: 0 })
   appliedLimitUsd: number;
 
+  // One-time grants apply only to the period in which they were awarded.
+  @Prop({ min: 0, default: 0 })
+  bonusCredits?: number;
+
+  @Prop()
+  bonusPeriodEnd?: Date;
+
   @Prop({ default: 0, min: 0 })
   creditsUsed: number;
 
