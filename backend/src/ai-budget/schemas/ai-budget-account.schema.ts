@@ -46,6 +46,11 @@ export class AiBudgetAccount {
   @Prop()
   activeRunId?: string;
 
+  @Prop() runWorkerId?: string;
+  @Prop() runWorkerHost?: string;
+  @Prop() runWorkerPid?: number;
+  @Prop({ type: [String], default: undefined }) runSandboxIds?: string[];
+
   @Prop()
   runLockUntil?: Date;
 

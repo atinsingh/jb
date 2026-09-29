@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { randomUUID } from 'crypto';
+import { budgetRunContext, budgetWorker, hasStoppedBudgetWorker } from './ai-budget-run-context';
+import { DockerSandboxDriver } from '../resume-harness/sandbox/docker-sandbox.driver';
+import { AgentPlatformClient } from '../resume-harness/sandbox/agent-platform.client';
 import { Model } from 'mongoose';
 import { ModelAliasService } from '../resume-harness/model-alias.service';
 import {
@@ -175,6 +178,10 @@ export class AiBudgetService {
         {
           $set: {
             activeRunId: runId,
+            runWorkerId: budgetWorker.id,
+            runWorkerHost: budgetWorker.host,
+            runWorkerPid: budgetWorker.pid,
+            runSandboxIds: [],
             runLockUntil: new Date(now.getTime() + LEASE_MILLISECONDS),
           },
         },
@@ -218,10 +225,19 @@ export class AiBudgetService {
         )
         .exec();
       ran = true;
-      return await run(
+      const registered = new Set<string>();
+      return await budgetRunContext.run({ registerSandbox: async (id) => {
+        if (registered.has(id)) return;
+        const result = await this.accountModel.updateOne(
+          { _id: claimed._id, activeRunId: runId },
+          { $addToSet: { runSandboxIds: id } },
+        ).exec();
+        if (!result.matchedCount) throw new AiBudgetUnavailableException();
+        registered.add(id);
+      } }, () => run(
         access,
         this.tags(ownerType, userId, service, attribution, runId),
-      );
+      ));
     } finally {
       try {
         if (ran) {
@@ -254,6 +270,7 @@ export class AiBudgetService {
               {
                 $unset: {
                   activeRunId: 1,
+                  runWorkerId: 1, runWorkerHost: 1, runWorkerPid: 1, runSandboxIds: 1,
                   runLockUntil: 1,
                   settlementPending: 1,
                   runSpendBeforeUsd: 1,
@@ -335,6 +352,16 @@ export class AiBudgetService {
       }
 
       const apiKey = this.codec.decrypt(account.encryptedKey);
+      if (account.activeRunId && hasStoppedBudgetWorker(account)) {
+        await this.stopAbandonedSandboxes(account);
+        await this.waitForUsage();
+        // Use the existing reconciliation path; do not waive incurred spend.
+        account.settlementPending = true;
+        await this.accountModel.updateOne(
+          { _id: account._id, activeRunId: account.activeRunId },
+          { $set: { settlementPending: true } },
+        ).exec();
+      }
       if (account.settlementPending) {
         await this.settleCandidateRun(
           { account, apiKey, tier },
@@ -347,6 +374,7 @@ export class AiBudgetService {
             {
               $unset: {
                 activeRunId: 1,
+                  runWorkerId: 1, runWorkerHost: 1, runWorkerPid: 1, runSandboxIds: 1,
                 runLockUntil: 1,
                 settlementPending: 1,
                 runSpendBeforeUsd: 1,
@@ -385,6 +413,21 @@ export class AiBudgetService {
       }
       throw new AiBudgetUnavailableException(error);
     }
+  }
+
+  private async stopAbandonedSandboxes(account: AiBudgetAccountDocument): Promise<void> {
+    const ids = account.runSandboxIds || [];
+    if (!ids.length) return;
+    const driver = (process.env.RESUME_SANDBOX_DRIVER || 'docker') === 'agent-platform'
+      ? new AgentPlatformClient()
+      : new DockerSandboxDriver({ image: '', workdir: '/workspace', ttlSeconds: 900 });
+    for (const id of ids) await driver.destroy(id);
+    // A saved résumé remains available, but its stopped sandbox cannot accept
+    // another turn. "Continue from here" provisions a fresh one.
+    await this.accountModel.db.collection('resume_harness_sessions').updateMany(
+      { sandboxId: { $in: ids }, userId: account.ownerId, status: 'active' },
+      { $set: { status: 'ended', endedAt: new Date() }, $unset: { sandboxId: 1 } },
+    );
   }
 
   private async refreshAccess(

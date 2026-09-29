@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { AiOperationService } from '../../ai-budget/ai-operation.service';
+import { budgetRunContext } from '../../ai-budget/ai-budget-run-context';
 import {
   ExecResult,
   ReapedSandbox,
@@ -92,6 +93,7 @@ export class SandboxService {
     });
 
     try {
+      await budgetRunContext.getStore()?.registerSandbox(sandboxId);
       await this.operations?.resource(sandboxId, () => this.destroy(sandboxId));
       this.operations?.checkpoint();
       if (input.files.length) await this.client.putFiles(sandboxId, input.files);
@@ -108,6 +110,7 @@ export class SandboxService {
   }
 
   private async cancellable<T>(sandboxId: string, work: () => Promise<T>): Promise<T> {
+    await budgetRunContext.getStore()?.registerSandbox(sandboxId);
     await this.operations?.resource(sandboxId, () => this.destroy(sandboxId));
     this.operations?.checkpoint();
     const result = await work();

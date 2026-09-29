@@ -4,6 +4,7 @@ import {
   AiBudgetUnavailableException,
 } from './ai-budget.errors';
 import { AiBudgetService } from './ai-budget.service';
+import { budgetWorker } from './ai-budget-run-context';
 
 describe('AiBudgetService', () => {
   const NOW = new Date('2026-09-15T12:00:00.000Z');
@@ -284,6 +285,29 @@ describe('AiBudgetService', () => {
         async () => 'recovered',
       ),
     ).resolves.toBe('recovered');
+  });
+
+  it('reconciles a restarted worker before its lease expires without erasing spend', async () => {
+    accountStore.account = {
+      ...existingAccount(), activeRunId: 'interrupted',
+      runLockUntil: new Date(NOW.getTime() + 15 * 60 * 1000),
+      runWorkerHost: budgetWorker.host, runWorkerPid: budgetWorker.pid,
+      runWorkerId: 'previous-process-incarnation', runSandboxIds: [],
+      runSpendBeforeUsd: .05, runCreditsBefore: 5,
+    };
+    await expect(service.withCandidateLease('candidate-1', 'resume_agent_turn', attribution('replacement'), async () => 'recovered')).resolves.toBe('recovered');
+    expect(accountStore.account?.creditsUsed).toBe(10);
+    expect(accountStore.account?.activeRunId).toBeUndefined();
+  });
+
+  it('does not steal another host or this live worker lease', async () => {
+    for (const host of [budgetWorker.host, 'another-pod']) {
+      accountStore.account = { ...existingAccount(), activeRunId: 'live',
+        runLockUntil: new Date(NOW.getTime() + 15 * 60 * 1000),
+        runWorkerHost: host, runWorkerPid: budgetWorker.pid, runWorkerId: budgetWorker.id,
+      };
+      await expect(service.withCandidateLease('candidate-1', 'resume_agent_turn', attribution('blocked'), async () => 'wrong')).rejects.toBeInstanceOf(AiBudgetOperationInProgressException);
+    }
   });
 
   it('retains the operation lock while LiteLLM flushes its final usage batch', async () => {
