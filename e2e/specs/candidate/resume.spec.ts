@@ -606,8 +606,13 @@ test.describe("Compare Resume manual workflow", () => {
     await page.goto("/app/resume-library", { waitUntil: "domcontentloaded" });
     await page.getByRole("button", { name: /Import Resume/i }).first().click();
     await page.locator('input[type="file"][accept=".pdf,.docx"]').setInputFiles({ name: "profile.pdf", mimeType: "application/pdf", buffer: source });
+    await expect(page.getByText("Keep original format", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Rewrite with AI", { exact: true })).toHaveCount(0);
+    await expect(page.getByLabel("Target role (optional)")).toHaveCount(0);
     await page.getByRole("button", { name: "Import resume", exact: true }).click();
     await expect(page.getByTestId("resume-library-import-1")).toBeVisible();
+    expect(imported).toMatchObject({ importMode: "keep_format" });
+    expect(imported).not.toHaveProperty("targetRole");
     expect(sourceRetained).toBe(true);
 
     await page.getByTestId("resume-library-import-1").getByRole("button", { name: "Open resume" }).click();

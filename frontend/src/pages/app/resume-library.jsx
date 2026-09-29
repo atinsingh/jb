@@ -1387,10 +1387,8 @@ function ResumeTable({ rows, busyId, ...h }) {
 /* --------------------------------------------------- import modal ------ */
 function ImportModal({ onClose, onDone }) {
   const [file, setFile] = useState(null);
-  const [mode, setMode] = useState("keep_format");
   const [name, setName] = useState("");
-  const [targetRole, setTargetRole] = useState("");
-  const [step, setStep] = useState("upload"); // upload | mode | processing
+  const [step, setStep] = useState("upload"); // upload | details | processing
   const [err, setErr] = useState(null);
   const inputRef = useRef(null);
   const createdResumeId = useRef(null);
@@ -1410,7 +1408,7 @@ function ImportModal({ onClose, onDone }) {
     setFile(f);
     createdResumeId.current = null;
     setName((n) => n || f.name.replace(/\.[^.]+$/, ""));
-    setStep("mode");
+    setStep("details");
   };
 
   const run = async () => {
@@ -1423,8 +1421,7 @@ function ImportModal({ onClose, onDone }) {
       const ext = (file.name.match(/\.[^.]+$/) || [""])[0].toLowerCase();
       const created = createdResumeId.current ? null : await importResume({
         name: name || file.name.replace(/\.[^.]+$/, ""),
-        importMode: mode,
-        targetRole: targetRole || undefined,
+        importMode: "keep_format",
         template: "modern",
         ...mapParsedToSchema(parsed),
         source: {
@@ -1443,7 +1440,7 @@ function ImportModal({ onClose, onDone }) {
       await onDone();
     } catch (e) {
       setErr(e);
-      setStep("mode");
+      setStep("details");
     }
   };
 
@@ -1494,7 +1491,7 @@ function ImportModal({ onClose, onDone }) {
             </div>
           )}
 
-          {step === "mode" && file && (
+          {step === "details" && file && (
             <div>
               <div
                 style={{
@@ -1562,39 +1559,7 @@ function ImportModal({ onClose, onDone }) {
 
               <div
                 style={{
-                  fontFamily: MONO,
-                  fontSize: 11,
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                  color: "var(--jb-v3-fg-3)",
-                  marginBottom: 10,
-                }}
-              >
-                How should we import it?
-              </div>
-              <div style={{ display: "grid", gap: 10, marginBottom: 18 }}>
-                <ModeOption
-                  active={mode === "keep_format"}
-                  onClick={() => setMode("keep_format")}
-                  title="Keep original format"
-                  desc="Preserve the wording and structure of your file. We extract it into editable sections without rewriting."
-                  icon="⧉"
-                />
-                <ModeOption
-                  active={mode === "ai_rewrite"}
-                  onClick={() => setMode("ai_rewrite")}
-                  title="Rewrite with AI"
-                  desc="Import the content, then improve clarity, impact and ATS fit. AI never invents facts — you review every change."
-                  icon="✦"
-                  ai
-                />
-              </div>
-
-              <div
-                style={{
                   display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: 12,
                   marginBottom: 20,
                 }}
               >
@@ -1604,14 +1569,6 @@ function ImportModal({ onClose, onDone }) {
                     onChange={(e) => setName(e.target.value)}
                     style={inp}
                     placeholder="e.g. Backend Engineer"
-                  />
-                </Field>
-                <Field label="Target role (optional)">
-                  <input
-                    value={targetRole}
-                    onChange={(e) => setTargetRole(e.target.value)}
-                    style={inp}
-                    placeholder="e.g. Senior Backend Engineer"
                   />
                 </Field>
               </div>
@@ -1631,83 +1588,12 @@ function ImportModal({ onClose, onDone }) {
 
           {step === "processing" && (
             <div style={{ padding: "30px 0" }}>
-              <LoadingState
-                label={
-                  mode === "ai_rewrite"
-                    ? "Importing & preparing AI review…"
-                    : "Extracting your resume…"
-                }
-              />
+              <LoadingState label="Extracting your resume…" />
             </div>
           )}
         </div>
       </motion.div>
     </Overlay>
-  );
-}
-
-function ModeOption({ active, onClick, title, desc, icon, ai }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        textAlign: "left",
-        display: "flex",
-        gap: 12,
-        padding: 14,
-        borderRadius: 2,
-        cursor: "pointer",
-        background:
-          active && ai
-            ? "linear-gradient(180deg,var(--jb-v3-ok-soft),var(--jb-v3-accent-soft))"
-            : "var(--jb-v3-panel)",
-        border: `1.5px solid ${active ? "var(--jb-v3-accent)" : "var(--jb-v3-line)"}`,
-        boxShadow: active
-          ? "0 0 0 3px color-mix(in srgb, var(--jb-v3-accent) 12%, transparent)"
-          : "none",
-        fontFamily: "inherit",
-      }}
-    >
-      <span
-        style={{
-          width: 30,
-          height: 30,
-          borderRadius: 2,
-          flexShrink: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: ai ? "var(--jb-v3-accent)" : "var(--jb-v3-control)",
-          color: ai ? "#fff" : "var(--jb-v3-fg-2)",
-          fontSize: 15,
-        }}
-      >
-        {icon}
-      </span>
-      <span>
-        <span
-          style={{
-            display: "block",
-            fontSize: 14,
-            fontWeight: 700,
-            marginBottom: 3,
-          }}
-        >
-          {title}
-        </span>
-        <span
-          style={{
-            display: "block",
-            fontSize: 12.5,
-            color: "var(--jb-v3-fg-2)",
-            lineHeight: 1.5,
-          }}
-        >
-          {desc}
-        </span>
-      </span>
-    </button>
   );
 }
 
