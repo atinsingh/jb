@@ -66,6 +66,9 @@ RUN apk add --no-cache \
     ca-certificates \
     ttf-freefont
 
+RUN addgroup --system --gid 1001 nodejs \
+    && adduser --system --uid 1001 nestjs
+
 ENV NODE_ENV=production \
     PORT=8000 \
     PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
@@ -74,17 +77,18 @@ ENV NODE_ENV=production \
 WORKDIR /app
 
 # Built contracts workspace (resolved by file:../packages/contracts)
-COPY --from=builder /packages /packages
+COPY --from=builder --chown=nestjs:nodejs /packages /packages
 
 # Install production-only dependencies
 COPY backend/package.json backend/yarn.lock ./
 RUN yarn install --production --frozen-lockfile && yarn cache clean
 
 # Compiled application
-COPY --from=builder /app/dist ./dist
+COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
+COPY --from=builder --chown=nestjs:nodejs /app/.env.production ./.env.production
 
 # Runtime upload directory
-RUN mkdir -p uploads/resumes
+RUN mkdir -p uploads/resumes && chown -R nestjs:nodejs uploads
 
 EXPOSE 8000
 
@@ -92,4 +96,5 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:8000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 # Entry point: compiled NestJS bootstrap (src/main.ts -> dist/src/main.js)
+USER nestjs
 CMD ["node", "dist/src/main.js"]

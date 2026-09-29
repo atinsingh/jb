@@ -160,9 +160,14 @@ graphify-out/
 # match `.env.example`, and in git the LAST matching pattern wins.
 # ---------------------------------------------------------------------------
 !.env.example
+!.env.production.example
 
 # Per-ticket verification evidence (screenshots, generated resumes, PDFs).
 # Generated during manual browser verification runs and often contains real
 # account data from whichever account was signed in — kept local, attached to
 # the ticket by hand rather than committed.
 docs/job-*-verification/
+
+# Rendered release state contains cluster/image history and production env
+# files are baked locally into images. Templates stay tracked.
+.deploy-state/

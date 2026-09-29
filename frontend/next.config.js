@@ -113,6 +113,7 @@ const retiredMarketingRedirects = [
   { source: '/post-job', destination: '/employers' },];
 
 const nextConfig = {
+  output: 'standalone',
   experimental: {
     // Compare can run up to five 240-second review turns plus ATS and
     // accounting. Next's 30-second proxy default cuts off valid responses.

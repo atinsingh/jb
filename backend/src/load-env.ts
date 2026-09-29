@@ -15,7 +15,8 @@
  * keys with drifting values, which is exactly how a fix lands in one file and
  * not the two that were actually being read.
  *
- * Precedence: real process env > .env.local > .env. dotenv never overwrites an
+ * Precedence in production: real process env > .env.production > .env.local >
+ * .env. Development never reads .env.production. dotenv never overwrites an
  * already-exported variable, so compose and CI override any file value without
  * editing it — and re-running dotenv.config() elsewhere is a harmless no-op.
  */
@@ -46,11 +47,15 @@ function findRepoRoot(): string {
 
 export const REPO_ROOT = findRepoRoot();
 
+export function envFileNames(nodeEnv = process.env.NODE_ENV): string[] {
+  return nodeEnv === 'production'
+    ? ['.env.production', '.env.local', '.env']
+    : ['.env.local', '.env'];
+}
+
 /** Loads the repo-wide env files. Safe to call more than once. */
 export function loadRepoEnv(): void {
-  // .env.local first: dotenv keeps the first value it sees, so listing the
-  // local override ahead of the shared default makes it win.
-  for (const file of ['.env.local', '.env']) {
+  for (const file of envFileNames()) {
     const path = join(REPO_ROOT, file);
     if (existsSync(path)) dotenv.config({ path });
   }

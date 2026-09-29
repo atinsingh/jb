@@ -14,9 +14,9 @@
 #   * NODE_ENV=production, no source bind mounts, no hot reload.
 #   * The backend image entrypoint (CMD) is used - no `command:` override.
 #
-# Secrets are read from ./.env.local at the repo root (operator-supplied). NEXT_PUBLIC_API_URL
-# is inlined into the frontend bundle at build time, so set it to the PUBLIC
-# backend URL your users hit (not the internal docker hostname).
+# `.env.production` is the source of truth. Run
+# `scripts/prepare-production-env.ps1` before Compose so each Docker build gets
+# only its own generated env file. NEXT_PUBLIC_* values are browser-public.
 # ---------------------------------------------------------------------------
 
 name: jb
@@ -48,11 +48,8 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
-    # Operator supplies production secrets here (SUPABASE_*, MONGODB_URI,
-    # STRIPE_*, SMTP_*, AI keys - see .env.example at the repo root).
     env_file:
-      # One env file for the whole repo — see .env.example.
-      - ./.env.local
+      - ./.env.production
     environment:
       - NODE_ENV=production
       - PORT=8000
@@ -77,9 +74,6 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       target: runtime
-      args:
-        # PUBLIC backend URL baked into the client bundle at build time.
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     image: jobocate-frontend:prod
     container_name: jobocate-frontend
     restart: unless-stopped

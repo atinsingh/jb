@@ -17,6 +17,9 @@ export interface S3DriverConfig {
 const MISSING_DEP_MESSAGE =
   'install @aws-sdk/client-s3 and @aws-sdk/s3-request-presigner to use the s3 driver';
 
+type S3Sdk = { s3: any; presigner: any };
+type S3SdkLoader = () => Promise<S3Sdk>;
+
 /**
  * S3 (and S3-compatible) storage driver. The AWS SDK v3 is loaded lazily via
  * dynamic import so this module compiles and loads even when the SDK is not
@@ -28,7 +31,10 @@ export class S3Driver implements StorageDriver {
   private sdkModule?: any;
   private presignerModule?: any;
 
-  constructor(config: S3DriverConfig) {
+  constructor(
+    config: S3DriverConfig,
+    private readonly sdkLoader?: S3SdkLoader,
+  ) {
     this.config = config;
   }
 
@@ -39,12 +45,18 @@ export class S3Driver implements StorageDriver {
    */
   private async loadSdk(): Promise<{ s3: any; presigner: any }> {
     if (!this.sdkModule || !this.presignerModule) {
-      const dynamicImport = (name: string): Promise<any> =>
-        // eslint-disable-next-line no-new-func
-        (Function('m', 'return import(m)') as (m: string) => Promise<any>)(name);
       try {
-        this.sdkModule = await dynamicImport('@aws-sdk/client-s3');
-        this.presignerModule = await dynamicImport('@aws-sdk/s3-request-presigner');
+        if (this.sdkLoader) {
+          const loaded = await this.sdkLoader();
+          this.sdkModule = loaded.s3;
+          this.presignerModule = loaded.presigner;
+        } else {
+          const dynamicImport = (name: string): Promise<any> =>
+            // eslint-disable-next-line no-new-func
+            (Function('m', 'return import(m)') as (m: string) => Promise<any>)(name);
+          this.sdkModule = await dynamicImport('@aws-sdk/client-s3');
+          this.presignerModule = await dynamicImport('@aws-sdk/s3-request-presigner');
+        }
       } catch {
         throw new Error(MISSING_DEP_MESSAGE);
       }

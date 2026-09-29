@@ -6,8 +6,9 @@
 # Package manager: yarn (yarn.lock is the committed lockfile used by the
 # original Dockerfile). Yarn Classic is lenient with peer deps.
 #
-# NEXT_PUBLIC_* values are inlined into the client bundle at BUILD time, so
-# NEXT_PUBLIC_API_URL must be provided as a build arg for production images.
+# NEXT_PUBLIC_* values are inlined into the client bundle at BUILD time from
+# a generated frontend/.env.production. The deployment script derives it from
+# the combined root file and includes only browser-public NEXT_PUBLIC_* values.
 #
 # Stages:
 #   deps    -> all deps (used by dev compose: `next dev` needs tailwind etc.)
@@ -18,7 +19,7 @@
 # ---------------------------------------------------------------------------
 # Stage 1: deps - install ALL dependencies
 # ---------------------------------------------------------------------------
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json yarn.lock ./
 RUN yarn install --frozen-lockfile
@@ -28,10 +29,6 @@ RUN yarn install --frozen-lockfile
 # ---------------------------------------------------------------------------
 FROM deps AS builder
 WORKDIR /app
-
-# Backend URL baked into the client bundle (override at build time)
-ARG NEXT_PUBLIC_API_URL=http://localhost:8000
-ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY . .
@@ -40,22 +37,23 @@ RUN yarn build
 # ---------------------------------------------------------------------------
 # Stage 3: runtime - slim production server (`next start`)
 # ---------------------------------------------------------------------------
-FROM node:20-alpine AS runtime
+FROM node:22-alpine AS runtime
 WORKDIR /app
 
 ENV NODE_ENV=production \
     PORT=3000 \
     NEXT_TELEMETRY_DISABLED=1
 
-# Production-only dependencies (Next is a runtime dependency)
-COPY package.json yarn.lock ./
-RUN yarn install --production --frozen-lockfile && yarn cache clean
+RUN addgroup --system --gid 1001 nodejs \
+    && adduser --system --uid 1001 nextjs
 
-# Build output + assets required by `next start`
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/next.config.js ./next.config.js
+# Standalone output already contains the minimal production dependencies.
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.env.production ./.env.production
 
 EXPOSE 3000
 
-CMD ["yarn", "start"]
+USER nextjs
+CMD ["node", "server.js"]

@@ -5,7 +5,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { join } from 'path';
-import { REPO_ROOT } from './load-env';
+import { envFileNames, REPO_ROOT } from './load-env';
 
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -68,7 +68,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
  * quietly resolved to a file that no longer exists.
  */
 function getEnvFilePath(): string[] {
-  return [join(REPO_ROOT, '.env.local'), join(REPO_ROOT, '.env')];
+  return envFileNames().map((file) => join(REPO_ROOT, file));
 }
 
 @Module({
