@@ -86,6 +86,25 @@ describe('LiteLlmBudgetClient', () => {
     expect(fetchMock.mock.calls[1][0]).toContain('page=2');
   });
 
+  it('counts unattributed spend once across pages without blocking or rounding every model call', async () => {
+    const old = { request_id: 'old-a', spend: .004, request_tags: ['harness=resume'] };
+    fetchMock.mockResolvedValueOnce(response({ data: [old,
+      { request_id: 'new-a', spend: .006, request_tags: ['logicalRunId=current'] },
+    ], total_pages: 2 })).mockResolvedValueOnce(response({ data: [old,
+      { request_id: 'old-b', spend: .005 },
+      { request_id: 'new-b', spend: .005, request_tags: ['logicalRunId=current'] },
+    ], total_pages: 2 }));
+    const usage = await client.usage('sk-owner', new Date('2026-09-01Z'), new Date('2026-10-01Z'));
+    expect(usage.spendUsd).toBeCloseTo(.02);
+    expect(usage.credits).toBe(3);
+  });
+
+  it.each([undefined, -1, 'invalid'])('still rejects invalid unattributed cost %j', async (spend) => {
+    fetchMock.mockResolvedValue(response({ data: [{ request_id: 'bad', spend }], total_pages: 1 }));
+    await expect(client.usage('sk-owner', new Date('2026-09-01Z'), new Date('2026-10-01Z')))
+      .rejects.toBeInstanceOf(AiBudgetUnavailableException);
+  });
+
   it('updates, reads, and revokes only the supplied virtual key', async () => {
     fetchMock
       .mockResolvedValueOnce(response({}))

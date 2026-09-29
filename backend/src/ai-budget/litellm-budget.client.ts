@@ -138,8 +138,12 @@ export class LiteLlmBudgetClient {
             (tag: unknown) =>
               typeof tag === 'string' && /^logicalRunId=.+/.test(tag),
           );
-        if (!run) throw new AiBudgetUnavailableException();
-        operations.set(run, (operations.get(run) || 0) + cost);
+        // Missing attribution does not mean missing spend. Keep these charges
+        // in one period bucket: inventing per-request operations would overbill
+        // multi-call work. Tagged operations still round independently, and the
+        // authoritative USD total remains intact for reconciliation/enforcement.
+        const bucket = run || 'unattributed';
+        operations.set(bucket, (operations.get(bucket) || 0) + cost);
       }
     }
     const costs = [...operations.values()];
