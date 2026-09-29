@@ -46,4 +46,16 @@ describe('LiteLLM Docker persistence', () => {
     expect(compose.services.backend.ports).toContain('8000:8000');
     expect(compose.services.mongodb.ports).toContain('27018:27017');
   });
+
+  it('drops caller sampling parameters for Claude thinking routes used by ATS', () => {
+    const thinkingRoutes = liteLlm.model_list.filter(
+      (route: any) => route.litellm_params.thinking?.type === 'enabled',
+    );
+    expect(thinkingRoutes.length).toBeGreaterThan(0);
+    for (const route of thinkingRoutes) {
+      expect(route.litellm_params.additional_drop_params).toEqual(
+        expect.arrayContaining(['temperature', 'top_p', 'top_k']),
+      );
+    }
+  });
 });

@@ -56,6 +56,9 @@ model_list:
       aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
       aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
       thinking: { type: enabled, budget_tokens: 8000 }
+      # Resume-Matcher supplies temperature=0.2; Claude thinking rejects it.
+      # Keep sampling at the provider defaults for every caller of this alias.
+      additional_drop_params: [temperature, top_p, top_k]
 
   # ------------------------------------------------------------- bedrock ---
   # Amazon Bedrock via IAM (aws_access_key_id / aws_secret_access_key). A

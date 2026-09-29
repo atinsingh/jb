@@ -8,6 +8,7 @@ import { AiBudgetService } from '../ai-budget/ai-budget.service';
 import { ResumeHarnessSession, ResumeHarnessSessionDocument } from '../resume-harness/schemas/resume-harness-session.schema';
 import { AtsSession, AtsSessionDocument } from './schemas/ats-session.schema';
 import { ResumeMatcherAdapter } from './resume-matcher.adapter';
+import { ModelAliasService } from '../resume-harness/model-alias.service';
 
 export interface StartAtsSessionInput {
   resumeSessionId: string;
@@ -22,6 +23,7 @@ export class AtsSessionService {
     @InjectModel(ResumeHarnessSession.name) private readonly resumeModel: Model<ResumeHarnessSessionDocument>,
     private readonly adapter: ResumeMatcherAdapter,
     private readonly budget: AiBudgetService,
+    private readonly aliases: ModelAliasService,
     @Optional() private readonly operations?: AiOperationService,
   ) {}
 
@@ -35,6 +37,7 @@ export class AtsSessionService {
     }
     const jobDescription = input.jobDescription.trim();
     if (!jobDescription) throw new BadRequestException('A job description is required');
+    const automatic = await this.aliases.resolveAutomaticForUser(userId);
     const row = await this.atsModel.create({
       userId,
       resumeSessionId: input.resumeSessionId,
@@ -42,7 +45,7 @@ export class AtsSessionService {
       jobDescription,
       jobDescriptionHash: createHash('sha256').update(jobDescription).digest('hex'),
       harness: resume.harness,
-      alias: resume.alias,
+      alias: automatic.alias,
       status: 'ready',
     });
     return this.view(row, resume.revision);
@@ -54,6 +57,8 @@ export class AtsSessionService {
     if (resume.status !== 'active' || !resume.sandboxId) {
       throw new ConflictException('Continue this résumé to rerun ATS analysis.');
     }
+    const automatic = await this.aliases.resolveAutomaticForUser(userId);
+    row.alias = automatic.alias;
     if (resume.revision !== row.sourceRevision) {
       row.sourceRevision = resume.revision;
     }
@@ -67,15 +72,15 @@ export class AtsSessionService {
     let completed = false;
     try {
       return await this.budget.withCandidateLease(userId, 'candidate_ats_review', {
-        harness: resume.harness, alias: resume.alias, model: resume.model || resume.alias,
-        effort: resume.effort || '', sessionId: String(row._id), runId: randomUUID(),
+        harness: resume.harness, alias: automatic.alias, model: automatic.model,
+        effort: automatic.effort, sessionId: String(row._id), runId: randomUUID(),
       }, async (access, tags) => {
       const result = await this.adapter.analyze({
         sandboxId: resume.sandboxId,
         latex: this.latexFor(resume, row.sourceRevision),
         jobDescription: row.jobDescription,
         sourceRevision: row.sourceRevision,
-        alias: resume.alias,
+        alias: automatic.alias,
         apiKey: access.apiKey,
         tags,
       });

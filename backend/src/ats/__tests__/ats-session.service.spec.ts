@@ -11,6 +11,7 @@ describe('AtsSessionService', () => {
   let quota: { enforceQuota: jest.Mock; consumeCredit: jest.Mock };
   let service: AtsSessionService;
   let budget: any;
+  let aliases: any;
 
   const query = (value: any) => ({ exec: async () => value });
 
@@ -68,7 +69,11 @@ describe('AtsSessionService', () => {
       consumeCredit: jest.fn().mockResolvedValue(undefined),
     };
     budget = { withCandidateLease: jest.fn(async (_owner, _service, _attribution, task) => task({ apiKey: 'sk-candidate' }, ['logicalRunId=ats-test'])) };
-    service = new AtsSessionService(atsModel, resumeModel, adapter, budget);
+    aliases = { resolveAutomaticForUser: jest.fn().mockResolvedValue({
+      alias: 'anthropic/claude-sonnet-4-6/low', harness: 'claude-code',
+      model: 'claude-sonnet-4-6', effort: 'low',
+    }) };
+    service = new AtsSessionService(atsModel, resumeModel, adapter, budget, aliases);
   });
 
   it('runs Resume-Matcher in the existing resume sandbox and persists its values unchanged', async () => {
@@ -83,7 +88,7 @@ describe('AtsSessionService', () => {
     expect(adapter.analyze).toHaveBeenCalledWith(expect.objectContaining({
       sandboxId: 'resume-box-1',
       sourceRevision: 2,
-      alias: 'openai/gpt-5/high',
+      alias: 'anthropic/claude-sonnet-4-6/low',
     }));
     expect(result).toEqual(expect.objectContaining({
       semanticMatch: 78.5,
@@ -92,9 +97,20 @@ describe('AtsSessionService', () => {
       sourceRevision: 2,
       stale: false,
     }));
-    expect(budget.withCandidateLease).toHaveBeenCalledWith(USER_ID, 'candidate_ats_review', expect.objectContaining({ alias: 'openai/gpt-5/high' }), expect.any(Function));
+    expect(budget.withCandidateLease).toHaveBeenCalledWith(USER_ID, 'candidate_ats_review', expect.objectContaining({ alias: 'anthropic/claude-sonnet-4-6/low', model: 'claude-sonnet-4-6', effort: 'low' }), expect.any(Function));
     expect(quota.enforceQuota).not.toHaveBeenCalled();
     expect(quota.consumeCredit).not.toHaveBeenCalled();
+  });
+
+  it('uses the current automatic default when retrying an existing ATS session', async () => {
+    const started = await service.start(USER_ID, { resumeSessionId: resumeRows[0]._id, sourceRevision: 2, jobDescription: 'Engineer' });
+    expect(started.alias).toBe('anthropic/claude-sonnet-4-6/low');
+    atsRows[0].alias = resumeRows[0].alias;
+    atsRows[0].status = 'failed';
+    const result = await service.run(USER_ID, started.id);
+    expect(result).toMatchObject({ status: 'completed', alias: 'anthropic/claude-sonnet-4-6/low' });
+    expect(aliases.resolveAutomaticForUser).toHaveBeenCalledWith(USER_ID);
+    expect(resumeRows[0].alias).toBe('openai/gpt-5/high');
   });
 
   it('returns a failed analysis as recoverable session state instead of an HTTP error', async () => {
