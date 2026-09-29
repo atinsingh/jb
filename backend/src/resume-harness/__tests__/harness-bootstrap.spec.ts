@@ -175,6 +175,8 @@ describe('harness bootstrap', () => {
       '--tools', 'Read,Bash', '--', 'Review this resume',
     ]);
     expect(boot.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS).toBeUndefined();
+    expect(boot.env.CLAUDE_CODE_DISABLE_THINKING).toBe('1');
+    expect(adapter.bootstrap(bootstrapInput()).env.CLAUDE_CODE_DISABLE_THINKING).toBeUndefined();
     const configured = adapter.bootstrap({
       ...bootstrapInput(), purpose: 'resume-review',
       alias: { ...bootstrapInput().alias, maxOutputTokens: 32768 },

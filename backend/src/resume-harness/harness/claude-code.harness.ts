@@ -57,6 +57,9 @@ export class ClaudeCodeHarness implements HarnessAdapter {
         ...(alias.maxOutputTokens
           ? { CLAUDE_CODE_MAX_OUTPUT_TOKENS: String(alias.maxOutputTokens) }
           : {}),
+        // The proxy alias owns thinking policy. Do not let the review CLI's
+        // automatic thinking override the configured default model settings.
+        ...(review ? { CLAUDE_CODE_DISABLE_THINKING: '1' } : {}),
         CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
         DISABLE_TELEMETRY: '1',
         HOME: workdir,
