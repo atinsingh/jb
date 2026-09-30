@@ -1,0 +1,220 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: __NAMESPACE__-sandboxes
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.34
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jobocate-agent-platform
+  namespace: __NAMESPACE__
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: jobocate-sandboxes
+  namespace: __NAMESPACE__-sandboxes
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list, watch, create, delete]
+  - apiGroups: [""]
+    resources: [pods/exec]
+    verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jobocate-sandboxes
+  namespace: __NAMESPACE__-sandboxes
+subjects:
+  - kind: ServiceAccount
+    name: jobocate-agent-platform
+    namespace: __NAMESPACE__
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: jobocate-sandboxes
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: sandbox-capacity
+  namespace: __NAMESPACE__-sandboxes
+spec:
+  hard:
+    pods: "6"
+    requests.cpu: "1.5"
+    requests.memory: 1536Mi
+    limits.cpu: "12"
+    limits.memory: 12Gi
+    requests.ephemeral-storage: 768Mi
+    limits.ephemeral-storage: 12Gi
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sandbox-isolation
+  namespace: __NAMESPACE__-sandboxes
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 127.0.0.0/8]
+      ports:
+        - {protocol: TCP, port: 443}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: __NAMESPACE__
+          podSelector:
+            matchLabels:
+              app: jobocate-litellm
+      ports:
+        - {protocol: TCP, port: 4000}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jobocate-agent-platform
+  namespace: __NAMESPACE__
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: jobocate-agent-platform}
+  template:
+    metadata:
+      labels: {app: jobocate-agent-platform}
+    spec:
+      serviceAccountName: jobocate-agent-platform
+      imagePullSecrets: [{name: registry-__REGISTRY__}]
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: gateway
+          image: __GATEWAY_IMAGE__
+          ports: [{containerPort: 4100}]
+          envFrom: [{secretRef: {name: jobocate-agent-platform}}]
+          env:
+            - {name: SANDBOX_NAMESPACE, value: __NAMESPACE__-sandboxes}
+            - {name: REGISTRY, value: __REGISTRY__}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          resources:
+            requests: {cpu: 50m, memory: 64Mi, ephemeral-storage: 32Mi}
+            limits: {cpu: 500m, memory: 256Mi, ephemeral-storage: 256Mi}
+          readinessProbe:
+            exec:
+              command: [node, -e, "fetch('http://127.0.0.1:4100/health',{headers:{authorization:'Bearer '+process.env.AGENT_PLATFORM_API_KEY}}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jobocate-agent-platform
+  namespace: __NAMESPACE__
+spec:
+  selector: {app: jobocate-agent-platform}
+  ports: [{port: 4100, targetPort: 4100}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jobocate-litellm
+  namespace: __NAMESPACE__
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: jobocate-litellm}
+  template:
+    metadata:
+      labels: {app: jobocate-litellm}
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: litellm
+          image: __LITELLM_IMAGE__
+          args: [--config, /config/config.yaml, --port, "4000"]
+          ports: [{containerPort: 4000}]
+          envFrom: [{secretRef: {name: jobocate-litellm}}]
+          env:
+            - name: DATABASE_URL
+              valueFrom: {secretKeyRef: {name: jobocate-litellm, key: LITELLM_DATABASE_URL}}
+          volumeMounts: [{name: config, mountPath: /config, readOnly: true}]
+          resources:
+            requests: {cpu: 250m, memory: 1Gi, ephemeral-storage: 128Mi}
+            limits: {cpu: "1", memory: 2Gi, ephemeral-storage: 512Mi}
+          startupProbe:
+            httpGet: {path: /health/liveliness, port: 4000}
+            failureThreshold: 60
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: {path: /health/readiness, port: 4000}
+            periodSeconds: 15
+          livenessProbe:
+            httpGet: {path: /health/liveliness, port: 4000}
+            periodSeconds: 20
+      volumes:
+        - name: config
+          configMap: {name: jobocate-litellm-config}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jobocate-litellm
+  namespace: __NAMESPACE__
+spec:
+  selector: {app: jobocate-litellm}
+  ports: [{port: 4000, targetPort: 4000}]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jobocate-ai
+  namespace: __NAMESPACE__
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/proxy-body-size: 16m
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "1900"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "1900"
+spec:
+  ingressClassName: nginx
+  tls:
+    - secretName: jobocate-tls
+      hosts: [__HOST__]
+  rules:
+    - host: __HOST__
+      http:
+        paths:
+          - path: /lite-llm(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: jobocate-litellm
+                port: {number: 4000}
+          - path: /agent-platform(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: jobocate-agent-platform
+                port: {number: 4100}

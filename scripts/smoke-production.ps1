@@ -16,7 +16,7 @@ function Get-Ok([string]$Url, [hashtable]$Headers = @{}) {
   return $response
 }
 
-foreach ($path in @('/app/resume', '/app/resume-library', '/app/preferences', '/app/settings', '/app/billing')) {
+foreach ($path in @('/app/dashboard', '/app/resume', '/app/resume-library', '/app/preferences', '/app/settings', '/app/billing')) {
   Get-Ok "$FrontendUrl$path" | Out-Null
   Write-Host "OK $path"
 }
@@ -25,6 +25,9 @@ $health = (Get-Ok "$ApiUrl/health").Content | ConvertFrom-Json
 if ($health.status -ne 'ok') { throw 'Backend health response was not ok.' }
 $readiness = (Get-Ok "$ApiUrl/health/readiness").Content | ConvertFrom-Json
 if (-not $readiness.ready) { throw "Backend readiness failed: $($readiness.missing -join ', ')" }
+$plans = (Get-Ok "$ApiUrl/api/billing/plans").Content | ConvertFrom-Json
+if (@($plans.plans).Count -lt 2) { throw 'Billing plans are missing required seeded Free/Paid data.' }
+Write-Host 'OK public billing plans'
 
 $token = [Environment]::GetEnvironmentVariable('JOBOCATE_SMOKE_ACCESS_TOKEN')
 if ($token) {

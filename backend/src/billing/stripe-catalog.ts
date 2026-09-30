@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import Stripe from 'stripe';
 import { parse } from 'yaml';
@@ -46,7 +46,10 @@ let cachedCatalog: z.infer<typeof catalogSchema> | undefined;
 
 const catalog = () => {
   if (!cachedCatalog) {
-    const path = join(REPO_ROOT, 'backend', 'config', 'stripe-catalog.yaml');
+    const backendRoot = existsSync(join(REPO_ROOT, 'backend', 'config'))
+      ? join(REPO_ROOT, 'backend')
+      : REPO_ROOT;
+    const path = join(backendRoot, 'config', 'stripe-catalog.yaml');
     cachedCatalog = catalogSchema.parse(parse(readFileSync(path, 'utf8')));
   }
   return cachedCatalog;

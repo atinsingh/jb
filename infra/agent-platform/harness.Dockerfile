@@ -38,15 +38,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # The three harnesses. Pinned so a session's behaviour does not change under it
 # mid-week; bump deliberately.
 RUN npm install -g --no-fund --no-audit \
-      @anthropic-ai/claude-code@latest \
-      @openai/codex@latest \
-      opencode-ai@latest \
+      @anthropic-ai/claude-code@2.1.267 \
+      @openai/codex@0.154.0 \
+      opencode-ai@1.18.30 \
     && npm cache clean --force
 
 # OpenCode drives the proxy through the openai-compatible adapter declared in
 # the generated opencode.json; preinstalling it keeps the first turn from
 # spending time on a network fetch.
-RUN npm install -g --no-fund --no-audit @ai-sdk/openai-compatible
+RUN npm install -g --no-fund --no-audit @ai-sdk/openai-compatible@2.0.75
 
 COPY jobocate_ats.py /opt/resume-matcher/jobocate_ats.py
 RUN chmod 0555 /opt/resume-matcher/jobocate_ats.py

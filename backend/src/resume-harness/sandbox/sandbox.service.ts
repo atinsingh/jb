@@ -113,9 +113,15 @@ export class SandboxService {
     await budgetRunContext.getStore()?.registerSandbox(sandboxId);
     await this.operations?.resource(sandboxId, () => this.destroy(sandboxId));
     this.operations?.checkpoint();
-    const result = await work();
-    this.operations?.checkpoint();
-    return result;
+    try {
+      const result = await work();
+      this.operations?.checkpoint();
+      return result;
+    } catch (error) {
+      // Cancellation deletes the pod and interrupts its transport request.
+      this.operations?.checkpoint();
+      throw error;
+    }
   }
 
   writeFiles(sandboxId: string, files: HarnessContextFile[]): Promise<void> {

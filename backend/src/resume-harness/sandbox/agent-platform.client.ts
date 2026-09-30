@@ -9,9 +9,8 @@ import {
 } from './sandbox-driver.interface';
 
 /**
- * Thin HTTP client for a self-hosted LiteLLM Agent Platform deployment
- * (https://github.com/BerriAI/litellm-agent-platform), which is what actually
- * runs the harness CLIs in a container per session.
+ * HTTP client for Jobocate's sandbox gateway (infra/agent-platform/gateway.cjs),
+ * which runs the harness CLIs in a Kubernetes pod per session.
  *
  * It is kept deliberately narrow — create, put files, exec, get file, destroy —
  * because that is the whole surface the resume flow needs, and a narrow client
@@ -79,10 +78,7 @@ export class AgentPlatformClient {
         headers: this.apiKey ? { authorization: `Bearer ${this.apiKey}` } : {},
         signal: AbortSignal.timeout(2000),
       });
-      // Any HTTP answer means something is listening and routable. A 401 still
-      // proves the platform is up — that is a credential problem, not an
-      // availability one, and it surfaces on the call that needs the credential.
-      return res.status < 500;
+      return res.ok;
     } catch {
       return false;
     }
@@ -96,7 +92,7 @@ export class AgentPlatformClient {
       workdir: spec.workdir,
       ttl_seconds: spec.ttlSeconds,
       labels: spec.labels ?? {},
-    });
+    }, { timeoutMs: 270_000 });
     return body.id;
   }
 
@@ -152,7 +148,7 @@ export class AgentPlatformClient {
       timeout_seconds: opts.timeoutSeconds ?? 600,
       cwd: opts.cwd,
       env: opts.env,
-    });
+    }, { timeoutMs: ((opts.timeoutSeconds ?? 600) + 30) * 1000 });
     return {
       exitCode: body.exit_code,
       stdout: body.stdout ?? '',
@@ -176,7 +172,7 @@ export class AgentPlatformClient {
     method: string,
     path: string,
     body?: unknown,
-    opts: { allowNotFound?: boolean } = {},
+    opts: { allowNotFound?: boolean; timeoutMs?: number } = {},
   ): Promise<T> {
     if (!this.baseUrl) {
       throw new ServiceUnavailableException(
@@ -193,6 +189,7 @@ export class AgentPlatformClient {
           ...(this.apiKey ? { authorization: `Bearer ${this.apiKey}` } : {}),
         },
         body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(opts.timeoutMs ?? 45_000),
       });
     } catch (err: any) {
       throw new ServiceUnavailableException(

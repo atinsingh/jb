@@ -1,7 +1,7 @@
 import { test, expect, storage, expectNoHorizontalOverflow } from '../../fixtures/test';
 
 test.use({ storageState: storage.candidate });
-const destinations = ['/app/resume', '/app/resume-library', '/app/preferences', '/app/settings', '/app/billing'];
+const destinations = ['/app/dashboard', '/app/resume', '/app/resume-library', '/app/preferences', '/app/settings', '/app/billing'];
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/auth/me', r => r.fulfill({ json: { user: { id: 'candidate-layout', role: 'ROLE_CANDIDATE' } } }));
   await page.route('**/api/resume-harness/options', r => r.fulfill({ json: { models: [{ model: 'test-model', label: 'Test model', efforts: ['low'] }], sandboxAvailable: true, profile: { ready: true, missing: [], optionalGaps: [] } } }));
@@ -29,6 +29,16 @@ test('candidate v1 navigation and explicit résumé modes fit desktop and mobile
     for (const link of await nav.locator('a').all()) await expect(link).toBeVisible();
     if (width === 1280) await page.screenshot({ path: 'tmp/v1-generate-desktop.png', fullPage: true });
   }
+});
+
+test('candidate can return to Dashboard after leaving it', async ({ page }) => {
+  await page.goto('/app/dashboard');
+  const nav = page.getByRole('navigation', { name: 'Candidate navigation' });
+  await nav.getByRole('link', { name: 'Library', exact: true }).click();
+  await expect(page).toHaveURL(/\/app\/resume-library$/);
+  await nav.getByRole('link', { name: 'Dashboard', exact: true }).click();
+  await expect(page).toHaveURL(/\/app\/dashboard$/);
+  await expect(nav.getByRole('link', { name: 'Dashboard', exact: true })).toHaveAttribute('aria-current', 'page');
 });
 
 test('a generation configuration failure leaves Compare accessible', async ({ page, guards }) => {
@@ -60,7 +70,7 @@ test('library action menu stays inside the viewport and supports Escape focus re
   await expectNoHorizontalOverflow(page);
 });
 
-test('all five candidate pages fit a narrow viewport', async ({ page }) => {
+test('all candidate navigation pages fit a narrow viewport', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 850 });
   for (const destination of destinations) {
     await page.goto(destination);

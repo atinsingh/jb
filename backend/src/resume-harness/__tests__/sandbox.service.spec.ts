@@ -1,4 +1,22 @@
 import { SandboxService } from '../sandbox/sandbox.service';
+import { AiOperationCancelledException } from '../../ai-budget/ai-operation.service';
+
+describe('SandboxService cancellation', () => {
+  it('reports cancellation when deleting the sandbox interrupts an active command', async () => {
+    let cancelled = false;
+    const transportError = new Error('Kubernetes sandbox operation failed');
+    const client = { exec: jest.fn(async () => { cancelled = true; throw transportError; }) };
+    const operations = {
+      resource: jest.fn(),
+      checkpoint: () => { if (cancelled) throw new AiOperationCancelledException(); },
+    };
+    const service = new SandboxService(client as any, operations as any);
+    await expect(service.exec('box', ['run'])).rejects.toBeInstanceOf(AiOperationCancelledException);
+    cancelled = false;
+    client.exec.mockImplementation(async () => { throw transportError; });
+    await expect(service.exec('box', ['run'])).rejects.toBe(transportError);
+  });
+});
 
 describe('SandboxService ATS lifetime', () => {
   it('uses a long safety lifetime so idle cleanup, not container sleep, ends ATS work', async () => {

@@ -36,10 +36,39 @@ the frontend build context and excludes them from the backend copy.
 The backend's working local sandbox driver executes the Docker CLI. DOKS worker
 nodes use containerd and do not provide a Docker daemon to application pods, so
 the deploy preflight requires `RESUME_SANDBOX_DRIVER=agent-platform` plus a
-reachable `AGENT_PLATFORM_URL`. That service and LiteLLM are external
-dependencies of this frontend/backend ticket; deploy and verify them before the
-authenticated smoke test. This prevents a rollout that looks healthy while the
-AI résumé flow returns 503.
+reachable `AGENT_PLATFORM_URL`. `scripts/deploy-ai-production.cjs` deploys the
+authenticated Jobocate Kubernetes sandbox gateway and LiteLLM, with prefix
+routes `/agent-platform` and `/lite-llm`. It does not deploy MongoDB or Postgres.
+The backend retains `MONGODB_URI`; LiteLLM uses `LITELLM_DATABASE_URL` pointing
+to Supabase's Postgres session pooler (port 5432, encoded password,
+`sslmode=require`). Use a dedicated Supabase project/database for LiteLLM's
+Prisma-managed tables, rather than mixing them with application tables.
+
+```powershell
+node scripts/deploy-ai-production.cjs --tag prod-YYYYMMDD-N
+```
+
+For the complete stack, including plans, entitlements, model and template catalogues, run
+`powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-all-production.ps1`.
+
+Mongo seeds are idempotent: `dist/src/scripts/seed.js` reconciles candidate
+plans and entitlements, `seed-harness-aliases.js` configures the model picker,
+and `seed-resume-templates.js` configures templates. The answer question
+catalogue also seeds on backend boot. They do not insert fake accounts or jobs.
+LiteLLM applies its upstream Postgres schema during startup and creates each
+user's budget key on first access; no manual SQL or duplicate database service
+is needed. Existing configured Stripe products are used by billing, rather
+than creating products in a shared live Stripe account.
+
+Run this before the frontend/backend deployment: it writes the published
+sandbox digest back into the combined `.env.production`. Optional
+`--sandbox-image` and `--gateway-image` accept already published immutable
+digests. `--gateway-only` deploys the sandbox while the Supabase database
+credential is pending. Secrets are sent through stdin to Kubernetes, never
+printed or included in the rendered manifest. Sandboxes use a separate
+namespace, no service account token, bounded resources, restricted networking,
+24-hour deadlines and automatic cleanup. The gateway's service account can
+manage only sandbox pods; it cannot access application pods or cluster secrets.
 
 ## Validate without deploying
 

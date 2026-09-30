@@ -62,6 +62,7 @@ test('production deployment renders a Kubernetes-valid, digest-pinned release', 
       'AGENT_PLATFORM_URL=https://agents.example.test',
       'AGENT_PLATFORM_API_KEY=agent-secret',
       'DEFAULT_AUTOMATIC_MODEL_ALIAS=anthropic/claude-sonnet-4-6/low',
+      'CANDIDATE_ATS_MAX_REVIEW_TURNS=3',
       'STORAGE_DRIVER=s3',
       'S3_BUCKET=jobocate',
       'S3_REGION=us-east-1',
@@ -181,6 +182,21 @@ test('combined production template contains both public and server values', () =
   assert.ok(keys.length > 0);
   assert.ok(keys.some((key) => key.startsWith('NEXT_PUBLIC_')));
   assert.ok(keys.some((key) => !key.startsWith('NEXT_PUBLIC_')));
+});
+
+test('production preflight rejects missing Compare retry configuration', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'jobocate-preflight-'));
+  try {
+    const envFile = join(directory, 'production.env');
+    const template = readFileSync(join(root, '.env.production.example'), 'utf8')
+      .replace(/^CANDIDATE_ATS_MAX_REVIEW_TURNS=.*\r?\n/m, '')
+      .replace(/^NEXT_PUBLIC_API_URL=.*$/m, 'NEXT_PUBLIC_API_URL=https://jobocate.pragra.io')
+      .replace(/^FRONTEND_URL=.*$/m, 'FRONTEND_URL=https://jobocate.pragra.io');
+    writeFileSync(envFile, template);
+    const result = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', join(root, 'scripts/deploy-production.ps1'), '-ValidateOnly', '-ProductionEnvFile', envFile, '-RenderDirectory', join(directory, 'rendered')], {cwd:root,encoding:'utf8'});
+    assert.notEqual(result.status, 0);
+    assert.match(result.stdout + result.stderr, /CANDIDATE_ATS_MAX_REVIEW_TURNS/);
+  } finally { rmSync(directory, {recursive:true,force:true}); }
 });
 
 test('backend production template uses the Supabase S3 bucket', () => {

@@ -117,7 +117,7 @@ $backendKeys = @(
   'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'SMTP_HOST', 'SMTP_USER',
   'SMTP_PASSWORD', 'LITELLM_BASE_URL', 'LITELLM_MASTER_KEY',
   'RESUME_SANDBOX_DRIVER', 'AGENT_PLATFORM_URL', 'AGENT_PLATFORM_API_KEY',
-  'DEFAULT_AUTOMATIC_MODEL_ALIAS', 'STORAGE_DRIVER', 'S3_BUCKET', 'S3_REGION',
+  'DEFAULT_AUTOMATIC_MODEL_ALIAS', 'CANDIDATE_ATS_MAX_REVIEW_TURNS', 'STORAGE_DRIVER', 'S3_BUCKET', 'S3_REGION',
   'S3_ENDPOINT', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY'
 )
 Assert-RequiredKeys $frontendEnv $frontendKeys 'Frontend production env'
@@ -131,6 +131,9 @@ if (@($backendEnv.Keys | Where-Object { $_ -like 'NEXT_PUBLIC_*' }).Count -gt 0)
   throw 'Backend production env must not duplicate browser-facing NEXT_PUBLIC_* values.'
 }
 if ($backendEnv.NODE_ENV -ne 'production') { throw 'Backend NODE_ENV must be production.' }
+if ($backendEnv.CANDIDATE_ATS_MAX_REVIEW_TURNS -notmatch '^[1-5]$') {
+  throw 'CANDIDATE_ATS_MAX_REVIEW_TURNS must be an integer from 1 to 5.'
+}
 if ($backendEnv.RESUME_SANDBOX_DRIVER -ne 'agent-platform') {
   throw 'Kubernetes deployment requires RESUME_SANDBOX_DRIVER=agent-platform; DOKS nodes do not expose a Docker daemon to the backend pod.'
 }
@@ -264,6 +267,10 @@ if ($previousFrontend -match $pinnedImagePattern -and $previousBackend -match $p
 Invoke-Checked { kubectl apply -f $manifest } 'Kubernetes apply failed.'
 Invoke-Checked { kubectl rollout status deployment/jobocate-backend -n $Namespace --timeout=10m } 'Backend rollout did not become ready.'
 Invoke-Checked { kubectl rollout status deployment/jobocate-frontend -n $Namespace --timeout=10m } 'Frontend rollout did not become ready.'
+
+foreach ($seed in @('seed.js', 'seed-harness-aliases.js', 'seed-resume-templates.js')) {
+  Invoke-Checked { kubectl exec deployment/jobocate-backend -n $Namespace -- node "dist/src/scripts/$seed" } "Required catalogue seed failed: $seed"
+}
 
 & (Join-Path $PSScriptRoot 'smoke-production.ps1') -FrontendUrl "https://$Domain" -ApiUrl "https://$Domain"
 if ($LASTEXITCODE -ne 0) { throw 'Production smoke checks failed.' }

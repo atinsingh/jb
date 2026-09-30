@@ -1,7 +1,25 @@
 import Stripe from 'stripe';
 import { buildLiveStripeTiers } from '../stripe-catalog';
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 
 describe('Stripe catalog', () => {
+  it('loads the catalog from the production image layout', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'jobocate-catalog-'));
+    mkdirSync(join(directory, 'config'));
+    copyFileSync(join(__dirname, '../../../config/stripe-catalog.yaml'), join(directory, 'config/stripe-catalog.yaml'));
+    try {
+      jest.isolateModules(() => {
+        jest.doMock('../../load-env', () => ({ REPO_ROOT: directory }));
+        const { configuredStripeProductIds } = require('../stripe-catalog');
+        expect(configuredStripeProductIds('candidate')).toHaveLength(2);
+      });
+    } finally {
+      jest.dontMock('../../load-env');
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
   it('rejects a configured product that has no default price', () => {
     const prices = [
       {
