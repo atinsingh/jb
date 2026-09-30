@@ -7,6 +7,29 @@ const test = require('node:test');
 
 const root = resolve(__dirname, '..');
 
+test('Windows PowerShell keeps pull output out of image digests and handles first deployment', () => {
+  const script = readFileSync(join(root, 'scripts/deploy-production.ps1'), 'utf8');
+  const checked = script.slice(script.indexOf('function Invoke-Checked'), script.indexOf('function Render-Manifest'));
+  const current = script.slice(script.indexOf('function Get-CurrentImage'), script.indexOf('$previousFrontend ='));
+  const digest = `registry.digitalocean.com/perfectum/jobocate-frontend@sha256:${'e'.repeat(64)}`;
+  const result = spawnSync('powershell.exe', ['-NoProfile', '-Command', `
+    $ErrorActionPreference = 'Stop'
+    $Namespace = 'jobocate-prod'
+    function docker {
+      $global:LASTEXITCODE = 0
+      if ($args[0] -eq 'pull') { Write-Output 'Pulling image progress'; return }
+      Write-Output '["${digest}","registry.digitalocean.com/other/image@sha256:${'f'.repeat(64)}"]'
+    }
+    function kubectl { $global:LASTEXITCODE = 0 }
+    ${checked}
+    ${current}
+    $image = Get-PinnedImage 'tagged-image' 'registry.digitalocean.com/perfectum/jobocate-frontend'
+    if ($image -ne '${digest}') { throw 'Pull output polluted the digest' }
+    if ($null -ne (Get-CurrentImage 'jobocate-frontend' 'frontend')) { throw 'First deployment must have no prior image' }
+  `], { cwd: root, encoding: 'utf8' });
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+});
+
 test('production deployment renders a Kubernetes-valid, digest-pinned release', () => {
   const temp = mkdtempSync(join(tmpdir(), 'jobocate-deploy-'));
   const productionEnv = join(temp, 'production.env');

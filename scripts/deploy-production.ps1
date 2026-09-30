@@ -63,10 +63,10 @@ function Invoke-Checked([scriptblock]$Command, [string]$Failure) {
 }
 
 function Get-PinnedImage([string]$TaggedImage, [string]$Repository) {
-  Invoke-Checked { docker pull $TaggedImage } "Could not pull the published image $TaggedImage."
+  Invoke-Checked { docker pull $TaggedImage } "Could not pull the published image $TaggedImage." | Out-Host
   $raw = & docker image inspect $TaggedImage --format '{{json .RepoDigests}}'
   if ($LASTEXITCODE -ne 0) { throw "Could not inspect $TaggedImage." }
-  $digests = @($raw | ConvertFrom-Json)
+  $digests = $raw | ConvertFrom-Json
   $match = $digests | Where-Object { $_ -like "$Repository@sha256:*" } | Select-Object -First 1
   if (-not $match -or $match -notmatch '@sha256:[a-f0-9]{64}$') {
     throw "The registry did not return an immutable digest for $TaggedImage."
@@ -174,6 +174,10 @@ $frontendTagged = "${frontendRepository}:$Tag"
 $backendTagged = "${backendRepository}:$Tag"
 
 Write-Host 'Authenticating Docker with DigitalOcean Container Registry...' -ForegroundColor Cyan
+if (-not $env:DOCKER_CONFIG) {
+  $env:DOCKER_CONFIG = Join-Path $RepoRoot '.deploy-state/docker-config'
+  New-Item -ItemType Directory -Path $env:DOCKER_CONFIG -Force | Out-Null
+}
 Invoke-Checked { doctl registry login --expiry-seconds 1800 } 'DigitalOcean registry login failed.'
 
 $preparedFrontendEnv = Join-Path $RepoRoot 'frontend/.env.production'
@@ -184,6 +188,8 @@ try {
   Invoke-Checked { docker build --pull --file (Join-Path $RepoRoot 'frontend/Dockerfile') --tag $frontendTagged (Join-Path $RepoRoot 'frontend') } 'Frontend image build failed.'
   Write-Host "Building immutable backend image $backendTagged" -ForegroundColor Cyan
   Invoke-Checked { docker build --pull --file (Join-Path $RepoRoot 'backend/Dockerfile') --tag $backendTagged $RepoRoot } 'Backend image build failed.'
+  $runtimeCheck = "const fs=require('fs');fs.accessSync('logs',fs.constants.W_OK);fs.accessSync('config/stripe-catalog.yaml',fs.constants.R_OK);const {AiBudgetPolicyService}=require('./dist/src/ai-budget/ai-budget-policy.service');new AiBudgetPolicyService();console.log('Backend runtime permissions and policies: OK');"
+  Invoke-Checked { docker run --rm --entrypoint node $backendTagged -e $runtimeCheck } 'Backend runtime permission or policy validation failed.'
 } finally {
   Remove-Item -LiteralPath $preparedFrontendEnv, $preparedBackendEnv -Force -ErrorAction SilentlyContinue
 }
@@ -203,7 +209,7 @@ $ingressIp = (& kubectl get service ingress-nginx-controller -n ingress-nginx -o
 if ($LASTEXITCODE -ne 0 -or $ingressIp -notmatch '^\d{1,3}(?:\.\d{1,3}){3}$') {
   throw 'Could not resolve the nginx ingress public IP.'
 }
-$dnsRows = @(& doctl compute domain records list $DnsZone -o json | ConvertFrom-Json)
+$dnsRows = & doctl compute domain records list $DnsZone -o json | ConvertFrom-Json
 if ($LASTEXITCODE -ne 0) { throw "Could not read DNS records for $DnsZone." }
 $dns = $dnsRows | Where-Object { $_.type -eq 'A' -and $_.name -eq $DnsRecord } | Select-Object -First 1
 if (-not $dns) {
@@ -212,8 +218,9 @@ if (-not $dns) {
   Invoke-Checked { doctl compute domain records update $DnsZone --record-id $dns.id --record-type A --record-name $DnsRecord --record-data $ingressIp --record-ttl 300 } "Could not update DNS for $Domain."
 }
 
-& kubectl get namespace $Namespace *> $null
-if ($LASTEXITCODE -ne 0) {
+$existingNamespace = & kubectl get namespace $Namespace --ignore-not-found -o name
+if ($LASTEXITCODE -ne 0) { throw "Could not check namespace $Namespace." }
+if (-not $existingNamespace) {
   Invoke-Checked { kubectl create namespace $Namespace } "Could not create namespace $Namespace."
 }
 
@@ -228,8 +235,9 @@ try {
 }
 
 function Get-CurrentImage([string]$Deployment, [string]$Container) {
-  $value = & kubectl get deployment $Deployment -n $Namespace -o "jsonpath={.spec.template.spec.containers[?(@.name=='$Container')].image}" 2>$null
-  if ($LASTEXITCODE -ne 0) { return $null }
+  $value = & kubectl get deployment $Deployment -n $Namespace --ignore-not-found -o "jsonpath={.spec.template.spec.containers[?(@.name=='$Container')].image}"
+  if ($LASTEXITCODE -ne 0) { throw "Could not inspect deployment $Deployment." }
+  if (-not $value) { return $null }
   return ([string]$value).Trim()
 }
 

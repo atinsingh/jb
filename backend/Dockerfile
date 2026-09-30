@@ -85,10 +85,12 @@ RUN yarn install --production --frozen-lockfile && yarn cache clean
 
 # Compiled application
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
+COPY --from=builder --chown=nestjs:nodejs /app/config ./config
+COPY --chown=nestjs:nodejs infra/litellm/config.yaml /infra/litellm/config.yaml
 COPY --from=builder --chown=nestjs:nodejs /app/.env.production ./.env.production
 
-# Runtime upload directory
-RUN mkdir -p uploads/resumes && chown -R nestjs:nodejs uploads
+# Runtime directories writable by the non-root process.
+RUN mkdir -p uploads/resumes logs && chown -R nestjs:nodejs uploads logs
 
 EXPOSE 8000
 
