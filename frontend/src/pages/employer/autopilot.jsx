@@ -256,7 +256,7 @@ export default function EmployerAutopilot() {
   const heroTitle = on ? 'Autopilot is ON' : 'Autopilot is paused';
   const heroSub = on
     ? `Working across ${stats?.reqsCovered ?? 0} reqs — screening, ranking and proposing actions for your approval.`
-    : 'Resume to let AI screen applicants and queue actions across your open reqs.';
+    : 'Resume to let screen applicants and queue actions across your open reqs.';
   const heroGlow = on ? 'rgba(31,164,99,0.32)' : 'rgba(122,115,103,0.18)';
   const heroIconBg = on ? '#1E2D24' : '#2C2A22';
   const heroIconColor = on ? '#5BD08C' : '#8A8378';
@@ -288,7 +288,7 @@ export default function EmployerAutopilot() {
   return (
     <>
       <Head>
-        <title>Autopilot · AI Hiring — Jobocate</title>
+        <title>Autopilot · Hiring — Jobocate</title>
       </Head>
 
       <style jsx global>{`
@@ -359,7 +359,7 @@ export default function EmployerAutopilot() {
                   color: '#9A9286',
                 }}
               >
-                AI / Autopilot
+                Autopilot
               </span>
             </div>
             <div style={{ flex: 1 }} />

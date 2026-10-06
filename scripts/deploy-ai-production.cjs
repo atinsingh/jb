@@ -7,7 +7,7 @@ const root=path.resolve(__dirname,'..');
 const option=(name,fallback)=>{const i=process.argv.indexOf(name);return i<0?fallback:process.argv[i+1];};
 const namespace=option('--namespace','jobocate-prod');
 const registry=option('--registry','perfectum');
-const domain=option('--domain','jobocate.pragra.io');
+const domain=option('--domain','jobocate.com');
 const tag=option('--tag',null);
 const gatewayOnly=process.argv.includes('--gateway-only');
 const validateOnly=process.argv.includes('--validate-only');

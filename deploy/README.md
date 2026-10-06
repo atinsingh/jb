@@ -9,7 +9,7 @@ not modify the existing `perfectum-prod` frontend/backend workloads.
 
 - DigitalOcean cluster: `perfectum-k8s` by default
 - DigitalOcean registry: `perfectum` by default
-- `jobocate.pragra.io`, created/updated by the deploy script as an A record
+- `jobocate.com`, created/updated by the deploy script as an A record
   pointing at the cluster ingress address
 - One root `.env.production`, copied from `.env.production.example`; the deploy
   script splits it into short-lived image-specific files before each build
@@ -75,7 +75,7 @@ manage only sandbox pods; it cannot access application pods or cluster secrets.
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-production.ps1 `
   -ValidateOnly `
-  -Domain jobocate.pragra.io
+  -Domain jobocate.com
 ```
 
 Validation checks required env keys, public/private separation, production
@@ -87,9 +87,9 @@ push, or change the cluster.
 ```powershell
 $env:JOBOCATE_SMOKE_ACCESS_TOKEN = '<short-lived candidate access token>'
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-production.ps1 `
-  -Domain jobocate.pragra.io `
-  -DnsZone pragra.io `
-  -DnsRecord jobocate
+  -Domain jobocate.com `
+  -DnsZone jobocate.com `
+  -DnsRecord '@'
 Remove-Item Env:JOBOCATE_SMOKE_ACCESS_TOKEN
 ```
 
@@ -101,7 +101,7 @@ The script:
    commit tag;
 4. resolves each pushed image to its registry digest;
 5. loads the DOKS kubeconfig and installs private registry pull credentials;
-6. creates or corrects the `jobocate.pragra.io` A record with `doctl`;
+6. creates or corrects the `jobocate.com` A record with `doctl`;
 7. saves the currently deployed digests under `.deploy-state/` when a prior
    complete release exists;
 8. applies namespace, deployments, services, TLS ingress, probes, and
@@ -111,8 +111,8 @@ The script:
 
 The public frontend and backend share one origin. nginx routes `/api`,
 `/health`, and `/socket.io` to NestJS and routes everything else to Next.js.
-Therefore `NEXT_PUBLIC_API_URL` is `https://jobocate.pragra.io`, while the
-actual REST endpoints remain under `https://jobocate.pragra.io/api/...`.
+Therefore `NEXT_PUBLIC_API_URL` is `https://jobocate.com`, while the
+actual REST endpoints remain under `https://jobocate.com/api/...`.
 
 The access token stays in the process environment and is never written to the
 manifest, state file, image, ticket, or command line. Without it, public smoke

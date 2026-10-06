@@ -136,7 +136,7 @@ export default function FindJobs() {
   return (
     <>
       <Head>
-        <title>Browse Jobs — AI Job Search | Jobocate</title>
+        <title>Browse Jobs — Job Search | Jobocate</title>
         <meta
           name="description"
           content="Browse open roles pulled straight from verified company career pages. No reposts, no scam listings — and every match opens to show exactly why it fits."

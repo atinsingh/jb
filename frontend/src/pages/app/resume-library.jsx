@@ -73,13 +73,13 @@ const relTime = (d) => {
 const METHOD_META = {
   manual: { label: "Created", icon: "✎" },
   imported: { label: "Imported", icon: "↧" },
-  ai_generated: { label: "AI-generated", icon: "✦" },
+  ai_generated: { label: "Generated", icon: "✦" },
   duplicate: { label: "Duplicate", icon: "⧉" },
 };
 
 const FILTERS = [
   { key: "all", label: "All" },
-  { key: "ai_generated", label: "AI-generated" },
+  { key: "ai_generated", label: "Generated" },
   { key: "imported", label: "Imported" },
   { key: "archived", label: "Archived" },
 ];
@@ -208,16 +208,6 @@ export default function ResumeLibrary() {
 
   const libraryLoading = loading || agentSessions === null;
 
-  const summary = useMemo(() => {
-    const active = libraryItems.filter((r) => r.status !== "archived");
-    const generated = active.filter((r) => r.libraryKind === "agent").length;
-    const imported = active.filter(
-      (r) => r.creationMethod === "imported",
-    ).length;
-    const archived = libraryItems.filter((r) => r.status === "archived").length;
-    return { total: active.length, generated, imported, archived };
-  }, [libraryItems]);
-
   const visible = useMemo(() => {
     let list = libraryItems.slice();
     if (filter === "archived")
@@ -300,7 +290,7 @@ export default function ResumeLibrary() {
         if (r.libraryKind === "agent") {
           const { pdfBase64 } = await getHarnessPdf(r.sessionId);
           if (!pdfBase64)
-            throw new Error("This résumé does not have a PDF yet.");
+            throw new Error("This resume does not have a PDF yet.");
           const bytes = Uint8Array.from(atob(pdfBase64), (char) =>
             char.charCodeAt(0),
           );
@@ -493,7 +483,7 @@ export default function ResumeLibrary() {
                     maxWidth: 560,
                   }}
                 >
-                  Your imported résumés, AI drafts, and saved versions.
+                  Your resumes and saved versions.
                 </p>
               </div>
               <div style={{ display: "flex", gap: 10 }}>
@@ -509,7 +499,7 @@ export default function ResumeLibrary() {
                   type="button"
                   className="jb-btn"
                   aria-label="Create Resume"
-                  onClick={() => router.push("/app/resume")}
+                  onClick={() => router.push("/app/resume?mode=generate")}
                   style={primaryBtn}
                 >
                   + Create Resume
@@ -531,8 +521,8 @@ export default function ResumeLibrary() {
                   fontSize: 13,
                 }}
               >
-                Imported résumés are temporarily unavailable. AI-generated
-                résumés remain available.
+                Imported resumes are temporarily unavailable. Generated
+                resumes remain available.
                 <button
                   type="button"
                   onClick={load}
@@ -553,41 +543,10 @@ export default function ResumeLibrary() {
                   fontSize: 13,
                 }}
               >
-                AI-generated résumés are temporarily unavailable. You can still
-                create or import a résumé.
+                Generated resumes are temporarily unavailable. You can still
+                create or import a resume.
               </div>
             )}
-
-            {/* SUMMARY CARDS */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))",
-                gap: 14,
-                marginBottom: 22,
-              }}
-            >
-              <SummaryCard
-                label="Total resumes"
-                value={libraryLoading ? "—" : summary.total}
-                hint="in your library"
-              />
-              <SummaryCard
-                label="AI-generated"
-                value={libraryLoading ? "—" : summary.generated}
-                hint="linked to sessions"
-              />
-              <SummaryCard
-                label="Imported"
-                value={libraryLoading ? "—" : summary.imported}
-                hint="uploaded by you"
-              />
-              <SummaryCard
-                label="Archived"
-                value={libraryLoading ? "—" : summary.archived}
-                hint="available to restore"
-              />
-            </div>
 
             {/* TOOLBAR */}
             <div
@@ -622,7 +581,7 @@ export default function ResumeLibrary() {
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search résumés…"
+                  placeholder="Search resumes…"
                   aria-label="Search resumes"
                   style={{
                     width: "100%",
@@ -741,7 +700,7 @@ export default function ResumeLibrary() {
               <EmptyState
                 icon="📄"
                 title="No resumes yet"
-                hint="Create one with the résumé agent or import your existing PDF or DOCX."
+                hint="Create a resume or import your existing PDF or DOCX."
                 action={
                   <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
                     <button
@@ -827,8 +786,8 @@ export default function ResumeLibrary() {
             title={`Delete “${confirmDelete.name}”?`}
             body={
               confirmDelete.libraryKind === "agent"
-                ? "This permanently removes the AI-generated résumé, its linked session, every revision, and every saved PDF."
-                : "This permanently removes the résumé and its version history. Any job applications that used it keep their record."
+                ? "This permanently removes the Generated resume, its linked session, every revision, and every saved PDF."
+                : "This permanently removes the resume and its version history. Any job applications that used it keep their record."
             }
             confirmLabel={
               confirmDelete.libraryKind === "agent"
@@ -867,43 +826,6 @@ function humanizeKey(value) {
     .split("-")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
-}
-
-function SummaryCard({ label, value, hint }) {
-  return (
-    <div
-      style={{
-        background: "var(--jb-v3-panel)",
-        border: "1px solid var(--jb-v3-line)",
-        borderRadius: 2,
-        padding: "16px 18px",
-      }}
-    >
-      <div
-        style={{
-          fontFamily: MONO,
-          fontSize: 11,
-          letterSpacing: "0.1em",
-          textTransform: "uppercase",
-          color: "var(--jb-v3-fg-3)",
-          marginBottom: 8,
-        }}
-      >
-        {label}
-      </div>
-      <div
-        style={{
-          fontSize: 26,
-          fontWeight: 700,
-          lineHeight: 1,
-          marginBottom: 4,
-        }}
-      >
-        {value}
-      </div>
-      <div style={{ fontSize: 12, color: "var(--jb-v3-fg-3)" }}>{hint}</div>
-    </div>
-  );
 }
 
 function Thumbnail({ r, h = 132 }) {
@@ -1434,7 +1356,7 @@ function ImportModal({ onClose, onDone }) {
         },
       });
       const id = createdResumeId.current || created?.id || created?._id;
-      if (!id) throw new Error("Could not identify the imported résumé.");
+      if (!id) throw new Error("Could not identify the imported resume.");
       createdResumeId.current = id;
       await uploadCompareSource(id, file);
       await onDone();

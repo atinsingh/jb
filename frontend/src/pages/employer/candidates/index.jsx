@@ -279,7 +279,7 @@ export default function EmployerCandidates() {
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 12, flexShrink: 0 }}>
                         <div style={{ textAlign: 'right' }}>
                           <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 20, fontWeight: 600, color: candidate.match >= 90 ? '#157A49' : candidate.match >= 80 ? '#4263EB' : '#8A8378' }}>{candidate.match}%</div>
-                          <div style={{ ...monoLabel, fontSize: 11, letterSpacing: '0.06em' }}>AI match</div>
+                          <div style={{ ...monoLabel, fontSize: 11, letterSpacing: '0.06em' }}>match</div>
                         </div>
                         <button onClick={() => handleViewDetails(candidate)} className="em-ghost" style={ghostBtn}>View profile</button>
                       </div>
@@ -316,7 +316,7 @@ export default function EmployerCandidates() {
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 18, background: '#EDF0FE', border: '1px solid #C7D2FB', borderRadius: 14, padding: '14px 16px', marginBottom: 20 }}>
                 <div>
-                  <div style={{ ...monoLabel, fontSize: 11, color: '#7C86C6', marginBottom: 3 }}>AI match</div>
+                  <div style={{ ...monoLabel, fontSize: 11, color: '#7C86C6', marginBottom: 3 }}>match</div>
                   <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 22, fontWeight: 600, color: '#1F2D6B' }}>{selectedCandidate.match}%</div>
                 </div>
                 <div style={{ width: 1, alignSelf: 'stretch', background: '#C7D2FB' }} />

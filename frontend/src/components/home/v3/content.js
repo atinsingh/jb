@@ -31,7 +31,7 @@ export const HERO_STATS = [
   { key: 'Median coverage lift', value: '+31', unit: 'pts' },
   { key: 'Reply rate', value: '3.4', unit: '×' },
   { key: 'Time per application', value: '90', unit: 'sec' },
-  { key: 'Résumés tailored', value: '412k', unit: '' },
+  { key: 'Resumes tailored', value: '412k', unit: '' },
 ];
 
 export const PROOF = {
@@ -48,9 +48,9 @@ export const PROOF = {
 export const AUDIENCES = [
   {
     who: 'For candidates',
-    claim: 'Build the résumé, know the score, talk to someone who has hired.',
+    claim: 'Build the resume, know the score, talk to someone who has hired.',
     lines: [
-      { k: 'Résumé tailored per posting', v: '90 sec' },
+      { k: 'Resume tailored per posting', v: '90 sec' },
       { k: 'ATS coverage scored before you send', v: '0-100' },
       { k: 'Claims you cannot defend, flagged', v: 'Gated' },
       { k: 'Human mentors on call', v: '5 fields' },
@@ -58,7 +58,7 @@ export const AUDIENCES = [
   },
   {
     who: 'For employers',
-    claim: 'Candidates whose résumés have been verified, not generated.',
+    claim: 'Candidates whose resumes have been verified, not generated.',
     lines: [
       { k: 'Every inferred claim confirmed by the candidate', v: 'Required' },
       { k: 'Coverage scored against your own posting', v: 'Per role' },
@@ -70,7 +70,7 @@ export const AUDIENCES = [
 
 export const MENTORS = {
   eyebrow: 'Human mentors',
-  heading: 'The software scores the résumé. A person walks you through the search.',
+  heading: 'The software scores the resume. A person walks you through the search.',
   body: 'Recruiters, comp leads, and staff engineers you can search by speciality and message directly. Read their track record before you pick.',
   cta: { label: 'Browse mentors', href: '/app/concierge' },
   people: [

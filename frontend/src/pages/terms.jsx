@@ -11,7 +11,7 @@ export default function Terms() {
     },
     {
       title: 'Description of Service',
-      content: `Jobocate provides an AI-powered job search platform that includes resume building, job matching, automated job applications, and career tools. We submit applications to verified company career pages on your behalf based on your preferences and profile information.`
+      content: `Jobocate provides a job search platform that includes resume building, job matching, automated job applications, and career tools. We submit applications to verified company career pages on your behalf based on your preferences and profile information.`
     },
     {
       title: 'User Accounts',
@@ -87,7 +87,7 @@ export default function Terms() {
             >
               <div className="p-8 rounded-2xl bg-gray-50 border border-gray-100 mb-8">
                 <p className="text-gray-600 text-lg leading-relaxed">
-                  Welcome to Jobocate. These Terms of Service govern your use of our AI-powered job search platform. Please read them carefully before using our services.
+                  Welcome to Jobocate. These Terms of Service govern your use of our job search platform. Please read them carefully before using our services.
                 </p>
               </div>
 

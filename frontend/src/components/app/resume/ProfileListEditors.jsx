@@ -3,16 +3,16 @@
 import { useState } from 'react';
 
 /**
- * Editors for the optional résumé data: work experience, certifications and
+ * Editors for the optional resume data: work experience, certifications and
  * standalone achievements.
  *
- * These live in Settings rather than on the résumé screen on purpose. The
+ * These live in Settings rather than on the resume screen on purpose. The
  * generator reads them from the account and never asks for them again, so this
  * is the single place they are entered — a copy on the generator page would
  * drift from the account and the candidate would have no way to tell which one
- * their résumé was built from.
+ * their resume was built from.
  *
- * All three are optional. Absent means a thinner résumé, never a blocked one.
+ * All three are optional. Absent means a thinner resume, never a blocked one.
  */
 
 const T = {
@@ -133,7 +133,7 @@ export default function ProfileListEditors({
       <Section
         testId="experience-editor"
         title="Work experience"
-        hint="Optional, and the single biggest thing your résumé is built from. Achievements are the lines the generator will draw on most."
+        hint="Optional, and the single biggest thing your resume is built from. Achievements are the lines the generator will draw on most."
         addLabel="Add a role"
         onAdd={() =>
           set('experience', [

@@ -27,6 +27,8 @@ export const getResumeData = async () => apiCall('/api/resume/data');
 // GET /api/resume-builder  ->  [{ id, name, template, ... }]
 export const listResumes = async () => apiCall('/api/resume-builder');
 
+export const getLoginHistory = async () => apiCall('/api/auth/login-history');
+
 // POST /api/resume-builder  (CreateResumeDto)
 export const createResume = async (payload) =>
   apiCall('/api/resume-builder', {

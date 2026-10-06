@@ -9,7 +9,7 @@ import { appRoute } from '@/components/app/appRoutes';
 import { employerNotificationsApi } from '@/services/employerApi';
 
 /* ----------------------------------------------------------------- data --- */
-const TYPE_LABELS = { applicants: 'Applicants', interviews: 'Interviews', offers: 'Offers', ai: 'AI agents' };
+const TYPE_LABELS = { applicants: 'Applicants', interviews: 'Interviews', offers: 'Offers', ai: 'agents' };
 const typeLabel = (t) => TYPE_LABELS[t] || t;
 
 // Per-type tint/ink (mirrors the design's row swatches) for live notifications.
@@ -39,7 +39,7 @@ const FILTER_DEFS = [
   { key: 'applicants', label: 'Applicants' },
   { key: 'interviews', label: 'Interviews' },
   { key: 'offers', label: 'Offers' },
-  { key: 'ai', label: '✦ AI' },
+  { key: 'ai', label: '✦ Automated' },
 ];
 
 const GROUP_DEFS = [
@@ -272,7 +272,7 @@ export default function EmployerNotifications() {
                 Notifications
               </h1>
               <p style={{ fontSize: 15.5, color: '#5A544A', margin: 0 }}>
-                <b style={{ color: '#1B1A16' }}>{unreadCount} unread</b> · activity across your reqs and AI agents.
+                <b style={{ color: '#1B1A16' }}>{unreadCount} unread</b> · activity across your reqs and agents.
               </p>
             </div>
 
@@ -369,7 +369,7 @@ export default function EmployerNotifications() {
                           <span style={{ fontSize: 14, fontWeight: n.weight, lineHeight: 1.45, color: n.textColor }}>
                             {n.text}
                           </span>
-                          {n.isAI && (
+                          {n.is&& (
                             <span
                               style={{
                                 fontFamily: 'var(--jb-font-mono)',
@@ -383,7 +383,7 @@ export default function EmployerNotifications() {
                                 borderRadius: 999,
                               }}
                             >
-                              ✦ AI
+                              ✦ Automated
                             </span>
                           )}
                         </div>

@@ -13,7 +13,7 @@ const CATEGORIES = [
   'Billing & plans',
   'Auto-Apply',
   'Matches & applications',
-  'Résumé & cover letters',
+  'Resume & cover letters',
   'Account & login',
   'Something else',
 ];

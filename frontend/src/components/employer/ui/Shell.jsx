@@ -43,12 +43,12 @@ const GROUPS = [
     { key: 'candidates', label: 'Candidates', href: '/employer/candidates', icon: 'candidates' },
     { key: 'interviews', label: 'Interviews', href: '/employer/interviews', icon: 'interviews' },
   ] },
-  { title: 'AI Recruiter', items: [
+  { title: 'Recruiting tools', items: [
     { key: 'autopilot', label: 'Autopilot', href: '/employer/autopilot', icon: 'sparkle', ai: true },
     { key: 'copilot', label: 'Copilot', href: '/employer/copilot', icon: 'sparkle', ai: true },
     { key: 'sourcing', label: 'Sourcing', href: '/employer/sourcing', icon: 'sparkle', ai: true },
     { key: 'screening', label: 'Screening', href: '/employer/screening', icon: 'screening', ai: true },
-    { key: 'ai-interview', label: 'AI Interview', href: '/employer/ai-interview', icon: 'sparkle', ai: true },
+    { key: 'ai-interview', label: 'Interview', href: '/employer/ai-interview', icon: 'sparkle', ai: true },
   ] },
   { title: 'Engage', items: [
     { key: 'talent-pool', label: 'Talent Pool', href: '/employer/talent-pool', icon: 'talent' },

@@ -86,7 +86,7 @@ function Ring({ value }) {
 }
 
 // `onScore` lets the parent know a check produced a score. Without it the page
-// keeps rendering its own "Résumé strength" ring alongside this one, because
+// keeps rendering its own "Resume strength" ring alongside this one, because
 // the persisted `atsScore` it gates on is only refreshed on reload.
 export default function AtsPanel({ resumeId, initialScore = null, initialReport = null, onScore }) {
   const [report, setReport] = useState(initialReport);
@@ -109,7 +109,7 @@ export default function AtsPanel({ resumeId, initialScore = null, initialReport 
       setScore(next);
       if (typeof next === 'number' && onScore) onScore(next);
     } catch (e) {
-      setError(e.message || 'Could not check this résumé.');
+      setError(e.message || 'Could not check this resume.');
     } finally {
       setChecking(false);
     }
@@ -141,7 +141,7 @@ export default function AtsPanel({ resumeId, initialScore = null, initialReport 
             {hasScore ? label.title : 'ATS compatibility'}
           </div>
           <div style={{ fontSize: 13, color: '#5A544A' }}>
-            {hasScore ? label.hint : 'Check whether an applicant-tracking system can read this résumé.'}
+            {hasScore ? label.hint : 'Check whether an applicant-tracking system can read this resume.'}
           </div>
         </div>
         <button type="button" onClick={runCheck} disabled={checking} style={btn}>
@@ -236,7 +236,7 @@ export default function AtsPanel({ resumeId, initialScore = null, initialReport 
                 </div>
                 {/* This result is never stored — it describes a pairing, not the document. */}
                 <p style={{ fontSize: 11.5, color: '#8A8375', margin: '3px 0 9px' }}>
-                  Not saved to your résumé — it changes with every job.
+                  Not saved to your resume — it changes with every job.
                 </p>
 
                 {match.missing.length > 0 ? (
@@ -245,7 +245,7 @@ export default function AtsPanel({ resumeId, initialScore = null, initialReport 
                   </div>
                 ) : (
                   <div style={{ fontSize: 13, color: '#157A49' }}>
-                    Your résumé evidences everything this job named.
+                    Your resume evidences everything this job named.
                   </div>
                 )}
               </div>

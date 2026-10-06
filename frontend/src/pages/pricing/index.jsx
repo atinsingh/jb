@@ -25,11 +25,10 @@ import { getPlans } from '@/services/billingApi';
  */
 
 const FAQS = [
-  ['What counts as an auto-apply credit?', 'One credit = one application submitted on your behalf to a verified company career page. Matching, resume building and tracking never use credits.'],
-  ['Can I switch plans or cancel anytime?', 'Yes. Upgrade, downgrade or cancel from your dashboard at any time. Changes take effect at the next billing cycle and unused annual time is prorated.'],
-  ['What happens when I hit the free limit?', 'Your matches keep updating and your tracker keeps working. You only lose the extra auto-apply volume, and nothing already filed is affected.'],
-  ['Does it invent experience?', 'No. Anything inferred goes to claims review, and export locks until you clear it.'],
-  ['Are there credit packs I should watch for?', 'No. One flat monthly price per tier, cancel in two clicks, and your plan never silently renews at a higher rate.'],
+  ['What uses credits?', 'Resume generation and rewriting use your plan allowance. Resume comparison uses local checks and does not use generation credits.'],
+  ['Can I manage my plan?', 'You can manage your subscription and billing from your account’s billing page.'],
+  ['What happens when I use my allowance?', 'New generation requests pause until your allowance resets or you upgrade. Your saved resumes remain available, and you can keep comparing documents.'],
+  ['Can I edit my resume?', 'Yes. Refine the wording, keep your versions together, and review the details before downloading your PDF.'],
 ];
 
 const SIGNUP = '/app/signup';
@@ -65,8 +64,8 @@ export default function Pricing() {
   return (
     <>
       <Head>
-        <title>Jobocate Pricing — AI Job Search Plans</title>
-        <meta name="description" content="Start free, forever. Upgrade only if the extra volume earns it — no hidden auto-renewals, no credit packs, cancel anytime." />
+        <title>Jobocate Pricing — Job Search Plans</title>
+        <meta name="description" content="Choose a plan for comparing, creating and refining your resumes with Jobocate." />
         <link rel="canonical" href="https://jobocate.com/pricing" />
       </Head>
 
@@ -86,14 +85,14 @@ export default function Pricing() {
 
           {error ? <p role="alert">Unable to load pricing from Stripe. Please try again.</p> : null}
           {!error && tiers.length === 0 ? <p>Loading pricing…</p> : null}
-          <div className={`${styles.strip} ${tiers.length === 3 ? styles.strip3 : ''}`}>
+          <div className={`${styles.strip} ${styles.pricingGrid}`}>
             {tiers.map((tier) => (
               <div key={tier.type} data-testid="candidate-pricing-tier" data-tier={tier.type} className={`${styles.tier} ${tier.type === 'PRO' ? styles.tierFeatured : ''}`}>
                 <div className={styles.tierHead}>
                   <h2 className={styles.tierName}>{tier.name}</h2>
                   {tier.type === 'PRO' ? <span className={styles.tierTag}>Paid</span> : null}
                 </div>
-                <p className={styles.tierSub}>{tier.description || (tier.type === 'FREE' ? 'Try the loop' : 'Active search')}</p>
+                <p className={styles.tierSub}>{tier.type === 'FREE' ? 'Explore resume tools at your own pace.' : 'More room to create and refine your resume.'}</p>
 
                 <p className={styles.tierPrice}>
                   <span className={styles.tierPriceValue}>{formatPrice(tier)}</span>
@@ -104,7 +103,7 @@ export default function Pricing() {
                   {tier.features.map((f) => (
                     <li key={f} className={styles.tierFeature}>
                       <span className={styles.tierTick} aria-hidden="true" />
-                      <span>{f}</span>
+                      <span>{f.replace(/\bAI[- ]?/g, '')}</span>
                     </li>
                   ))}
                 </ul>

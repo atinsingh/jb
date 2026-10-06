@@ -6,7 +6,8 @@ import { ThemeProvider } from 'next-themes';
 import ThemeProviderWrapper from '@/components/theme/ThemeProviderWrapper';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { Instrument_Serif, Public_Sans, IBM_Plex_Mono, Sora, DM_Mono } from 'next/font/google';
+import localFont from 'next/font/local';
+import { Instrument_Serif, IBM_Plex_Mono, Sora, DM_Mono } from 'next/font/google';
 
 /*
  * ============================================================================
@@ -35,9 +36,9 @@ const fontDisplay = Instrument_Serif({
 });
 
 // Body / UI sans. <-- SWAP THIS ONE LINE TO CHANGE THE SANS FACE.
-const fontSans = Public_Sans({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
+const fontSans = localFont({
+  src: '../assets/fonts/public-sans-latin.woff2',
+  weight: '100 900',
   display: 'swap',
   fallback: ['system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
 });
@@ -126,7 +127,7 @@ export default function App({ Component, pageProps }) {
             <meta name="description" content="Jobocate - Find your dream job today" />
           </Head>
           {isAppSurface ? (
-            <div className="jb jbv3" style={{ display: 'contents' }}>
+            <div className={`jb jbv3 ${router.pathname.startsWith('/app') ? 'jb-candidate' : ''}`} style={{ display: 'contents' }}>
               {page}
             </div>
           ) : (

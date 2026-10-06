@@ -1,5 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ResumeComparisonService } from './resume-comparison.service';
+import { AtsParseabilityService } from '../ats/ats-parseability.service';
+import { AtsMatchService } from '../ats/ats-match.service';
 
 describe('ResumeComparisonService', () => {
   const userId = '507f1f77bcf86cd799439011';
@@ -23,6 +25,7 @@ describe('ResumeComparisonService', () => {
 
   const resumeModel = {
     findOne: jest.fn(),
+    updateOne: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
   };
   const aiContent = {
     analyze: jest.fn(() => ({
@@ -46,9 +49,6 @@ describe('ResumeComparisonService', () => {
     put: jest.fn().mockResolvedValue({ key: 'resumes/compare/original.pdf' }),
     getBuffer: jest.fn().mockResolvedValue(Buffer.from('%PDF-preview')),
   };
-  const agentReview = {
-    review: jest.fn(),
-  };
   const parser = { extractText: jest.fn(), heuristicParse: jest.fn() };
 
   let service: ResumeComparisonService;
@@ -63,52 +63,11 @@ describe('ResumeComparisonService', () => {
       aiContent as any,
       jobDescriptions as any,
       storage as any,
-      agentReview as any,
       parser as any,
+      new AtsParseabilityService(),
+      new AtsMatchService(),
     );
-    agentReview.review.mockResolvedValue({
-      source: 'agent-session',
-      sessionId: 'candidate-ats-session-1',
-      harness: 'opencode',
-      modelAlias: 'bedrock/nova-2-lite/low',
-      ats: {
-        score: 81,
-        findings: [{
-          code: 'AGENT_ATS_1',
-          severity: 'warning',
-          message: 'The first bullet is too vague for an ATS reviewer.',
-          fix: 'Name the API type, scale, and measured result.',
-          section: 'experience',
-          quote: 'Built APIs.',
-        }],
-      },
-      match: {
-        coverage: 63,
-        matched: ['typescript'],
-        missing: ['aws'],
-        keywordCount: 2,
-      },
-      annotations: [
-        {
-          id: 'agent-1',
-          section: 'experience',
-          severity: 'warning',
-          color: 'amber',
-          message: 'This bullet does not show scope or impact.',
-          fix: 'State what the API served and quantify the outcome.',
-          quote: 'Built APIs.',
-        },
-        {
-          id: 'agent-2',
-          section: 'experience',
-          severity: 'critical',
-          color: 'red',
-          message: 'This second bullet repeats the same weak construction.',
-          fix: 'Replace it with a distinct, job-relevant accomplishment.',
-          quote: 'Built services.',
-        },
-      ],
-    });
+
   });
 
   it('requires a job description or URL before comparison starts', async () => {
@@ -124,11 +83,9 @@ describe('ResumeComparisonService', () => {
       jobUrl: 'https://jobs.example.com/role',
     } as any);
 
-    expect(result.match.coverage).toBe(63);
+    expect(result.match.coverage).toBe(50);
     expect(result.ats.missingSections).toEqual(['education', 'achievements']);
-    expect(agentReview.review).toHaveBeenCalledWith(expect.objectContaining({
-      jobDescription: 'TypeScript and AWS role',
-    }), { forceRefresh: false });
+
   });
 
   it('uses an explicitly changed job URL instead of stale saved description', async () => {
@@ -143,9 +100,8 @@ describe('ResumeComparisonService', () => {
       jobUrl: 'https://jobs.example.com/new',
     });
 
-    expect(agentReview.review).toHaveBeenCalledWith(expect.objectContaining({
-      jobDescription: 'New posting',
-    }), { forceRefresh: false });
+    expect(jobDescriptions.resolve).toHaveBeenCalledWith('https://jobs.example.com/new');
+
   });
 
   it('retains an uploaded source file for an owned imported resume', async () => {
@@ -218,33 +174,15 @@ describe('ResumeComparisonService', () => {
     );
   });
 
-  it('uses an agent for ATS/job review while keeping AI-content scoring heuristic-only', async () => {
-    const result = await service.compare('resume-1', userId, {
-      jobDescription: 'We need TypeScript and AWS experience.',
-    });
-
-    expect(result.resumeId).toBe('resume-1');
-    expect(result.ats.score).toBe(81);
-    expect(result.match).toEqual(expect.objectContaining({ coverage: 63, missing: ['aws'] }));
+  it('returns local scores and actionable job gaps', async () => {
+    const result = await service.compare('resume-1', userId, { jobDescription: 'TypeScript and AWS required.' });
+    expect(result.match.coverage).toBe(50);
     expect(result.aiContent.composite).toBe(78);
-    expect(result.review).toEqual(expect.objectContaining({
-      source: 'agent-session',
-      sessionId: 'candidate-ats-session-1',
-      harness: 'opencode',
-    }));
-    expect(agentReview.review).toHaveBeenCalledWith(expect.objectContaining({
-      userId,
-      resumeId: 'resume-1',
-      jobDescription: 'We need TypeScript and AWS experience.',
-      resumeText: expect.stringContaining('Built APIs.'),
-    }), { forceRefresh: false });
-    expect(result.annotations).toHaveLength(2);
+    expect(result.review.source).toBe('deterministic');
     expect(result.annotations).toEqual(expect.arrayContaining([
-      expect.objectContaining({ quote: 'Built APIs.', message: expect.stringContaining('scope') }),
-      expect.objectContaining({ quote: 'Built services.', message: expect.stringContaining('repeats') }),
+      expect.objectContaining({ section: 'skills', message: expect.stringContaining('AWS') }),
+      expect.objectContaining({ quote: 'Results-driven', fix: expect.any(String) }),
     ]));
-    expect(result.annotations.some((item) => item.id.startsWith('ai-'))).toBe(false);
-    expect(result.annotations.every((item) => item.fix)).toBe(true);
   });
 
   it('reviews the complete source PDF when structured import lost the professional sections', async () => {
@@ -260,10 +198,8 @@ describe('ResumeComparisonService', () => {
     await service.compare('resume-1', userId, { jobDescription: 'Kubernetes role' });
 
     expect(parser.extractText).toHaveBeenCalled();
-    expect(agentReview.review).toHaveBeenCalledWith(expect.objectContaining({
-      resumeText: expect.stringContaining('Deployed 8 containerised services.'),
-      originalFile: expect.objectContaining({ filename: 'original.pdf', bytes: Buffer.from('%PDF-preview') }),
-    }), { forceRefresh: false });
+    const second = await service.compare('resume-1', userId, { jobDescription: 'Kubernetes role' });
+    expect(second.match.coverage).toBe(100);
     expect(aiContent.analyze).toHaveBeenCalledWith(expect.stringContaining('Software Engineer | Example Co'));
   });
 
@@ -276,32 +212,6 @@ describe('ResumeComparisonService', () => {
 
     await expect(service.compare('resume-1', userId, { jobDescription: 'Cloud role' }))
       .rejects.toThrow('PDF extraction failed');
-    expect(agentReview.review).not.toHaveBeenCalled();
-  });
-
-  it('drops agent comments whose quote was not copied from the resume', async () => {
-    agentReview.review.mockResolvedValueOnce({
-      source: 'agent-session',
-      sessionId: 'candidate-ats-session-2',
-      harness: 'opencode',
-      modelAlias: 'bedrock/nova-2-lite/low',
-      ats: { score: 70, findings: [] },
-      match: { coverage: 60, matched: [], missing: [], keywordCount: 0 },
-      annotations: [
-        {
-          id: 'grounded', section: 'summary', severity: 'warning', color: 'amber',
-          message: 'Generic opening.', fix: 'Lead with a concrete specialization.', quote: 'Results-driven engineer',
-        },
-        {
-          id: 'invented', section: 'experience', severity: 'critical', color: 'red',
-          message: 'Invented quote.', fix: 'Should never appear.', quote: 'Managed a team of 50 engineers',
-        },
-      ],
-    });
-
-    const result = await service.compare('resume-1', userId, { jobDescription: 'Backend engineer' });
-
-    expect(result.annotations.map((item) => item.id)).toEqual(['grounded']);
   });
 
   it('does not compare an AI harness-owned document', async () => {
@@ -312,26 +222,6 @@ describe('ResumeComparisonService', () => {
     await expect(service.compare('resume-1', userId, {})).rejects.toBeInstanceOf(
       BadRequestException,
     );
-  });
-
-  it('passes all resume sections to the agent without turning heuristic stock phrases into comments', async () => {
-    resumeModel.findOne.mockReturnValue({
-      exec: () => Promise.resolve({
-        ...resume,
-        summary: 'Backend engineer focused on payments.',
-        experience: [{
-          ...resume.experience[0],
-          description: 'Results-driven delivery across the platform.',
-        }],
-      }),
-    });
-
-    const result = await service.compare('resume-1', userId, { jobDescription: 'Backend engineer' });
-
-    expect(agentReview.review).toHaveBeenCalledWith(expect.objectContaining({
-      resumeText: expect.stringContaining('Results-driven delivery across the platform.'),
-    }), { forceRefresh: false });
-    expect(result.annotations.some((item) => item.id === 'ai-stock-phrases')).toBe(false);
   });
 
   it('does not expose another user\'s imported resume', async () => {

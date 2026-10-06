@@ -35,11 +35,8 @@ const LINKS = [
   { label: 'About', href: '/about' },
   { label: 'Jobs', href: '/jobs' },
   { label: 'For employers', href: '/employers' },
-  { label: 'Employer pricing', href: '/employers/pricing' },
   { label: 'Privacy', href: '/privacy' },
   { label: 'Terms', href: '/terms' },
-  { label: 'Cookies', href: '/cookies' },
-  { label: 'GDPR', href: '/gdpr' },
 ];
 
 export default function SiteFooter() {
@@ -69,11 +66,7 @@ export default function SiteFooter() {
           <p className="jbfoot__meta">
             {`© ${new Date().getFullYear()} Jobocate. All rights reserved.`}
           </p>
-          {/* Kept deliberately: this is a disclosure about automated ranking,
-              not marketing copy. */}
-          <p className="jbfoot__meta">
-            Jobocate uses AI to assist applications and ranking. People make the final decisions.
-          </p>
+
         </div>
       </div>
 
@@ -114,10 +107,10 @@ export default function SiteFooter() {
         }
 
         .jbfoot__link {
-          font-family: var(--jb-font-mono);
-          font-size: 10.5px;
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
+          font-family: var(--jb-font-sans);
+          font-size: 12px;
+
+
           color: var(--jb-ink-muted);
           text-decoration: none;
           /* 44px touch target, kept from the previous footer. */
@@ -144,10 +137,10 @@ export default function SiteFooter() {
 
         .jbfoot__meta {
           margin: 0;
-          font-family: var(--jb-font-mono);
-          font-size: 9.5px;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
+          font-family: var(--jb-font-sans);
+          font-size: 11px;
+
+
           color: var(--jb-ink-subtle);
         }
 

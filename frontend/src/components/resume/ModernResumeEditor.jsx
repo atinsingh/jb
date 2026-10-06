@@ -241,7 +241,7 @@ export default function ModernResumeEditor({
                     className="text-xs"
                   >
                     <SparklesIcon className="h-3 w-3" />
-                    {resumeData.summary ? 'Rewrite with AI' : 'Generate with AI'}
+                    {resumeData.summary ? 'Rewrite' : 'Generate'}
                   </Button>
                 </div>
               </SectionCard>

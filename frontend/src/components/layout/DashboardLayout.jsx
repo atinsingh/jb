@@ -96,8 +96,8 @@ export default function DashboardLayout({ children }) {
     { name: 'Dashboard', href: '/app/dashboard', icon: HomeModernIcon, current: router.pathname === '/app/dashboard' },
     { name: 'My Applications', href: '/app/tracker', icon: ClipboardDocumentListIcon, current: router.pathname === '/app/tracker' },
     { name: 'Matched Jobs', href: '/jobs', icon: BriefcaseIcon, current: router.pathname === '/jobs' },
-    { name: 'Résumé', href: '/app/resume', icon: SparklesIcon, current: router.pathname === '/app/resume', isPro: true },
-    { name: 'AI Cover Letter', href: '/app/cover-letter', icon: EnvelopeIcon, current: router.pathname === '/app/cover-letter', isPro: true },
+    { name: 'Resume', href: '/app/resume', icon: SparklesIcon, current: router.pathname === '/app/resume', isPro: true },
+    { name: 'Cover Letter', href: '/app/cover-letter', icon: EnvelopeIcon, current: router.pathname === '/app/cover-letter', isPro: true },
     { name: 'Interview Buddy', href: '/app/mock-interview', icon: MicrophoneIcon, current: router.pathname === '/app/mock-interview', isPro: true },
     { name: 'Job Profiles', href: '/app/preferences', icon: UserGroupIcon, current: router.pathname === '/app/preferences' },
   ];

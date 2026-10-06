@@ -148,7 +148,7 @@ export default function AppBilling() {
 
         {budget && (
           <div data-testid="billing-budget" style={{ ...mono(11, '0'), marginBottom: 18 }}>
-            {budget.status === 'unavailable' ? 'AI credits unavailable · model-running actions are paused' : `AI credits: ${Number(budget.remaining || 0)} of ${Number(budget.limit || 0)} remaining · ${budget.status} · renews monthly`}
+            {budget.status === 'unavailable' ? 'Credits unavailable · model-running actions are paused' : `Credits: ${Number(budget.remaining || 0)} of ${Number(budget.limit || 0)} remaining · ${budget.status} · renews monthly`}
           </div>
         )}
 

@@ -120,7 +120,7 @@
   /* The warm off-white every secondary column sits on: the icon rail, the
      Matches filter rail, the Applications board columns. */
   --jb-a-rail: #fbfaf8;
-  /* One step deeper than the rail — the résumé workspace, where the white
+  /* One step deeper than the rail — the resume workspace, where the white
      paper has to read as a raised sheet against the ground behind it. */
   --jb-a-stage-deep: #f4f3f0;
   --jb-a-control: #f1f0ec;
@@ -189,7 +189,7 @@
   --jb-a-invert-ink: #fbfaf8;
   --jb-a-invert-muted: rgba(251, 250, 248, 0.6);
 
-  /* Two shadows, and only two. `paper` exists for one reason — the résumé
+  /* Two shadows, and only two. `paper` exists for one reason — the resume
      sheet lifting off --jb-a-stage-deep. `lift` is the small hover response on
      a card that is genuinely draggable or clickable. Everything else on this
      surface separates with a rule, not a shadow. */
@@ -619,7 +619,7 @@ html[data-jb-theme='light'] .jbv3-chrome {
   --jb-v3-invert: #f5f5f4;
   --jb-v3-invert-ink: #0b0b0c;
 
-  /* `paper` is the résumé sheet lifting off the page; `lift` is the small
+  /* `paper` is the resume sheet lifting off the page; `lift` is the small
      hover response on an interactive card. */
   --jb-v3-shadow-paper: 0 24px 48px -28px rgba(0, 0, 0, 0.65);
   --jb-v3-shadow-lift: 0 10px 22px -14px rgba(0, 0, 0, 0.55);
@@ -768,4 +768,66 @@ html[data-jb-theme='light'] .jbv3-chrome {
 
   --jb-nav-wash: rgba(232, 228, 218, 0.78);
   --jb-nav-wash-solid: rgba(232, 228, 218, 0.94);
+}
+/* Candidate and public resume surfaces share a quiet, neutral palette. */
+.jb-candidate.jbv3,
+.jb-candidate.jbv3-chrome,
+.jb-candidate .jbv3,
+.jb-public.jbv3-chrome {
+  --jb-v3-bg: #111214;
+  --jb-v3-panel: #191a1d;
+  --jb-v3-sunk: #141518;
+  --jb-v3-line: #292b30;
+  --jb-v3-line-2: #3b3e45;
+  --jb-v3-fg: #f5f5f7;
+  --jb-v3-fg-2: #b4b7c0;
+  --jb-v3-fg-3: #9b9faa;
+  --jb-v3-accent: #c5e5dc;
+  --jb-v3-accent-hover: #ddf3ec;
+  --jb-v3-accent-ink: #172923;
+  --jb-v3-accent-faint: #c5e5dc;
+  --jb-v3-accent-soft: rgba(197, 229, 220, .08);
+  --jb-v3-accent-line: rgba(197, 229, 220, .35);
+  --jb-v3-font-display: var(--jb-face-sans), system-ui, sans-serif;
+  --jb-v3-font-mono: var(--jb-face-sans), system-ui, sans-serif;
+  --jb-d-bg: #111214;
+  --jb-d-gradient: #111214;
+  --jb-d-panel: #191a1d;
+  --jb-d-footer: #111214;
+  --jb-d-ink: #f5f5f7;
+  --jb-d-accent: #c5e5dc;
+  --jb-d-focus: #c5e5dc;
+  --jb-nav-wash: rgba(17, 18, 20, .9);
+  --jb-nav-wash-solid: #111214;
+}
+html[data-jb-theme='light'] .jb-candidate.jbv3,
+html[data-jb-theme='light'] .jb-candidate.jbv3-chrome,
+html[data-jb-theme='light'] .jb-candidate .jbv3,
+html[data-jb-theme='light'] .jb-public.jbv3-chrome {
+  --jb-v3-bg: #fafaf9;
+  --jb-v3-panel: #ffffff;
+  --jb-v3-sunk: #f3f4f2;
+  --jb-v3-line: #e3e5e1;
+  --jb-v3-line-2: #ced2cd;
+  --jb-v3-fg: #202321;
+  --jb-v3-fg-2: #555d57;
+  --jb-v3-fg-3: #657068;
+  --jb-v3-accent: #244d40;
+  --jb-v3-accent-hover: #18392f;
+  --jb-v3-accent-ink: #ffffff;
+  --jb-v3-accent-faint: #244d40;
+  --jb-v3-accent-soft: rgba(36, 77, 64, .06);
+  --jb-v3-accent-line: rgba(36, 77, 64, .3);
+  --jb-d-bg: #fafaf9;
+  --jb-d-gradient: #fafaf9;
+  --jb-d-panel: #ffffff;
+  --jb-d-footer: #fafaf9;
+  --jb-d-ink: #202321;
+  --jb-d-ink-70: #555d57;
+  --jb-d-ink-65: #555d57;
+  --jb-d-ink-55: #657068;
+  --jb-d-accent: #244d40;
+  --jb-d-focus: #244d40;
+  --jb-nav-wash: rgba(250, 250, 249, .9);
+  --jb-nav-wash-solid: #fafaf9;
 }

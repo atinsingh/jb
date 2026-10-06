@@ -141,7 +141,7 @@ function PostJob() {
   // Initialize form data with all required fields
   const [formData, setFormData] = useState(emptyForm);
 
-  // AI drafting: seed-only fields not part of the saved job, plus the
+  // drafting: seed-only fields not part of the saved job, plus the
   // generation call's own loading/error state.
   const [aiSkills, setAiSkills] = useState('');
   const [aiNotes, setAiNotes] = useState('');
@@ -337,7 +337,7 @@ function PostJob() {
     if (
       hasExistingContent &&
       !window.confirm(
-        'This replaces the description, responsibilities and requirements you’ve already entered with an AI draft. Continue?',
+        'This replaces the description, responsibilities and requirements you’ve already entered with an draft. Continue?',
       )
     ) {
       return;
@@ -591,7 +591,7 @@ function PostJob() {
                 <div style={{ background: 'var(--jb-v3-accent-soft)', border: '1px solid var(--jb-v3-accent-line)', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 15 }}>✦</span>
-                    <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--jb-v3-fg)' }}>Draft with AI</span>
+                    <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--jb-v3-fg)' }}>Draft with Jobocate</span>
                     <span style={{ fontSize: 12, color: 'var(--jb-v3-fg-2)' }}>— writes the description, responsibilities and requirements below from the title and skills you give it. Edit anything before publishing.</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
@@ -604,7 +604,7 @@ function PostJob() {
                         style={fieldInput}
                       />
                     </Field>
-                    <Field label="Notes for the AI (optional)">
+                    <Field label="Notes for Jobocate (optional)">
                       <input
                         type="text"
                         value={aiNotes}

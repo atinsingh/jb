@@ -1,6 +1,5 @@
 'use client';
 
-import { useAiOperation } from '@/hooks/useAiOperation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   compareResume,
@@ -22,7 +21,7 @@ const colors = {
 const input = {
   width: '100%',
   border: '1px solid var(--jb-v3-line)',
-  borderRadius: 3,
+  borderRadius: 10,
   background: 'var(--jb-v3-panel)',
   color: 'var(--jb-v3-fg)',
   padding: '10px 12px',
@@ -31,7 +30,7 @@ const input = {
 
 const button = {
   border: 'none',
-  borderRadius: 3,
+  borderRadius: 10,
   padding: '10px 15px',
   font: 'inherit',
   fontSize: 13,
@@ -109,34 +108,35 @@ function CompareUpload({ onOpen }) {
   };
 
   return (
-    <section data-testid="compare-resume-upload" style={{ maxWidth: 720 }}>
-      <h2 style={{ fontSize: 25, margin: '0 0 8px' }}>Compare Resume</h2>
+    <section data-testid="compare-resume-upload" style={{ maxWidth: 760 }}>
+      <h2 style={{ fontSize: 22, margin: '0 0 8px', fontWeight: 500 }}>Compare Resume</h2>
       <p style={{ color: 'var(--jb-v3-fg-3)', lineHeight: 1.55 }}>
-        Import a PDF or DOCX. It stays a manually editable résumé while ATS and
-        directional AI-content signals point to areas worth improving.
+        Upload your resume and add the role you have in mind. Get clear scores and practical feedback.
       </p>
-      <div style={{ border: '1px dashed var(--jb-v3-accent-line)', padding: 22, background: 'var(--jb-v3-panel)' }}>
-        <label style={{ display: 'block', fontSize: 13, fontWeight: 700, marginBottom: 9 }}>
-          Existing resume
-        </label>
+      <div style={{ border: '1px solid var(--jb-v3-line)', borderRadius: 14, padding: 26, background: 'var(--jb-v3-panel)' }}>
+        <label style={{ display: 'block', border: '1px dashed var(--jb-v3-line-2)', borderRadius: 10, padding: 24, fontSize: 13, fontWeight: 600 }}>
+          <span style={{ display: 'block', marginBottom: 12 }}>01 / Your resume</span>
         <input
           aria-label="Existing resume"
           type="file"
           accept=".pdf,.docx"
+          disabled={busy}
           onChange={(event) => setFile(event.target.files?.[0] || null)}
+          style={{ width: '100%', fontSize: 13 }}
         />
-        {file && <div style={{ marginTop: 10, fontSize: 13 }}>{file.name}</div>}
-        <label style={{ display: 'block', fontSize: 13, fontWeight: 700, marginTop: 18 }}>
-          Job URL
-          <input type="url" value={jobUrl} onChange={(event) => setJobUrl(event.target.value)} placeholder="https://company.com/jobs/role" style={{ ...input, marginTop: 6 }} />
+          <span style={{ display: 'block', marginTop: 12, color: 'var(--jb-v3-fg-3)', fontWeight: 400, fontSize: 12 }}>PDF or DOCX · up to 5 MB</span>
         </label>
-        <label style={{ display: 'block', fontSize: 13, fontWeight: 700, marginTop: 12 }}>
-          Job description
-          <textarea value={jobDescription} onChange={(event) => setJobDescription(event.target.value)} rows={5} placeholder="Or paste the job description" style={{ ...input, marginTop: 6, resize: 'vertical' }} />
+        <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginTop: 24 }}>
+          02 / The role
+          <textarea aria-label="Job description" value={jobDescription} onChange={(event) => setJobDescription(event.target.value)} disabled={busy} rows={5} placeholder="Paste the job description" style={{ ...input, marginTop: 10, resize: 'vertical' }} />
         </label>
+        <details style={{ marginTop: 14, fontSize: 13 }}>
+          <summary style={{ cursor: 'pointer', color: 'var(--jb-v3-fg-2)' }}>Use a job link instead</summary>
+          <input aria-label="Job URL" type="url" value={jobUrl} onChange={(event) => setJobUrl(event.target.value)} disabled={busy} placeholder="https://company.com/jobs/role" style={{ ...input, marginTop: 10 }} />
+        </details>
         {error && <div role="alert" style={{ color: 'var(--jb-v3-danger)', marginTop: 10 }}>{error}</div>}
         <button type="button" onClick={start} disabled={!file || (!jobDescription.trim() && !jobUrl.trim()) || busy} style={{ ...button, marginTop: 16, opacity: !file || (!jobDescription.trim() && !jobUrl.trim()) || busy ? 0.5 : 1 }}>
-          {busy ? 'Importing…' : 'Import and compare'}
+          {busy ? 'Opening your resume…' : 'Import and compare'}
         </button>
       </div>
     </section>
@@ -164,7 +164,7 @@ function AnnotationMarker({ section, annotations }) {
         className="comparison-tooltip"
         style={{
           position: 'absolute', zIndex: 5, top: 22, right: 0, width: 300,
-          padding: 12, border: `1px solid ${tone.border}`, borderRadius: 3,
+          padding: 12, border: `1px solid ${tone.border}`, borderRadius: 10,
           background: 'var(--jb-v3-panel)', color: 'var(--jb-v3-fg)',
           boxShadow: '0 12px 34px color-mix(in srgb, var(--jb-v3-fg) 16%, transparent)',
           opacity: 0, visibility: 'hidden', pointerEvents: 'none', lineHeight: 1.45,
@@ -189,7 +189,7 @@ function Section({ section, title, annotations, children }) {
   );
   const tone = own.length ? colors[color] : null;
   return (
-    <section style={{ border: `1px solid ${tone?.border || 'var(--jb-v3-line)'}`, background: tone?.bg || 'var(--jb-v3-panel)', borderRadius: 3, padding: 16 }}>
+    <section style={{ border: `1px solid ${tone?.border || 'var(--jb-v3-line)'}`, background: tone?.bg || 'var(--jb-v3-panel)', borderRadius: 10, padding: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
         <h3 style={{ fontSize: 15, margin: 0 }}>{title}</h3>
         <AnnotationMarker section={section} annotations={own} />
@@ -275,7 +275,7 @@ function SuggestionList({ annotations }) {
         <span style={{ fontSize: 11, color: 'var(--jb-v3-fg-3)' }}>{annotations.length} total</span>
       </div>
       <p style={{ fontSize: 11, lineHeight: 1.45, color: 'var(--jb-v3-fg-3)', margin: '6px 0 9px' }}>
-        Highlights mark text that already exists. Missing requirements have nothing to highlight, so every suggestion is also listed here.
+        Start with the highest-priority edits.
       </p>
       {ordered.length ? (
         <div style={{ display: 'grid', gap: 7, maxHeight: 330, overflowY: 'auto', paddingRight: 3 }}>
@@ -370,8 +370,6 @@ function validateDetails(resume) {
 }
 
 export default function CompareResumeWorkspace({ resumeId, onOpen }) {
-  const operation = useAiOperation();
-  const runOperation = operation.run;
   const [resume, setResume] = useState(null);
   const [assessment, setAssessment] = useState(null);
   const [jobDescription, setJobDescription] = useState('');
@@ -388,7 +386,6 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
     if (!id) return;
     setBusy(true);
     setComparing(true);
-    setAssessment(null);
     setMessage('');
     try {
       const context = { jobDescription: jd.trim(), jobUrl: url.trim() };
@@ -396,7 +393,7 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
         const updated = await updateResume(id, { source: { ...resume.source, ...context } });
         setResume(withoutDuplicatedExperienceText(updated));
       }
-      const result = await runOperation(headers => compareResume(id, { ...context, forceRefresh: true }, headers));
+      const result = await compareResume(id, context);
       if (Object.keys(result.details || {}).length) setResume((current) => withoutDuplicatedExperienceText({ ...current, ...result.details }));
       setAssessment(result);
     } catch (cause) {
@@ -424,7 +421,7 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
           setComparing(false);
           return null;
         }
-        return runOperation(headers => compareResume(resumeId, {}, headers));
+        return compareResume(resumeId, {});
       })
       .then((result) => {
         if (cancelled || !result) return;
@@ -439,7 +436,7 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
         }
       });
     return () => { cancelled = true; };
-  }, [resumeId, runOperation]);
+  }, [resumeId]);
 
   useEffect(() => {
     if (!resumeId) return;
@@ -448,7 +445,7 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
     setSourceError('');
     getCompareSource(resumeId)
       .then((blob) => !cancelled && setSourceBlob(blob))
-      .catch((cause) => !cancelled && setSourceError(cause?.message || 'Could not open the uploaded résumé.'));
+      .catch((cause) => !cancelled && setSourceError(cause?.message || 'Could not open the uploaded resume.'));
     return () => { cancelled = true; };
   }, [resumeId]);
 
@@ -462,7 +459,7 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
       setResume(withoutDuplicatedExperienceText(document));
       setSourceBlob(blob);
     } catch (cause) {
-      setSourceError(cause?.message || 'Could not attach the original résumé.');
+      setSourceError(cause?.message || 'Could not attach the original resume.');
     } finally {
       setSourceBusy(false);
     }
@@ -514,7 +511,7 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
         })),
       };
       setResume(withoutDuplicatedExperienceText(await updateResume(resumeId, payload)));
-      setMessage('Resume details saved. The review still reflects the uploaded file; Refresh comparison runs separately.');
+      setMessage('Resume details saved. The review still reflects the uploaded file; Compare again to refresh the results.');
     } catch (cause) {
       setMessage(cause?.message || 'Could not save resume details.');
     } finally {
@@ -538,7 +535,7 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
         @keyframes compare-loading-sweep { from { background-position: 110% 0; } to { background-position: -110% 0; } }
         @keyframes compare-loading-travel { from { transform: translateX(-100%); } to { transform: translateX(270%); } }
         @media (prefers-reduced-motion: reduce) { .compare-loading-line, .compare-loading-track::after { animation: none; } }
-        .compare-resume-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); gap: 18px; align-items: start; }
+        .compare-resume-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 370px); gap: 18px; align-items: start; }
         @media (max-width: 900px) {
           .compare-resume-layout { grid-template-columns: minmax(0, 1fr); }
           .compare-resume-aside { position: static !important; }
@@ -548,45 +545,45 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
         <div>
           <h2 style={{ fontSize: 26, margin: '0 0 5px' }}>Compare Resume</h2>
           <div style={{ color: 'var(--jb-v3-fg-3)', fontSize: 13 }}>{resume.name}</div>
-          {!comparing && <div style={{ color: 'var(--jb-v3-fg-3)', fontSize: 11, marginTop: 4 }}>Imported résumé details · editable</div>}
+          {!comparing && <div style={{ color: 'var(--jb-v3-fg-3)', fontSize: 11, marginTop: 4 }}>Original document and comparison</div>}
         </div>
-        <button type="button" onClick={save} disabled={busy} style={{ ...button, opacity: busy ? 0.55 : 1 }}>
-          {busy && !comparing ? 'Saving…' : 'Save Resume Details'}
-        </button>
+
       </div>
 
-      {operation.cancelError && <div role="alert">{operation.cancelError}</div>}
       {message && <div role="alert" style={{ marginBottom: 14, color: message.startsWith('Resume details saved.') ? 'var(--jb-v3-fg-2)' : 'var(--jb-v3-danger)' }}>{message}</div>}
       {comparing && (
         <div role="status" aria-live="polite" data-testid="comparison-pending" style={{ marginBottom: 14, padding: '13px 15px', border: '1px solid var(--jb-v3-accent-line)', background: 'var(--jb-v3-panel)' }}>
-          <div style={{ fontSize: 13, fontWeight: 700 }}>Comparing your résumé with the job…</div>
-          <div style={{ fontSize: 11.5, color: 'var(--jb-v3-fg-3)', marginTop: 4 }}>The agent is reviewing the original file. Scores, comments, and highlights will appear together when it finishes.</div>
-          {operation.active && <button type="button" onClick={operation.cancel} disabled={operation.cancelling} style={{ ...button, marginTop: 10 }}>{operation.cancelling ? 'Stopping and reconciling usage…' : 'Cancel comparison'}</button>}
+          <div style={{ fontSize: 13, fontWeight: 700 }}>Checking db for the comparison…</div>
+          <div style={{ fontSize: 11.5, color: 'var(--jb-v3-fg-3)', marginTop: 4 }}>Reading your saved resume and checking it against the role.</div>
+
           <div className="compare-loading-track" aria-hidden="true" />
         </div>
       )}
       {!comparing && !assessment && !jobDescription.trim() && !jobUrl.trim() && (
         <div role="status" style={{ marginBottom: 14, color: 'var(--jb-v3-fg-2)' }}>
-          Add a job description or job URL to compare this résumé.
+          Add a job description or job URL to compare this resume.
         </div>
       )}
       {validationError && <div role="alert" style={{ marginBottom: 14, color: 'var(--jb-v3-danger)' }}>{validationError}</div>}
       <div className="compare-resume-layout" aria-busy={comparing}>
         <div style={{ display: 'grid', gap: 12 }}>
-          {comparing ? <ComparisonLoading /> : <>
+          {comparing && !assessment ? <ComparisonLoading /> : <>
           {assessment && sourceBlob ? (
             <CompareDocumentPreview blob={sourceBlob} filename={resume.source?.originalFilename || 'resume.pdf'} annotations={annotations} resume={resume} />
           ) : sourceError ? (
             <div role="status" style={{ padding: 12, border: '1px solid var(--jb-v3-line)' }}>
               <div>{sourceError} Re-upload the original PDF or DOCX to preview it here.</div>
               <label style={{ display: 'block', marginTop: 10, fontSize: 13 }}>
-                Re-upload original résumé
+                Re-upload original resume
                 <input type="file" accept=".pdf,.doc,.docx" disabled={sourceBusy} onChange={(event) => reattachSource(event.target.files?.[0])} style={{ display: 'block', marginTop: 6 }} />
               </label>
             </div>
           ) : !assessment && !message ? (
             <div role="status" style={{ padding: 12, border: '1px solid var(--jb-v3-line)' }}>Run the comparison to see the highlighted original document.</div>
           ) : null}
+          <details data-testid="comparison-edit-details" style={{ border: '1px solid var(--jb-v3-line)', borderRadius: 12, padding: 18 }}>
+            <summary style={{ cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>Edit resume details</summary>
+            <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
           <Section section="personal" title="Contact details" annotations={annotations}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               {['fullName', 'email', 'phone', 'location', 'linkedin'].map((key) => (
@@ -648,28 +645,23 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
               <button type="button" onClick={addEducation} style={{ ...button, color: 'var(--jb-v3-accent)', background: 'transparent', border: '1px dashed var(--jb-v3-accent-line)' }}>+ Add education</button>
             </div>
           </Section>
+            <button type="button" onClick={save} disabled={busy} style={button}>{busy ? 'Saving…' : 'Save resume details'}</button>
+            </div>
+          </details>
           </>}
         </div>
 
-        <aside className="compare-resume-aside" style={{ position: 'sticky', top: 18, border: '1px solid var(--jb-v3-line)', borderRadius: 3, padding: 16, background: 'var(--jb-v3-panel)' }}>
+        <aside className="compare-resume-aside" style={{ position: 'sticky', top: 18, border: '1px solid var(--jb-v3-line)', borderRadius: 10, padding: 16, background: 'var(--jb-v3-panel)' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: 15 }}>Comparison</h3>
-          {comparing ? <ComparisonLoading scores /> : <>
+          {comparing && !assessment ? <ComparisonLoading scores /> : <>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9, marginBottom: 14 }}>
-            <Score label="ATS readability" value={assessment?.ats?.score} testId="compare-ats-score" cardTestId="compare-ats-card" caption="Higher is better" />
-            <Score label="Job match" value={assessment?.match?.coverage} testId="compare-match-score" cardTestId="compare-match-card" caption="Higher is better" />
-            <Score label="AI-pattern likelihood" value={assessment?.aiContent?.composite} suffix="%" testId="compare-ai-score" cardTestId="compare-ai-card" caption="Lower is better" wide />
+            <Score label="ATS Match Percentage" value={assessment?.ats?.score} suffix="%" testId="compare-ats-score" cardTestId="compare-ats-card" caption="Document compatibility" />
+            <Score label="Job Match" value={assessment?.match?.coverage} suffix="%" testId="compare-match-score" cardTestId="compare-match-card" caption="Required skills covered" />
+            <Score label="Content patterns" value={assessment?.aiContent?.composite} suffix="%" testId="compare-ai-score" cardTestId="compare-ai-card" caption="Writing pattern score" wide />
           </div>
-          <p data-testid="comparison-score-explanation" style={{ fontSize: 11, lineHeight: 1.45, color: 'var(--jb-v3-fg-3)', margin: '-5px 0 11px' }}>
-            ATS readability and Job match are independently reviewed by the résumé agent. AI-pattern likelihood is a separate local heuristic that flags writing patterns—not authorship. Similar numbers are coincidental.
-          </p>
-          {assessment?.review?.source === 'agent-session' && (
-            <div data-testid="comparison-review-source" style={{ fontSize: 10.5, color: 'var(--jb-v3-fg-3)', margin: '-5px 0 10px' }}>
-              Agent session · {assessment.review.harness || 'configured harness'} · {assessment.review.modelAlias || 'configured model'}
-            </div>
-          )}
           {(assessment?.ats?.explanation || assessment?.match?.explanation) && (
             <details data-testid="comparison-score-reasons" style={{ fontSize: 11.5, margin: '0 0 12px' }}>
-              <summary style={{ cursor: 'pointer', fontWeight: 700 }}>Why these two scores?</summary>
+              <summary style={{ cursor: 'pointer', fontWeight: 700 }}>How scoring works</summary>
               {assessment?.ats?.explanation && <p><b>ATS:</b> {assessment.ats.explanation}</p>}
               {assessment?.match?.explanation && <p><b>Job match:</b> {assessment.match.explanation}</p>}
             </details>
@@ -677,7 +669,7 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
           <AiPatternBreakdown result={assessment?.aiContent} />
           {!!assessment?.ats?.missingSections?.length && (
             <section data-testid="comparison-missing-sections" style={{ marginBottom: 14, padding: 10, borderLeft: `3px solid ${colors.amber.border}`, background: colors.amber.bg }}>
-              <strong style={{ fontSize: 12 }}>Missing résumé sections</strong>
+              <strong style={{ fontSize: 12 }}>Missing resume sections</strong>
               <p style={{ fontSize: 11.5, lineHeight: 1.45, margin: '5px 0 0' }}>
                 {assessment.ats.missingSections.map((section) => sectionLabels[section] || section).join(', ')}. Add truthful details where available; absent sections cannot be highlighted in the original file.
               </p>
@@ -701,9 +693,7 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
           <button type="button" onClick={() => runComparison()} disabled={busy || (!jobDescription.trim() && !jobUrl.trim())} style={{ ...button, width: '100%', marginTop: 10, opacity: busy || (!jobDescription.trim() && !jobUrl.trim()) ? 0.55 : 1 }}>
             {comparing ? 'Comparing…' : 'Refresh comparison'}
           </button>
-          <p style={{ fontSize: 11.5, lineHeight: 1.5, color: 'var(--jb-v3-fg-3)', marginBottom: 0 }}>
-            Agent comparisons use measured model credits (1 credit per cent of usage). AI-content likelihood is a local heuristic and uses no credit; it is directional evidence, not proof. Apply every suggestion manually and only when it remains truthful.
-          </p>
+
         </aside>
       </div>
     </div>

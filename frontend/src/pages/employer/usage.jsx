@@ -19,7 +19,7 @@ const MONO = 'var(--jb-font-mono)';
 const METER_DEFS = [
   { label: 'Active jobs', usedKey: 'jobSlotsUsed', limitKey: 'jobSlotsLimit', unit: 'slots' },
   { label: 'Team seats', usedKey: 'seatsUsed', limitKey: 'seatsLimit', unit: 'seats' },
-  { label: 'AI credits', usedKey: 'aiCreditsUsed', limitKey: 'aiCreditsLimit', unit: 'credits this month' },
+  { label: 'credits', usedKey: 'aiCreditsUsed', limitKey: 'aiCreditsLimit', unit: 'credits this month' },
   { label: 'Sourcing credits', usedKey: 'sourcingCreditsUsed', limitKey: 'sourcingCreditsLimit', unit: 'credits' },
 ];
 

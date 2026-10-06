@@ -94,6 +94,12 @@ export class SupabaseTokenService implements OnModuleInit {
       throw new UnauthorizedException('This account is no longer active');
     }
 
+    try {
+      await this.userSync.recordLogin(user, claims);
+    } catch {
+      // Statistics must never prevent an otherwise valid sign-in.
+      this.logger.warn('Could not record platform sign-in history');
+    }
     return user;
   }
 

@@ -33,7 +33,7 @@ import { getEmployerPlans } from '@/services/billingApi';
 const SIGNUP = '/app/signup?as=employer';
 
 const FAQS = [
-  ['How are AI credits used?', 'Model-backed features share one monthly AI credit balance. Usage is measured and rounded once per operation, including retries. Cached results and the local AI-content heuristic use no credits.'],
+  ['How are credits used?', 'Model-backed features share one monthly credit balance. Usage is measured and rounded once per operation, including retries. Cached results and the local content heuristic use no credits.'],
   ['Can I post a job for free?', 'Yes. Free lets you post your first role. You only pay when you need more slots, seats or automation.'],
   ['How do job slots work?', 'A slot is one active, published requisition. Closing or pausing a req frees its slot, and keeps all its candidate data.'],
   ['Is candidate data handled compliantly?', 'Yes. EEO reporting, GDPR/CCPA data-request tooling and configurable retention windows are built in. Enterprise adds a DPA and security review.'],
@@ -71,7 +71,7 @@ export default function EmployerPricing() {
     <>
       <Head>
         <title>Employer Pricing — Hiring Plans | Jobocate</title>
-        <meta name="description" content="Plans that scale with your hiring: job slots, team seats, AI credits and sourcing credits. Start with your first role free." />
+        <meta name="description" content="Plans that scale with your hiring: job slots, team seats, credits and sourcing credits. Start with your first role free." />
         <link rel="canonical" href="https://jobocate.com/employers/pricing" />
       </Head>
 
@@ -110,7 +110,7 @@ export default function EmployerPricing() {
                     <li key={label} className={styles.tierFeature}>
                       <span className={styles.tierTick} aria-hidden="true" />
                       <span>
-                        {value} {label}
+                        {value} {label.replace(/\bAI[- ]?/g, '')}
                       </span>
                     </li>
                   ))}

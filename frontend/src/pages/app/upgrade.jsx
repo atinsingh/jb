@@ -12,26 +12,26 @@ import { createCheckout, getPlans } from '@/services/billingApi';
 // Safe two-tier fallback while the live catalogue is loading.
 // ---------------------------------------------------------------------------
 const PLAN_DATA = [
-  { key: 'free', name: 'Free', tagline: 'Essential search tools with a $0.50 monthly AI allowance.', monthly: 0, annual: 0, popular: false },
-  { key: 'paid', name: 'Paid', tagline: 'More capacity with a $4 monthly AI allowance.', monthly: 10, annual: 100, popular: true },
+  { key: 'free', name: 'Free', tagline: 'Essential search tools with a $0.50 monthly credit allowance.', monthly: 0, annual: 0, popular: false },
+  { key: 'paid', name: 'Paid', tagline: 'More capacity with a $4 monthly credit allowance.', monthly: 10, annual: 100, popular: true },
 ];
 
 const DELTA_DATA = {
   paid: {
     label: 'What Paid unlocks',
     items: [
-      { title: '$4 AI allowance / mo', desc: 'Measured model spend shared across candidate AI services.' },
-      { title: 'AI cover letters', desc: 'Tailored, editable drafts for every role.' },
-      { title: 'Per-role personalization', desc: 'Résumés tuned to each job description.' },
-      { title: 'Monthly renewal', desc: 'The AI allowance renews monthly on either billing cycle.' },
+      { title: '$4 credit allowance / mo', desc: 'Measured model spend shared across candidate services.' },
+      { title: 'Cover letters', desc: 'Tailored, editable drafts for every role.' },
+      { title: 'Per-role personalization', desc: 'Resumes tuned to each job description.' },
+      { title: 'Monthly renewal', desc: 'The credit allowance renews monthly on either billing cycle.' },
     ],
   },
   free: {
     label: 'What Free includes',
     items: [
-      { title: 'AI résumé builder', desc: 'ATS-friendly résumés in minutes.' },
+      { title: 'Resume builder', desc: 'ATS-friendly resumes in minutes.' },
       { title: 'Smart job matching', desc: 'Roles ranked by fit, every day.' },
-      { title: '$0.50 AI allowance / mo', desc: 'Measured model spend renews every month.' },
+      { title: '$0.50 credit allowance / mo', desc: 'Measured model spend renews every month.' },
       { title: 'Application tracker', desc: 'Your whole pipeline in one board.' },
     ],
   },
@@ -103,7 +103,7 @@ export default function AppUpgrade() {
       const t = (tier || 'PAID').toString().toUpperCase();
       return `${t} TRIAL · ${days} DAY${days === 1 ? '' : 'S'} LEFT`;
     }
-    return 'AI ALLOWANCE · RENEWS MONTHLY';
+    return 'CREDIT ALLOWANCE · RENEWS MONTHLY';
   }, [entitlement]);
 
   // ---- renderVals() port -------------------------------------------------
@@ -141,7 +141,7 @@ export default function AppUpgrade() {
   const delta = DELTA_DATA[plan] || DELTA_DATA.free;
 
   const successSubs = {
-    paid: 'Your Paid plan is active. The $4 AI allowance renews monthly.',
+    paid: 'Your Paid plan is active. The $4 credit allowance renews monthly.',
     free: 'You’re on the Free plan. Upgrade anytime to put your search on autopilot.',
   };
 

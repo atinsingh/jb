@@ -8,7 +8,7 @@ import {
 } from './ats.types';
 
 /**
- * "Will an applicant-tracking system be able to read this résumé at all?"
+ * "Will an applicant-tracking system be able to read this resume at all?"
  *
  * Deterministic by design — no model is involved. A score that moves on an
  * unchanged document destroys the only thing it is good for: telling a
@@ -32,7 +32,7 @@ const COLUMN_LINE_THRESHOLD = 6;
 const EMAIL_RE = /[\w.+-]+@[\w-]+\.[\w.]+/;
 const PHONE_RE = /(\+?\d[\d\s().-]{7,}\d)/;
 
-/** Heading words a parser looks for when segmenting a résumé. */
+/** Heading words a parser looks for when segmenting a resume. */
 const SECTION_HEADINGS = {
   experience: ['experience', 'employment', 'work history', 'professional background'],
   education: ['education', 'academic'],
@@ -50,7 +50,7 @@ const DATE_PATTERNS: Array<{ name: string; re: RegExp }> = [
 @Injectable()
 export class AtsParseabilityService {
   /**
-   * Score a résumé's machine-readability.
+   * Score a resume's machine-readability.
    *
    * @returns a score, the findings behind it, and the extracted text LENGTH.
    *          The text itself is never returned or stored — the report must not
@@ -71,7 +71,7 @@ export class AtsParseabilityService {
           {
             code: 'NO_TEXT',
             severity: 'critical',
-            message: 'No text could be extracted from this résumé — an ATS sees an empty document.',
+            message: 'No text could be extracted from this resume — an ATS sees an empty document.',
             fix: 'Export a text-based PDF from your editor rather than scanning or exporting as an image.',
           },
         ],
@@ -113,7 +113,7 @@ export class AtsParseabilityService {
         if (typeof v === 'object') Object.values(v).forEach(walk);
       };
       // Mongoose documents contain circular bookkeeping objects. Flatten only
-      // their plain résumé fields, never the document's internal state.
+      // their plain resume fields, never the document's internal state.
       const structured = input.structured as AtsStructuredResume & { toObject?: () => Record<string, unknown> };
       const resume = typeof structured.toObject === 'function'
         ? structured.toObject()
@@ -211,7 +211,7 @@ export class AtsParseabilityService {
   /**
    * Column and table detection, from geometry rather than text.
    *
-   * Multi-column layouts are the most common silent killer: the résumé looks
+   * Multi-column layouts are the most common silent killer: the resume looks
    * immaculate to a human and interleaves into nonsense when read left to right.
    */
   private checkLayout(layout?: AtsLayout): AtsFinding[] {
@@ -231,7 +231,7 @@ export class AtsParseabilityService {
         code: 'MULTI_COLUMN_LAYOUT',
         severity: 'critical',
         message:
-          `This résumé appears to use a multi-column layout (${columnLines.length} lines with ` +
+          `This resume appears to use a multi-column layout (${columnLines.length} lines with ` +
           'wide horizontal gaps). Many parsers read straight across, interleaving the columns into nonsense.',
         fix: 'Rebuild in a single column. Keep the visual polish in typography and spacing instead.',
       },

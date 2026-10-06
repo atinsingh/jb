@@ -212,6 +212,9 @@ export class Resume {
   @Prop({ type: Number })
   atsScore?: number;
 
+  @Prop({ type: [{ _id: false, at: Date, atsScore: Number, jobMatchScore: Number, contentScore: Number }], default: [] })
+  comparisonHistory?: Array<{ at: Date; atsScore: number; jobMatchScore: number; contentScore: number }>;
+
   /**
    * The findings behind `atsScore`, each with an actionable fix.
    *

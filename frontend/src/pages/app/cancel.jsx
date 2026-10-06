@@ -34,7 +34,7 @@ const OFFERS = {
   not_using: {
     badge: 'PAUSE INSTEAD',
     headline: 'Take a break without losing your work.',
-    body: 'Pause instead of cancelling. We’ll keep your profile, résumés and history ready for when your search picks up again.',
+    body: 'Pause instead of cancelling. We’ll keep your profile, resumes and history ready for when your search picks up again.',
     accept: 'Pause for free instead',
     successNote: 'Your membership is paused. Resume anytime — everything is saved.',
   },
@@ -64,9 +64,9 @@ const OFFER_OUTCOME = {
 };
 
 const LOSING = [
-  '$4 monthly AI allowance',
-  'AI cover letters',
-  'Per-role résumé personalization',
+  '$4 monthly credit allowance',
+  'Cover letters',
+  'Per-role resume personalization',
   'Priority job matching',
   'Email support',
 ];
@@ -154,7 +154,7 @@ export default function AppCancel() {
       iconBg: 'var(--jb-v3-accent)',
       iconColor: 'var(--jb-v3-accent-ink)',
       title: 'Glad you’re staying.',
-      body: 'Your Paid membership is unchanged — your tools and monthly AI allowance remain active.',
+      body: 'Your Paid membership is unchanged — your tools and monthly credit allowance remain active.',
       cta: 'Back to dashboard',
       href: appRoute('App Dashboard.dc.html'),
       secondary: false,

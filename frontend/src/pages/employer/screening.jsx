@@ -66,7 +66,7 @@ export default function EmployerScreening() {
   const [assessmentBudget, setAssessmentBudget] = useState(null);
   const { status: sandboxStatus } = useEmployerAtsSandboxRelease();
 
-  // Fetch AI screening results for all applicants. No sample fallback.
+  // Fetch screening results for all applicants. No sample fallback.
   const load = async () => {
     setLoading(true);
     setError(null);
@@ -189,7 +189,7 @@ export default function EmployerScreening() {
   return (
     <>
       <Head>
-        <title>AI Screening Results — Jobocate for Employers</title>
+        <title>Screening Results — Jobocate for Employers</title>
       </Head>
 
       <style jsx global>{`
@@ -236,7 +236,7 @@ export default function EmployerScreening() {
           {/* HEADER */}
           <header style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: 14, padding: '14px 32px', background: 'rgba(247,243,234,0.85)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #E7E0D2' }}>
             <span style={{ color: '#1FA463' }}>✦</span>
-            <span style={{ fontFamily: MONO, fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9286' }}>AI screening</span>
+            <span style={{ fontFamily: MONO, fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9286' }}>screening</span>
             <div style={{ flex: 1 }} />
             <button
               onClick={load}
@@ -301,7 +301,7 @@ export default function EmployerScreening() {
             ) : error ? (
               <ErrorState error={error} onRetry={load} />
             ) : applicants.length === 0 ? (
-              <EmptyState icon="○" title="No applicants to screen yet" hint="Once candidates apply to your open roles, their AI screening scores will appear here." />
+              <EmptyState icon="○" title="No applicants to screen yet" hint="Once candidates apply to your open roles, their screening scores will appear here." />
             ) : (
               <>
                 {/* BULK BAR */}

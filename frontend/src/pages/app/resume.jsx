@@ -31,11 +31,11 @@ import {
 } from "@/services/atsApi";
 
 /**
- * The résumé surface. One screen: set up a session, then talk to it.
+ * The resume surface. One screen: set up a session, then talk to it.
  *
  * Two halves, and the split is the whole design. Before a session exists the
  * screen is a short setup form. Once it exists it becomes a conversation with
- * the document beside it — because iterating on a résumé is a dialogue
+ * the document beside it — because iterating on a resume is a dialogue
  * ("shorten the summary", "lead with the Stripe work"), not a form resubmission.
  *
  * The screen asks for the target role, an optional job posting, and
@@ -69,10 +69,9 @@ const T = {
 };
 
 const label = {
-  fontFamily: T.mono,
-  fontSize: 10.5,
-  letterSpacing: "0.13em",
-  textTransform: "uppercase",
+  fontFamily: "inherit",
+  fontSize: 12,
+  fontWeight: 500,
   color: T.fg3,
 };
 
@@ -83,7 +82,7 @@ const primaryBtn = {
   color: T.accentInk,
   background: T.accent,
   border: "none",
-  borderRadius: 3,
+  borderRadius: 10,
   padding: "11px 20px",
   cursor: "pointer",
   transition: "opacity .15s ease",
@@ -105,7 +104,7 @@ const field = {
   color: T.fg,
   background: T.panel,
   border: `1px solid ${T.line}`,
-  borderRadius: 3,
+  borderRadius: 10,
   padding: "11px 13px",
   transition: "border-color .15s ease",
 };
@@ -123,9 +122,9 @@ const FIELD_LABELS = {
 };
 
 const PHASE_COPY = {
-  writing: "Writing the résumé…",
-  compiling: "Compiling LaTeX…",
-  fixing: "Build failed — fixing it…",
+  writing: "Writing the resume…",
+  compiling: "Preparing your PDF…",
+  fixing: "Adjusting your document…",
   relayout: "Re-applying to the new look…",
 };
 
@@ -257,8 +256,8 @@ export default function AppResume() {
   /**
    * The catalogue loads separately from `options`.
    *
-   * A failure here must not take the screen down: a résumé without a chosen
-   * template is still a résumé, and the backend falls back to the catalogue
+   * A failure here must not take the screen down: a resume without a chosen
+   * template is still a resume, and the backend falls back to the catalogue
    * default. So this sets an empty list and the picker says so, rather than
    * throwing the candidate to the error state.
    */
@@ -278,10 +277,11 @@ export default function AppResume() {
   }, []);
 
   useEffect(() => {
+    if (!router.isReady || !generateMode) return;
     loadOptions();
     loadTemplates();
     loadBudget();
-  }, [loadOptions, loadTemplates, loadBudget]);
+  }, [router.isReady, generateMode, loadOptions, loadTemplates, loadBudget]);
 
   useEffect(() => {
     if (!router.isReady) return undefined;
@@ -350,13 +350,13 @@ export default function AppResume() {
       .catch((error) => {
         if (!cancelled) {
           if (error?.status === 404) {
-            // A new résumé revision normally has no ATS result yet. That is an
+            // A new resume revision normally has no ATS result yet. That is an
             // empty state, not an outage; the candidate can start the first
             // analysis with the button beside it.
             setAts(null);
           } else {
             setAtsWarning(
-              "ATS analysis is temporarily unavailable. Your résumé is still saved and editable.",
+              "ATS analysis is temporarily unavailable. Your resume is still saved and editable.",
             );
           }
         }
@@ -377,7 +377,7 @@ export default function AppResume() {
   /**
    * Fail closed.
    *
-   * `ready` is the server's verdict on whether a résumé can be written at all,
+   * `ready` is the server's verdict on whether a resume can be written at all,
    * and only an explicit `true` opens the form. Absent, undefined, still
    * loading, or a response shape we did not expect all count as "not ready" —
    * a stale backend that predates the `profile` block once left this screen
@@ -561,7 +561,7 @@ export default function AppResume() {
    * Apply a look change to the live session.
    *
    * One streamed turn, exactly like an instruction: the backend rewrites the
-   * context files, then asks the harness to re-apply the résumé to them. The
+   * context files, then asks the harness to re-apply the resume to them. The
    * transcript records it as a message so the change is visible in the same
    * place every other change is.
    */
@@ -601,7 +601,7 @@ export default function AppResume() {
           ...m,
           {
             role: "agent",
-            text: s.summary || "Re-applied the résumé to the new look.",
+            text: s.summary || "Re-applied the resume to the new look.",
             compiled: s.compiled,
             revision: s.revision,
             activities: s.conversation?.at(-1)?.activities || [],
@@ -706,14 +706,14 @@ export default function AppResume() {
       if (analysis.status === "failed") {
         setAtsWarning(
           analysis.unavailableReason ||
-            "ATS analysis is temporarily unavailable. Your résumé is still saved and editable.",
+            "ATS analysis is temporarily unavailable. Your resume is still saved and editable.",
         );
       }
     } catch (e) {
       setAtsWarning(
         e?.message
           ? `ATS analysis is temporarily unavailable: ${e.message}`
-          : "ATS analysis is temporarily unavailable. Your résumé is still saved and editable.",
+          : "ATS analysis is temporarily unavailable. Your resume is still saved and editable.",
       );
     } finally {
       setAtsBusy(false);
@@ -772,7 +772,7 @@ export default function AppResume() {
             transform: none;
           }
         }
-        .resume-mode-choice { text-align: left; padding: 22px; border: 1px solid var(--jb-v3-line-2); border-radius: 8px; background: var(--jb-v3-panel); color: var(--jb-v3-fg); cursor: pointer; }
+        .resume-mode-choice { text-align: left; padding: 16px 20px; border: 1px solid var(--jb-v3-line-2); border-radius: 8px; background: var(--jb-v3-panel); color: var(--jb-v3-fg); cursor: pointer; }
         .resume-mode-choice:hover, .resume-mode-choice[aria-pressed="true"] { border-color: var(--jb-v3-accent); background: color-mix(in srgb, var(--jb-v3-accent) 8%, var(--jb-v3-panel)); }
         .resume-mode-choice:focus-visible { outline: 2px solid var(--jb-v3-accent); outline-offset: 3px; }
         @media(max-width: 900px) { .resume-live-workspace { grid-template-columns: minmax(0, 1fr) !important; } }
@@ -840,11 +840,11 @@ export default function AppResume() {
 
       <div
         id="jbres"
-        style={{ padding: "28px clamp(16px, 3vw, 32px) 48px", maxWidth: 1440, margin: "0 auto" }}
+        style={{ padding: "28px clamp(16px, 3vw, 32px) 48px", maxWidth: 1200, margin: "0 auto" }}
       >
         <div style={{ maxWidth: 720 }}>
           <div style={{ ...label, color: T.accent, marginBottom: 10 }}>
-            Résumé
+            Resume
           </div>
           <h1
             style={{
@@ -856,7 +856,7 @@ export default function AppResume() {
               margin: "0 0 10px",
             }}
           >
-            Your résumé, ready for the next role.
+            Your resume, ready for the next role.
           </h1>
           <p
             style={{
@@ -866,16 +866,16 @@ export default function AppResume() {
               lineHeight: 1.55,
             }}
           >
-            Review an existing résumé or create one with AI.
+            Compare your resume with a role, or create your next version.
           </p>
-          <BudgetSummary
+          {generateMode && <BudgetSummary
             budget={budget}
             estimate={
               options?.models
                 ?.find((model) => model.model === selectedModel)
                 ?.estimates?.[effort]
             }
-          />
+          />}
         </div>
         {operation.cancelError && <div role="alert">{operation.cancelError}</div>}
         {operation.active && <button type="button" disabled={operation.cancelling} onClick={async () => {
@@ -884,7 +884,7 @@ export default function AppResume() {
             try { acceptSession(await getHarnessSession(sessionRef.current.id)); } catch (e) { setError(e); }
           }
           void loadBudget();
-        }} style={primaryBtn}>{operation.cancelling ? "Stopping and reconciling usage…" : "Cancel AI operation"}</button>}
+        }} style={primaryBtn}>{operation.cancelling ? "Stopping and reconciling usage…" : "Cancel generation"}</button>}
         {!session && (
           <EntryPaths active={compareMode ? "compare" : generateMode ? "ai" : null} onCompare={() => router.push({ pathname: "/app/resume", query: { mode: "compare", ...(importedResumeId ? { id: importedResumeId } : {}) } }, undefined, { scroll: false })} onGenerate={() => router.push("/app/resume?mode=generate", undefined, { scroll: false })} />
         )}
@@ -968,14 +968,14 @@ export default function AppResume() {
 
 function BudgetSummary({ budget, estimate }) {
   if (!budget) {
-    return <div data-testid="ai-budget" style={{ fontSize: 13, color: T.fg3, marginBottom: 22 }}>Checking AI budget…</div>;
+    return <div data-testid="ai-budget" style={{ fontSize: 13, color: T.fg3, marginBottom: 22 }}>Checking credits…</div>;
   }
   if (budget.status === "unavailable") {
     return (
       <Notice
         data-testid="ai-budget"
         tone="error"
-        text="AI budget is unavailable. Model-running actions are paused; saved résumés and downloads remain available."
+        text="Credits are unavailable. You can still open saved resumes and download them."
       />
     );
   }
@@ -987,9 +987,9 @@ function BudgetSummary({ budget, estimate }) {
   return (
     <div
       data-testid="ai-budget"
-      style={{ border: `1px solid ${T.line}`, background: T.panel, borderRadius: 3, padding: "12px 14px", marginBottom: 22, fontSize: 13, lineHeight: 1.55 }}
+      style={{ border: `1px solid ${T.line}`, background: T.panel, borderRadius: 10, padding: "12px 14px", marginBottom: 22, fontSize: 13, lineHeight: 1.55 }}
     >
-      <strong>AI credits: {remaining} of {limit} remaining</strong>
+      <strong>Credits: {remaining} of {limit} remaining</strong>
       <span style={{ color: T.fg3 }}> · {budget.status} · resets {reset}</span>
       {estimate?.label && <div style={{ color: T.fg2 }}>Selected run: {estimate.label}</div>}
     </div>
@@ -1002,13 +1002,13 @@ function EntryPaths({ active, onCompare, onGenerate }) {
       <button type="button" aria-pressed={active === "compare"} onClick={onCompare} className="resume-mode-choice">
         <span style={{ display: "block", fontSize: 15, marginBottom: 4 }}>Compare Resume</span>
         <span style={{ display: "block", color: T.fg3, fontWeight: 400, lineHeight: 1.45 }}>
-          Upload a résumé for scores and actionable feedback. →
+          Check your existing resume against a role.
         </span>
       </button>
       <button type="button" aria-pressed={active === "ai"} onClick={onGenerate} className="resume-mode-choice">
-        <span style={{ display: "block", fontSize: 15, marginBottom: 4 }}>AI Generate Resume</span>
+        <span style={{ display: "block", fontSize: 15, marginBottom: 4 }}>Jobocate Generate Resume</span>
         <span style={{ display: "block", color: T.fg3, fontWeight: 400, lineHeight: 1.45 }}>
-          Build and refine a résumé with your profile. →
+          Create a polished resume from your profile.
         </span>
       </button>
     </div>
@@ -1053,7 +1053,7 @@ function sessionMessages(session) {
     },
     {
       role: "agent",
-      text: turn.summary || "Résumé updated.",
+      text: turn.summary || "Resume updated.",
       compiled: turn.compiled,
       revision: turn.revision,
     },
@@ -1079,7 +1079,7 @@ function Setup(p) {
         {p.platformDown && (
           <Notice
             data-testid="platform-unavailable"
-            text="The sandbox platform is unreachable, so new sessions cannot start right now."
+            text="Resume generation is temporarily unavailable. Please try again shortly."
           />
         )}
         {p.error && (
@@ -1105,7 +1105,7 @@ function Setup(p) {
             maxWidth: 720,
             border: `1px solid ${T.line}`,
             background: T.panel,
-            borderRadius: 3,
+            borderRadius: 10,
             padding: "22px 24px",
             fontSize: 13.5,
             color: T.fg3,
@@ -1170,7 +1170,7 @@ function RequiredGate({ profile }) {
       style={{
         border: "1px solid #e6b8ba",
         background: "color-mix(in srgb, #b4232a 4%, var(--jb-v3-panel))",
-        borderRadius: 3,
+        borderRadius: 10,
         padding: "26px 28px",
       }}
     >
@@ -1224,8 +1224,8 @@ function RequiredGate({ profile }) {
         }}
       >
         {unknown
-          ? "We could not confirm your profile is complete, so generation is held back. Check that these are filled in — a résumé is written from your account, not from this page."
-          : "A résumé is written from your account, not from this page — so these details have to exist before an agent can write one. Without them it would have to invent your name or leave an employer no way to reach you."}
+          ? "We could not confirm your profile is complete, so generation is held back. Check that these are filled in — a resume is written from your account, not from this page."
+          : "Add your contact details to Settings so your resume has the right information."}
       </p>
 
       <ul style={{ listStyle: "none", padding: 0, margin: "0 0 22px" }}>
@@ -1435,6 +1435,9 @@ function SetupForm(p) {
           </div>
         </Field>
 
+        <details>
+          <summary style={{ fontSize: 13, color: T.fg3, cursor: "pointer" }}>Generation settings</summary>
+          <div style={{ marginTop: 16 }}>
         <ModelAndEffort
           models={p.options?.models || []}
           selectedModel={p.selectedModel}
@@ -1443,6 +1446,8 @@ function SetupForm(p) {
           setEffort={p.setEffort}
           tier={p.options?.tier}
         />
+          </div>
+        </details>
 
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <button
@@ -1461,8 +1466,8 @@ function SetupForm(p) {
             }}
           >
             {p.phase === "provisioning"
-              ? "Provisioning sandbox…"
-              : "Start session"}
+              ? "Preparing your resume…"
+              : "Generate resume"}
           </button>
         </div>
       </Card>
@@ -1485,7 +1490,7 @@ function Workspace(p) {
           flexWrap: "wrap",
           background: T.panel,
           border: `1px solid ${T.line}`,
-          borderRadius: 3,
+          borderRadius: 10,
           padding: "12px 18px",
           marginBottom: 16,
         }}
@@ -1495,8 +1500,6 @@ function Workspace(p) {
           v={templateName(p.templates, session.templateKey) || "—"}
           testId="session-template"
         />
-        <Stat k="Model" v={session.model} testId="session-model" />
-        <Stat k="Effort" v={session.effort} testId="session-effort" />
         <Stat
           k="Revision"
           v={String(session.revision)}
@@ -1542,7 +1545,7 @@ function Workspace(p) {
         <div style={{ marginBottom: 16 }}>
           <Notice
             data-testid="session-ended"
-            text="This session has ended and its sandbox is released. Your document, PDFs and revisions are saved."
+            text="This editing session has ended. Your document, PDFs and revisions are saved."
           />
           <button
             disabled={p.busy}
@@ -1562,7 +1565,7 @@ function Workspace(p) {
       )}
 
       {/*
-       * A passing build is not a finished résumé.
+       * A passing build is not a finished resume.
        *
        * LaTeX compiles filler exactly as happily as a career, so a session can
        * report "build passing" twice and hand back a page of placeholders.
@@ -1575,7 +1578,7 @@ function Workspace(p) {
           style={{
             border: "1px solid #e0b970",
             background: "color-mix(in srgb, #9a6a2e 6%, var(--jb-v3-panel))",
-            borderRadius: 3,
+            borderRadius: 10,
             padding: "13px 16px",
             marginBottom: 16,
           }}
@@ -1613,7 +1616,7 @@ function Workspace(p) {
           >
             {p.pdfBase64
               ? "This preview is a working draft. Replace its placeholders with real career details before publishing."
-              : "The preview is withheld until the document has real career content. Import a résumé or add the missing facts in Settings, then generate again."}
+              : "The preview is withheld until the document has real career content. Import a resume or add the missing facts in Settings, then generate again."}
           </p>
         </div>
       )}
@@ -1653,7 +1656,7 @@ function Workspace(p) {
           style={{
             background: T.panel,
             border: `1px solid ${T.line}`,
-            borderRadius: 3,
+            borderRadius: 10,
             display: "flex",
             flexDirection: "column",
             height: 640,
@@ -1690,7 +1693,7 @@ function Workspace(p) {
                   lineHeight: 1.6,
                 }}
               >
-                Describe the résumé you want. Then keep going — “shorten the
+                Describe the resume you want. Then keep going — “shorten the
                 summary”, “lead with the payments work”, “make it one page”.
               </p>
             )}
@@ -1737,7 +1740,7 @@ function Workspace(p) {
                       padding: "9px 11px",
                       background: T.sunk,
                       border: `1px solid ${T.line}`,
-                      borderRadius: 3,
+                      borderRadius: 10,
                       fontSize: 11.5,
                       lineHeight: 1.55,
                       color: T.fg3,
@@ -1770,7 +1773,7 @@ function Workspace(p) {
                 placeholder={
                   session.revision
                     ? "What should change?"
-                    : "Build my résumé from my profile"
+                    : "Build my resume from my profile"
                 }
                 style={{ ...field, flex: 1 }}
               />
@@ -1794,7 +1797,7 @@ function Workspace(p) {
           style={{
             background: T.panel,
             border: `1px solid ${T.line}`,
-            borderRadius: 3,
+            borderRadius: 10,
             overflow: "hidden",
             height: 640,
             display: "flex",
@@ -1818,7 +1821,7 @@ function Workspace(p) {
           {p.pdfBase64 ? (
             <iframe
               data-testid="pdf-preview"
-              title="Rendered résumé"
+              title="Rendered resume"
               src={`data:application/pdf;base64,${p.pdfBase64}`}
               style={{
                 flex: 1,
@@ -1843,8 +1846,8 @@ function Workspace(p) {
               }}
             >
               {p.busy
-                ? "Compiling your résumé…"
-                : "Your résumé appears here once it compiles."}
+                ? "Compiling your resume…"
+                : "Your resume appears here once it compiles."}
             </div>
           )}
 
@@ -1899,7 +1902,7 @@ function Workspace(p) {
                       </div>
                     )}
                     {!turn.summary && !turn.instruction && (
-                      <div style={{ color: T.fg2 }}>Résumé updated.</div>
+                      <div style={{ color: T.fg2 }}>Resume updated.</div>
                     )}
                     <div style={{ color: T.fg3 }}>
                       {sessionTime(turn.createdAt)} · Build{" "}
@@ -1972,7 +1975,7 @@ function AtsPanel({
   const visibleWarning =
     jobContextWarning ||
     (missingContext
-      ? "Add a job description or job URL to run ATS matching. You can continue working on the résumé without it."
+      ? "Add a job description or job URL to run ATS matching. You can continue working on the resume without it."
       : warning);
 
   return (
@@ -1981,7 +1984,7 @@ function AtsPanel({
       style={{
         background: T.panel,
         border: `1px solid ${stale ? "#e0b970" : T.line}`,
-        borderRadius: 3,
+        borderRadius: 10,
         padding: 18,
         marginBottom: 18,
       }}
@@ -2004,8 +2007,7 @@ function AtsPanel({
               lineHeight: 1.55,
             }}
           >
-            Score this exact résumé revision against the job description in the
-            same agent sandbox.
+            Compare this resume version with your job description.
           </p>
           <p style={{ margin: "6px 0 0", color: T.fg3, fontSize: 12 }}>
             ATS analysis uses measured model credits (1 credit per cent of usage).
@@ -2013,7 +2015,7 @@ function AtsPanel({
           </p>
           {!session.revision && (
             <p style={{ margin: "8px 0 0", color: T.fg3, fontSize: 12.5 }}>
-              Generate the résumé before running an analysis.
+              Generate the resume before running an analysis.
             </p>
           )}
           {visibleWarning && (
@@ -2040,7 +2042,7 @@ function AtsPanel({
                 fontWeight: 600,
               }}
             >
-              This result is for revision {result.sourceRevision}; the résumé is
+              This result is for revision {result.sourceRevision}; the resume is
               now revision {session.revision}.
             </p>
           )}
@@ -2175,7 +2177,7 @@ function Bubble({ message }) {
           background: you ? T.accent : T.sunk,
           color: you ? T.accentInk : T.fg2,
           border: you ? "none" : `1px solid ${T.line}`,
-          borderRadius: 3,
+          borderRadius: 10,
           padding: "10px 13px",
           fontSize: 13.5,
           lineHeight: 1.55,
@@ -2256,7 +2258,7 @@ function ProfileFacts({ profile }) {
       style={{
         background: T.panel,
         border: `1px solid ${missing.length ? "#e6b8ba" : T.line}`,
-        borderRadius: 3,
+        borderRadius: 10,
         padding: "15px 18px",
         marginBottom: 18,
       }}
@@ -2298,7 +2300,7 @@ function ProfileFacts({ profile }) {
             lineHeight: 1.5,
           }}
         >
-          Optional, and your résumé will be stronger with them:{" "}
+          Optional, and your resume will be stronger with them:{" "}
           {gaps.map((f) => FIELD_LABELS[f] || f).join(", ")}.{" "}
           <Link href="/app/settings" style={{ color: T.accent }}>
             Add in Settings →
@@ -2396,7 +2398,7 @@ function TemplatePicker({
           data-testid="templates-empty"
           style={{ fontSize: 13.5, color: T.fg3, margin: 0 }}
         >
-          No templates are installed, so the agent will use its own layout.
+          No templates are available. Your resume will use the default layout.
         </p>
       </Field>
     );
@@ -2440,7 +2442,7 @@ function TemplatePicker({
                   boxShadow: on
                     ? `0 0 0 2px color-mix(in srgb, var(--jb-v3-accent) 18%, transparent)`
                     : "none",
-                  borderRadius: 3,
+                  borderRadius: 10,
                   transition: "border-color .15s ease, box-shadow .15s ease",
                 }}
               >
@@ -2487,7 +2489,7 @@ function TemplatePicker({
 
       <Field
         title="Look"
-        hint="Presentation only. These never change what your résumé claims."
+        hint="Presentation only. These never change what your resume claims."
       >
         <KnobRow
           template={selected}
@@ -2585,7 +2587,7 @@ function LookPanel({ templates, session, busy, budgetBlocked, applyLook, revertL
       style={{
         background: T.panel,
         border: `1px solid ${T.line}`,
-        borderRadius: 3,
+        borderRadius: 10,
         marginBottom: 16,
       }}
     >
@@ -2741,7 +2743,7 @@ function Shell({ children }) {
   return (
     <>
       <Head>
-        <title>Résumé · Jobocate</title>
+        <title>Resume · Jobocate</title>
       </Head>
       <div
         style={{
@@ -2765,7 +2767,7 @@ function Card({ children, testId }) {
       style={{
         background: T.panel,
         border: `1px solid ${T.line}`,
-        borderRadius: 3,
+        borderRadius: 10,
         padding: 26,
         display: "flex",
         flexDirection: "column",
@@ -2828,7 +2830,7 @@ function Notice({ tone, text, ...rest }) {
       style={{
         border: `1px solid ${tone === "error" ? "#e6b8ba" : T.line}`,
         background: T.panel,
-        borderRadius: 3,
+        borderRadius: 10,
         padding: "12px 16px",
         fontSize: 13.5,
         color: tone === "error" ? "#b4232a" : T.fg2,

@@ -28,7 +28,7 @@ const TABS = [
   { id: 'account', label: 'Account' },
   // The optional resume data. It lives here, not on the resume screen, so the
   // generator has exactly one source for it.
-  { id: 'resume', label: 'Résumé details' },
+  { id: 'resume', label: 'Resume details' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'plan', label: 'Plan' },
 ];
@@ -69,7 +69,7 @@ function SwitchRow({ label, checked, onChange }) {
 }
 
 /**
- * `required` here means "the résumé generator cannot run without this", not
+ * `required` here means "the resume generator cannot run without this", not
  * "the form will not submit". Settings stays savable in any state — a
  * half-filled profile is a normal thing to have — so the marker is a warning
  * about a downstream consequence, and the empty row says what that consequence
@@ -93,7 +93,7 @@ function TextRow({ label, value, onChange, readOnly, required }) {
         {label}
         {required && (
           <abbr
-            title="Required to generate a résumé"
+            title="Required to generate a resume"
             aria-label="required"
             data-testid={`required-${label.toLowerCase().replace(/\s+/g, '-')}`}
             style={{
@@ -125,7 +125,7 @@ function TextRow({ label, value, onChange, readOnly, required }) {
           />
           {empty && (
             <p style={{ fontSize: 12, color: '#b4232a', margin: '6px 0 0' }}>
-              Needed before you can generate a résumé.
+              Needed before you can generate a resume.
             </p>
           )}
         </div>

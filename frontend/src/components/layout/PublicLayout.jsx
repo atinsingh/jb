@@ -27,7 +27,7 @@ import SiteFooter from '@/components/site/SiteFooter';
  */
 export default function PublicLayout({ children, variant = 'candidate', surface = 'flightplan' }) {
   return (
-    <div className={surface === 'v3' ? 'jb-dark jbv3-chrome' : 'jb-dark'}>
+    <div className={`${surface === 'v3' ? 'jb-dark jbv3-chrome jb-public' : 'jb-dark'} ${variant === 'candidate' ? 'jb-candidate' : ''}`}>
       <SiteNav variant={variant} />
       <main id="main">{children}</main>
       <SiteFooter />

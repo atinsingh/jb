@@ -11,7 +11,7 @@ export default function Privacy() {
     },
     {
       title: 'How We Use Your Information',
-      content: `Your information is used to provide and improve our services, match you with relevant job opportunities, submit job applications on your behalf, and communicate with you about your account and our services. We use AI and machine learning to analyze your profile and optimize your job search experience.`
+      content: `Your information is used to provide and improve our services, match you with relevant job opportunities, submit job applications on your behalf, and communicate with you about your account and our services. Your profile helps personalize your job search experience.`
     },
     {
       title: 'Data Sharing',
@@ -79,7 +79,7 @@ export default function Privacy() {
             >
               <div className="p-8 rounded-2xl bg-gray-50 border border-gray-100 mb-8">
                 <p className="text-gray-600 text-lg leading-relaxed">
-                  At Jobocate, we take your privacy seriously. This policy explains how we collect, use, and protect your personal information when you use our AI-powered job search platform.
+                  At Jobocate, we take your privacy seriously. This policy explains how we collect, use, and protect your personal information when you use our job search platform.
                 </p>
               </div>
 

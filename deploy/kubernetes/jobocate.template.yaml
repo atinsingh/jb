@@ -48,6 +48,8 @@ spec:
               value: production
             - name: PORT
               value: "8000"
+            - name: FRONTEND_URL
+              value: https://__HOST__
             - name: INTERNAL_FRONTEND_URL
               value: http://jobocate-frontend:3000
           securityContext:

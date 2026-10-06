@@ -26,7 +26,7 @@ const ROLES = [
   {
     id: 'ROLE_CANDIDATE',
     name: 'Looking for a job',
-    desc: 'Get matched, auto-apply, and prepare for interviews.',
+    desc: 'Compare your resume and create your next version.',
   },
   {
     id: 'ROLE_EMPLOYER',
@@ -74,7 +74,7 @@ export default function AppSignup() {
   useEffect(() => {
     if (!loading && user) {
       router.replace(
-        user.role === 'ROLE_EMPLOYER' ? '/employer/onboarding' : '/app/onboarding',
+        user.role === 'ROLE_EMPLOYER' ? '/employer/onboarding' : '/app/dashboard',
       );
     }
   }, [loading, user, router]);
@@ -99,7 +99,7 @@ export default function AppSignup() {
       }
 
       router.replace(
-        role === 'ROLE_EMPLOYER' ? '/employer/onboarding' : '/app/onboarding',
+        role === 'ROLE_EMPLOYER' ? '/employer/onboarding' : '/app/dashboard',
       );
     } catch (err) {
       setError(err?.message || 'Could not create that account. Please try again.');
@@ -331,7 +331,7 @@ export default function AppSignup() {
               <p className={styles.asideHead}>
                 {role === 'ROLE_EMPLOYER'
                   ? 'Screening runs while you sleep.'
-                  : 'The search runs while you sleep.'}
+                  : 'Your experience, ready for the next role.'}
               </p>
 
               <div className={styles.statStrip}>
@@ -341,8 +341,8 @@ export default function AppSignup() {
                       ['11', 'days to hire'],
                     ]
                   : [
-                      ['62', 'roles matched weekly'],
-                      ['9', 'minutes to apply'],
+                      ['Compare', 'your existing resume'],
+                      ['Create', 'your next version'],
                     ]
                 ).map(([value, label]) => (
                   <div key={label} className={styles.statCell}>
@@ -355,7 +355,7 @@ export default function AppSignup() {
               <p className={styles.asideNote}>
                 {role === 'ROLE_EMPLOYER'
                   ? 'Every shortlist shows the reasoning behind it, and nothing is sent without your approval.'
-                  : 'Every match shows why it fits, and nothing is submitted until you approve it.'}
+                  : 'Start with a comparison or build from your profile. Your dashboard keeps both in one place.'}
               </p>
             </aside>
           </div>

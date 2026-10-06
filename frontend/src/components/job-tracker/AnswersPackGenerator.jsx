@@ -108,7 +108,7 @@ export default function AnswersPackGenerator({ applicationId, jobId, existingAns
       {Object.keys(answersPack).length === 0 && !loading ? (
         <div className="text-center py-12 text-zinc-600 dark:text-zinc-400">
           <SparklesIcon className="h-12 w-12 mx-auto mb-4 text-zinc-400" />
-          <p>Generate an answers pack to get AI-powered responses to common application questions.</p>
+          <p>Generate an answers pack to get tailored responses to common application questions.</p>
         </div>
       ) : (
         <div className="space-y-4">

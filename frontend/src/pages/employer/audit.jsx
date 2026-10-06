@@ -11,7 +11,7 @@ import { employerAuditApi } from '@/services/employerApi';
 /* ---------------------------------------------------------------- data --- */
 const FILTERS = [
   { key: 'all', label: 'All activity' },
-  { key: 'ai', label: '✦ AI only' },
+  { key: 'ai', label: '✦ Automated only' },
   { key: 'human', label: 'People only' },
 ];
 
@@ -88,7 +88,7 @@ export default function EmployerAuditLog() {
   // Export the currently-visible rows as a real CSV download.
   const exportCsv = () => {
     if (!rows.length) return;
-    const header = ['Actor', 'Role', 'AI', 'Action', 'Target', 'When', 'IP'];
+    const header = ['Actor', 'Role', 'Automated', 'Action', 'Target', 'When', 'IP'];
     const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const body = rows.map((e) =>
       [e.actor, e.role, e.ai ? 'yes' : 'no', e.action, e.target, e.when, e.ip]
@@ -156,7 +156,7 @@ export default function EmployerAuditLog() {
             <div style={{ marginBottom: 20 }}>
               <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 36, lineHeight: 1, margin: '0 0 6px' }}>Audit log</h1>
               <p style={{ fontSize: 14.5, color: '#5A544A', margin: 0 }}>
-                Every action across your workspace, including <span style={{ color: '#157A49', fontWeight: 600 }}>✦ AI</span> automations.
+                Every action across your workspace, including <span style={{ color: '#157A49', fontWeight: 600 }}>✦ Automated</span> automations.
               </p>
             </div>
 
@@ -222,7 +222,7 @@ export default function EmployerAuditLog() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <span style={{ fontSize: 13, fontWeight: 600, color: '#1B1A16', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.actor}</span>
                           {e.ai && (
-                            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', color: '#157A49', background: '#EAF6EE', border: '1px solid #CDE9D6', padding: '2px 6px', borderRadius: 999, whiteSpace: 'nowrap' }}>✦ AI</span>
+                            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', color: '#157A49', background: '#EAF6EE', border: '1px solid #CDE9D6', padding: '2px 6px', borderRadius: 999, whiteSpace: 'nowrap' }}>✦ Automated</span>
                           )}
                         </div>
                         <div style={{ fontSize: 11, color: '#A79E8F' }}>{e.role}</div>

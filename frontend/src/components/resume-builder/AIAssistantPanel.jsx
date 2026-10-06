@@ -185,7 +185,7 @@ export default function AIAssistantPanel({ resumeData, onUpdate, isOpen, onClose
         <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <SparklesIcon className="h-5 w-5 text-primary-600 dark:text-primary-400" />
-            <h2 className="font-semibold text-zinc-900 dark:text-white">AI Assistant</h2>
+            <h2 className="font-semibold text-zinc-900 dark:text-white">Writing Assistant</h2>
           </div>
           <button
             onClick={onClose}
@@ -199,7 +199,7 @@ export default function AIAssistantPanel({ resumeData, onUpdate, isOpen, onClose
         {quota && (
           <div className="p-4 border-b border-zinc-200 dark:border-zinc-800">
             <div className="text-xs text-zinc-600 dark:text-zinc-400 mb-2">
-              AI Credits: {quota.remaining || 0} / {quota.limit || '∞'}
+              Credits: {quota.remaining || 0} / {quota.limit || '∞'}
             </div>
             {quota.limit && (
               <div className="w-full bg-zinc-200 dark:bg-zinc-700 rounded-full h-2">

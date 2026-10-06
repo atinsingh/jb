@@ -127,7 +127,7 @@ function annotate(root, annotations, resume, showTooltip, hideTooltip) {
       placed = true;
       break;
     }
-    // Model output is grounded in parsed résumé text, while the PDF text layer
+    // Model output is grounded in parsed resume text, while the PDF text layer
     // comes from the original file. If a quote was normalized, truncated, or
     // split differently during parsing, it may not exist verbatim in the PDF.
     // Never drop that comment: attach it to the section's existing highlight.
@@ -135,7 +135,7 @@ function annotate(root, annotations, resume, showTooltip, hideTooltip) {
   }
 }
 
-async function renderPdf(blob, container, signal) {
+async function renderPdf(blob, container, signal, width) {
   const pdfjs = await import('pdfjs-dist');
   if (signal.aborted) return () => {};
   pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
@@ -149,7 +149,7 @@ async function renderPdf(blob, container, signal) {
     if (signal.aborted) break;
     const page = await pdf.getPage(number);
     const natural = page.getViewport({ scale: 1 });
-    const scale = Math.min(1.45, 760 / natural.width);
+    const scale = Math.min(1.45, Math.min(760, width) / natural.width);
     const viewport = page.getViewport({ scale });
     const sheet = document.createElement('div');
     sheet.className = 'compare-pdf-page';
@@ -237,6 +237,7 @@ export default function CompareDocumentPreview({ blob, filename, annotations, re
   const [tooltip, setTooltip] = useState(null);
   const [error, setError] = useState('');
   const [renderVersion, setRenderVersion] = useState(0);
+  const [width, setWidth] = useState(0);
   const showTooltip = (annotationsForMark, rect) => setTooltip({
     annotations: annotationsForMark,
     top: Math.min(window.innerHeight - 180, rect.bottom + 8),
@@ -245,7 +246,15 @@ export default function CompareDocumentPreview({ blob, filename, annotations, re
   const hideTooltip = () => setTooltip(null);
 
   useEffect(() => {
-    if (!blob || !containerRef.current) return;
+    const container = containerRef.current;
+    if (!container) return;
+    const observer = new ResizeObserver(([entry]) => setWidth(Math.floor(entry.contentRect.width)));
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!blob || !containerRef.current || !width) return;
     const container = containerRef.current;
     const controller = new AbortController();
     let dispose = () => {};
@@ -260,7 +269,7 @@ export default function CompareDocumentPreview({ blob, filename, annotations, re
         if (controller.signal.aborted) return;
         await renderAsync(blob, staging, undefined, { breakPages: true });
       } else if (normalizedFilename.endsWith('.pdf')) {
-        dispose = await renderPdf(blob, staging, controller.signal);
+        dispose = await renderPdf(blob, staging, controller.signal, width);
       } else {
         renderStructuredResume(originalResume.current, staging);
       }
@@ -274,7 +283,7 @@ export default function CompareDocumentPreview({ blob, filename, annotations, re
       dispose();
       container.replaceChildren();
     };
-  }, [blob, filename]);
+  }, [blob, filename, width]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -287,8 +296,8 @@ export default function CompareDocumentPreview({ blob, filename, annotations, re
   }, [annotations, renderVersion]);
 
   return (
-    <section data-testid="compare-document-preview" style={{ border: '1px solid var(--jb-v3-line)', background: 'var(--jb-v3-panel)', padding: 16 }}>
-      <h3 style={{ margin: '0 0 5px', fontSize: 16 }}>Uploaded résumé</h3>
+    <section data-testid="compare-document-preview" style={{ minWidth: 0, border: '1px solid var(--jb-v3-line)', borderRadius: 12, background: 'var(--jb-v3-panel)', padding: 16 }}>
+      <h3 style={{ margin: '0 0 5px', fontSize: 16 }}>Uploaded resume</h3>
       <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--jb-v3-fg-3)' }}>Colored areas show where to review the original file. Hover or focus a highlight for a suggested fix.</p>
       {error && <div role="alert">{error}</div>}
       <div className="compare-document-scroll" style={{ overflow: 'auto', maxHeight: 760, background: '#e7e9ee', padding: 12 }}>

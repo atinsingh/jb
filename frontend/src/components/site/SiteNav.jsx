@@ -40,9 +40,8 @@ import useJbTheme from '@/components/theme/useJbTheme';
  */
 
 const NAV_LINKS = [
-  { label: 'Product', href: '/' },
+  { label: 'Candidates', href: '/#candidates' },
   { label: 'Pricing', href: '/pricing' },
-  { label: 'About', href: '/about' },
   { label: 'For employers', href: '/employers' },
   { label: 'Jobs', href: '/jobs' },
 ];
@@ -168,10 +167,10 @@ export default function SiteNav({ variant = 'candidate' }) {
         }
 
         .jbnav__bar {
-          max-width: 1360px;
+          max-width: 1200px;
           margin: 0 auto;
           padding: 0 28px;
-          height: 56px;
+          height: 72px;
           display: flex;
           align-items: center;
           gap: 34px;
@@ -193,10 +192,10 @@ export default function SiteNav({ variant = 'candidate' }) {
 
         .jbnav__link {
           padding: 8px 12px 7px;
-          font-family: var(--jb-font-mono);
-          font-size: 10.5px;
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
+          font-family: var(--jb-font-sans);
+          font-size: 13px;
+
+
           white-space: nowrap;
           color: var(--jb-ink-muted);
           text-decoration: none;
@@ -222,10 +221,10 @@ export default function SiteNav({ variant = 'candidate' }) {
         }
 
         .jbnav__signin {
-          font-family: var(--jb-font-mono);
+          font-family: var(--jb-font-sans);
           font-size: 10px;
           letter-spacing: 0.12em;
-          text-transform: uppercase;
+
           color: var(--jb-ink-muted);
           text-decoration: none;
           padding: 6px 8px;
@@ -243,12 +242,12 @@ export default function SiteNav({ variant = 'candidate' }) {
              accent instead. Falls back for non-v3 surfaces. */
           background: var(--jb-v3-accent, var(--jb-accent));
           color: var(--jb-v3-accent-ink, var(--jb-ivory));
-          border-radius: 2px;
+          border-radius: 8px;
           padding: 6px 14px;
-          font-family: var(--jb-font-mono);
+          font-family: var(--jb-font-sans);
           font-size: 10px;
           letter-spacing: 0.12em;
-          text-transform: uppercase;
+
           text-decoration: none;
           white-space: nowrap;
           transition: transform 0.18s ease;
@@ -261,12 +260,12 @@ export default function SiteNav({ variant = 'candidate' }) {
         .jbnav__theme {
           background: none;
           border: 1px solid var(--jb-border-strong);
-          border-radius: 2px;
+          border-radius: 8px;
           padding: 5px 10px;
-          font-family: var(--jb-font-mono);
+          font-family: var(--jb-font-sans);
           font-size: 10px;
           letter-spacing: 0.12em;
-          text-transform: uppercase;
+
           color: var(--jb-ink-muted);
           cursor: pointer;
           transition: border-color 0.2s ease, color 0.2s ease;

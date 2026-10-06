@@ -4,7 +4,7 @@ param(
   [string]$Cluster = 'perfectum-k8s',
   [string]$Namespace = 'jobocate-prod',
   [string]$Registry = 'perfectum',
-  [string]$Domain = 'jobocate.pragra.io'
+  [string]$Domain = 'jobocate.com'
 )
 $ErrorActionPreference = 'Stop'
 $RepoRoot = Split-Path $PSScriptRoot -Parent

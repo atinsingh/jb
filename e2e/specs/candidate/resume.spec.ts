@@ -518,14 +518,14 @@ test.describe("résumé AI budget", () => {
 });
 
 test.describe("Compare Resume manual workflow", () => {
-  test("keeps comparison results and extracted fields in a loading state until the agent response arrives", async ({ page }) => {
+  test("keeps comparison results and extracted fields in a loading state until the comparison response arrives", async ({ page }) => {
     await stubHarnessApi(page);
     const { PDFDocument } = require("../../../backend/node_modules/pdf-lib");
     const pdf = await PDFDocument.create();
     pdf.addPage([600, 800]).drawText("Jordan Reyes", { x: 50, y: 700, size: 12 });
     const source = Buffer.from(await pdf.save());
     let releaseComparison!: () => void;
-    const comparisonHeld = new Promise<void>((resolve) => { releaseComparison = resolve; });
+    let comparisonHeld = new Promise<void>((resolve) => { releaseComparison = resolve; });
     const imported = {
       id: "pending-compare", name: "Imported profile", creationMethod: "imported",
       fullName: "Jordan Reyes", summary: "", skills: [],
@@ -550,20 +550,31 @@ test.describe("Compare Resume manual workflow", () => {
     await expect(page.getByTestId("comparison-fields-loading")).toBeVisible();
     await expect(page.getByLabel("Summary")).toHaveCount(0);
     await expect(page.getByTestId("comparison-score-loading")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Save Resume Details" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Save resume details" })).toHaveCount(0);
+    await expect(page.getByTestId("comparison-pending")).toContainText("Checking db for the comparison");
     await expect(page.getByLabel("Job description")).toBeDisabled();
     expect(await page.getByTestId("compare-ats-score").count()).toBe(0);
 
     releaseComparison();
     await expect(page.getByTestId("comparison-pending")).toHaveCount(0);
+    await page.getByText("Edit resume details", { exact: true }).click();
     await expect(page.getByLabel("Summary")).toBeEnabled();
     await expect(page.getByLabel("Summary")).toHaveValue("Backend engineer building containerised services.");
     await expect(page.getByLabel("Company 1")).toHaveValue("Example Co");
     await expect(page.getByLabel("Role description 1")).toHaveValue("");
     await expect(page.getByLabel("Role achievements 1")).toHaveValue("Built services.");
     await expect(page.getByTestId("comparison-missing-sections")).toContainText("Skills, Education, Achievements");
-    await expect(page.getByTestId("compare-ats-score")).toHaveText("72");
-    await expect(page.getByTestId("compare-match-score")).toHaveText("61");
+    await expect(page.getByTestId("compare-ats-score")).toHaveText("72%");
+    await expect(page.getByTestId("compare-match-score")).toHaveText("61%");
+    const preview = page.getByTestId("compare-document-preview").locator("canvas").first();
+    await expect(preview).toBeVisible();
+    comparisonHeld = new Promise<void>((resolve) => { releaseComparison = resolve; });
+    await page.getByRole("button", { name: "Refresh comparison", exact: true }).click();
+    await expect(page.getByTestId("comparison-pending")).toBeVisible();
+    expect(await preview.count()).toBe(1);
+    await expect(page.getByTestId("compare-ats-score")).toHaveText("72%");
+    releaseComparison();
+    await expect(page.getByTestId("comparison-pending")).toHaveCount(0);
   });
 
   test("opens a library-imported PDF before job context and compares after it is added", async ({ page }) => {
@@ -617,12 +628,13 @@ test.describe("Compare Resume manual workflow", () => {
 
     await page.getByTestId("resume-library-import-1").getByRole("button", { name: "Open resume" }).click();
     await expect(page.getByTestId("compare-document-preview")).toHaveCount(0);
+    await page.getByText("Edit resume details", { exact: true }).click();
     await expect(page.getByLabel("Full name")).toHaveValue("Jordan Reyes");
     await expect(page.getByTestId("compare-ats-score")).toHaveText("—");
     expect(comparisons).toBe(0);
     await page.getByLabel("Job description").fill("TypeScript engineer wanted");
     await page.getByRole("button", { name: "Refresh comparison" }).click();
-    await expect(page.getByTestId("compare-ats-score")).toHaveText("72");
+    await expect(page.getByTestId("compare-ats-score")).toHaveText("72%");
     await expect(page.getByTestId("compare-document-preview")).toBeVisible();
     expect(comparisons).toBe(1);
   });
@@ -658,7 +670,7 @@ test.describe("Compare Resume manual workflow", () => {
     await page.route("**/api/resume-builder/legacy-import", (route: Route) => route.fulfill({ json: imported }));
 
     await page.goto("/app/resume?id=legacy-import", { waitUntil: "domcontentloaded" });
-    await page.getByLabel("Re-upload original résumé").setInputFiles({ name: "older.pdf", mimeType: "application/pdf", buffer: source });
+    await page.getByLabel("Re-upload original resume").setInputFiles({ name: "older.pdf", mimeType: "application/pdf", buffer: source });
     await expect.poll(() => retained).toBe(true);
     await expect(page.getByTestId("compare-document-preview")).toHaveCount(0);
     await page.getByLabel("Job description").fill("Backend engineer wanted");
@@ -702,9 +714,9 @@ test.describe("Compare Resume manual workflow", () => {
     await expect(page.getByText("Paste the job description.")).toBeVisible();
     await page.getByLabel("Job description").fill("Backend engineer wanted");
     await page.getByRole("button", { name: "Refresh comparison" }).click();
-    await expect(page.getByTestId("compare-ats-score")).toHaveText("72");
+    await expect(page.getByTestId("compare-ats-score")).toHaveText("72%");
     await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(page.getByTestId("compare-ats-score")).toHaveText("72");
+    await expect(page.getByTestId("compare-ats-score")).toHaveText("72%");
   });
 
   test("shows repair comments on the uploaded DOCX text", async ({ page }) => {
@@ -838,21 +850,22 @@ test.describe("Compare Resume manual workflow", () => {
     await highlight.hover();
     await expect(page.getByRole("tooltip")).toContainText("Replace the generic opener");
     await expect(page.locator('[data-testid^="document-highlight-agent-"]')).toHaveCount(6);
-    await expect(page.getByTestId("compare-ats-score")).toHaveText("45");
-    await expect(page.getByTestId("compare-match-score")).toHaveText("61");
+    await expect(page.getByTestId("compare-ats-score")).toHaveText("45%");
+    await expect(page.getByTestId("compare-match-score")).toHaveText("61%");
     await expect(page.getByTestId("compare-ai-score")).toHaveText("47%");
     await expect(page.getByTestId("comparison-suggestion")).toHaveCount(6);
     await expect(page.getByTestId("comparison-suggestions")).toContainText(
       "State how the workflows changed support performance.",
     );
-    await expect(page.getByTestId("comparison-review-source")).toContainText("bedrock/nova-2-lite/low");
-    await expect(page.getByTestId("compare-ats-card")).toContainText("Higher is better");
-    await expect(page.getByTestId("compare-ai-card")).toContainText("Lower is better");
+    await expect(page.getByTestId("comparison-review-source")).toHaveCount(0);
+    await expect(page.getByTestId("compare-ats-card")).toContainText("Document compatibility");
+    await expect(page.getByTestId("compare-ai-card")).toContainText("Writing pattern score");
     await page.getByTestId("ai-pattern-breakdown").getByText("Why 47%?").click();
     await expect(page.getByTestId("ai-pattern-breakdown")).toContainText("Stock phrases");
     await expect(page.getByTestId("ai-pattern-breakdown")).toContainText("81%");
     const canvas = page.getByTestId("compare-document-preview").locator("canvas").first();
     await canvas.evaluate((element) => element.setAttribute("data-render-token", "kept"));
+    await page.getByText("Edit resume details", { exact: true }).click();
     await page.getByLabel("Summary").fill("More specific summary");
     await expect(canvas).toHaveAttribute("data-render-token", "kept");
   });
@@ -870,6 +883,7 @@ test.describe("Compare Resume manual workflow", () => {
       buffer: Buffer.from("%PDF-1.4"),
     });
     await expect(start).toBeDisabled();
+    await page.getByText("Use a job link instead", { exact: true }).click();
     await page.getByLabel("Job URL").fill("https://jobs.example.com/engineer");
     await expect(start).toBeEnabled();
     await page.getByLabel("Job URL").fill("");
@@ -962,7 +976,7 @@ test.describe("Compare Resume manual workflow", () => {
 
     await page.goto("/app/resume", { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("button", { name: "Compare Resume" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "AI Generate Resume" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Jobocate Generate Resume" })).toBeVisible();
     expect(restoredHarnessRequests).toBe(0);
     await page.getByRole("button", { name: "Compare Resume" }).click();
     await expect(page.getByTestId("compare-resume-upload")).toBeVisible();
@@ -971,11 +985,12 @@ test.describe("Compare Resume manual workflow", () => {
       waitUntil: "domcontentloaded",
     });
     await expect(page.getByRole("heading", { name: "Compare Resume" })).toBeVisible();
-    await expect(page.getByTestId("compare-ats-score")).toHaveText("72");
+    await expect(page.getByTestId("compare-ats-score")).toHaveText("72%");
     await expect(page.getByTestId("compare-ai-score")).toHaveText("78%");
     expect(comparisons).toBe(1);
     expect(comparisonRequests[0]?.forceRefresh).toBeUndefined();
 
+    await page.getByText("Edit resume details", { exact: true }).click();
     const summaryAnnotation = page.getByTestId("annotation-summary");
     await summaryAnnotation.hover();
     await expect(page.getByRole("tooltip")).toContainText(
@@ -987,16 +1002,16 @@ test.describe("Compare Resume manual workflow", () => {
     );
     await page.getByLabel("Role description 1").fill("Built and owned the customer API.");
     await page.getByRole("button", { name: "+ Add certification" }).click();
-    await page.getByRole("button", { name: "Save Resume Details" }).click();
+    await page.getByRole("button", { name: "Save resume details" }).click();
     await expect(page.getByRole("alert").filter({ hasText: "Certification name" })).toBeVisible();
     expect(updates).toHaveLength(0);
     await page.getByLabel("name 2").fill("AWS Certified");
     await page.getByLabel("issuer 2").fill("AWS");
     await page.getByLabel("Achievements", { exact: true }).fill("Conference speaker");
-    await page.getByRole("button", { name: "Save Resume Details" }).click();
+    await page.getByRole("button", { name: "Save resume details" }).click();
     await expect(page.getByRole("alert").filter({ hasText: "Resume details saved." })).toBeVisible();
     await expect(page.getByTestId("comparison-pending")).toHaveCount(0);
-    await expect(page.getByTestId("compare-ats-score")).toHaveText("72");
+    await expect(page.getByTestId("compare-ats-score")).toHaveText("72%");
     expect(comparisons).toBe(1);
     expect(Object.keys(updates.at(-1)).sort()).toEqual([
       "fullName", "email", "phone", "location", "linkedin", "summary", "skills",
@@ -1018,7 +1033,7 @@ test.describe("Compare Resume manual workflow", () => {
     });
     await page.getByRole("button", { name: "Refresh comparison" }).click();
     await expect.poll(() => comparisons).toBe(2);
-    expect(comparisonRequests[1]?.forceRefresh).toBe(true);
+    expect(comparisonRequests[1]?.forceRefresh).toBeUndefined();
   });
 });
 
@@ -1204,7 +1219,7 @@ test.describe("résumé session history", () => {
 
     await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
     await expect(page.getByTestId("past-sessions")).toHaveCount(0);
-    await page.getByRole("button", { name: /AI Generate Resume/ }).click();
+    await page.getByRole("button", { name: /Jobocate Generate Resume/ }).click();
     await page.getByTestId("start-session").click();
     await page.getByTestId("instruction").fill("Build my résumé.");
     await page.getByTestId("send-instruction").click();
@@ -1281,7 +1296,7 @@ test.describe("résumé session history", () => {
   }) => {
     await stubHarnessApi(page);
     await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
-    await page.getByRole("button", { name: /AI Generate Resume/ }).click();
+    await page.getByRole("button", { name: /Jobocate Generate Resume/ }).click();
     await page.getByTestId("start-session").click();
     await page.getByTestId("instruction").fill("Build my résumé.");
     await page.getByTestId("send-instruction").click();
@@ -1350,7 +1365,7 @@ test.describe("résumé session history", () => {
     await page
       .getByRole("button", { name: "Create Resume", exact: true })
       .click();
-    await page.getByRole("button", { name: /AI Generate Resume/ }).click();
+    await page.getByRole("button", { name: /Jobocate Generate Resume/ }).click();
     await page.getByTestId("start-session").click();
     await page.getByTestId("instruction").fill("Build my résumé.");
     await page.getByTestId("send-instruction").click();
@@ -1365,7 +1380,7 @@ test.describe("résumé session history", () => {
     guards.allowConsoleErrors();
     await stubHarnessApi(page);
     await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
-    await page.getByRole("button", { name: /AI Generate Resume/ }).click();
+    await page.getByRole("button", { name: /Jobocate Generate Resume/ }).click();
     await page.getByTestId("start-session").click();
     await page.getByTestId("instruction").fill("Build my résumé.");
     await page.getByTestId("send-instruction").click();
@@ -1440,10 +1455,8 @@ test.describe("LaTeX résumé — agent harness", () => {
     await page.getByTestId("start-session").click();
 
     await expect(page.getByTestId("session-harness")).toHaveCount(0);
-    await expect(page.getByTestId("session-model")).toHaveText(
-      "claude-sonnet-4-5",
-    );
-    await expect(page.getByTestId("session-effort")).toHaveText("high");
+    await expect(page.getByTestId("session-model")).toHaveCount(0);
+    await expect(page.getByTestId("session-effort")).toHaveCount(0);
 
     // ---- generate ----
     await page
@@ -1781,6 +1794,7 @@ test.describe("résumé — model and effort selection", () => {
   }) => {
     await stubHarnessApi(page);
     await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
+    await page.getByText("Generation settings", { exact: true }).click();
 
     await expect(page.getByTestId("model-select")).toHaveValue(
       "claude-sonnet-4-5",
@@ -1822,6 +1836,7 @@ test.describe("résumé — model and effort selection", () => {
     });
 
     await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
+    await page.getByText("Generation settings", { exact: true }).click();
     await page.getByTestId("model-select").selectOption("gpt-5.6-luna");
     await page.getByTestId("effort-select").selectOption("xhigh");
     await page.getByTestId("start-session").click();
@@ -1965,7 +1980,7 @@ test.describe("résumé — templates and vibe", () => {
 
     await page.getByTestId("template-card-modern-sans").click();
     await page.getByTestId("setup-knob-accent").selectOption("navy");
-    await page.getByRole("button", { name: /AI Generate Resume/ }).click();
+    await page.getByRole("button", { name: /Jobocate Generate Resume/ }).click();
     await page.getByTestId("start-session").click();
     await page.getByTestId("instruction").fill("Build my résumé.");
     await page.getByTestId("send-instruction").click();
@@ -2023,7 +2038,7 @@ test.describe("résumé — templates and vibe", () => {
       route.fulfill({ json: SESSION }),
     );
     await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
-    await page.getByRole("button", { name: /AI Generate Resume/ }).click();
+    await page.getByRole("button", { name: /Jobocate Generate Resume/ }).click();
     await page.getByTestId("start-session").click();
     await page.getByTestId("instruction").fill("Build my résumé.");
     await page.getByTestId("send-instruction").click();
@@ -2131,7 +2146,7 @@ test.describe("résumé — templates and vibe", () => {
     await stubHarnessApi(page);
     await page.goto("/app/resume?mode=generate", { waitUntil: "domcontentloaded" });
 
-    await page.getByRole("button", { name: /AI Generate Resume/ }).click();
+    await page.getByRole("button", { name: /Jobocate Generate Resume/ }).click();
     await page.getByTestId("start-session").click();
     await page.getByTestId("instruction").fill("Build my résumé.");
     await page.getByTestId("send-instruction").click();
@@ -2185,39 +2200,6 @@ test.describe("résumé — templates and vibe", () => {
   });
 });
 
-test('cancels a running comparison and permits another comparison', async ({ page, guards }) => {
-  await stubHarnessApi(page);
-  guards.allowFailures(/\/compare$/);
-  guards.allowConsoleErrors();
-  let release!: () => void;
-  const held = new Promise<void>(resolve => { release = resolve; });
-  let operationId = '';
-  let calls = 0;
-  await page.route('**/api/resume-builder/cancel-compare', r => r.fulfill({ json: {
-    id: 'cancel-compare', fullName: 'Jordan Reyes', creationMethod: 'imported',
-    source: { fileExtension: '.pdf', jobDescription: 'Backend engineer' },
-  } }));
-  await page.route('**/api/resume-builder/cancel-compare/compare/source', r => r.fulfill({ body: Buffer.from(PDF, 'base64'), contentType: 'application/pdf' }));
-  await page.route('**/api/resume-builder/cancel-compare/compare', async r => {
-    operationId = r.request().headers()['x-ai-operation-id'];
-    calls++;
-    if (calls === 1) await held;
-    await r.fulfill({ status: 409, json: { code: 'AI_OPERATION_CANCELLED', message: 'Operation cancelled.' } });
-  });
-  await page.route('**/api/ai-operations/*/cancel', async r => {
-    expect(operationId).toBeTruthy();
-    expect(r.request().url()).toContain(operationId);
-    release();
-    await r.fulfill({ json: { status: 'cancelled' } });
-  });
-  await page.goto('/app/resume?mode=compare&id=cancel-compare');
-  await page.getByRole('button', { name: 'Cancel comparison', exact: true }).click();
-  await expect(page.getByTestId('comparison-pending')).toBeHidden();
-  await expect(page.getByRole('button', { name: 'Refresh comparison' })).toBeEnabled();
-  await page.getByRole('button', { name: 'Refresh comparison' }).click();
-  await expect.poll(() => calls).toBe(2);
-});
-
 test('cancels a running agent turn and keeps the saved session available', async ({ page }) => {
   await stubHarnessApi(page);
   let release!: () => void;
@@ -2238,7 +2220,7 @@ test('cancels a running agent turn and keeps the saved session available', async
   await page.getByTestId('start-session').click();
   await page.getByTestId('instruction').fill('Build my résumé');
   await page.getByTestId('send-instruction').click();
-  await page.getByRole('button', { name: 'Cancel AI operation', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Cancel AI operation', exact: true })).toBeHidden();
+  await page.getByRole('button', { name: 'Cancel generation', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Cancel generation', exact: true })).toBeHidden();
   await expect(page.getByTestId('instruction')).toBeVisible();
 });

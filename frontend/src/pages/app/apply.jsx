@@ -9,7 +9,7 @@
  * Two rules the layout exists to serve:
  *   - Every answer shows WHERE IT CAME FROM. Facts the candidate stated, answers
  *     we remembered, and prose a model drafted are visually distinct.
- *   - AI-drafted prose renders INLINE rather than behind a click. If reading a
+ *   - Drafted prose renders INLINE rather than behind a click. If reading a
  *     draft required a detour, bulk approval would be unusable — nearly every
  *     form asks "why us?" — and drafts would go out unread.
  *
@@ -81,7 +81,7 @@ const ghostBtn = {
 
 /** Where an answer came from, so provenance is never ambiguous. */
 function SourceTag({ source }) {
-  if (source === 'ai_draft') return <span style={AI}>AI DRAFT · READ IT</span>;
+  if (source === 'ai_draft') return <span style={AI}>DRAFT · READ IT</span>;
   if (source === 'candidate') return <span style={OK}>YOU ANSWERED</span>;
   if (source === 'bank') return <span style={OK}>REMEMBERED</span>;
   return <span style={OK}>YOUR PROFILE</span>;
@@ -235,7 +235,7 @@ function QueueCard({ item, onAnswer, onApprove, onDecline, busyId }) {
           </p>
           <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
             <span style={OK}>{fromYou} FROM YOU</span>
-            {item.aiDraftCount > 0 && <span style={AI}>{item.aiDraftCount} AI DRAFT</span>}
+            {item.aiDraftCount > 0 && <span style={AI}>{item.aiDraftCount} DRAFT</span>}
             {item.blockers.length > 0 && <span style={NEED}>{item.blockers.length} NEEDS YOU</span>}
           </div>
         </div>
@@ -316,7 +316,7 @@ function QueueCard({ item, onAnswer, onApprove, onDecline, busyId }) {
         </div>
       )}
 
-      {/* AI drafts stay visible even when collapsed — reading them must be the
+      {/* drafts stay visible even when collapsed — reading them must be the
           default, not a detour. */}
       {!expanded &&
         item.answers

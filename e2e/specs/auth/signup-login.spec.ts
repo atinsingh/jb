@@ -21,12 +21,12 @@ test.use({ storageState: { cookies: [], origins: [] } });
  */
 async function hasSession(page: import('@playwright/test').Page): Promise<boolean> {
   const cookies = await page.context().cookies();
-  return cookies.some((c) => /^sb-.*-auth-token/.test(c.name) && !!c.value);
+  return cookies.some((c) => /^sb-.*-auth-token(?:\.\d+)?$/.test(c.name) && !!c.value);
 }
 
 test.describe('signing up and in', () => {
   test('a new candidate can register through the form', async ({ page }) => {
-    const email = uniqueEmail('signup-candidate');
+    const email = uniqueEmail('signup-candidate').replace('@example.com', '@jobocate.com');
 
     await page.goto('/app/signup', { waitUntil: 'domcontentloaded' });
 
@@ -47,15 +47,32 @@ test.describe('signing up and in', () => {
     // with ...", so an unscoped name match would click Google and leave.
     await page.locator('form').getByRole('button', { name: /create account/i }).click();
 
-    // Success is a persisted session, not a URL: the app routes new users to
-    // onboarding, dashboard or a verify-email notice depending on config, and
-    // asserting one of those would make this test about routing config.
-    await expect
-      .poll(() => hasSession(page), {
-        message: 'signup did not establish a session',
-        timeout: 30_000,
-      })
-      .toBe(true);
+    // Confirmation-enabled signup waits for email; an immediate session lands
+    // on the dashboard without requiring an upload.
+    await expect.poll(async () =>
+      await hasSession(page) || await page.getByRole('heading', { name: 'Check your inbox.' }).isVisible(),
+    ).toBe(true);
+    if (!await hasSession(page)) return;
+    await expect(page).toHaveURL(/\/app\/dashboard\/?$/);
+    await expect(page.getByRole('link', { name: /compare a resume/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /create a resume/i })).toBeVisible();
+    await expect(page.getByText(/roles matched|auto.applied|welcome candidate/i)).toHaveCount(0);
+  });
+
+  test('an authenticated candidate visiting signup lands on the resume dashboard', async ({ page, candidateUser }) => {
+    await page.goto('/app/login', { waitUntil: 'networkidle' });
+    await page.fill('input[name="email"]', candidateUser.email);
+    await page.fill('input[name="password"]', candidateUser.password);
+    await page.locator('form').getByRole('button', { name: /^log in$/i }).click();
+    await expect(page).toHaveURL(/\/app\/dashboard/);
+    await page.goto('/app/signup');
+    await expect(page).toHaveURL(/\/app\/dashboard\/?$/);
+    await expect(page.getByRole('link', { name: /compare a resume/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /create a resume/i })).toBeVisible();
+    await expect(page.getByText(/auto.apply|pipeline|matches|welcome candidate/i)).toHaveCount(0);
+    await page.reload();
+    await expect(page).toHaveURL(/\/app\/dashboard\/?$/);
+    await expect(page.getByRole('link', { name: /compare a resume/i })).toBeVisible();
   });
 
   test('an existing user can sign in and reach the product', async ({

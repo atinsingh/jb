@@ -603,7 +603,7 @@ export default function EmployerOnboarding() {
                 maxWidth: 430,
               }}
             >
-              Hire 3× faster with AI-screened applicants.
+              Hire 3× faster with screened applicants.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 34 }}>
               {BRAND_LABELS.map((label, i) => {

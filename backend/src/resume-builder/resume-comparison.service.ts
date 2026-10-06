@@ -2,14 +2,15 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { AtsSeverity } from '../ats/ats.types';
-import { ResumeAiContentHeuristicService } from '../employer-pipeline/resume-ai-content-heuristic.service';
+import { AtsParseabilityService } from '../ats/ats-parseability.service';
+import { AtsMatchService } from '../ats/ats-match.service';
+import { AI_CONTENT_HEURISTIC_CONFIG, ResumeAiContentHeuristicService } from '../employer-pipeline/resume-ai-content-heuristic.service';
 import { Resume, ResumeDocument } from '../schemas/resume.schema';
 import { JobDescriptionResolverService } from '../resume-harness/job-description-resolver.service';
 import { ResumeParserService } from '../resume/resume-parser.service';
 import { StorageService } from '../storage';
 import { randomUUID } from 'crypto';
 import { extname } from 'path';
-import { CandidateResumeReviewAgent } from './candidate-resume-review.agent';
 
 export type ResumeComparisonAnnotation = {
   id: string;
@@ -29,8 +30,9 @@ export class ResumeComparisonService {
     private readonly aiContent: ResumeAiContentHeuristicService,
     private readonly jobDescriptions: JobDescriptionResolverService,
     private readonly storage: StorageService,
-    private readonly agentReview: CandidateResumeReviewAgent,
     private readonly parser: ResumeParserService,
+    private readonly ats: AtsParseabilityService,
+    private readonly matcher: AtsMatchService,
   ) {}
 
   async attachSource(resumeId: string, userId: string, file: Express.Multer.File) {
@@ -128,34 +130,62 @@ export class ResumeComparisonService {
       if (Object.keys(details).length) await resume.save();
     }
     const aiContent = this.aiContent.analyze(text);
-    const review = await this.agentReview.review({
-      userId,
-      resumeId,
-      resumeText: text,
-      originalFile,
-      jobDescription: targetText,
-      missingSections,
-    }, { forceRefresh: input.forceRefresh === true });
-    const annotations = this.groundedAnnotations(review.annotations, text);
+    // Score the original upload, never partially parsed or subsequently edited fields.
+    const ats = this.ats.check(originalFile ? { text } : { structured });
+    const match = this.matcher.match(originalFile ? text : structured, targetText);
+    const annotations: ResumeComparisonAnnotation[] = ats.findings.map((finding) => ({
+      id: finding.code,
+      section: finding.code.includes('EXPERIENCE') ? 'experience'
+        : finding.code.includes('EDUCATION') ? 'education'
+        : finding.code.includes('SKILL') ? 'skills'
+        : finding.code.includes('EMAIL') || finding.code.includes('PHONE') ? 'personal' : 'summary',
+      severity: finding.severity,
+      color: finding.severity === 'critical' ? 'red' : finding.severity === 'warning' ? 'amber' : 'blue',
+      message: finding.message,
+      fix: finding.fix,
+    }));
+    if (match.missing.length) annotations.push({
+      id: 'missing-job-skills', section: 'skills', severity: 'warning', color: 'amber',
+      message: `Job requirements not found in this resume: ${match.missing.join(', ')}.`,
+      fix: 'Add relevant examples only for skills you have used.',
+    });
+    for (const phrase of AI_CONTENT_HEURISTIC_CONFIG.stockPhrases) {
+      const start = text.toLowerCase().indexOf(phrase);
+      if (start < 0) continue;
+      annotations.push({
+        id: `stock-${phrase.replace(/\s+/g, '-')}`, section: 'summary', severity: 'info', color: 'blue',
+        quote: text.slice(start, start + phrase.length),
+        message: 'This phrase is generic.',
+        fix: 'Replace it with a specific example of your work and its outcome.',
+      });
+    }
     const sectionNotice = missingSections.length
       ? `Missing sections: ${missingSections.map((section) => section[0].toUpperCase() + section.slice(1)).join(', ')}.`
       : '';
 
+    // ponytail: retain 500 runs per resume; use a separate activity collection if longer retention is needed.
+    await this.resumeModel.updateOne(
+      { _id: resumeId, userId: new Types.ObjectId(userId) },
+      { $push: { comparisonHistory: { $each: [{
+        at: new Date(), atsScore: ats.score, jobMatchScore: match.coverage, contentScore: aiContent.composite,
+      }], $slice: -500 } } },
+    );
+
     return {
       resumeId,
       ats: {
-        ...review.ats,
-        explanation: [review.ats.explanation, sectionNotice].filter(Boolean).join(' '),
+        ...ats,
+        explanation: ["Document compatibility is scored with fixed checks for contact details, sections, dates and selectable text.", sectionNotice].filter(Boolean).join(' '),
         missingSections,
       },
-      match: review.match,
-      aiContent,
-      review: {
-        source: review.source,
-        sessionId: review.sessionId,
-        harness: review.harness,
-        modelAlias: review.modelAlias,
+      match: {
+        ...match,
+        explanation: match.keywordCount
+          ? `${match.matched.length} of ${match.keywordCount} recognized job skills are evidenced in the resume.`
+          : 'No recognized job skills were found. Add a more specific job description to measure coverage.',
       },
+      aiContent,
+      review: { source: 'deterministic', version: 'comparison-v1' },
       annotations,
       details,
     };
@@ -168,43 +198,9 @@ export class ResumeComparisonService {
       experience: ['experience', 'work experience', 'professional experience', 'employment history'],
       skills: ['skills', 'technical skills', 'core skills', 'key skills', 'core competencies'],
       education: ['education', 'academic background', 'academics'],
-      achievements: ['achievements', 'accomplishments', 'awards', 'honors', 'honours'],
+      achievements: ['achievements', 'other initiatives and achievements', 'accomplishments', 'awards', 'honors', 'honours'],
     };
     return Object.entries(aliases).filter(([, names]) => !names.some((name) => headings.has(name))).map(([section]) => section);
-  }
-
-  private groundedAnnotations(items: ResumeComparisonAnnotation[], resumeText: string) {
-    const sections = new Set<ResumeComparisonAnnotation['section']>([
-      'personal', 'summary', 'experience', 'skills', 'education', 'projects',
-      'achievements', 'certifications', 'languages',
-    ]);
-    const haystack = this.comparable(resumeText);
-    const seen = new Set<string>();
-    return (Array.isArray(items) ? items : []).flatMap((item, index) => {
-      const quote = String(item?.quote || '').trim();
-      const message = String(item?.message || '').trim();
-      const fix = String(item?.fix || '').trim();
-      const section = sections.has(item?.section) ? item.section : undefined;
-      const normalizedQuote = this.comparable(quote);
-      if (!section || !message || !fix || normalizedQuote.length < 4 || !haystack.includes(normalizedQuote)) {
-        return [];
-      }
-      const signature = `${section}:${normalizedQuote}:${message.toLowerCase()}`;
-      if (seen.has(signature)) return [];
-      seen.add(signature);
-      const severity: AtsSeverity = item.severity === 'critical' || item.severity === 'warning'
-        ? item.severity
-        : 'info';
-      return [{
-        id: String(item.id || `agent-${index + 1}`),
-        section,
-        severity,
-        color: severity === 'critical' ? 'red' as const : severity === 'warning' ? 'amber' as const : 'blue' as const,
-        message,
-        fix,
-        quote,
-      }];
-    });
   }
 
   private resumeText(resume: Resume): string {
@@ -245,18 +241,9 @@ export class ResumeComparisonService {
       buffer: source.buffer,
     } as Express.Multer.File);
     if (text.trim().length < 30) {
-      throw new BadRequestException('The original résumé contains too little selectable text to compare. Upload a text-based PDF or DOCX.');
+      throw new BadRequestException('The original resume contains too little selectable text to compare. Upload a text-based PDF or DOCX.');
     }
     return { text, originalFile: { filename: source.filename, bytes: source.buffer } };
   }
 
-  private comparable(value: string): string {
-    return String(value || '')
-      .normalize('NFKD')
-      .toLowerCase()
-      .replace(/[\u2018\u2019]/g, "'")
-      .replace(/[\u2013\u2014]/g, '-')
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
 }

@@ -74,6 +74,7 @@
 
 .strip3 { grid-template-columns: repeat(3, 1fr); }
 .strip4 { grid-template-columns: repeat(4, 1fr); }
+.pricingGrid { grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); }
 
 .factCell {
   background: var(--jb-v3-panel);

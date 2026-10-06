@@ -9,11 +9,11 @@ const assessmentStateCopy = {
   STALE: 'Assessment is stale because the submitted resume or job description changed.',
   NO_RESUME: 'No submitted resume is attached to this applicant.',
   NO_JOB_DESCRIPTION: 'This job needs a description before its resume can be assessed.',
-  BUDGET_EXHAUSTED: 'ATS match was not run because employer AI credits are exhausted.',
+  BUDGET_EXHAUSTED: 'ATS match was not run because employer credits are exhausted.',
   CONFIGURATION_ERROR: 'ATS match could not start because employer ATS is not configured. Contact support before retrying.',
   ATS_FAILED: 'ATS matching failed during execution. Retry the assessment.',
   ATS_INTERRUPTED: 'ATS matching stopped because its scoring container became unavailable. Retry the assessment.',
-  DETECTOR_FAILED: 'The local AI-content heuristic failed during execution. Retry the assessment.',
+  DETECTOR_FAILED: 'The local content-pattern check failed during execution. Retry the assessment.',
 };
 
 const signalLabel = (key) =>
@@ -34,15 +34,15 @@ function AtsBudgetStatus({ budget }) {
   const copy = budget.status === 'CONFIGURATION_ERROR'
     ? 'ATS budget is unavailable because employer ATS is not configured.'
     : budget.status === 'BUDGET_EXHAUSTED'
-      ? `AI credits exhausted: ${budget.remainingCredits} of ${budget.limitCredits} remaining this month.`
+      ? `credits exhausted: ${budget.remainingCredits} of ${budget.limitCredits} remaining this month.`
       : hasAmounts
-        ? `AI credits: ${budget.remainingCredits} of ${budget.limitCredits} remaining this month${reset ? ` · resets ${reset}` : ''}.`
+        ? `credits: ${budget.remainingCredits} of ${budget.limitCredits} remaining this month${reset ? ` · resets ${reset}` : ''}.`
         : 'ATS budget is ready.';
 
   return (
     <div className={styles.budget}>
       <div>{copy}</div>
-      <div>ATS uses measured model credits (1 credit per cent of usage). The local AI-content heuristic uses none.</div>
+      <div>ATS uses measured model credits (1 credit per cent of usage). The local content-pattern check uses none.</div>
     </div>
   );
 }
@@ -144,7 +144,7 @@ export default function ResumeAssessmentPanel({
 
           <section>
             <div className={styles.row}>
-              <strong>AI-content likelihood (directional)</strong>
+              <strong>Content pattern score</strong>
               {aiContent?.status === 'COMPLETE' && (
                 <span className={styles.scoreDim}>{aiContent.composite}/100</span>
               )}
@@ -168,7 +168,7 @@ export default function ResumeAssessmentPanel({
               <div className={aiContent?.status === 'DETECTOR_FAILED' ? styles.fail : styles.muted}>
                 {aiContent?.status === 'DETECTOR_FAILED'
                   ? assessmentStateCopy.DETECTOR_FAILED
-                  : 'AI-content likelihood has not run.'}
+                  : 'Content pattern check has not run.'}
               </div>
             )}
           </section>

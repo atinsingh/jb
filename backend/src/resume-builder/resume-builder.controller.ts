@@ -77,6 +77,7 @@ export class ResumeBuilderController {
       tags: resume.tags || [],
       isPrimary: !!resume.isPrimary,
       atsScore: typeof resume.atsScore === 'number' ? resume.atsScore : null,
+      comparisonHistory: resume.comparisonHistory || [],
       applicationCount: resume.applicationCount || 0,
       version: resume.version || 1,
       source: resume.source || null,

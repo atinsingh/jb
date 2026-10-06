@@ -30,7 +30,7 @@ test('Windows PowerShell keeps pull output out of image digests and handles firs
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 });
 
-test('production deployment renders a Kubernetes-valid, digest-pinned release', () => {
+test('production deployment defaults to apex jobocate.com with same-origin API routing and digest-pinned images', () => {
   const temp = mkdtempSync(join(tmpdir(), 'jobocate-deploy-'));
   const productionEnv = join(temp, 'production.env');
   const frontendEnv = join(temp, 'prepared-frontend.env');
@@ -40,7 +40,7 @@ test('production deployment renders a Kubernetes-valid, digest-pinned release', 
   writeFileSync(
     productionEnv,
     [
-      'NEXT_PUBLIC_API_URL=https://jobocate.test',
+      'NEXT_PUBLIC_API_URL=https://jobocate.com',
       'NEXT_PUBLIC_SUPABASE_URL=https://project.supabase.co',
       'NEXT_PUBLIC_SUPABASE_ANON_KEY=public-anon-key',
       'NODE_ENV=production',
@@ -49,7 +49,7 @@ test('production deployment renders a Kubernetes-valid, digest-pinned release', 
       'SUPABASE_URL=https://project.supabase.co',
       'SUPABASE_JWKS_URL=https://project.supabase.co/auth/v1/.well-known/jwks.json',
       'SUPABASE_SERVICE_ROLE_KEY=server-only-key',
-      'FRONTEND_URL=https://jobocate.test',
+      'FRONTEND_URL=https://jobocate.com',
       'RESUME_SHARE_SECRET=resume-secret',
       'STRIPE_SECRET_KEY=sk_test_example',
       'STRIPE_WEBHOOK_SECRET=whsec_example',
@@ -106,12 +106,6 @@ test('production deployment renders a Kubernetes-valid, digest-pinned release', 
         '-File',
         join(root, 'scripts', 'deploy-production.ps1'),
         '-ValidateOnly',
-        '-Domain',
-        'jobocate.test',
-        '-DnsZone',
-        'test',
-        '-DnsRecord',
-        'jobocate',
         '-ProductionEnvFile',
         productionEnv,
         '-RenderDirectory',
@@ -124,6 +118,10 @@ test('production deployment renders a Kubernetes-valid, digest-pinned release', 
     const manifest = readFileSync(join(renderDir, 'jobocate.yaml'), 'utf8');
     assert.match(manifest, /kind: Namespace/);
     assert.match(manifest, /kind: Ingress/);
+    assert.match(manifest, /host: jobocate\.com/);
+    assert.match(manifest, /path: \/api\s/);
+    assert.match(manifest, /name: FRONTEND_URL\s+value: https:\/\/jobocate\.com/);
+    assert.doesNotMatch(manifest, /jobocate\.pragra\.io/);
     assert.match(manifest, /readinessProbe:/);
     assert.match(manifest, /livenessProbe:/);
     assert.match(manifest, /resources:/);
@@ -190,8 +188,8 @@ test('production preflight rejects missing Compare retry configuration', () => {
     const envFile = join(directory, 'production.env');
     const template = readFileSync(join(root, '.env.production.example'), 'utf8')
       .replace(/^CANDIDATE_ATS_MAX_REVIEW_TURNS=.*\r?\n/m, '')
-      .replace(/^NEXT_PUBLIC_API_URL=.*$/m, 'NEXT_PUBLIC_API_URL=https://jobocate.pragra.io')
-      .replace(/^FRONTEND_URL=.*$/m, 'FRONTEND_URL=https://jobocate.pragra.io');
+      .replace(/^NEXT_PUBLIC_API_URL=.*$/m, 'NEXT_PUBLIC_API_URL=https://jobocate.com')
+      .replace(/^FRONTEND_URL=.*$/m, 'FRONTEND_URL=https://jobocate.com');
     writeFileSync(envFile, template);
     const result = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', join(root, 'scripts/deploy-production.ps1'), '-ValidateOnly', '-ProductionEnvFile', envFile, '-RenderDirectory', join(directory, 'rendered')], {cwd:root,encoding:'utf8'});
     assert.notEqual(result.status, 0);

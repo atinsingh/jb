@@ -37,9 +37,9 @@ const DEFAULTS = {
 
 const ALL_ROLES = ['Senior Product Designer', 'Staff Product Designer', 'Design Systems Lead', 'Product Designer', 'Design Engineer', 'Design Manager'];
 const ALL_LOCS = ['San Francisco', 'New York', 'Remote (US)', 'Austin'];
-const STEP_TITLES = ['Résumé', 'Profile', 'Preferences'];
+const STEP_TITLES = ['Resume', 'Profile', 'Preferences'];
 const HEADS = [
-  { h: 'Add your résumé', s: 'We’ll read it once and turn it into a profile, matches and tailored applications.' },
+  { h: 'Add your resume', s: 'We’ll read it once and turn it into a profile, matches and tailored applications.' },
   { h: 'Confirm your profile', s: 'Here’s what we pulled. Fix anything that looks off.' },
   { h: 'What are you looking for?', s: 'This tunes your matches and what Auto-Apply will send.' },
 ];
@@ -116,7 +116,7 @@ export default function AppOnboarding() {
   const canContinue = !(step === 0 && !uploaded);
   const stepLabel = `Step ${step + 1} of 3`;
 
-  // Suggestion chips. Anything the résumé parse produced goes first — a static
+  // Suggestion chips. Anything the resume parse produced goes first — a static
   // list of design titles is useless to a backend engineer — and the generic
   // options follow so there is always something to click.
   const roleOptions = [...new Set([headline, ...ALL_ROLES].filter(Boolean))];
@@ -140,7 +140,7 @@ export default function AppOnboarding() {
       if (Array.isArray(p.skills) && p.skills.length) setSkills(p.skills);
     } catch (e) {
       // graceful: leave the fields for the user to fill in, surface a soft note
-      setParseError('Could not read your résumé automatically — you can fill in the details below.');
+      setParseError('Could not read your resume automatically — you can fill in the details below.');
     } finally {
       setParsing(false);
     }
@@ -318,7 +318,7 @@ export default function AppOnboarding() {
               </p>
             </div>
 
-            {/* ---- STEP 1: résumé --------------------------------------- */}
+            {/* ---- STEP 1: resume --------------------------------------- */}
             {isUpload && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <input
@@ -355,7 +355,7 @@ export default function AppOnboarding() {
                     }}
                   >
                     <span style={{ fontFamily: 'var(--jb-v3-font-display)', fontWeight: 600, letterSpacing: '-0.04em', fontSize: 30 }}>
-                      Drop your résumé here
+                      Drop your resume here
                     </span>
                     <span style={{ fontSize: 14.5, color: 'var(--jb-v3-fg-3)' }}>
                       PDF or DOCX, up to 10 MB. We read it once to fill your profile.
@@ -391,7 +391,7 @@ export default function AppOnboarding() {
                   >
                     <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
                       <span style={{ fontSize: 15.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {fileName || 'Your résumé'}
+                        {fileName || 'Your resume'}
                       </span>
                       <span style={{ fontSize: 13.5, color: 'var(--jb-v3-fg-3)' }}>
                         {parsing ? 'Reading it now…' : parseError ? parseError : `${fileSize} · read and ready`}
@@ -404,7 +404,7 @@ export default function AppOnboarding() {
                 )}
 
                 <span style={{ fontSize: 14.5, color: 'var(--jb-v3-fg-3)' }}>
-                  No résumé yet?{' '}
+                  No resume yet?{' '}
                   <Link href="/app/resume" style={{ color: 'var(--jb-v3-accent)', fontWeight: 600, textDecoration: 'none' }}>
                     Start from a blank one
                   </Link>{' '}

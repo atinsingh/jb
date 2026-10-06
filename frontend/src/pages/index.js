@@ -18,9 +18,9 @@ import HomeV3 from '@/components/home/v3/HomeV3';
 
 const SITE_URL = 'https://jobocate.com';
 const OG_IMAGE = `${SITE_URL}/jobocate-logo.png`;
-const SEO_TITLE = 'Jobocate — AI Job Search from Apply to Offer';
+const SEO_TITLE = 'Jobocate — A Better Resume for Your Next Role';
 const SEO_DESC =
-  "The AI job-search platform that matches you to roles you're eligible for, tailors every application from your real experience, and applies only when you approve. Free to start.";
+  "Compare your resume with a job description, get useful feedback, and create a polished resume from your real experience. Free to start.";
 
 // Honest structured data only: Organization + WebSite. No AggregateRating /
 // JobPosting / review markup — there is no verified rating data behind this
@@ -33,7 +33,7 @@ const JSONLD = [
     url: SITE_URL,
     logo: OG_IMAGE,
     description:
-      'AI job-search and hiring platform. Candidates get matched to eligible roles and control every application; employers post jobs and meet ranked candidates.',
+      'Resume and job-search platform. Candidates get matched to eligible roles and control every application; employers post jobs and meet ranked candidates.',
   },
   {
     '@context': 'https://schema.org',
@@ -51,7 +51,7 @@ export default function JobocateHome() {
         <meta name="description" content={SEO_DESC} />
         <meta
           name="keywords"
-          content="AI job search, job matching, auto apply jobs, tailored job applications, AI cover letter generator, job application tracker, apply to jobs, hiring platform"
+          content="resume comparison, job matching, auto apply jobs, tailored job applications, resume builder, job application tracker, apply to jobs, hiring platform"
         />
         <meta name="robots" content="index, follow" />
         <link rel="canonical" href={`${SITE_URL}/`} />
@@ -61,7 +61,7 @@ export default function JobocateHome() {
         <meta property="og:type" content="website" />
         <meta property="og:url" content={`${SITE_URL}/`} />
         <meta property="og:image" content={OG_IMAGE} />
-        <meta property="og:image:alt" content="Jobocate — AI job search from apply to offer" />
+        <meta property="og:image:alt" content="Jobocate — A better resume for your next role" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={SEO_TITLE} />
         <meta name="twitter:description" content={SEO_DESC} />

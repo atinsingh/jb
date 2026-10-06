@@ -1,8 +1,8 @@
 [CmdletBinding()]
 param(
-  [string]$Domain = 'jobocate.pragra.io',
-  [string]$DnsZone = 'pragra.io',
-  [string]$DnsRecord = 'jobocate',
+  [string]$Domain = 'jobocate.com',
+  [string]$DnsZone = 'jobocate.com',
+  [string]$DnsRecord = '@',
   [string]$Cluster = 'perfectum-k8s',
   [string]$Registry = 'perfectum',
   [string]$Namespace = 'jobocate-prod',
@@ -98,8 +98,9 @@ function Render-Manifest(
 
 if ($Domain -notmatch '^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$') { throw 'Domain is invalid.' }
 if ($DnsZone -notmatch '^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$') { throw 'DnsZone is invalid.' }
-if ($DnsRecord -notmatch '^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$') { throw 'DnsRecord is invalid.' }
-if ("$DnsRecord.$DnsZone" -ne $Domain) { throw 'DnsRecord and DnsZone must form Domain.' }
+if ($DnsRecord -ne '@' -and $DnsRecord -notmatch '^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$') { throw 'DnsRecord is invalid.' }
+$dnsHost = if ($DnsRecord -eq '@') { $DnsZone } else { "$DnsRecord.$DnsZone" }
+if ($dnsHost -ne $Domain) { throw 'DnsRecord and DnsZone must form Domain.' }
 if ($Namespace -notmatch '^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$') { throw 'Namespace is invalid.' }
 if ($Registry -notmatch '^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$') { throw 'Registry is invalid.' }
 

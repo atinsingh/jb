@@ -212,6 +212,7 @@ export const AuthProvider = ({ children }) => {
         // here, and only when first creating the user — user_metadata is
         // user-writable, so it can never grant anything privileged.
         data: { name, role },
+        emailRedirectTo: `${window.location.origin}/auth/success`,
       },
     });
     if (error) throw new Error(error.message);

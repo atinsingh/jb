@@ -339,7 +339,7 @@ export default function AppConcierge() {
                   style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 10, marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--jb-v3-line)' }}
                 >
                   <span />
-                  <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--jb-v3-fg-3)', width: 64, textAlign: 'right' }}>AI</span>
+                  <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--jb-v3-fg-3)', width: 64, textAlign: 'right' }}>Jobocate</span>
                   <span style={{ fontFamily: 'var(--jb-v3-font-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--jb-v3-accent)', width: 64, textAlign: 'right' }}>Coach</span>
                 </div>
               </div>

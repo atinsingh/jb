@@ -249,19 +249,19 @@ export default function JobApplications() {
                     disabled={(!previewFile && !savedFileName) || previewBusy || sandboxStatus !== 'ready'}
                     onClick={runAtsPreview}
                   >
-                    {previewBusy ? 'Scoring…' : 'Score uploaded résumé'}
+                    {previewBusy ? 'Scoring…' : 'Score uploaded resume'}
                   </button>
                 </div>
                 <label className="upload">
-                  <span>Résumé file</span>
+                  <span>Resume file</span>
                   <input
                     type="file"
                     accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    aria-label="Upload résumé for ATS preview"
+                    aria-label="Upload resume for ATS preview"
                     onChange={(event) => setPreviewFile(event.target.files?.[0] || null)}
                   />
                 </label>
-                {savedFileName && <p>Saved résumé: {savedFileName}. You can score it again without uploading.</p>}
+                {savedFileName && <p>Saved resume: {savedFileName}. You can score it again without uploading.</p>}
                 <ResumeAssessmentPanel
                   title="Preview result"
                   assessment={preview}
@@ -274,7 +274,7 @@ export default function JobApplications() {
               <EmptyState
                 tone="dark"
                 title="No applications yet"
-                hint="Nobody has applied yet. You can still score a résumé against this job with the upload above."
+                hint="Nobody has applied yet. You can still score a resume against this job with the upload above."
                 action={(
                   <Link href="/employer/screening" className="ghost-link">Open screening</Link>
                 )}

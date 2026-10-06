@@ -35,6 +35,16 @@ export class AuthController {
     return { user: req.user };
   }
 
+  @Get('login-history')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get recent platform sign-ins for the authenticated user' })
+  async getLoginHistory(@Request() req) {
+    return [...(req.user.loginHistory || [])]
+      .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
+      .map(({ at, method }) => ({ at, method }));
+  }
+
   @Patch('workspace')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')

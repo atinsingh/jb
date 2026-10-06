@@ -263,7 +263,7 @@ export class ResumeBuilderService {
   async duplicate(id: string, userId: string, name?: string): Promise<ResumeDocument> {
     const src = await this.findOne(id, userId);
     const obj: any = src.toObject();
-    ['_id', '__v', 'createdAt', 'updatedAt', 'publicUrl', 'isPublic', 'pdfUrl', 'pdfPath'].forEach(
+    ['_id', '__v', 'createdAt', 'updatedAt', 'publicUrl', 'isPublic', 'pdfUrl', 'pdfPath', 'comparisonHistory'].forEach(
       (k) => delete obj[k],
     );
     obj.name = name || `${src.name} (copy)`;

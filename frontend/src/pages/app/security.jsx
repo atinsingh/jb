@@ -309,7 +309,7 @@ export default function AppSecurity() {
                 <div style={{ marginTop: 22, padding: 20, background: 'var(--jb-v3-danger-soft)', border: '1px solid var(--jb-v3-danger-line)', borderRadius: 2 }}>
                   <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--jb-v3-danger)', marginBottom: 5 }}>Delete account</div>
                   <p style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--jb-v3-warn)', margin: '0 0 14px' }}>
-                    This permanently removes your profile, résumés, applications and history. This can&rsquo;t be undone. Type <b style={{ fontFamily: 'var(--jb-v3-font-mono)' }}>DELETE</b> to confirm.
+                    This permanently removes your profile, resumes, applications and history. This can&rsquo;t be undone. Type <b style={{ fontFamily: 'var(--jb-v3-font-mono)' }}>DELETE</b> to confirm.
                   </p>
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                     <input

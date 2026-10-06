@@ -541,7 +541,7 @@ export default function AppApplicationDetail() {
                       marginBottom: 16,
                     }}
                   >
-                    ✦ Prep with AI →
+                    ✦ Prepare for interview →
                   </Link>
 
                   {model.recruiter && (

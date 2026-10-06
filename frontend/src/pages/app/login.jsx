@@ -41,7 +41,7 @@ export default function AppLogin() {
   const copy = role === 'ROLE_EMPLOYER'
     ? {
         heading: 'Log in to keep hiring on autopilot.',
-        lede: 'Your candidates, interviews and AI recruiter are where you left them.',
+        lede: 'Your candidates, interviews and recruiter are where you left them.',
         signupHref: '/app/signup?as=employer',
         asideHead: 'Your recruiting copilot kept working.',
         stats: [
@@ -52,16 +52,16 @@ export default function AppLogin() {
           'Every shortlist shows the reasoning behind it, and nothing is sent without your approval.',
       }
     : {
-        heading: 'Log in to keep the search running.',
-        lede: 'Your matches and auto-applications are where you left them.',
+        heading: 'Welcome back to your workspace.',
+        lede: 'Your resumes and saved versions are where you left them.',
         signupHref: '/app/signup',
-        asideHead: 'Your copilot kept working.',
+        asideHead: 'Pick up where you left off.',
         stats: [
-          ['14', 'new matches'],
-          ['6', 'auto-applied'],
+          ['Compare', 'an existing resume'],
+          ['Create', 'your next version'],
         ],
         asideNote:
-          'Every match shows why it fits, and nothing is submitted until you approve it.',
+          'Compare a resume with a role, or create a polished PDF from your experience.',
       };
 
   // Role-aware landing. The middleware gates the route; this picks the surface.
@@ -251,7 +251,7 @@ export default function AppLogin() {
             <aside className={styles.asideCell}>
               <p className={styles.asideHead}>{copy.asideHead}</p>
 
-              <Histogram />
+              {role === 'ROLE_EMPLOYER' && <Histogram />}
 
               <div className={styles.statStrip}>
                 {copy.stats.map(([value, label]) => (

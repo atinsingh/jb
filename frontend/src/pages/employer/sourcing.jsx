@@ -71,7 +71,7 @@ function adaptCandidate(c, i) {
     fit: fitNum != null ? `${fitNum}%` : '—',
     featured: i === 0,
     accent: i === 0 ? 'green' : 'indigo',
-    rationale: skills.length ? `Key skills: ${skills.join(', ')}.` : 'Sourced by the AI recruiter.',
+    rationale: skills.length ? `Key skills: ${skills.join(', ')}.` : 'Sourced by Jobocate recruiter.',
     outreach: c.outreach || '',
     candidateId: c.candidateId,
     sourcePool: c.sourcePool,
@@ -252,7 +252,7 @@ export default function EmployerSourcing() {
           {/* HEADER */}
           <header style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: 12, padding: '14px 32px', background: 'rgba(247,243,234,0.85)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #E7E0D2' }}>
             <span style={{ color: '#1FA463' }}>✦</span>
-            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9286' }}>AI / Sourcing Agent</span>
+            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9286' }}>Sourcing Agent</span>
             <div style={{ flex: 1 }} />
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: '#5A544A' }}>
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: loading ? '#1FA463' : '#A79E8F', animation: loading ? 'empulse 1.8s ease-in-out infinite' : 'none' }} />
@@ -345,7 +345,7 @@ export default function EmployerSourcing() {
                 <div>
                   <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Sourced candidates</h2>
                   <p style={{ fontSize: 13, color: '#8A8378', margin: '3px 0 0' }}>
-                    {candidates.length} candidate{candidates.length === 1 ? '' : 's'} · ranked by AI fit
+                    {candidates.length} candidate{candidates.length === 1 ? '' : 's'} · ranked by job fit
                   </p>
                 </div>
                 <div style={{ display: 'inline-flex', padding: 3, background: '#F2ECE0', border: '1px solid #E6DECF', borderRadius: 999, gap: 3 }}>
@@ -399,7 +399,7 @@ export default function EmployerSourcing() {
                           </div>
                           <div style={{ textAlign: 'right', flexShrink: 0 }}>
                             <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 20, fontWeight: 600, color: fitColor(c.fit) }}>{c.fit}</div>
-                            <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#A79E8F' }}>AI fit</div>
+                            <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#A79E8F' }}>fit</div>
                           </div>
                         </div>
 

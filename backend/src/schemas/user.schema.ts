@@ -17,6 +17,7 @@ export type UserDocument = HydratedDocument<User>;
       ret.id = ret._id?.toString?.() ?? ret._id;
       delete ret._id;
       delete ret.__v;
+      if (ret.loginHistory) ret.loginHistory = ret.loginHistory.map(({ at, method }) => ({ at, method }));
       if (ret.password !== undefined) {
         delete ret.password;
       }
@@ -163,6 +164,9 @@ export class User {
 
   @Prop()
   lastLogin?: Date;
+
+  @Prop({ type: [{ _id: false, sessionId: String, at: Date, method: String }], default: [] })
+  loginHistory?: Array<{ sessionId: string; at: Date; method: string }>;
 
   // The Supabase Auth user UUID (the JWT `sub` claim), and the join key between
   // the two stores. Supabase owns identity; this document keeps owning role,

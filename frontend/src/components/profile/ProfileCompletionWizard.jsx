@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { 
-  XMarkIcon, 
-  DocumentArrowUpIcon, 
+import {
+  XMarkIcon,
+  DocumentArrowUpIcon,
   PencilSquareIcon,
   CheckCircleIcon,
   ArrowRightIcon,
@@ -40,12 +40,12 @@ export default function ProfileCompletionWizard({ isOpen, onClose, onComplete })
   const [currentStep, setCurrentStep] = useState(STEPS.CHOOSE_METHOD);
   const [method, setMethod] = useState(null);
   const [loading, setLoading] = useState(false);
-  
+
   const [resumeFile, setResumeFile] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [parsedData, setParsedData] = useState(null);
-  
+
   const [formData, setFormData] = useState({
     name: user?.name || '',
     phone: user?.phone || '',
@@ -55,7 +55,7 @@ export default function ProfileCompletionWizard({ isOpen, onClose, onComplete })
     experience: user?.experience || [],
     education: user?.education || [],
   });
-  
+
   const [currentSkill, setCurrentSkill] = useState('');
   const [currentExperience, setCurrentExperience] = useState({
     title: '',
@@ -142,7 +142,7 @@ export default function ProfileCompletionWizard({ isOpen, onClose, onComplete })
 
       const data = await response.json();
       setParsedData(data.parsedData);
-      
+
       if (data.parsedData) {
         setFormData(prev => ({
           ...prev,
@@ -168,7 +168,7 @@ export default function ProfileCompletionWizard({ isOpen, onClose, onComplete })
     setLoading(true);
     try {
       const token = await getAccessToken();
-      
+
       if (!token) {
         toast.error('Please log in to save your profile');
         router.push(LOGIN_ROUTE);
@@ -261,8 +261,8 @@ export default function ProfileCompletionWizard({ isOpen, onClose, onComplete })
       if (!response.ok) {
         // Handle validation errors
         if (response.status === 400 && responseData.message) {
-          const errorMessage = Array.isArray(responseData.message) 
-            ? responseData.message.join(', ') 
+          const errorMessage = Array.isArray(responseData.message)
+            ? responseData.message.join(', ')
             : responseData.message;
           throw new Error(errorMessage);
         }
@@ -272,19 +272,19 @@ export default function ProfileCompletionWizard({ isOpen, onClose, onComplete })
       console.log('Profile saved successfully:', responseData);
 
       toast.success('Profile completed successfully!');
-      
+
       // Refresh user data
       if (refreshUser) {
         await refreshUser();
       }
-      
+
       // Trigger profile update event
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('profileUpdated'));
       }
 
       setCurrentStep(STEPS.COMPLETE);
-      
+
       setTimeout(() => {
         if (onComplete) {
           onComplete();
@@ -376,7 +376,7 @@ export default function ProfileCompletionWizard({ isOpen, onClose, onComplete })
 
   const getProgress = () => {
     const totalSteps = method === 'upload' ? 3 : 6;
-    const current = currentStep === STEPS.CHOOSE_METHOD ? 0 : 
+    const current = currentStep === STEPS.CHOOSE_METHOD ? 0 :
                    currentStep === STEPS.REVIEW ? totalSteps - 1 :
                    currentStep === STEPS.COMPLETE ? totalSteps :
                    currentStep - (method === 'upload' ? 1 : 1);
@@ -388,11 +388,11 @@ export default function ProfileCompletionWizard({ isOpen, onClose, onComplete })
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex min-h-screen items-center justify-center p-4">
-        <div 
+        <div
           className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity"
           onClick={onClose}
         />
-        
+
         <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
           {/* Header */}
           <div className="bg-gradient-to-r from-primary-500 to-primary-600 px-8 py-6">
@@ -447,7 +447,7 @@ export default function ProfileCompletionWizard({ isOpen, onClose, onComplete })
                       </div>
                       <h4 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">Upload Resume</h4>
                       <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-                        Upload your resume and we'll automatically extract your information using AI
+                        Upload your resume and we'll automatically extract your information
                       </p>
                       <div className="mt-4 inline-flex items-center text-sm font-medium text-primary-600 dark:text-primary-400 group-hover:text-primary-700">
                         Get Started
@@ -455,7 +455,7 @@ export default function ProfileCompletionWizard({ isOpen, onClose, onComplete })
                       </div>
                     </div>
                   </button>
-                  
+
                   <button
                     onClick={() => {
                       setMethod('manual');
@@ -545,7 +545,7 @@ export default function ProfileCompletionWizard({ isOpen, onClose, onComplete })
                     </div>
                   )}
                 </div>
-                
+
                 <div className="flex justify-between pt-4">
                   <button
                     onClick={() => setCurrentStep(STEPS.CHOOSE_METHOD)}
@@ -792,7 +792,7 @@ export default function ProfileCompletionWizard({ isOpen, onClose, onComplete })
                     Add Experience
                   </button>
                 </div>
-                
+
                 {formData.experience.length > 0 && (
                   <div className="mt-6 space-y-3">
                     <p className="text-sm font-semibold text-gray-700">
@@ -816,7 +816,7 @@ export default function ProfileCompletionWizard({ isOpen, onClose, onComplete })
                     ))}
                   </div>
                 )}
-                
+
                 <div className="flex justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
                   <button
                     onClick={() => setCurrentStep(STEPS.MANUAL_SKILLS)}
@@ -884,7 +884,7 @@ export default function ProfileCompletionWizard({ isOpen, onClose, onComplete })
                     Add Education
                   </button>
                 </div>
-                
+
                 {formData.education.length > 0 && (
                   <div className="mt-6 space-y-3">
                     <p className="text-sm font-semibold text-gray-700">
@@ -907,7 +907,7 @@ export default function ProfileCompletionWizard({ isOpen, onClose, onComplete })
                     ))}
                   </div>
                 )}
-                
+
                 <div className="flex justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
                   <button
                     onClick={() => setCurrentStep(STEPS.MANUAL_EXPERIENCE)}
@@ -1005,7 +1005,7 @@ export default function ProfileCompletionWizard({ isOpen, onClose, onComplete })
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="flex justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
                   <button
                     onClick={() => setCurrentStep(method === 'upload' ? STEPS.UPLOAD_RESUME : STEPS.MANUAL_EDUCATION)}

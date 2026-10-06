@@ -53,7 +53,7 @@ export default function EmployerAiInterview() {
   const [qset, setQset] = useState('design');
   const [limit, setLimit] = useState('30');
 
-  // Scorecard is generated on demand — nothing is shown until the AI returns.
+  // Scorecard is generated on demand — nothing is shown until Jobocate returns.
   const [notes, setNotes] = useState('');
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState(false);
@@ -97,14 +97,14 @@ export default function EmployerAiInterview() {
   const rec = (card && REC_META[card.recommendation]) || null;
 
   const tabs = [
-    { key: 'screen', label: '✦ AI screening interview' },
-    { key: 'scorecard', label: '✦ AI scorecard' },
+    { key: 'screen', label: '✦ Automated screening interview' },
+    { key: 'scorecard', label: '✦ Automated scorecard' },
   ];
 
   return (
     <>
       <Head>
-        <title>AI interviews — Jobocate</title>
+        <title>interviews — Jobocate</title>
       </Head>
 
       <style jsx global>{`
@@ -160,13 +160,13 @@ export default function EmployerAiInterview() {
           {/* HEADER */}
           <header style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: 14, padding: '14px 32px', background: 'rgba(247,243,234,0.85)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #E7E0D2' }}>
             <span style={{ color: '#1FA463' }}>✦</span>
-            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9286' }}>AI interview tools</span>
+            <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9286' }}>interview tools</span>
             <div style={{ flex: 1 }} />
             <Link href={appRoute('Employer Interviews.dc.html')} style={{ fontSize: 13, fontWeight: 600, color: '#4263EB', textDecoration: 'none' }}>All interviews →</Link>
           </header>
 
           <div style={{ padding: '26px 32px 56px', maxWidth: 1080, width: '100%', margin: '0 auto' }}>
-            <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 34, lineHeight: 1, margin: '0 0 16px' }}>AI interviews</h1>
+            <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 34, lineHeight: 1, margin: '0 0 16px' }}>interviews</h1>
 
             {/* TABS */}
             <div style={{ display: 'inline-flex', padding: 4, background: '#F1ECE0', border: '1px solid #E1D9C9', borderRadius: 999, gap: 4, marginBottom: 24 }}>
@@ -198,13 +198,13 @@ export default function EmployerAiInterview() {
               })}
             </div>
 
-            {/* ============ TAB 1: AI SCREENING INTERVIEW ============ */}
+            {/* ============ TAB 1: SCREENING INTERVIEW ============ */}
             {isScreen && (
               <div className="ai-split" style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
                 {/* CONFIG */}
                 <div className="ai-panel" style={{ width: 340, flexShrink: 0, background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18, padding: 22 }}>
                   <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>Configure interview</h2>
-                  <p style={{ fontSize: 12.5, color: '#8A8378', margin: '0 0 18px' }}>The AI conducts an async interview; candidates answer on their own time.</p>
+                  <p style={{ fontSize: 12.5, color: '#8A8378', margin: '0 0 18px' }}>Jobocate conducts an async interview; candidates answer on their own time.</p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                     <div>
                       <label style={monoLabel}>Question set</label>
@@ -279,21 +279,21 @@ export default function EmployerAiInterview() {
                   <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 16 }}>
                     <EmptyState
                       icon="○"
-                      title="No completed AI interviews yet"
-                      hint="When candidates finish an async AI interview, their transcripts and recommendations will appear here."
+                      title="No completed interviews yet"
+                      hint="When candidates finish an async interview, their transcripts and recommendations will appear here."
                     />
                   </div>
                 </div>
               </div>
             )}
 
-            {/* ============ TAB 2: AI SCORECARD ============ */}
+            {/* ============ TAB 2: SCORECARD ============ */}
             {isScorecard && (
               <div className="ai-split" style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
                 {/* INPUT */}
                 <div className="ai-panel" style={{ width: 380, flexShrink: 0, background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18, padding: 22 }}>
                   <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>Generate a scorecard</h2>
-                  <p style={{ fontSize: 12.5, color: '#8A8378', margin: '0 0 16px' }}>Paste interview notes or a transcript — the AI structures it into a scorecard for the team to confirm.</p>
+                  <p style={{ fontSize: 12.5, color: '#8A8378', margin: '0 0 16px' }}>Paste interview notes or a transcript — Jobocate structures it into a scorecard for the team to confirm.</p>
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
@@ -336,7 +336,7 @@ export default function EmployerAiInterview() {
                     <div style={{ background: '#FFFEFB', border: '1px solid #E6DECF', borderRadius: 18, padding: 24, animation: 'emrise 0.3s ease' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
                         <div>
-                          <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1FA463', marginBottom: 5 }}>✦ AI-generated scorecard</div>
+                          <div style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1FA463', marginBottom: 5 }}>✦ Automated-generated scorecard</div>
                           <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>
                             {card.overall != null ? `Overall ${card.overall} / 5` : 'Interview scorecard'}
                           </h2>

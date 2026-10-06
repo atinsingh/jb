@@ -1,4 +1,3 @@
-import { AiOperationInterceptor } from '../ai-budget/ai-operation.module';
 import { BadRequestException, Body, Controller, Get, Param, Post, Request, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -12,7 +11,6 @@ import { ResumeComparisonService } from './resume-comparison.service';
 @ApiBearerAuth()
 @Controller('resume-builder')
 @UseGuards(JwtAuthGuard)
-@UseInterceptors(AiOperationInterceptor)
 export class ResumeComparisonController {
   constructor(private readonly comparison: ResumeComparisonService) {}
 
@@ -40,7 +38,7 @@ export class ResumeComparisonController {
   }
 
   @Post(':id/compare')
-  @ApiOperation({ summary: 'Compare an imported resume using an agent-session ATS/job review and heuristic AI-content signals' })
+  @ApiOperation({ summary: 'Compare an imported resume with deterministic document, job-match and content checks' })
   compare(
     @Param('id') id: string,
     @Body() body: { jobDescription?: string; jobUrl?: string; forceRefresh?: boolean },

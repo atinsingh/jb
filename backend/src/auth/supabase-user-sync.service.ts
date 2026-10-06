@@ -92,6 +92,33 @@ export class SupabaseUserSyncService {
     return user;
   }
 
+  /** Called only after token verification and account status checks. */
+  async recordLogin(user: UserDocument, claims: Record<string, any>): Promise<void> {
+    const sessionId = claims.session_id;
+    if (typeof sessionId !== 'string' || !sessionId || user.loginHistory?.some(entry => entry.sessionId === sessionId)) return;
+    const methods = Array.isArray(claims.amr) ? claims.amr : [];
+    const authentication = methods.find(entry => ['oauth', 'password', 'otp', 'sso'].includes(entry?.method));
+    const authMethod = authentication?.method;
+    const method = authMethod === 'oauth' ? this.providerFrom(claims.app_metadata?.provider) : authMethod || 'platform';
+    const timestamp = authentication?.timestamp;
+    const at = typeof timestamp === 'number' && Number.isFinite(timestamp) && timestamp > 0 && timestamp * 1000 <= Date.now()
+      ? new Date(timestamp * 1000) : new Date();
+    const entry = { sessionId, at, method };
+    // Atomic session deduplication also covers concurrent page-load requests.
+    // ponytail: keep the latest 100 platform sessions; separate collection if longer retention is needed.
+    const result = await this.userModel.updateOne(
+      { _id: user._id, 'loginHistory.sessionId': { $ne: sessionId } },
+      { $push: { loginHistory: { $each: [entry], $slice: -100 } }, $max: { lastLogin: entry.at } },
+    );
+    if (result.modifiedCount) {
+      user.loginHistory = [...(user.loginHistory || []), entry].slice(-100);
+      user.lastLogin = new Date(Math.max(user.lastLogin?.getTime() || 0, at.getTime()));
+      // Already saved atomically; a later workspace save must not overwrite concurrent sign-ins.
+      user.unmarkModified('loginHistory');
+      user.unmarkModified('lastLogin');
+    }
+  }
+
   /**
    * Apply one `auth.users` change.
    *
