@@ -7,6 +7,38 @@ const test = require('node:test');
 
 const root = resolve(__dirname, '..');
 
+test('domain TLS uses the existing DigitalOcean DNS solver without changing other domain rules', () => {
+  const script = readFileSync(join(root, 'scripts/deploy-production.ps1'), 'utf8');
+  const helper = script.match(/function Ensure-DomainDnsSolver\s*\{[\s\S]*?\n\}/)?.[0];
+  assert.ok(helper, 'Deployment must configure DNS validation for the new domain');
+  const result = spawnSync('powershell.exe', ['-NoProfile', '-Command', `
+    $ErrorActionPreference = 'Stop'
+    $Domain = 'jobocate.com'
+    $global:patchCount = 0
+    $global:issuer = @{spec=@{acme=@{solvers=@(
+      @{selector=@{dnsNames=@('pragra.io')};dns01=@{digitalocean=@{tokenSecretRef=@{name='digitalocean-dns-token';key='access-token'}}}},
+      @{http01=@{ingress=@{class='nginx'}}}
+    )}}}
+    function kubectl {
+      $global:LASTEXITCODE = 0
+      if ($args[0] -eq 'get') { $global:issuer | ConvertTo-Json -Depth 20; return }
+      $path = $args[[Array]::IndexOf($args, '--patch-file') + 1]
+      $patch = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+      $rules = @($patch.spec.acme.solvers)
+      if ($rules.Count -ne 3 -or $rules[0].selector.dnsNames[0] -ne $Domain) { throw 'Wrong DNS validation host' }
+      if ($rules[0].dns01.digitalocean.tokenSecretRef.name -ne 'digitalocean-dns-token') { throw 'Must reuse the existing DNS credentials' }
+      if ($rules[1].selector.dnsNames[0] -ne 'pragra.io' -or $rules[2].http01.ingress.class -ne 'nginx') { throw 'Changed another domain rule' }
+      $global:issuer.spec.acme.solvers = $rules
+      $global:patchCount++
+    }
+    ${helper}
+    Ensure-DomainDnsSolver
+    Ensure-DomainDnsSolver
+    if ($global:patchCount -ne 1) { throw 'DNS solver configuration must be idempotent' }
+  `], { cwd: root, encoding: 'utf8' });
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+});
+
 test('Windows PowerShell keeps pull output out of image digests and handles first deployment', () => {
   const script = readFileSync(join(root, 'scripts/deploy-production.ps1'), 'utf8');
   const checked = script.slice(script.indexOf('function Invoke-Checked'), script.indexOf('function Render-Manifest'));

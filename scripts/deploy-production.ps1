@@ -96,6 +96,24 @@ function Render-Manifest(
   return $path
 }
 
+function Ensure-DomainDnsSolver {
+  $issuer = & kubectl get clusterissuer letsencrypt-prod -o json | ConvertFrom-Json
+  if ($LASTEXITCODE -ne 0) { throw 'Could not inspect the certificate issuer.' }
+  $solvers = @($issuer.spec.acme.solvers)
+  $dnsSolvers = @($solvers | Where-Object { $_.PSObject.Properties.Name -contains 'dns01' })
+  if ($dnsSolvers | Where-Object { $_.selector.dnsNames -contains $Domain }) { return }
+  $digitalOcean = $dnsSolvers | Where-Object { $_.dns01.PSObject.Properties.Name -contains 'digitalocean' } | Select-Object -First 1
+  if (-not $digitalOcean) { return } # Keep the issuer's existing HTTP validation when no DNS credential is configured.
+  $rule = @{ dns01 = $digitalOcean.dns01; selector = @{ dnsNames = @($Domain) } }
+  $patch = @{ spec = @{ acme = @{ solvers = @($rule) + $solvers } } } | ConvertTo-Json -Depth 20
+  $patchFile = [IO.Path]::GetTempFileName()
+  try {
+    [IO.File]::WriteAllText($patchFile, $patch, (New-Object Text.UTF8Encoding($false)))
+    & kubectl patch clusterissuer letsencrypt-prod --type=merge --patch-file $patchFile
+    if ($LASTEXITCODE -ne 0) { throw 'Could not configure domain DNS validation.' }
+  } finally { Remove-Item -LiteralPath $patchFile -Force -ErrorAction SilentlyContinue }
+}
+
 if ($Domain -notmatch '^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$') { throw 'Domain is invalid.' }
 if ($DnsZone -notmatch '^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$') { throw 'DnsZone is invalid.' }
 if ($DnsRecord -ne '@' -and $DnsRecord -notmatch '^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$') { throw 'DnsRecord is invalid.' }
@@ -208,6 +226,7 @@ Write-Host "Loading kubeconfig for $Cluster..." -ForegroundColor Cyan
 Invoke-Checked { doctl kubernetes cluster kubeconfig save $Cluster --expiry-seconds 3600 } 'Could not load the DOKS kubeconfig.'
 Invoke-Checked { kubectl get ingressclass nginx } 'The nginx ingress class is not installed.'
 Invoke-Checked { kubectl get clusterissuer letsencrypt-prod } 'The letsencrypt-prod ClusterIssuer is not installed.'
+Ensure-DomainDnsSolver
 
 $ingressIp = (& kubectl get service ingress-nginx-controller -n ingress-nginx -o 'jsonpath={.status.loadBalancer.ingress[0].ip}').Trim()
 if ($LASTEXITCODE -ne 0 -or $ingressIp -notmatch '^\d{1,3}(?:\.\d{1,3}){3}$') {
