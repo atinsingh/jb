@@ -4,7 +4,7 @@ import { AtsMatchService } from '../ats/ats-match.service';
 import { ResumeAiContentHeuristicService } from '../employer-pipeline/resume-ai-content-heuristic.service';
 
 describe('deterministic candidate comparison', () => {
-  it('scores unchanged documents identically across refreshes without starting paid work', async () => {
+  it('retains detailed metered review while keeping all scores deterministic across refreshes', async () => {
     const resume = {
       _id: 'resume-1', creationMethod: 'imported', fullName: 'Jordan Reyes',
       email: 'jordan@example.com', phone: '4165551234',
@@ -16,9 +16,17 @@ describe('deterministic candidate comparison', () => {
     const match = new AtsMatchService();
     const content = new ResumeAiContentHeuristicService();
     const updateOne = jest.fn().mockResolvedValue({ modifiedCount: 1 });
+    const review = {
+      source: 'agent-session', sessionId: 'review-1', harness: 'opencode', modelAlias: 'automatic',
+      ats: { score: 1, explanation: 'The experience needs more specific outcomes.' },
+      match: { coverage: 2, explanation: 'TypeScript is evidenced; AWS needs supporting experience.' },
+      annotations: [{ id: 'detail', section: 'experience', severity: 'warning',
+        quote: 'Built TypeScript APIs.', message: 'The API work lacks an outcome.', fix: 'What did these APIs help users accomplish?' }],
+    };
+    const agent = { review: jest.fn().mockResolvedValue(review) };
     const service = new (ResumeComparisonService as any)(
       { findOne: () => ({ exec: async () => resume }), updateOne }, content, {}, {},
-      {}, ats, match,
+      {}, ats, match, agent,
     );
     const input = { jobDescription: 'TypeScript and AWS required.' };
     const first = await service.compare('resume-1', '507f1f77bcf86cd799439011', input);
@@ -35,7 +43,17 @@ describe('deterministic candidate comparison', () => {
     expect(changedJob.match.coverage).toBe(100);
     expect(changedJob.ats.score).toBe(first.ats.score);
     expect(changedJob.aiContent.composite).toBe(first.aiContent.composite);
-    expect(first.review).toEqual({ source: 'deterministic', version: 'comparison-v1' });
+    expect(first.review).toMatchObject({ source: 'agent-session', sessionId: 'review-1' });
+    expect(first.ats.explanation).toContain(review.ats.explanation);
+    expect(first.match.explanation).toContain(review.match.explanation);
+    expect(first.annotations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ quote: 'Built TypeScript APIs.', message: review.annotations[0].message, color: 'amber' }),
+    ]));
+    expect(agent.review).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      userId: '507f1f77bcf86cd799439011', resumeId: 'resume-1', resumeText: expect.stringContaining('Built TypeScript APIs.'),
+      jobDescription: input.jobDescription,
+    }), { forceRefresh: false });
+    expect(agent.review).toHaveBeenNthCalledWith(2, expect.anything(), { forceRefresh: true });
     expect(updateOne).toHaveBeenCalledTimes(3);
     expect(updateOne).toHaveBeenNthCalledWith(1,
       { _id: 'resume-1', userId: expect.anything() },

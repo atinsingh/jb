@@ -50,6 +50,10 @@ describe('ResumeComparisonService', () => {
     getBuffer: jest.fn().mockResolvedValue(Buffer.from('%PDF-preview')),
   };
   const parser = { extractText: jest.fn(), heuristicParse: jest.fn() };
+  const agent = { review: jest.fn().mockResolvedValue({
+    source: 'agent-session', sessionId: 'review-1', harness: 'opencode', modelAlias: 'automatic',
+    ats: { explanation: 'Review of the original document.' }, match: { explanation: 'Review against the job.' }, annotations: [],
+  }) };
 
   let service: ResumeComparisonService;
 
@@ -66,6 +70,7 @@ describe('ResumeComparisonService', () => {
       parser as any,
       new AtsParseabilityService(),
       new AtsMatchService(),
+      agent,
     );
 
   });
@@ -178,7 +183,7 @@ describe('ResumeComparisonService', () => {
     const result = await service.compare('resume-1', userId, { jobDescription: 'TypeScript and AWS required.' });
     expect(result.match.coverage).toBe(50);
     expect(result.aiContent.composite).toBe(78);
-    expect(result.review.source).toBe('deterministic');
+    expect(result.review.source).toBe('agent-session');
     expect(result.annotations).toEqual(expect.arrayContaining([
       expect.objectContaining({ section: 'skills', message: expect.stringContaining('AWS') }),
       expect.objectContaining({ quote: 'Results-driven', fix: expect.any(String) }),

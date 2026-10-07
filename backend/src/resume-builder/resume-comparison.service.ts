@@ -11,6 +11,7 @@ import { ResumeParserService } from '../resume/resume-parser.service';
 import { StorageService } from '../storage';
 import { randomUUID } from 'crypto';
 import { extname } from 'path';
+import { CandidateResumeReviewAgent } from './candidate-resume-review.agent';
 
 export type ResumeComparisonAnnotation = {
   id: string;
@@ -33,6 +34,7 @@ export class ResumeComparisonService {
     private readonly parser: ResumeParserService,
     private readonly ats: AtsParseabilityService,
     private readonly matcher: AtsMatchService,
+    private readonly agentReview: CandidateResumeReviewAgent,
   ) {}
 
   async attachSource(resumeId: string, userId: string, file: Express.Multer.File) {
@@ -133,6 +135,9 @@ export class ResumeComparisonService {
     // Score the original upload, never partially parsed or subsequently edited fields.
     const ats = this.ats.check(originalFile ? { text } : { structured });
     const match = this.matcher.match(originalFile ? text : structured, targetText);
+    const review = await this.agentReview.review({
+      userId, resumeId, resumeText: text, originalFile, jobDescription: targetText, missingSections,
+    }, { forceRefresh: input.forceRefresh === true });
     const annotations: ResumeComparisonAnnotation[] = ats.findings.map((finding) => ({
       id: finding.code,
       section: finding.code.includes('EXPERIENCE') ? 'experience'
@@ -159,6 +164,7 @@ export class ResumeComparisonService {
         fix: 'Replace it with a specific example of your work and its outcome.',
       });
     }
+    annotations.push(...this.groundedAnnotations(review.annotations, text));
     const sectionNotice = missingSections.length
       ? `Missing sections: ${missingSections.map((section) => section[0].toUpperCase() + section.slice(1)).join(', ')}.`
       : '';
@@ -175,20 +181,29 @@ export class ResumeComparisonService {
       resumeId,
       ats: {
         ...ats,
-        explanation: ["Document compatibility is scored with fixed checks for contact details, sections, dates and selectable text.", sectionNotice].filter(Boolean).join(' '),
+        explanation: [review.ats.explanation, sectionNotice].filter(Boolean).join(' '),
         missingSections,
       },
       match: {
         ...match,
-        explanation: match.keywordCount
-          ? `${match.matched.length} of ${match.keywordCount} recognized job skills are evidenced in the resume.`
-          : 'No recognized job skills were found. Add a more specific job description to measure coverage.',
+        explanation: review.match.explanation,
       },
       aiContent,
-      review: { source: 'deterministic', version: 'comparison-v1' },
+      review: { source: review.source, sessionId: review.sessionId, harness: review.harness, modelAlias: review.modelAlias },
       annotations,
       details,
     };
+  }
+
+  private groundedAnnotations(items: ResumeComparisonAnnotation[], text: string) {
+    const comparable = (value: string) => String(value || '').normalize('NFKD').toLowerCase()
+      .replace(/[\u2018\u2019]/g, "'").replace(/[\u2013\u2014]/g, '-').replace(/\s+/g, ' ').trim();
+    const haystack = comparable(text);
+    return (Array.isArray(items) ? items : []).filter(item =>
+      item.quote && comparable(item.quote).length >= 4 && haystack.includes(comparable(item.quote))
+      && item.message?.trim() && item.fix?.trim(),
+    ).map(item => ({ ...item, color: item.severity === 'critical' ? 'red' as const
+      : item.severity === 'warning' ? 'amber' as const : 'blue' as const }));
   }
 
   private missingCoreSections(text: string): string[] {

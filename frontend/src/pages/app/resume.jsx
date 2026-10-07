@@ -280,8 +280,11 @@ export default function AppResume() {
     if (!router.isReady || !generateMode) return;
     loadOptions();
     loadTemplates();
-    loadBudget();
-  }, [router.isReady, generateMode, loadOptions, loadTemplates, loadBudget]);
+  }, [router.isReady, generateMode, loadOptions, loadTemplates]);
+
+  useEffect(() => {
+    if (router.isReady) void loadBudget();
+  }, [router.isReady, loadBudget]);
 
   useEffect(() => {
     if (!router.isReady) return undefined;
@@ -868,14 +871,14 @@ export default function AppResume() {
           >
             Compare your resume with a role, or create your next version.
           </p>
-          {generateMode && <BudgetSummary
+          <BudgetSummary
             budget={budget}
             estimate={
               options?.models
                 ?.find((model) => model.model === selectedModel)
                 ?.estimates?.[effort]
             }
-          />}
+          />
         </div>
         {operation.cancelError && <div role="alert">{operation.cancelError}</div>}
         {operation.active && <button type="button" disabled={operation.cancelling} onClick={async () => {
@@ -891,6 +894,7 @@ export default function AppResume() {
         {!session && compareMode ? (
           <CompareResumeWorkspace
             resumeId={importedResumeId}
+            onComparisonSettled={loadBudget}
             onOpen={(id) => router.replace({ pathname: "/app/resume", query: { mode: "compare", id } })}
           />
         ) : !session && generateMode ? (

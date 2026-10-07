@@ -258,7 +258,6 @@ export default function CompareDocumentPreview({ blob, filename, annotations, re
     const container = containerRef.current;
     const controller = new AbortController();
     let dispose = () => {};
-    container.replaceChildren();
     setError('');
     const render = async () => {
       const staging = document.createElement('div');
@@ -281,7 +280,6 @@ export default function CompareDocumentPreview({ blob, filename, annotations, re
     return () => {
       controller.abort();
       dispose();
-      container.replaceChildren();
     };
   }, [blob, filename, width]);
 
@@ -300,7 +298,7 @@ export default function CompareDocumentPreview({ blob, filename, annotations, re
       <h3 style={{ margin: '0 0 5px', fontSize: 16 }}>Uploaded resume</h3>
       <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--jb-v3-fg-3)' }}>Colored areas show where to review the original file. Hover or focus a highlight for a suggested fix.</p>
       {error && <div role="alert">{error}</div>}
-      <div className="compare-document-scroll" style={{ overflow: 'auto', maxHeight: 760, background: '#e7e9ee', padding: 12 }}>
+      <div className="compare-document-scroll" style={{ overflow: 'auto', scrollbarGutter: 'stable', maxHeight: 760, background: '#e7e9ee', padding: 12 }}>
         <div ref={containerRef} style={{ display: 'grid', justifyItems: 'center', gap: 16 }} />
       </div>
       {tooltip && (

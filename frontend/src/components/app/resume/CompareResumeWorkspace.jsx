@@ -17,6 +17,7 @@ const colors = {
   amber: { border: '#D99018', bg: 'color-mix(in srgb, #D99018 9%, transparent)', label: 'Improve' },
   blue: { border: '#4263EB', bg: 'color-mix(in srgb, #4263EB 7%, transparent)', label: 'Review' },
 };
+const emptyAnnotations = [];
 
 const input = {
   width: '100%',
@@ -369,7 +370,7 @@ function validateDetails(resume) {
   return '';
 }
 
-export default function CompareResumeWorkspace({ resumeId, onOpen }) {
+export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonSettled }) {
   const [resume, setResume] = useState(null);
   const [assessment, setAssessment] = useState(null);
   const [jobDescription, setJobDescription] = useState('');
@@ -393,16 +394,17 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
         const updated = await updateResume(id, { source: { ...resume.source, ...context } });
         setResume(withoutDuplicatedExperienceText(updated));
       }
-      const result = await compareResume(id, context);
+      const result = await compareResume(id, { ...context, forceRefresh: true });
       if (Object.keys(result.details || {}).length) setResume((current) => withoutDuplicatedExperienceText({ ...current, ...result.details }));
       setAssessment(result);
     } catch (cause) {
       setMessage(cause?.message || 'Comparison is temporarily unavailable.');
     } finally {
+      void onComparisonSettled?.();
       setComparing(false);
       setBusy(false);
     }
-  }, [resumeId, jobDescription, jobUrl, resume]);
+  }, [resumeId, jobDescription, jobUrl, resume, onComparisonSettled]);
 
   useEffect(() => {
     if (!resumeId) return;
@@ -431,12 +433,13 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
       .catch((cause) => !cancelled && setMessage(cause?.message || 'Could not open this resume.'))
       .finally(() => {
         if (!cancelled) {
+          void onComparisonSettled?.();
           setComparing(false);
           setBusy(false);
         }
       });
     return () => { cancelled = true; };
-  }, [resumeId]);
+  }, [resumeId, onComparisonSettled]);
 
   useEffect(() => {
     if (!resumeId) return;
@@ -465,7 +468,7 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
     }
   };
 
-  const annotations = assessment?.annotations || [];
+  const annotations = assessment?.annotations || emptyAnnotations;
   const update = (patch) => setResume((current) => ({ ...current, ...patch }));
   const patchExperience = (index, patch) => update({
     experience: resume.experience.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item),
@@ -567,8 +570,8 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
       {validationError && <div role="alert" style={{ marginBottom: 14, color: 'var(--jb-v3-danger)' }}>{validationError}</div>}
       <div className="compare-resume-layout" aria-busy={comparing}>
         <div style={{ display: 'grid', gap: 12 }}>
-          {comparing && !assessment ? <ComparisonLoading /> : <>
-          {assessment && sourceBlob ? (
+          <>
+          {sourceBlob ? (
             <CompareDocumentPreview blob={sourceBlob} filename={resume.source?.originalFilename || 'resume.pdf'} annotations={annotations} resume={resume} />
           ) : sourceError ? (
             <div role="status" style={{ padding: 12, border: '1px solid var(--jb-v3-line)' }}>
@@ -648,7 +651,7 @@ export default function CompareResumeWorkspace({ resumeId, onOpen }) {
             <button type="button" onClick={save} disabled={busy} style={button}>{busy ? 'Saving…' : 'Save resume details'}</button>
             </div>
           </details>
-          </>}
+          </>
         </div>
 
         <aside className="compare-resume-aside" style={{ position: 'sticky', top: 18, border: '1px solid var(--jb-v3-line)', borderRadius: 10, padding: 16, background: 'var(--jb-v3-panel)' }}>

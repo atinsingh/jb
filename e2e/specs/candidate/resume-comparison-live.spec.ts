@@ -3,6 +3,7 @@ import { readFileSync, mkdirSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 
 test('uploaded resume scores stay stable and its PDF fits the comparison panel', async ({ page, candidateUser, browser }, testInfo) => {
+  test.setTimeout(480_000);
   await page.goto('/app/login', { waitUntil: 'networkidle' });
   await page.fill('input[name="email"]', candidateUser.email);
   await page.fill('input[name="password"]', candidateUser.password);
@@ -15,8 +16,12 @@ test('uploaded resume scores stay stable and its PDF fits the comparison panel',
     ...(recording ? { recordVideo: { dir: testInfo.outputPath('video'), size: { width: 1280, height: 720 } } } : {}),
   });
   const demo = await context.newPage();
+  if (process.env.E2E_API_URL) {
+    await context.route('http://localhost:8000/api/**', route => route.continue({
+      url: route.request().url().replace('http://localhost:8000', process.env.E2E_API_URL!),
+    }));
+  }
   const failures: string[] = [];
-  const paidRequests: string[] = [];
   const beats: Array<{ time: number; text: string }> = [];
   const started = Date.now();
   const beat = async (text: string) => {
@@ -28,7 +33,6 @@ test('uploaded resume scores stay stable and its PDF fits the comparison panel',
   demo.on('response', response => { if (response.url().includes('/api/') && response.status() >= 400) failures.push(`${response.status()} ${response.url()}`); });
   demo.on('request', request => {
     if (/\/resume-builder\/[^/]+\/compare$/.test(request.url())) comparisonRequest = request;
-    if (/\/resume-harness\/(options|budget|templates|sessions)|\/ai-operations\//.test(request.url())) paidRequests.push(request.url());
   });
   // The original file remains private. Only its contact row is masked in the recording.
   if (recording) await demo.addInitScript(() => {
@@ -43,7 +47,6 @@ test('uploaded resume scores stay stable and its PDF fits the comparison panel',
       await demo.goto('http://localhost:3000/app/dashboard', { waitUntil: 'networkidle' });
       await expect(demo.getByRole('heading', { name: 'Resume activity', exact: true })).toBeVisible();
       await beat('Open Resume from the navigation.');
-      paidRequests.length = 0; // Dashboard lists saved drafts; the comparison must not call the harness.
       await demo.getByRole('navigation', { name: 'Candidate navigation' }).getByRole('link', { name: 'Resume', exact: true }).click();
       await demo.getByRole('button', { name: /^Compare Resume/ }).click();
       await demo.getByLabel('Existing resume').waitFor({ state: 'visible' });
@@ -66,9 +69,12 @@ test('uploaded resume scores stay stable and its PDF fits the comparison panel',
     await beat('Add the job you have in mind.');
     await demo.getByLabel('Job description', { exact: true }).fill('Full Stack Software Engineer. Build and maintain TypeScript and React applications, APIs with Python, and PostgreSQL databases. Deploy services on Kubernetes and AWS. Experience with Terraform is required.');
     await beat('Compare the original document with the role.');
-    const response = demo.waitForResponse(r => /\/resume-builder\/[^/]+\/compare$/.test(r.url()) && r.request().method() === 'POST');
+    const response = demo.waitForResponse(r => /\/resume-builder\/[^/]+\/compare$/.test(r.url()) && r.request().method() === 'POST', { timeout: 180_000 });
     await demo.getByRole('button', { name: 'Import and compare', exact: true }).click();
     const initial = await (await response).json();
+    expect(initial.review).toMatchObject({ source: 'agent-session', sessionId: expect.any(String) });
+    expect(initial.annotations.filter((item: any) => item.quote && item.id.startsWith('agent-')).length).toBeGreaterThan(0);
+    await expect(demo.getByTestId('ai-budget')).toContainText('remaining');
     await expect(demo.getByTestId('compare-ats-score')).toHaveText(`${initial.ats.score}%`);
     const canvas = demo.getByTestId('compare-document-preview').locator('canvas').first();
     await expect(canvas).toBeVisible();
@@ -89,7 +95,7 @@ test('uploaded resume scores stay stable and its PDF fits the comparison panel',
       await demo.screenshot({ path: resolve('../frontend/public/demo/resume-comparison-poster.jpg'), type: 'jpeg', quality: 88 });
     }
     await expect(demo.getByTestId('comparison-edit-details')).not.toHaveAttribute('open', '');
-    const refreshedResponse = demo.waitForResponse(r => /\/resume-builder\/[^/]+\/compare$/.test(r.url()) && r.request().method() === 'POST');
+    const refreshedResponse = demo.waitForResponse(r => /\/resume-builder\/[^/]+\/compare$/.test(r.url()) && r.request().method() === 'POST', { timeout: 180_000 });
     await demo.getByRole('button', { name: 'Refresh comparison', exact: true }).click();
     const refreshed = await (await refreshedResponse).json();
     expect([refreshed.ats.score, refreshed.match.coverage, refreshed.aiContent.composite]).toEqual([initial.ats.score, initial.match.coverage, initial.aiContent.composite]);
@@ -103,7 +109,6 @@ test('uploaded resume scores stay stable and its PDF fits the comparison panel',
     await expect.poll(() => canvas.evaluate(element => !!element.closest('.compare-document-scroll') && element.isConnected && element.getBoundingClientRect().width <= element.closest('.compare-document-scroll')!.clientWidth - 24 + 1)).toBe(true);
     expect(await demo.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     expect(failures).toEqual([]);
-    expect(paidRequests).toEqual([]);
     const headers = { Authorization: comparisonRequest.headers().authorization };
     const apiRoot = new URL('/api/', comparisonRequest.url()).href;
     const saved = await demo.request.get(`${apiRoot}resume-builder`, { headers });
