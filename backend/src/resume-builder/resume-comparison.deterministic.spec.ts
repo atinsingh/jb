@@ -44,8 +44,8 @@ describe('deterministic candidate comparison', () => {
     expect(changedJob.ats.score).toBe(first.ats.score);
     expect(changedJob.aiContent.composite).toBe(first.aiContent.composite);
     expect(first.review).toMatchObject({ source: 'agent-session', sessionId: 'review-1' });
-    expect(first.ats.explanation).toContain(review.ats.explanation);
-    expect(first.match.explanation).toContain(review.match.explanation);
+    expect(first.ats.explanation).toContain(`${first.ats.score}%`);
+    expect(first.match.explanation).toContain(`${first.match.coverage}%`);
     expect(first.annotations).toEqual(expect.arrayContaining([
       expect.objectContaining({ quote: 'Built TypeScript APIs.', message: review.annotations[0].message, color: 'amber' }),
     ]));
@@ -62,5 +62,47 @@ describe('deterministic candidate comparison', () => {
         jobMatchScore: first.match.coverage, contentScore: first.aiContent.composite,
       }], $slice: -500 } } },
     );
+  });
+
+  it('explains the displayed scores even when a cached agent explanation quotes another assessment', async () => {
+    const text = [
+      'Jordan Reyes', 'jordan@example.com', '4165551234', 'Summary',
+      'TypeScript engineer building customer services.', 'Experience',
+      'Built TypeScript APIs.', 'Skills', 'TypeScript', 'Education',
+      'BSc, Example University', ...Array(30).fill('Delivered reliable services with documented customer outcomes.'),
+    ].join('\n');
+    const resume = {
+      creationMethod: 'imported', source: { storageKey: 'resumes/compare/507f1f77bcf86cd799439011/source.pdf', originalFilename: 'source.pdf' },
+      save: jest.fn(),
+    };
+    const agent = { review: jest.fn().mockResolvedValue({
+      source: 'agent-session', sessionId: 'cached-review',
+      ats: { score: 36, explanation: 'ATS semantic score is 35.6/100 — a weak match.' },
+      match: { coverage: 36, explanation: 'Job match is 35.6%.' },
+      annotations: [{ id: 'detail', section: 'experience', severity: 'warning',
+        quote: 'Built TypeScript APIs.', message: 'Explain the customer outcome.', fix: 'What did these APIs help customers accomplish?' }],
+    }) };
+    const service = new (ResumeComparisonService as any)(
+      { findOne: () => ({ exec: async () => resume }), updateOne: jest.fn() },
+      new ResumeAiContentHeuristicService(), {},
+      { getBuffer: async () => Buffer.from('pdf') },
+      { extractText: async () => text, heuristicParse: () => ({}) },
+      new AtsParseabilityService(), new AtsMatchService(), agent,
+    );
+
+    const result = await service.compare('resume-1', '507f1f77bcf86cd799439011', { jobDescription: 'TypeScript and AWS required.' });
+
+    expect(result.ats.score).toBe(100);
+    expect(result.ats.explanation).toContain('100%');
+    expect(result.ats.explanation).toContain('document compatibility');
+    expect(result.match.coverage).toBe(50);
+    expect(result.match.explanation).toContain('50%');
+    expect(result.match.explanation).toContain('1 of 2');
+    expect(result.match.explanation).toContain('AWS');
+    expect(`${result.ats.explanation} ${result.match.explanation}`).not.toContain('35.6');
+    expect(result.annotations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ quote: 'Built TypeScript APIs.', message: 'Explain the customer outcome.' }),
+    ]));
+    expect(result.review.sessionId).toBe('cached-review');
   });
 });

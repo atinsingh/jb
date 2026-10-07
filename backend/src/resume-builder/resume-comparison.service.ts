@@ -181,12 +181,14 @@ export class ResumeComparisonService {
       resumeId,
       ats: {
         ...ats,
-        explanation: [review.ats.explanation, sectionNotice].filter(Boolean).join(' '),
+        explanation: `${ats.score}% document compatibility, based on readable text, contact details, section headings, dates, and length. ${sectionNotice}`.trim(),
         missingSections,
       },
       match: {
         ...match,
-        explanation: review.match.explanation,
+        explanation: match.keywordCount
+          ? `${match.coverage}%: ${match.matched.length} of ${match.keywordCount} recognized job skills found in the resume.${match.missing.length ? ` Missing: ${match.missing.join(', ')}.` : ''}`
+          : '0%: no recognized job skills found in the job description to compare.',
       },
       aiContent,
       review: { source: review.source, sessionId: review.sessionId, harness: review.harness, modelAlias: review.modelAlias },
