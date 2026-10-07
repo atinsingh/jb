@@ -108,12 +108,18 @@ export class BillingService {
     let startingAfter: string | undefined;
     let paid: Stripe.Subscription | undefined;
     do {
-      const page = await this.stripe.subscriptions.list({
-        customer: user.stripeCustomerId,
-        status: 'all',
-        limit: 100,
-        ...(startingAfter ? { starting_after: startingAfter } : {}),
-      });
+      let page: Stripe.ApiList<Stripe.Subscription>;
+      try {
+        page = await this.stripe.subscriptions.list({
+          customer: user.stripeCustomerId,
+          status: 'all',
+          limit: 100,
+          ...(startingAfter ? { starting_after: startingAfter } : {}),
+        });
+      } catch (error) {
+        if (this.isMissingStripeCustomer(error)) break;
+        throw error;
+      }
       paid = page.data.find((subscription) =>
         ['active', 'trialing'].includes(subscription.status) &&
         subscription.metadata?.userId === userId &&
@@ -167,10 +173,13 @@ export class BillingService {
     const user = await this.userModel.findById(userId);
     if (!user?.stripeCustomerId) return [];
 
-    const invoices = await this.stripe.invoices.list({
-      customer: user.stripeCustomerId,
-      limit: 100,
-    });
+    let invoices: Stripe.ApiList<Stripe.Invoice>;
+    try {
+      invoices = await this.stripe.invoices.list({ customer: user.stripeCustomerId, limit: 100 });
+    } catch (error) {
+      if (this.isMissingStripeCustomer(error)) return [];
+      throw error;
+    }
 
     return invoices.data.map((inv) => ({
       date: inv.created ? new Date(inv.created * 1000).toISOString() : new Date().toISOString(),
@@ -183,7 +192,12 @@ export class BillingService {
 
   async createOrGetStripeCustomer(user: UserDocument): Promise<string> {
     if (user.stripeCustomerId) {
-      return user.stripeCustomerId;
+      try {
+        const customer = await this.stripe.customers.retrieve(user.stripeCustomerId);
+        if (!customer.deleted) return customer.id;
+      } catch (error) {
+        if (!this.isMissingStripeCustomer(error)) throw error;
+      }
     }
 
     const customer = await this.stripe.customers.create({
@@ -201,6 +215,11 @@ export class BillingService {
     this.logger.log({ userId: user._id, customerId: customer.id }, 'Stripe customer created');
 
     return customer.id;
+  }
+
+  private isMissingStripeCustomer(error: any): boolean {
+    return error?.code === 'resource_missing' &&
+      (error.param === 'customer' || /^No such customer:/i.test(error.message || ''));
   }
 
   async createCheckoutSession(user: UserDocument, dto: CreateCheckoutSessionDto): Promise<{ sessionId: string; url: string }> {

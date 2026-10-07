@@ -116,4 +116,28 @@ describe('BillingService.getUserInvoices', () => {
     expect(invoices[0].status).toBe('open');
     expect(invoices[0].amount).toBe(0);
   });
+
+  it('handles a customer missing from the configured Stripe account without hiding other Stripe errors', async () => {
+    const user = { _id: { toString: () => '507f1f77bcf86cd799439011' }, stripeCustomerId: 'cus_stale', currentPlanType: 'FREE' };
+    const service = buildService(user, { data: [] });
+    const missing = Object.assign(new Error("No such customer: 'cus_stale'"), { code: 'resource_missing', param: 'customer' });
+    const failure = new Error('Stripe connection failed');
+    const list = jest.fn().mockRejectedValue(missing);
+    const retrieve = jest.fn().mockRejectedValue(missing);
+    const create = jest.fn().mockResolvedValue({ id: 'cus_current_environment' });
+    (service as any).stripe = { subscriptions: { list }, invoices: { list }, customers: { retrieve, create } };
+    (service as any).subscriptionModel = { findOne: jest.fn().mockResolvedValue(null) };
+    (service as any).userModel.findByIdAndUpdate = jest.fn().mockResolvedValue(user);
+    jest.spyOn(service, 'getUserSubscription').mockResolvedValue(null);
+    await expect(service.getReconciledSubscription(user as any)).resolves.toEqual({ subscription: null, currentPlan: 'FREE' });
+    await expect(service.getUserInvoices('user-1')).resolves.toEqual([]);
+    expect(create).not.toHaveBeenCalled(); // Reads must not create Stripe customers.
+    await expect(service.createOrGetStripeCustomer(user as any)).resolves.toBe('cus_current_environment');
+    expect((service as any).userModel.findByIdAndUpdate).toHaveBeenCalledWith(user._id, { stripeCustomerId: 'cus_current_environment' });
+    list.mockRejectedValue(failure);
+    await expect(service.getReconciledSubscription(user as any)).rejects.toBe(failure);
+    await expect(service.getUserInvoices('user-1')).rejects.toBe(failure);
+    retrieve.mockRejectedValue(failure);
+    await expect(service.createOrGetStripeCustomer(user as any)).rejects.toBe(failure);
+  });
 });
