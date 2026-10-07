@@ -20,11 +20,9 @@ export interface LiveStripeTier {
 }
 
 const productRefSchema = z.object({
-  productId: z.string().regex(/^prod_/),
   env: z
     .string()
-    .regex(/^STRIPE_[A-Z0-9_]+$/)
-    .optional(),
+    .regex(/^STRIPE_[A-Z0-9_]+$/),
 });
 
 const tierSchema = z.object({
@@ -55,7 +53,13 @@ const catalog = () => {
   return cachedCatalog;
 };
 
-const configuredProductId = (ref: CatalogTier['products']['monthly']): string => (ref.env && process.env[ref.env]?.trim()) || ref.productId;
+const configuredProductId = (ref: CatalogTier['products']['monthly']): string => {
+  const id = process.env[ref.env]?.trim();
+  if (!id || !/^prod_[A-Za-z0-9]+$/.test(id)) {
+    throw new Error(`Configure ${ref.env} with a valid Stripe product ID in the environment file for this deployment.`);
+  }
+  return id;
+};
 
 export const configuredStripeProductIds = (
   audience: StripeCatalogAudience,
@@ -107,7 +111,7 @@ const livePrice = (prices: Stripe.Price[], productId: string, interval: 'month' 
 /**
  * Build tiers only from explicitly configured products. Stripe remains the
  * source of truth for active default Price IDs, amounts, currency and interval;
- * the YAML file merely isolates this app's products in a shared account.
+ * the YAML file names the environment variables that isolate this app's products.
  */
 export const buildLiveStripeTiers = (prices: Stripe.Price[], audience: StripeCatalogAudience): LiveStripeTier[] =>
   catalog().audiences[audience].flatMap((tier) => {

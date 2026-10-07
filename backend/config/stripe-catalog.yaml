@@ -1,19 +1,15 @@
 version: 1
 
-# Product IDs are stable, non-secret Stripe identifiers. They form an explicit
-# allowlist so this app never imports products belonging to another app that
-# shares the Stripe account. Deployments may override an ID with the named env
-# var. The active default Price is fetched from Stripe at request time.
+# Product IDs come exclusively from the named environment variables.
+# The active default Price is fetched from Stripe at request time.
 audiences:
   candidate:
     - key: paid
       name: Paid
       products:
         monthly:
-          productId: prod_VAucq8N2hh10sb
           env: STRIPE_CANDIDATE_PAID_MONTHLY_PRODUCT_ID
         yearly:
-          productId: prod_VAue1EgKKX8FIz
           env: STRIPE_CANDIDATE_PAID_YEARLY_PRODUCT_ID
 
   employer:
@@ -21,9 +17,7 @@ audiences:
       name: Paid
       products:
         monthly:
-          productId: prod_VAucq8N2hh10sb
           env: STRIPE_EMPLOYER_PAID_MONTHLY_PRODUCT_ID
         yearly:
-          productId: prod_VAue1EgKKX8FIz
           env: STRIPE_EMPLOYER_PAID_YEARLY_PRODUCT_ID
 
