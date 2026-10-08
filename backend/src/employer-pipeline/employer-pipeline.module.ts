@@ -71,6 +71,6 @@ import { AiBudgetModule } from '../ai-budget/ai-budget.module';
       useClass: EmployerAtsGateway,
     },
   ],
-  exports: [EmployerPipelineService, MongooseModule],
+  exports: [EmployerPipelineService, EmployerResumeAssessmentService, MongooseModule],
 })
 export class EmployerPipelineModule {}

@@ -5,6 +5,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { EmployerBillingService } from './employer-billing.service';
 import { UpgradeDto } from './dto/upgrade.dto';
+import { CreateBillingPortalDto } from '../billing/dto';
 
 @ApiTags('employer-billing')
 @Controller('employer/billing')
@@ -62,7 +63,7 @@ export class EmployerBillingController {
   })
   @ApiResponse({ status: 201, description: 'Portal session created' })
   @ApiResponse({ status: 400, description: 'No billing information found' })
-  async portal(@Request() req, @Body() body: { returnUrl?: string }) {
+  async portal(@Request() req, @Body() body: CreateBillingPortalDto) {
     const ownerId = req.user._id.toString();
     return this.employerBillingService.createBillingPortalSession(
       ownerId,

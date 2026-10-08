@@ -89,6 +89,8 @@ export default function AppBilling() {
     }
   };
 
+  const hasSubscription = subscription?.stripeSubscriptionId && !['canceled', 'incomplete_expired'].includes(subscription.status);
+
   const paidTotal = useMemo(() => invoices.filter((i) => i.status === 'paid').length, [invoices]);
 
   const managePlan = async () => {
@@ -146,13 +148,16 @@ export default function AppBilling() {
           </div>
         </div>
 
+        <p style={{ color: 'var(--jb-v3-fg-2)', fontSize: 13 }}>One Paid membership covers candidate and employer workspaces.</p>
+        <p style={{ color: 'var(--jb-v3-fg-3)', fontSize: 12 }}>Candidate and employer AI credits are counted separately.</p>
+
         {budget && (
           <div data-testid="billing-budget" style={{ ...mono(11, '0'), marginBottom: 18 }}>
             {budget.status === 'unavailable' ? 'Credits unavailable · model-running actions are paused' : `Credits: ${Number(budget.remaining || 0)} of ${Number(budget.limit || 0)} remaining · ${budget.status} · renews monthly`}
           </div>
         )}
 
-        {currentPlan === 'PRO' && <MonoButton onClick={managePlan} style={{ marginBottom: 18 }}>Manage subscription</MonoButton>}
+        {hasSubscription && <MonoButton onClick={managePlan} style={{ marginBottom: 18 }}>Manage subscription</MonoButton>}
 
         <CellGrid cols={Math.max(plans.length, 1)} style={{ marginBottom: 34 }}>
           {plans.map((p) => {
@@ -236,13 +241,13 @@ export default function AppBilling() {
                   filled={p.type === 'PRO'}
                   disabled={p.type === 'FREE' || current}
                   data-testid={`billing-checkout-${p.type}`}
-                  onClick={() => checkout(p)}
+                  onClick={() => hasSubscription ? managePlan() : checkout(p)}
                   style={{
                     padding: '8px 0',
                     opacity: p.type === 'FREE' || current ? 0.55 : 1,
                   }}
                 >
-                  {current ? 'Current' : p.type === 'FREE' ? 'Free' : 'Choose Paid'}
+                  {current ? 'Current' : p.type === 'FREE' ? 'Free' : hasSubscription ? 'Manage subscription' : 'Choose Paid'}
                 </MonoButton>
               </div>
             );

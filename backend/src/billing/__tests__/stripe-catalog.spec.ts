@@ -18,7 +18,7 @@ describe('Stripe catalog', () => {
     for (const mode of ['Dev', 'Production']) {
       keys.forEach((key, index) => { process.env[key] = `prod_${mode}${index}`; });
       expect(configuredStripeProductIds('candidate')).toEqual([`prod_${mode}0`, `prod_${mode}1`]);
-      expect(configuredStripeProductIds('employer')).toEqual([`prod_${mode}2`, `prod_${mode}3`]);
+      expect(configuredStripeProductIds('employer')).toEqual(configuredStripeProductIds('candidate'));
       const prices = { list: jest.fn().mockResolvedValue({ data: [] }) };
       await fetchConfiguredStripePrices({ prices } as unknown as Stripe, 'candidate');
       expect(prices.list).toHaveBeenNthCalledWith(1, expect.objectContaining({ product: `prod_${mode}0` }));

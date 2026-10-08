@@ -256,10 +256,11 @@ export class PublisherService {
     type?: string;
     ownerId?: Types.ObjectId | string;
     status?: string;
+    visibility?: string;
   }): Promise<PublishOutcome> {
     const externalId = `jobocate:${employerJob._id}`;
     const now = new Date();
-    const published = employerJob.status === 'active';
+    const published = employerJob.status === 'active' && employerJob.visibility !== 'private';
 
     // Run the SAME geography engine the ingestion path runs. Without this the
     // bridge wrote `workplaceType` but left `country` unset, which is the one

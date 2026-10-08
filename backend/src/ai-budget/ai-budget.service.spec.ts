@@ -463,6 +463,43 @@ describe('AiBudgetService', () => {
     expect(accountStore.model.findOne).toHaveBeenCalledWith({ ownerType: 'employer', ownerId: 'employer-1' });
   });
 
+  it('keeps both workspace pools separate for the same user', async () => {
+    const accounts = new Map<string, any>();
+    const limits = new Map<string, number>();
+    const spent = new Map<string, number>();
+    const query = (read: () => any) => ({ select: () => ({ exec: async () => read() }), exec: async () => read() });
+    const model = {
+      findOne: jest.fn((filter: any) => query(() => accounts.get(filter.ownerType + ':' + filter.ownerId) || null)),
+      create: jest.fn(async (value: any) => {
+        const account = { _id: value.keyAlias, ...value };
+        accounts.set(value.keyAlias, account);
+        return account;
+      }),
+      updateOne: jest.fn((filter: any, update: any) => query(() => {
+        Object.assign(accounts.get(filter._id), update.$set);
+        return { modifiedCount: 1 };
+      })),
+    };
+    client.generate.mockImplementation(async (options: any) => {
+      limits.set(options.keyAlias, options.maxBudgetUsd);
+      return { key: options.keyAlias, keyId: options.keyAlias };
+    });
+    client.update.mockImplementation(async (key: string, options: any) => { limits.set(key, options.maxBudgetUsd); });
+    client.info.mockImplementation(async (key: string) => ({ limitUsd: limits.get(key), spendUsd: (spent.get(key) || 0) / 100, resetAt: new Date('2026-10-01T00:00:00.000Z') }));
+    client.usage.mockImplementation(async (key: string) => ({ spendUsd: (spent.get(key) || 0) / 100, credits: spent.get(key) || 0 }));
+    service = new AiBudgetService(model as any, policy, client, codec, modelAliases, { getOrCreateSubscription: jest.fn().mockResolvedValue({ plan: 'free' }) } as any);
+
+    expect(await service.statusCandidate('same-user')).toMatchObject({ limit: 50, remaining: 50 });
+    expect(await service.statusOwner('employer', 'same-user')).toMatchObject({ limit: 100, remaining: 100 });
+    expect(accounts.size).toBe(2);
+    spent.set('candidate:same-user', 5);
+    expect(await service.statusCandidate('same-user')).toMatchObject({ limit: 50, spent: 5, remaining: 45 });
+    expect(await service.statusOwner('employer', 'same-user')).toMatchObject({ limit: 100, spent: 0, remaining: 100 });
+    spent.set('employer:same-user', 50);
+    expect(await service.statusOwner('employer', 'same-user')).toMatchObject({ limit: 100, remaining: 50 });
+    expect(await service.statusCandidate('same-user')).toMatchObject({ remaining: 45 });
+  });
+
   it('keeps the employer allowance when management is temporarily unavailable', async () => {
     infoFailure = true;
     expect(await service.statusOwner('employer', 'employer-1')).toMatchObject({ limit: 100, remaining: 0, status: 'unavailable' });

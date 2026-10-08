@@ -26,7 +26,7 @@ export class CreateCheckoutSessionDto {
 export class CreateBillingPortalDto {
   @ApiPropertyOptional({ description: 'Return URL after portal session' })
   @IsOptional()
-  @IsUrl()
+  @IsUrl({ require_tld: false, require_protocol: true, protocols: ['http', 'https'] })
   returnUrl?: string;
 }
 

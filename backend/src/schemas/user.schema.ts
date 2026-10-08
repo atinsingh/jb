@@ -143,6 +143,10 @@ export class User {
   @Prop()
   stripeCustomerId?: string;
 
+  // Serializes checkout creation across workspaces and backend workers.
+  @Prop({ type: Date })
+  checkoutLockUntil?: Date;
+
   // Agent-specific fields
   @Prop({ default: 0 })
   assignedCandidatesCount?: number;

@@ -33,6 +33,11 @@ describe('PublisherService.publishEmployerJob', () => {
   const setOf = () => jobModel.findOneAndUpdate.mock.calls[0][1].$set;
   const filterOf = () => jobModel.findOneAndUpdate.mock.calls[0][0];
 
+  it('keeps a private active job out of the searchable public pool', async () => {
+    await service.publishEmployerJob({ _id: 'private', title: 'Private role', status: 'active', visibility: 'private' } as any);
+    expect(setOf()).toMatchObject({ isActive: false, lifecycle: 'paused' });
+  });
+
   it('unpublishes the searchable mirror when an employer deletes its job', async () => {
     jobModel.updateOne.mockResolvedValue({ modifiedCount: 1 });
 

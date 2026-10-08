@@ -112,6 +112,19 @@ const retiredMarketingRedirects = [
   { source: '/promo', destination: '/' },
   { source: '/post-job', destination: '/employers' },];
 
+const mutedEmployerRedirects = [
+  ...['candidates', 'screening', 'pipeline', 'talent-pool', 'interviews', 'messages',
+    'offers', 'company', 'distribution', 'autopilot', 'copilot', 'sourcing',
+    'ai-interview', 'approvals', 'notifications', 'integrations', 'developer',
+    'audit', 'compliance', 'onboarding', 'quota'].map((page) => ({
+    source: '/employer/' + page + '/:path*', destination: '/employer/dashboard',
+  })),
+  ...['profile', 'billing', 'plans', 'usage', 'security'].map((page) => ({
+    source: '/employer/' + page + '/:path*', destination: '/employer/settings',
+  })),
+  { source: '/employer/jobs/post.clean', destination: '/employer/jobs/post' },
+];
+
 const nextConfig = {
   output: 'standalone',
   experimental: {
@@ -135,7 +148,7 @@ const nextConfig = {
     styledComponents: true,
   },
   async redirects() {
-    return [...legacyRedirects, ...retiredMarketingRedirects].map((r) => ({
+    return [...legacyRedirects, ...retiredMarketingRedirects, ...mutedEmployerRedirects].map((r) => ({
       ...r,
       permanent: false,
     }));

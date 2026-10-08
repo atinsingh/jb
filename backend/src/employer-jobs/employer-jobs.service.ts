@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import {
   EmployerJob,
   EmployerJobDocument,
@@ -8,6 +8,7 @@ import {
 import { CreateJobDto } from './dto/create-job.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
 import { PublisherService } from '../ingestion/pipeline/publisher.service';
+import { EmployerApplicant, EmployerApplicantDocument } from '../employer-pipeline/schemas/employer-applicant.schema';
 
 @Injectable()
 export class EmployerJobsService {
@@ -17,6 +18,8 @@ export class EmployerJobsService {
     @InjectModel(EmployerJob.name)
     private employerJobModel: Model<EmployerJobDocument>,
     private readonly publisherService: PublisherService,
+    @InjectModel(EmployerApplicant.name)
+    private readonly applicantModel: Model<EmployerApplicantDocument>,
   ) {}
 
   /**
@@ -58,7 +61,15 @@ export class EmployerJobsService {
     if (status) {
       query.status = status;
     }
-    return this.employerJobModel.find(query).sort({ createdAt: -1 }).exec();
+    const jobs = await this.employerJobModel.find(query).sort({ createdAt: -1 }).exec();
+    if (!jobs.length) return jobs;
+    const counts = await this.applicantModel.aggregate([
+      { $match: { ownerId: new Types.ObjectId(ownerId), jobId: { $in: jobs.map(job => job._id) } } },
+      { $group: { _id: '$jobId', count: { $sum: 1 } } },
+    ]).exec();
+    const byJob = new Map(counts.map(row => [String(row._id), row.count]));
+    for (const job of jobs) job.applicantCount = byJob.get(String(job._id)) || 0;
+    return jobs;
   }
 
   async findOne(

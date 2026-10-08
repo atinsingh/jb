@@ -402,16 +402,6 @@ export class EmployerResumeAssessmentService {
     }
 
     const resumeText = this.artifactText(artifact.content);
-    let aiContent: PersistedResumeAssessment['aiContent'];
-    try {
-      aiContent = { status: 'COMPLETE', ...this.heuristic.analyze(resumeText) };
-    } catch {
-      aiContent = {
-        status: 'DETECTOR_FAILED',
-        reason: 'LOCAL_HEURISTIC_EXECUTION_FAILED',
-      };
-    }
-
     let ats: PersistedResumeAssessment['ats'];
     try {
       ats = await this.atsGateway.assess({
@@ -432,6 +422,20 @@ export class EmployerResumeAssessmentService {
         reason: 'EMPLOYER_ATS_EXECUTION_FAILED',
         harness: 'ats',
       };
+    }
+
+    let aiContent: PersistedResumeAssessment['aiContent'];
+    if (ats.status === 'BUDGET_EXHAUSTED') {
+      aiContent = { status: 'NOT_RUN', reason: 'EMPLOYER_BUDGET_EXHAUSTED' };
+    } else {
+      try {
+        aiContent = { status: 'COMPLETE', ...this.heuristic.analyze(resumeText) };
+      } catch {
+        aiContent = {
+          status: 'DETECTOR_FAILED',
+          reason: 'LOCAL_HEURISTIC_EXECUTION_FAILED',
+        };
+      }
     }
 
     const completed: PersistedResumeAssessment = {

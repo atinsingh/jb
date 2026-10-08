@@ -157,10 +157,11 @@ describe('EmployerResumeAssessmentService', () => {
     expect(gateway.assess).not.toHaveBeenCalled();
   });
 
-  it('hashes the exact employer-owned job snapshot and returns the heuristic when ATS is budget-blocked', async () => {
+  it('persists the submitted pair as unreviewed and skips both checks when employer credits are exhausted', async () => {
+    const analyze = jest.spyOn(heuristic, 'analyze');
     const result = await service.assess(String(OWNER), String(APPLICANT));
 
-    expect(result.status).toBe('PARTIAL');
+    expect(result.status).toBe('BUDGET_EXHAUSTED');
     expect(result.ats).toEqual(
       expect.objectContaining({
         status: 'BUDGET_EXHAUSTED',
@@ -169,9 +170,8 @@ describe('EmployerResumeAssessmentService', () => {
     );
     expect(result.aiContent).toEqual(
       expect.objectContaining({
-        status: 'COMPLETE',
-        detectorVersion: 'jobocate-heuristic-v1',
-        weightingVersion: 'weights-v1',
+        status: 'NOT_RUN',
+        reason: 'EMPLOYER_BUDGET_EXHAUSTED',
       }),
     );
     expect(result.job).toEqual({
@@ -192,6 +192,8 @@ describe('EmployerResumeAssessmentService', () => {
       }),
     );
     expect(gateway.assess.mock.calls[0][0]).not.toHaveProperty('candidateId');
+    expect(analyze).not.toHaveBeenCalled();
+    analyze.mockRestore();
     expect(JSON.stringify(applicantModel.updateOne.mock.calls)).not.toContain('aiScore');
   });
 

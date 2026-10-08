@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, InternalServerErrorException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, InternalServerErrorException, ConflictException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
@@ -8,7 +8,7 @@ import { User, UserDocument } from '../schemas/user.schema';
 import { SubscriptionPlan, SubscriptionPlanDocument } from '../schemas/subscription-plan.schema';
 import { UserSubscription, UserSubscriptionDocument } from '../schemas/user-subscription.schema';
 import { UsageRecord, UsageRecordDocument } from '../schemas/usage-record.schema';
-import { EmployerBillingService } from '../employer-billing/employer-billing.service';
+import { EMPLOYER_PLANS } from '../employer-billing/employer-plans';
 import { CreateCheckoutSessionDto, CancelSubscriptionDto } from './dto';
 import {
   buildLiveStripeTiers,
@@ -37,7 +37,6 @@ export class BillingService {
     @InjectModel(UsageRecord.name)
     private usageModel: Model<UsageRecordDocument>,
     private configService: ConfigService,
-    private employerBilling: EmployerBillingService,
   ) {
     const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY', '');
     if (!stripeSecretKey) {
@@ -55,6 +54,30 @@ export class BillingService {
   private async getCandidateStripeTiers(): Promise<LiveStripeTier[]> {
     const prices = await fetchConfiguredStripePrices(this.stripe, 'candidate');
     return buildLiveStripeTiers(prices, 'candidate');
+  }
+
+  async getAccount(userId: string): Promise<UserDocument> {
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+    return user;
+  }
+
+  async getEmployerPlansCatalog() {
+    const tiers = await this.getCandidateStripeTiers();
+    const paid = tiers.find(tier => tier.key === 'paid');
+    return EMPLOYER_PLANS.flatMap(({ limits, ...plan }) => {
+      if (plan.key === 'paid' && !paid) return [];
+      return [{
+        ...plan,
+        ...(plan.key === 'paid' ? paid : { priceMonthly: 0, priceYearly: 0, currency: paid?.currency || 'usd' }),
+        current: false,
+        levers: [
+          ['Job slots', String(limits.jobSlotsLimit)], ['Team seats', String(limits.seatsLimit)],
+          ['Employer AI credits / mo', String(limits.aiBudgetCreditsLimit)],
+          ['Sourcing credits', String(limits.sourcingCreditsLimit)],
+        ] as Array<[string, string]>,
+      }];
+    });
   }
 
   async getPlans(): Promise<any[]> {
@@ -107,6 +130,7 @@ export class BillingService {
     const productIds = new Set(configuredStripeProductIds('candidate'));
     let startingAfter: string | undefined;
     let paid: Stripe.Subscription | undefined;
+    let latest: Stripe.Subscription | undefined;
     do {
       let page: Stripe.ApiList<Stripe.Subscription>;
       try {
@@ -120,28 +144,30 @@ export class BillingService {
         if (this.isMissingStripeCustomer(error)) break;
         throw error;
       }
-      paid = page.data.find((subscription) =>
-        ['active', 'trialing'].includes(subscription.status) &&
-        subscription.metadata?.userId === userId &&
-        subscription.metadata?.planType === 'PRO' &&
-        subscription.items.data.some((item) =>
-          productIds.has(typeof item.price.product === 'string' ? item.price.product : item.price.product?.id),
-        ),
+      const owned = page.data.filter(subscription =>
+        subscription.metadata?.userId === userId && subscription.metadata?.planType === 'PRO' &&
+        subscription.items.data.some(item => productIds.has(typeof item.price.product === 'string' ? item.price.product : item.price.product?.id)),
       );
+      latest ||= owned[0];
+      paid = owned.find(subscription => ['active', 'trialing'].includes(subscription.status));
       if (paid) break;
       startingAfter = page.has_more ? page.data.at(-1)?.id : undefined;
     } while (startingAfter);
 
     const existing = await this.subscriptionModel.findOne({ userId: new Types.ObjectId(userId) });
-    if (paid) {
+    const authoritative = paid || latest;
+    if (authoritative) {
       const proPlan = await this.getPlanByType('PRO');
-      if (!proPlan || paid.metadata.planId !== proPlan._id.toString()) {
+      if (!proPlan || authoritative.metadata.planId !== proPlan._id.toString()) {
         throw new InternalServerErrorException('Paid Stripe subscription does not match the active Paid plan');
       }
-      if (existing?.stripeSubscriptionId !== paid.id || existing.status !== paid.status || user.currentPlanType !== 'PRO') {
-        await this.handleSubscriptionUpdated(paid);
+      const currentPlan = paid ? 'PRO' : 'FREE';
+      if (existing?.stripeSubscriptionId !== authoritative.id || existing.status !== authoritative.status || user.currentPlanType !== currentPlan
+        || existing.cancelAtPeriodEnd !== authoritative.cancel_at_period_end
+        || existing.currentPeriodEnd?.getTime() !== authoritative.current_period_end * 1000) {
+        await this.handleSubscriptionUpdated(authoritative);
       }
-      return { subscription: await this.getUserSubscription(userId), currentPlan: 'PRO' };
+      return { subscription: await this.getUserSubscription(userId), currentPlan };
     }
 
     if (user.currentPlanType === 'PRO' || (existing && ['active', 'trialing'].includes(existing.status))) {
@@ -206,8 +232,9 @@ export class BillingService {
       metadata: {
         userId: user._id.toString(),
       },
-    });
+    }, { idempotencyKey: 'account-customer:' + user._id.toString() });
 
+    user.stripeCustomerId = customer.id;
     await this.userModel.findByIdAndUpdate(user._id, {
       stripeCustomerId: customer.id,
     });
@@ -234,57 +261,68 @@ export class BillingService {
       );
     }
 
-    const customerId = await this.createOrGetStripeCustomer(user);
+    const lockUntil = new Date(Date.now() + 5 * 60 * 1000);
+    const locked = await this.userModel.findOneAndUpdate({
+      _id: user._id,
+      $or: [{ checkoutLockUntil: { $exists: false } }, { checkoutLockUntil: { $lt: new Date() } }],
+    }, { $set: { checkoutLockUntil: lockUntil } }, { new: true });
+    if (!locked) throw new ConflictException('A checkout is already being prepared. Please try again shortly.');
+    user = locked;
+    try {
+      const customerId = await this.createOrGetStripeCustomer(user);
 
-    if (await existingPaidSubscription(this.stripe, customerId)) rejectExistingSubscription();
-    const pending = await reusableCheckout(
-      this.stripe,
-      customerId,
-      (session) => session.metadata?.userId === user._id.toString(),
-      (session) => session.metadata?.planId === plan._id.toString() && session.metadata?.billingCycle === dto.billingCycle,
-    );
-    if (pending) return { sessionId: pending.id, url: pending.url! };
+      if (await existingPaidSubscription(this.stripe, customerId)) rejectExistingSubscription();
+      const pending = await reusableCheckout(
+        this.stripe,
+        customerId,
+        (session) => session.metadata?.userId === user._id.toString(),
+        (session) => session.metadata?.planId === plan._id.toString() && session.metadata?.billingCycle === dto.billingCycle,
+      );
+      if (pending) return { sessionId: pending.id, url: pending.url! };
 
-    const paid = (await this.getCandidateStripeTiers()).find((tier) => tier.key === 'paid');
-    const priceId = dto.billingCycle === 'yearly' ? paid?.stripePriceIdYearly : paid?.stripePriceIdMonthly;
+      const paid = (await this.getCandidateStripeTiers()).find((tier) => tier.key === 'paid');
+      const priceId = dto.billingCycle === 'yearly' ? paid?.stripePriceIdYearly : paid?.stripePriceIdMonthly;
 
-    if (!priceId) {
-      throw new BadRequestException('Plan pricing not configured');
-    }
+      if (!priceId) {
+        throw new BadRequestException('Plan pricing not configured');
+      }
 
-    const session = await this.stripe.checkout.sessions.create({
-      customer: customerId,
-      mode: 'subscription',
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
-      success_url: dto.successUrl || `${this.frontendUrl}/app/billing?success=true`,
-      cancel_url: dto.cancelUrl || `${this.frontendUrl}/app/billing?canceled=true`,
-      metadata: {
-        userId: user._id.toString(),
-        planId: plan._id.toString(),
-        planType: plan.type,
-        billingCycle: dto.billingCycle,
-      },
-      subscription_data: {
+      const session = await this.stripe.checkout.sessions.create({
+        customer: customerId,
+        mode: 'subscription',
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price: priceId,
+            quantity: 1,
+          },
+        ],
+        success_url: dto.successUrl || `${this.frontendUrl}/app/billing?success=true`,
+        cancel_url: dto.cancelUrl || `${this.frontendUrl}/app/billing?canceled=true`,
         metadata: {
           userId: user._id.toString(),
           planId: plan._id.toString(),
           planType: plan.type,
+          billingCycle: dto.billingCycle,
         },
-      },
-    }, { idempotencyKey: `candidate:${user._id}:${plan._id}:${dto.billingCycle}:${Math.floor(Date.now() / 600000)}` });
+        subscription_data: {
+          metadata: {
+            userId: user._id.toString(),
+            planId: plan._id.toString(),
+            planType: plan.type,
+          },
+        },
+      }, { idempotencyKey: `candidate:${user._id}:${plan._id}:${dto.billingCycle}:${Math.floor(Date.now() / 600000)}` });
 
-    this.logger.log({ userId: user._id, planId: plan._id, sessionId: session.id }, 'Checkout session created');
+      this.logger.log({ userId: user._id, planId: plan._id, sessionId: session.id }, 'Checkout session created');
 
-    return {
-      sessionId: session.id,
-      url: session.url!,
-    };
+      return {
+        sessionId: session.id,
+        url: session.url!,
+      };
+    } finally {
+      await this.userModel.updateOne({ _id: user._id, checkoutLockUntil: lockUntil }, { $unset: { checkoutLockUntil: 1 } });
+    }
   }
 
   async createBillingPortalSession(user: UserDocument, returnUrl?: string): Promise<{ url: string }> {
@@ -390,15 +428,6 @@ export class BillingService {
 
     this.logger.log({ eventType: event.type, eventId: event.id }, 'Processing Stripe webhook');
 
-    // Candidate and employer subscriptions share one endpoint (one URL, one
-    // signing secret to operate). Employer objects are tagged with
-    // `metadata.audience = 'employer'` at checkout, so route on that before the
-    // candidate handlers — which would otherwise log "missing userId" and drop
-    // the event.
-    if (await this.delegateEmployerEvent(event)) {
-      return { received: true };
-    }
-
     switch (event.type) {
       case 'checkout.session.completed':
         await this.handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
@@ -426,37 +455,6 @@ export class BillingService {
     }
 
     return { received: true };
-  }
-
-  /**
-   * Hand an employer-tagged event to EmployerBillingService.
-   *
-   * Returns true when the event was employer-owned and has been dealt with, so
-   * the caller skips the candidate handlers. Subscription objects carry the
-   * metadata directly; invoices don't, so they are matched by customer id
-   * inside `recordInvoice`.
-   */
-  private async delegateEmployerEvent(event: Stripe.Event): Promise<boolean> {
-    switch (event.type) {
-      case 'customer.subscription.created':
-      case 'customer.subscription.updated':
-      case 'customer.subscription.deleted': {
-        const subscription = event.data.object as Stripe.Subscription;
-        if (subscription.metadata?.audience !== 'employer') return false;
-        await this.employerBilling.applyStripeSubscription(subscription);
-        return true;
-      }
-      case 'invoice.payment_succeeded': {
-        const invoice = event.data.object as Stripe.Invoice;
-        if (invoice.subscription_details?.metadata?.audience !== 'employer') {
-          return false;
-        }
-        await this.employerBilling.recordInvoice(invoice);
-        return true;
-      }
-      default:
-        return false;
-    }
   }
 
   private async handleCheckoutCompleted(session: Stripe.Checkout.Session): Promise<void> {
@@ -496,12 +494,17 @@ export class BillingService {
       paused: 'paused',
     };
 
-    const status = statusMap[subscription.status] || 'active';
+    const status = statusMap[subscription.status] || 'unpaid';
 
     // Find or create user subscription
     let userSubscription = await this.subscriptionModel.findOne({
       userId: new Types.ObjectId(userId),
     });
+
+    if (userSubscription?.stripeSubscriptionId && userSubscription.stripeSubscriptionId !== subscription.id) {
+      const current = await currentPaidSubscription(this.stripe, String(subscription.customer));
+      if (current && current.id !== subscription.id) return this.handleSubscriptionUpdated(current);
+    }
 
     const subscriptionData = {
       userId: new Types.ObjectId(userId),
@@ -526,7 +529,7 @@ export class BillingService {
 
     // Update user
     await this.userModel.findByIdAndUpdate(userId, {
-      currentPlanType: planType || 'FREE',
+      currentPlanType: ['active', 'trialing'].includes(status) && planType === 'PRO' ? 'PRO' : 'FREE',
       subscriptionStatus: status,
       subscriptionId: userSubscription._id,
       stripeCustomerId: subscription.customer as string,

@@ -74,7 +74,7 @@ export default function AppSignup() {
   useEffect(() => {
     if (!loading && user) {
       router.replace(
-        user.role === 'ROLE_EMPLOYER' ? '/employer/onboarding' : '/app/dashboard',
+        user.role === 'ROLE_EMPLOYER' ? '/employer/dashboard' : '/app/dashboard',
       );
     }
   }, [loading, user, router]);
@@ -99,7 +99,7 @@ export default function AppSignup() {
       }
 
       router.replace(
-        role === 'ROLE_EMPLOYER' ? '/employer/onboarding' : '/app/dashboard',
+        role === 'ROLE_EMPLOYER' ? '/employer/dashboard' : '/app/dashboard',
       );
     } catch (err) {
       setError(err?.message || 'Could not create that account. Please try again.');

@@ -23,7 +23,6 @@ describe('BillingService.getUserInvoices', () => {
       {} as any,
       {} as any,
       configService,
-      {} as any,
     );
 
     // The constructor builds a real Stripe client from the (fake) secret key.

@@ -215,7 +215,7 @@ export default function JobApplications() {
       <div id="emapp" className="applications-page">
         <EmployerSidebar active="jobs" />
         <main>
-          <div className="dot-fade" aria-hidden="true" />
+
           <div className="content">
             <div className="heading">
               <div>
@@ -417,31 +417,30 @@ export default function JobApplications() {
       </div>
 
       <style jsx>{`
-        .applications-page { min-height: 100vh; display: flex; background: var(--jb-v3-bg); color: var(--jb-v3-fg); }
+        .applications-page { min-height: 100vh; display: flex; flex-direction: column; background: var(--jb-v3-bg); color: var(--jb-v3-fg); font-family: var(--jb-v3-font-display); }
         main { position: relative; flex: 1; min-width: 0; }
-        .dot-fade { position: absolute; inset: 0 0 auto; height: 520px; pointer-events: none; background-image: radial-gradient(circle, var(--jb-v3-dot) .8px, transparent .9px); background-size: 26px 26px; mask-image: linear-gradient(#000, transparent); }
-        .content { position: relative; width: min(100%, 1160px); margin: 0 auto; padding: 44px 28px 80px; }
+        .content { position: relative; width: min(100%, 1200px); margin: 0 auto; padding: 32px 24px 48px; }
         .heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 32px; }
-        .heading a, .heading > strong { font-family: var(--jb-v3-font-mono); text-transform: uppercase; letter-spacing: .12em; font-size: 10px; color: var(--jb-v3-fg-3); text-decoration: none; }
-        h1 { margin: 7px 0 8px; font-size: clamp(30px, 4vw, 44px); font-weight: 500; }
+        .heading a, .heading > strong { font-size: 12px; color: var(--jb-v3-fg-3); text-decoration: none; }
+        h1 { margin: 7px 0 8px; font-size: clamp(28px, 4vw, 38px); letter-spacing: -.045em; font-weight: 500; }
         .heading p { margin: 0; color: var(--jb-v3-fg-2); font-size: 14px; max-width: 62ch; }
         .heading > strong { font-weight: 400; }
-        .preview-card { border: 1px solid var(--jb-v3-line); background: var(--jb-v3-panel); padding: 22px; margin-bottom: 18px; }
+        .preview-card { border-radius: 12px; border: 1px solid var(--jb-v3-line); background: var(--jb-v3-panel); padding: 22px; margin-bottom: 18px; }
         .preview-head { display: flex; align-items: start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
         .preview-card h2 { margin: 0 0 6px; font-size: 18px; font-weight: 600; }
         .preview-card p { margin: 0; color: var(--jb-v3-fg-2); font-size: 13.5px; max-width: 62ch; }
         .upload { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
-        .upload span { font-family: var(--jb-v3-font-mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--jb-v3-fg-3); }
+        .upload span { font-size: 12px; color: var(--jb-v3-fg-3); }
         .upload input { color: var(--jb-v3-fg); font: inherit; font-size: 13px; }
         .toolbar { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
         .search { display: flex; flex-direction: column; gap: 6px; min-width: 180px; }
-        .search span { font-family: var(--jb-v3-font-mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--jb-v3-fg-3); }
+        .search span { font-size: 12px; color: var(--jb-v3-fg-3); }
         .search input, .search select {
           min-width: 220px; color: var(--jb-v3-fg); background: var(--jb-v3-control);
-          border: 1px solid var(--jb-v3-line-2); border-radius: 2px; padding: 10px 12px; font: inherit; font-size: 13px;
+          border: 1px solid var(--jb-v3-line-2); border-radius: 8px; padding: 10px 12px; font: inherit; font-size: 13px;
         }
         .split { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: 18px; align-items: start; }
-        .list, .detail { border: 1px solid var(--jb-v3-line); background: var(--jb-v3-panel); }
+        .list, .detail { border-radius: 12px; overflow: hidden; border: 1px solid var(--jb-v3-line); background: var(--jb-v3-panel); }
         .row {
           width: 100%; display: grid; grid-template-columns: 36px 1fr auto; gap: 12px; align-items: center;
           padding: 14px 16px; border: 0; border-bottom: 1px solid var(--jb-v3-line); background: transparent;
@@ -462,7 +461,7 @@ export default function JobApplications() {
         h2 { margin: 0; font-size: 28px; font-weight: 500; }
         .identity p { margin: 4px 0 0; color: var(--jb-v3-fg-2); font-size: 14px; }
         dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin: 22px; padding-top: 18px; border-top: 1px solid var(--jb-v3-line); }
-        dt { font-family: var(--jb-v3-font-mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--jb-v3-fg-3); margin-bottom: 5px; }
+        dt { font-size: 12px; color: var(--jb-v3-fg-3); margin-bottom: 5px; }
         dd { margin: 0; font-size: 13.5px; }
         dd a { color: var(--jb-v3-accent); text-decoration: none; }
         .skills { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 22px 8px; }
@@ -470,10 +469,10 @@ export default function JobApplications() {
         .detail :global(.resume-assessment) { margin: 0 22px; }
         .actions { display: flex; justify-content: flex-end; gap: 8px; padding: 18px 22px 22px; }
         .ghost, .primary, .ghost-link {
-          font: inherit; font-size: 12.5px; font-weight: 600; border-radius: 2px; padding: 9px 14px; cursor: pointer;
+          font: inherit; font-size: 12.5px; font-weight: 600; border-radius: 8px; padding: 9px 14px; cursor: pointer;
         }
         .ghost { color: var(--jb-v3-fg-2); background: transparent; border: 1px solid var(--jb-v3-line-2); }
-        .primary { color: #fff; background: var(--jb-v3-accent); border: none; }
+        .primary { color: var(--jb-v3-accent-ink); background: var(--jb-v3-accent); border: none; }
         .ghost-link { display: inline-block; margin-top: 12px; color: var(--jb-v3-fg); border: 1px solid var(--jb-v3-line-2); text-decoration: none; }
         .empty-filter { padding: 28px 16px; color: var(--jb-v3-fg-3); font-size: 13.5px; }
         @media (max-width: 860px) {

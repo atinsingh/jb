@@ -17,7 +17,7 @@ audiences:
       name: Paid
       products:
         monthly:
-          env: STRIPE_EMPLOYER_PAID_MONTHLY_PRODUCT_ID
+          env: STRIPE_CANDIDATE_PAID_MONTHLY_PRODUCT_ID
         yearly:
-          env: STRIPE_EMPLOYER_PAID_YEARLY_PRODUCT_ID
+          env: STRIPE_CANDIDATE_PAID_YEARLY_PRODUCT_ID
 

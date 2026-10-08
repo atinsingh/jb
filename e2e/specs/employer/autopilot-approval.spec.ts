@@ -11,7 +11,7 @@ import { api, createUser, uniqueId, type TestUser } from '../../support/api';
  */
 test.describe.configure({ mode: 'serial' });
 
-test.describe('Autopilot: proposal -> approval -> real applicant change', () => {
+test.describe.skip('Autopilot UI muted by JOB-131: proposal -> approval -> real applicant change', () => {
   let employer: TestUser;
   let candidate: TestUser;
   let jobId: string;

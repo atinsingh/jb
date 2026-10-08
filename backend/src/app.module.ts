@@ -45,7 +45,6 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { LeadsModule } from './leads/leads.module';
 import { StorageModule } from './storage/storage.module';
 import { EmployerApprovalsModule } from './employer-approvals/employer-approvals.module';
-import { EmployerCompanyModule } from './employer-company/employer-company.module';
 import { EmployerMessagesModule } from './employer-messages/employer-messages.module';
 import { AdminModule } from './admin/admin.module';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -143,7 +142,6 @@ function getEnvFilePath(): string[] {
     EmployerDistributionModule,
     EmployerNotificationsModule,
     EmployerApprovalsModule,
-    EmployerCompanyModule,
     EmployerMessagesModule,
     AdminModule,
     IngestionModule,

@@ -21,6 +21,8 @@ test.describe('posting a job', () => {
       page.locator('input[name="title"], input[id="title"]').first(),
       'the post-a-job form has no title field',
     ).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('Draft with Jobocate', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /generate draft/i })).toHaveCount(0);
   });
 
   test('a job posted through the form is readable back', async ({

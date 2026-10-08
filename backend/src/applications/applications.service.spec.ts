@@ -15,6 +15,8 @@ import { EmployerPipelineService } from '../employer-pipeline/employer-pipeline.
 import { NotificationsService } from '../notifications/notifications.service';
 import { AutopilotRulesService } from '../ai-recruiter/autopilot-rules.service';
 import { StorageService } from '../storage/storage.service';
+import { EmployerResumeAssessmentService } from '../employer-pipeline/employer-resume-assessment.service';
+import { ResumeAiContentHeuristicService } from '../employer-pipeline/resume-ai-content-heuristic.service';
 
 const CAND = new Types.ObjectId().toHexString();
 const OWNER = new Types.ObjectId().toHexString();
@@ -47,6 +49,7 @@ describe('ApplicationsService', () => {
   };
   const notificationsService = { create: jest.fn().mockResolvedValue({}) };
   const autopilotRulesService = { evaluateApplicant: jest.fn().mockResolvedValue(undefined) };
+  const resumeAssessmentService = { assess: jest.fn().mockResolvedValue({ status: 'COMPLETE' }) };
 
   beforeEach(async () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
@@ -65,6 +68,7 @@ describe('ApplicationsService', () => {
         { provide: EmployerPipelineService, useValue: employerPipelineService },
         { provide: NotificationsService, useValue: notificationsService },
         { provide: AutopilotRulesService, useValue: autopilotRulesService },
+        { provide: EmployerResumeAssessmentService, useValue: resumeAssessmentService },
       ],
     }).compile();
 
@@ -90,6 +94,7 @@ describe('ApplicationsService', () => {
       sort: jest.fn().mockReturnThis(),
       exec: jest.fn().mockResolvedValue(null),
     });
+    jobModel.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue({ ...scrapedJob, isActive: true }) });
   });
 
   afterEach(() => jest.clearAllMocks());
@@ -102,6 +107,8 @@ describe('ApplicationsService', () => {
     source: 'Jobocate',
     addedBy: OWNER,
     sourceJobKey: EMPLOYER_JOB_ID,
+    importMethod: 'employer_direct',
+    isActive: true,
   };
   const scrapedJob = {
     _id: JOBID,
@@ -175,6 +182,34 @@ describe('ApplicationsService', () => {
       expect(audiences).toEqual(['candidate']);
     });
 
+    it('automatically persists both reviews of the submitted snapshot under the employer account', async () => {
+      const instant = new Date('2026-10-08T00:00:00.000Z');
+      const applicant: any = { _id: new Types.ObjectId(), ownerId: new Types.ObjectId(OWNER), jobId: new Types.ObjectId(EMPLOYER_JOB_ID),
+        applicationId: new Types.ObjectId(), submittedResume: { artifactId: new Types.ObjectId(), version: 7, hash: 'submitted-hash' },
+        createdAt: instant, updatedAt: instant };
+      const query = (value: any) => ({ lean: () => ({ exec: async () => value }), exec: async () => value });
+      const gateway = { assess: jest.fn().mockResolvedValue({ status: 'COMPLETE', semanticMatch: 78, costUsd: 0.04, harness: 'ats' }) };
+      const reviews = new EmployerResumeAssessmentService(
+        { findOne: () => query(applicant), updateOne: (_filter: any, update: any) => {
+          Object.assign(applicant, update.$set); return query({ modifiedCount: 1 });
+        } } as any,
+        { findOne: () => query({ applicationId: applicant.applicationId, version: 7, metadata: { sha256: 'submitted-hash' }, content: JSON.stringify({ summary: 'Backend engineer', skills: ['TypeScript'] }) }) } as any,
+        { findOne: () => query({ ...employerJob, _id: EMPLOYER_JOB_ID, description: 'Build TypeScript APIs.' }) } as any,
+        new ResumeAiContentHeuristicService(), gateway as any, {} as any, {} as any,
+      );
+      resumeAssessmentService.assess.mockImplementationOnce((ownerId, applicantId) => reviews.assess(ownerId, applicantId));
+      employerPipelineService.upsertApplicant.mockResolvedValueOnce(applicant);
+      jobModel.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(employerJob) });
+      await service.bridgeApplicationToPipeline({ _id: applicant.applicationId, candidateId: CAND, jobId: JOBID,
+        artifacts: { resumeVersionId: applicant.submittedResume.artifactId, resumeVersion: 7, resumeHash: 'submitted-hash' } } as any);
+      await new Promise(resolve => setImmediate(resolve));
+      expect(applicant.resumeAssessment).toMatchObject({ status: 'COMPLETE', checkedAt: expect.any(Date),
+        actor: { ownerId: OWNER, ownerType: 'employer' }, submittedResume: { version: 7, hash: 'submitted-hash' },
+        ats: { semanticMatch: 78, costUsd: 0.04 }, aiContent: { status: 'COMPLETE' } });
+      expect(gateway.assess).toHaveBeenCalledTimes(1);
+      expect(gateway.assess).toHaveBeenCalledWith(expect.objectContaining({ ownerId: OWNER, applicationId: String(applicant.applicationId), resumeHash: 'submitted-hash' }));
+    });
+
     it('swallows errors and never throws (defensive)', async () => {
       jobModel.findById.mockReturnValue({
         lean: jest.fn().mockRejectedValue(new Error('db down')),
@@ -208,6 +243,8 @@ describe('ApplicationsService', () => {
         OWNER,
         newlyCreatedApplicant,
       );
+      await new Promise(resolve => setImmediate(resolve));
+      expect(resumeAssessmentService.assess).toHaveBeenCalledWith(OWNER, 'app-new');
     });
 
     it('does not re-evaluate an applicant that already existed (re-apply / update path)', async () => {
@@ -227,10 +264,28 @@ describe('ApplicationsService', () => {
       } as any);
 
       expect(autopilotRulesService.evaluateApplicant).not.toHaveBeenCalled();
+      expect(resumeAssessmentService.assess).not.toHaveBeenCalled();
     });
   });
 
   describe('createApplication', () => {
+    it('records a direct employer application as submitted, without waiting for review', async () => {
+      jobModel.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(employerJob) });
+      applicationModel.findOne.mockResolvedValue(null);
+      applicationModel.mockImplementation((doc: any) => ({ ...doc, save: async () => doc }));
+      jest.spyOn(service, 'bridgeApplicationToPipeline').mockResolvedValue(undefined);
+      const result = await service.createApplication(CAND, JOBID);
+      expect(result).toMatchObject({ status: 'submitted', submittedAt: expect.any(Date) });
+      expect(applicationEventsService.recordEvent).toHaveBeenCalledWith(expect.objectContaining({ type: 'submitted' }));
+    });
+
+    it('refuses an application to a hidden or closed searchable job', async () => {
+      applicationModel.findOne.mockResolvedValue(null);
+      jobModel.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue({ ...employerJob, isActive: false }) });
+      await expect(service.createApplication(CAND, JOBID)).rejects.toThrow('Job not found');
+      expect(applicationModel).not.toHaveBeenCalled();
+    });
+
     it('saves, records the event and invokes the bridge', async () => {
       applicationModel.findOne.mockResolvedValue(null);
       const saved = { _id: 's1', candidateId: CAND, jobId: JOBID };

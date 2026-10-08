@@ -226,7 +226,7 @@ export const employerBillingApi = {
       }),
     portal: () => apiCall('/api/employer/billing/portal', {
       method: 'POST',
-      body: JSON.stringify({ returnUrl: `${window.location.origin}/employer/billing` }),
+      body: JSON.stringify({ returnUrl: `${window.location.origin}/employer/settings` }),
     }),
 };
 

@@ -156,7 +156,8 @@ export const AuthProvider = ({ children }) => {
     if (isAgent) {
       if (onCandidateApp || onEmployerApp) router.replace('/agent/dashboard');
     } else if (isEmployer) {
-      if (onCandidateApp || onAgentApp) router.replace('/employer/dashboard');
+      if (path === '/app/billing') router.replace({ pathname: '/employer/settings', query: router.query });
+      else if (onCandidateApp || onAgentApp) router.replace('/employer/dashboard');
     } else {
       if (onEmployerApp || onAgentApp) router.replace('/app/dashboard');
     }

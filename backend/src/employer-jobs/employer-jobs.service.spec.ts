@@ -30,6 +30,7 @@ describe('EmployerJobsService (search bridge)', () => {
         EmployerJobsService,
         { provide: getModelToken(EmployerJob.name), useValue: employerJobModel },
         { provide: PublisherService, useValue: publisherService },
+        { provide: getModelToken('EmployerApplicant'), useValue: {} },
       ],
     }).compile();
 

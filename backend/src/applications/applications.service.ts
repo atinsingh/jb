@@ -16,10 +16,13 @@ import {
 } from '../schemas/application-artifact.schema';
 import { StorageService } from '../storage/storage.service';
 import { createHash } from 'crypto';
+import { EmployerResumeAssessmentService } from '../employer-pipeline/employer-resume-assessment.service';
 
 @Injectable()
 export class ApplicationsService {
   private readonly logger = new Logger(ApplicationsService.name);
+  // ponytail: process-local review queue; use the existing durable queue before adding backend workers.
+  private readonly resumeReviews = new Map<string, Promise<void>>();
 
   constructor(
     @InjectModel(Application.name) private applicationModel: Model<ApplicationDocument>,
@@ -33,6 +36,7 @@ export class ApplicationsService {
     private readonly employerPipelineService: EmployerPipelineService,
     private readonly notificationsService: NotificationsService,
     private readonly autopilotRulesService: AutopilotRulesService,
+    private readonly resumeAssessmentService: EmployerResumeAssessmentService,
   ) { }
 
   async createApplication(
@@ -52,12 +56,18 @@ export class ApplicationsService {
       throw new BadRequestException('Application already exists for this job');
     }
 
+    const job = await this.jobModel.findById(jobId).lean();
+    if (!job || !job.isActive) throw new NotFoundException('Job not found');
+    const direct = job.importMethod === 'employer_direct';
+    const submittedAt = direct ? new Date() : undefined;
+
     const application = new this.applicationModel({
       candidateId,
       jobId,
       matchScore: matchScore || 0,
       coverLetter: coverLetter || '',
-      status: 'pending',
+      status: direct ? 'submitted' : 'pending',
+      ...(submittedAt ? { submittedAt } : {}),
       appliedAt: new Date(),
       autoApplied,
     });
@@ -67,8 +77,8 @@ export class ApplicationsService {
     await this.applicationEventsService.recordEvent({
       applicationId: saved._id as any,
       userId: saved.candidateId,
-      type: 'queued',
-      message: 'Application queued',
+      type: direct ? 'submitted' : 'queued',
+      message: direct ? 'Application submitted' : 'Application queued',
     });
     await this.bridgeApplicationToPipeline(saved);
     return saved;
@@ -302,6 +312,7 @@ export class ApplicationsService {
         applicant.createdAt.getTime() === applicant.updatedAt.getTime();
 
       if (isNewlyCreated) {
+        if (ownerId) this.queueResumeAssessment(ownerId, String(applicant._id));
         try {
           await this.autopilotRulesService.evaluateApplicant(ownerId, applicant);
         } catch {
@@ -318,7 +329,7 @@ export class ApplicationsService {
           userId: ownerId,
           type: 'applicants',
           text: `${candidateFields.candidateName || 'A candidate'} applied to ${job.title}`,
-          href: '/employer/pipeline',
+          href: `/employer/jobs/${employerJobId}/applications`,
         });
       }
     } catch (err) {
@@ -328,6 +339,21 @@ export class ApplicationsService {
         )}: ${err instanceof Error ? err.message : err}`,
       );
     }
+  }
+
+  private queueResumeAssessment(ownerId: string, applicantId: string): void {
+    const previous = this.resumeReviews.get(ownerId) || Promise.resolve();
+    const review = previous.then(async () => {
+      try {
+        await this.resumeAssessmentService.assess(ownerId, applicantId);
+      } catch (error) {
+        this.logger.warn(`Submitted resume assessment failed for ${applicantId}: ${error instanceof Error ? error.message : error}`);
+      }
+    });
+    this.resumeReviews.set(ownerId, review);
+    void review.then(() => {
+      if (this.resumeReviews.get(ownerId) === review) this.resumeReviews.delete(ownerId);
+    });
   }
 
   /**

@@ -17,7 +17,7 @@ const NAV = [
   ['Billing', '/app/billing'],
 ];
 
-export default function AppTopNav() {
+export default function AppTopNav({ items = NAV, navigationLabel = 'Candidate navigation', homeHref = '/app/resume', ...headerProps }) {
   const { pathname } = useRouter();
   const { theme, toggle } = useJbTheme();
   const { user, logout } = useAuth();
@@ -28,11 +28,11 @@ export default function AppTopNav() {
     try { await logout(); } catch { setLoggingOut(false); }
   };
   return (
-    <header className="app-v3-header">
+    <header className="app-v3-header" {...headerProps}>
       <div className="candidate-nav-row">
-        <Link href="/app/resume" aria-label="Jobocate" className="candidate-logo"><Logo size={22} /></Link>
-        <nav aria-label="Candidate navigation">
-          {NAV.map(([label, href]) => <Link key={href} href={href} aria-current={pathname === href ? 'page' : undefined}>{label}</Link>)}
+        <Link href={homeHref} aria-label="Jobocate" className="candidate-logo"><Logo size={22} /></Link>
+        <nav aria-label={navigationLabel}>
+          {items.map(([label, href]) => <Link key={href} href={href} aria-current={pathname === href || pathname.startsWith(`${href}/`) ? 'page' : undefined}>{label}</Link>)}
         </nav>
         <div className="candidate-nav-actions">
           <button type="button" onClick={toggle} aria-label="Toggle theme">{theme === 'light' ? 'Light' : 'Dark'}</button>

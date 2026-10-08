@@ -105,6 +105,8 @@ export const getJobRecommendations = async (limit = 10) => {
 };
 
 // Application Agent API
+export const applyToJob = async (jobId) => apiCall(`/api/applications/apply/${jobId}`, { method: 'POST' });
+
 export const queueApplication = async (jobId) => {
   return apiCall(`/api/applications/queue/${jobId}`, {
     method: 'POST',

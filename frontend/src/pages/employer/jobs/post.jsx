@@ -62,16 +62,16 @@ const educationLevels = [
 ];
 
 /* ------------------------------------------------------------- ui atoms --- */
-const monoLabel = { fontFamily: 'var(--jb-font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--jb-v3-fg-3)', display: 'block', marginBottom: 7 };
-const blueBtn = { display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, color: '#fff', background: '#4263EB', border: 'none', borderRadius: 999, padding: '10px 18px', cursor: 'pointer' };
-const ghostBtn = { display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: 'var(--jb-v3-fg)', background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line-btn)', borderRadius: 999, padding: '10px 16px', cursor: 'pointer' };
+const monoLabel = { fontFamily: 'inherit', fontSize: 12, color: 'var(--jb-v3-fg-3)', display: 'block', marginBottom: 7 };
+const blueBtn = { display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, color: 'var(--jb-v3-accent-ink)', background: 'var(--jb-v3-accent)', border: 'none', borderRadius: 8, padding: '10px 18px', cursor: 'pointer' };
+const ghostBtn = { display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: 'var(--jb-v3-fg)', background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line-btn)', borderRadius: 8, padding: '10px 16px', cursor: 'pointer' };
 const fieldInput = { width: '100%', fontFamily: 'inherit', fontSize: 13.5, color: 'var(--jb-v3-fg)', background: 'var(--jb-v3-control)', border: '1px solid var(--jb-v3-line-2)', borderRadius: 10, padding: '11px 12px', boxSizing: 'border-box' };
 const selectStyle = {
   ...fieldInput, cursor: 'pointer', appearance: 'none', paddingRight: 34,
   backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238A8378' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
   backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center',
 };
-const cardStyle = { background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 16, overflow: 'hidden' };
+const cardStyle = { background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 12, overflow: 'hidden' };
 
 const emptyForm = () => ({
   title: '',
@@ -141,17 +141,8 @@ function PostJob() {
   // Initialize form data with all required fields
   const [formData, setFormData] = useState(emptyForm);
 
-  // drafting: seed-only fields not part of the saved job, plus the
-  // generation call's own loading/error state.
-  const [aiSkills, setAiSkills] = useState('');
-  const [aiNotes, setAiNotes] = useState('');
-  const [generating, setGenerating] = useState(false);
-  const [genError, setGenError] = useState('');
-
   const resetForm = () => {
     setFormData(emptyForm());
-    setAiSkills('');
-    setAiNotes('');
     setEditingId(null);
     setActiveSection('job-info');
     setSubmitError('');
@@ -176,8 +167,6 @@ function PostJob() {
       isRemote: !!job.isRemote,
       visibility: job.visibility || 'public',
     });
-    setAiSkills('');
-    setAiNotes('');
     setEditingId(job._id);
     setActiveSection('job-info');
     setSubmitError('');
@@ -321,65 +310,6 @@ function PostJob() {
     }
   };
 
-  // Draft description/responsibilities/requirements/benefits from what's
-  // already been entered. Never touches the form until the call succeeds, and
-  // never overwrites content the employer already wrote without asking.
-  const handleGenerate = async () => {
-    if (!formData.title.trim()) {
-      setGenError('Enter a job title first — the draft is built from it.');
-      return;
-    }
-
-    const hasExistingContent =
-      formData.description.trim() ||
-      formData.responsibilities.length > 0 ||
-      formData.requirements.length > 0;
-    if (
-      hasExistingContent &&
-      !window.confirm(
-        'This replaces the description, responsibilities and requirements you’ve already entered with an draft. Continue?',
-      )
-    ) {
-      return;
-    }
-
-    setGenerating(true);
-    setGenError('');
-
-    try {
-      const seed = {
-        title: formData.title.trim(),
-        companyName: formData.companyName.trim() || undefined,
-        location: formData.location.trim() || undefined,
-        isRemote: !!formData.isRemote,
-        jobType: toTypeEnum(formData.type),
-        experience: formData.experience || undefined,
-        educationLevel: formData.educationLevel || undefined,
-        skills: aiSkills
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean),
-        notes: aiNotes.trim() || undefined,
-      };
-
-      const { draft } = await employerJobsApi.generateDescription(seed);
-
-      setFormData((prev) => ({
-        ...prev,
-        description: draft.description,
-        responsibilities: draft.responsibilities,
-        requirements: draft.requirements,
-        benefits: draft.benefits.length > 0 ? draft.benefits : prev.benefits,
-        skills: seed.skills.length > 0 ? seed.skills : prev.skills,
-      }));
-    } catch (error) {
-      console.error('Error generating job description:', error);
-      setGenError(error?.message || 'Could not generate a draft. Please try again.');
-    } finally {
-      setGenerating(false);
-    }
-  };
-
   const handleSubmit = (e) => {
     e.preventDefault();
     persist('active');
@@ -432,9 +362,9 @@ function PostJob() {
   );
 
   const previewRow = (label, value) => (
-    <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 16, padding: '14px 0', borderTop: '1px solid #F2ECE0' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 16, padding: '14px 0', borderTop: '1px solid var(--jb-v3-line)' }}>
       <span style={monoLabel}>{label}</span>
-      <div style={{ fontSize: 13.5, color: '#2A2820' }}>{value}</div>
+      <div style={{ fontSize: 13.5, color: 'var(--jb-v3-fg)' }}>{value}</div>
     </div>
   );
 
@@ -450,19 +380,19 @@ function PostJob() {
 
       <style jsx global>{`
         #emapp ::-webkit-scrollbar { width: 8px; }
-        #emapp ::-webkit-scrollbar-thumb { background: #e1d9c9; border-radius: 8px; }
-        #emapp input:focus, #emapp textarea:focus, #emapp select:focus { outline: none; border-color: #4263eb; box-shadow: 0 0 0 3px rgba(66,99,235,0.14); }
-        #emapp .em-blue-btn:hover { background: #364fc7 !important; }
-        #emapp .em-ghost:hover { background: #f4efe4 !important; }
+        #emapp ::-webkit-scrollbar-thumb { background: var(--jb-v3-line-2); border-radius: 8px; }
+        #emapp input:focus, #emapp textarea:focus, #emapp select:focus { outline: none; border-color: var(--jb-v3-accent); box-shadow: 0 0 0 3px rgba(66,99,235,0.14); }
+        #emapp .em-blue-btn:hover { background: var(--jb-v3-accent-hover) !important; }
+        #emapp .em-ghost:hover { background: var(--jb-v3-control) !important; }
       `}</style>
 
-      <div id="emapp" data-v3-page="true" style={{ display: 'flex', minHeight: '100vh', background: '#F7F3EA', fontFamily: 'var(--jb-font-sans)', color: '#1B1A16' }}>
+      <div id="emapp" data-v3-page="true" style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--jb-v3-bg)', fontFamily: 'var(--jb-v3-font-display)', color: 'var(--jb-v3-fg)' }}>
         <EmployerSidebar active="jobs" />
 
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           {/* HEADER */}
-          <header style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: 14, padding: '14px 32px', background: 'rgba(247,243,234,0.85)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #E7E0D2' }}>
-            <Link href="/employer/jobs" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13.5, fontWeight: 600, color: '#5A544A', textDecoration: 'none' }}>← Back to jobs</Link>
+          <header style={{ position: 'relative', zIndex: 20, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', padding: '18px 24px', background: 'var(--jb-v3-bg)', backdropFilter: 'blur(10px)', borderBottom: '1px solid var(--jb-v3-line)' }}>
+            <Link href="/employer/jobs" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13.5, fontWeight: 600, color: 'var(--jb-v3-fg-2)', textDecoration: 'none' }}>← Back to jobs</Link>
             <span style={{ ...monoLabel, marginBottom: 0, marginLeft: 4 }}>Hiring · Post a job</span>
             <div style={{ flex: 1 }} />
             <button type="button" onClick={resetForm} disabled={isSubmitting} className="em-ghost" style={{ ...ghostBtn, opacity: isSubmitting ? 0.6 : 1 }}>New job</button>
@@ -470,34 +400,34 @@ function PostJob() {
             <button type="submit" form="jobPostForm" disabled={isSubmitting} className="em-blue-btn" style={{ ...blueBtn, opacity: isSubmitting ? 0.6 : 1 }}>{isSubmitting ? 'Publishing…' : editingId ? 'Save & publish' : 'Publish'}</button>
           </header>
 
-          <div style={{ padding: '28px 32px 64px', maxWidth: 820, width: '100%', margin: '0 auto' }}>
+          <div style={{ padding: '32px 24px 48px', maxWidth: 1200, width: '100%', margin: '0 auto' }}>
             {/* Title */}
             <div style={{ marginBottom: 22 }}>
-              <h1 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 36, lineHeight: 1, margin: '0 0 6px' }}>{editingId ? 'Edit job' : 'Post a job'}</h1>
-              <p style={{ fontSize: 14.5, color: '#5A544A', margin: 0 }}>
+              <h1 style={{ fontFamily: 'var(--jb-v3-font-display)', fontWeight: 500, fontSize: 38, lineHeight: 1, margin: '0 0 6px' }}>{editingId ? 'Edit job' : 'Post a job'}</h1>
+              <p style={{ fontSize: 14.5, color: 'var(--jb-v3-fg-2)', margin: 0 }}>
                 Fill in the details below to post a new role. Fields marked with <span style={{ color: '#C9622E' }}>*</span> are required.
               </p>
             </div>
 
             <section aria-label="Existing jobs" style={{ ...cardStyle, marginBottom: 20 }}>
-              <div style={{ padding: '14px 18px', borderBottom: '1px solid #F2ECE0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--jb-v3-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <h2 style={{ fontSize: 15, margin: 0 }}>Existing jobs</h2>
-                  <p style={{ fontSize: 12.5, color: '#8A8378', margin: '3px 0 0' }}>Select a role to edit it here, or remove it.</p>
+                  <p style={{ fontSize: 12.5, color: 'var(--jb-v3-fg-3)', margin: '3px 0 0' }}>Select a role to edit it here, or remove it.</p>
                 </div>
                 <span style={monoLabel}>{jobs.length} roles</span>
               </div>
               {jobsLoading ? (
-                <div style={{ padding: 18, fontSize: 13, color: '#8A8378' }}>Loading jobs…</div>
+                <div style={{ padding: 18, fontSize: 13, color: 'var(--jb-v3-fg-3)' }}>Loading jobs…</div>
               ) : jobsError ? (
                 <div role="alert" style={{ padding: 18, fontSize: 13, color: '#C9622E' }}>{jobsError}</div>
               ) : jobs.length === 0 ? (
-                <div style={{ padding: 18, fontSize: 13, color: '#8A8378' }}>No jobs yet. Create your first role below.</div>
+                <div style={{ padding: 18, fontSize: 13, color: 'var(--jb-v3-fg-3)' }}>No jobs yet. Create your first role below.</div>
               ) : jobs.map((job) => (
-                <div key={job._id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', borderBottom: '1px solid #F2ECE0' }}>
+                <div key={job._id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', borderBottom: '1px solid var(--jb-v3-line)' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 700 }}>{job.title}</div>
-                    <div style={{ fontSize: 12, color: '#8A8378', marginTop: 2 }}>{job.status || 'draft'} · {job.location || 'No location'}</div>
+                    <div style={{ fontSize: 12, color: 'var(--jb-v3-fg-3)', marginTop: 2 }}>{job.status || 'draft'} · {job.location || 'No location'}</div>
                   </div>
                   <button type="button" aria-label={`Edit ${job.title}`} onClick={() => editJob(job)} className="em-ghost" style={ghostBtn}>Edit</button>
                   <button type="button" aria-label={`Delete ${job.title}`} onClick={() => deleteJob(job)} style={{ ...ghostBtn, color: '#B84A3A' }}>Delete</button>
@@ -517,7 +447,7 @@ function PostJob() {
                     style={{
                       display: 'inline-flex', alignItems: 'center', gap: 8, fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600,
                       color: on ? 'var(--jb-v3-accent-faint)' : 'var(--jb-v3-fg-3)', background: on ? 'var(--jb-v3-accent-soft)' : 'var(--jb-v3-panel)',
-                      border: `1px solid ${on ? 'var(--jb-v3-accent-line)' : 'var(--jb-v3-line)'}`, borderRadius: 999, padding: '8px 14px', cursor: 'pointer',
+                      border: `1px solid ${on ? 'var(--jb-v3-accent-line)' : 'var(--jb-v3-line)'}`, borderRadius: 8, padding: '8px 14px', cursor: 'pointer',
                     }}
                   >
                     <span style={{ fontFamily: 'var(--jb-font-mono)', fontSize: 11, fontWeight: 600, color: on ? 'var(--jb-v3-accent-faint)' : 'var(--jb-v3-fg-3)' }}>{index + 1}</span>
@@ -573,11 +503,11 @@ function PostJob() {
                   </Field>
                 </div>
                 {formData.salary && (
-                  <div style={{ fontSize: 12.5, color: '#8A8378' }}>Displayed as: <span style={{ fontWeight: 600, color: '#3A352C' }}>{formData.salary}</span></div>
+                  <div style={{ fontSize: 12.5, color: 'var(--jb-v3-fg-3)' }}>Displayed as: <span style={{ fontWeight: 600, color: '#3A352C' }}>{formData.salary}</span></div>
                 )}
 
                 <label htmlFor="isRemote" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                  <input id="isRemote" name="isRemote" type="checkbox" checked={formData.isRemote} onChange={handleChange} style={{ width: 16, height: 16, accentColor: '#4263EB', cursor: 'pointer' }} />
+                  <input id="isRemote" name="isRemote" type="checkbox" checked={formData.isRemote} onChange={handleChange} style={{ width: 16, height: 16, accentColor: 'var(--jb-v3-accent)', cursor: 'pointer' }} />
                   <span style={{ fontSize: 13.5, color: '#3A352C' }}>This is a remote position</span>
                 </label>
 
@@ -588,53 +518,13 @@ function PostJob() {
                   </select>
                 </Field>
 
-                <div style={{ background: 'var(--jb-v3-accent-soft)', border: '1px solid var(--jb-v3-accent-line)', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 15 }}>✦</span>
-                    <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--jb-v3-fg)' }}>Draft with Jobocate</span>
-                    <span style={{ fontSize: 12, color: 'var(--jb-v3-fg-2)' }}>— writes the description, responsibilities and requirements below from the title and skills you give it. Edit anything before publishing.</span>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-                    <Field label="Key Skills (comma-separated)">
-                      <input
-                        type="text"
-                        value={aiSkills}
-                        onChange={(e) => setAiSkills(e.target.value)}
-                        placeholder="e.g. Node.js, TypeScript, AWS"
-                        style={fieldInput}
-                      />
-                    </Field>
-                    <Field label="Notes for Jobocate (optional)">
-                      <input
-                        type="text"
-                        value={aiNotes}
-                        onChange={(e) => setAiNotes(e.target.value)}
-                        placeholder="e.g. also owns our payments pipeline"
-                        style={fieldInput}
-                      />
-                    </Field>
-                  </div>
-                  {genError && (
-                    <div role="alert" style={{ fontSize: 12.5, color: '#9B4A2F' }}>{genError}</div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={handleGenerate}
-                    disabled={generating}
-                    className="em-blue-btn"
-                    style={{ ...blueBtn, alignSelf: 'flex-start', opacity: generating ? 0.65 : 1 }}
-                  >
-                    {generating ? 'Drafting…' : '✦ Generate draft'}
-                  </button>
-                </div>
-
                 <Field label="Job Description" required>
                   <textarea id="description" name="description" value={formData.description} onChange={handleChange} placeholder="Describe the job responsibilities, required skills, and other details…" rows={8} required style={{ ...fieldInput, resize: 'vertical', lineHeight: 1.6 }} />
                 </Field>
               </Section>
 
               {/* COMPANY DETAILS */}
-              <Section title="Company Details" description="Information about your company." visible={activeSection === 'company'}>
+              <Section title="Company Details" description="Choose the company for this posting. You can post for a different company each time." visible={activeSection === 'company'}>
                 <Field label="Company Name" required>
                   <input id="companyName" name="companyName" type="text" value={formData.companyName} onChange={handleChange} placeholder="e.g. Acme Inc." required style={fieldInput} />
                 </Field>
@@ -686,8 +576,8 @@ function PostJob() {
               {/* PREVIEW */}
               <Section title="Preview & Submit" description="Review your job posting before submitting." visible={activeSection === 'preview'}>
                 <div style={{ background: 'var(--jb-v3-control)', border: '1px solid var(--jb-v3-line)', borderRadius: 12, padding: 20 }}>
-                  <h3 style={{ fontFamily: 'var(--jb-font-display)', fontWeight: 400, fontSize: 24, margin: '0 0 4px' }}>{formData.title || 'Job Title'}</h3>
-                  <p style={{ fontSize: 13.5, color: '#8A8378', margin: 0 }}>
+                  <h3 style={{ fontFamily: 'var(--jb-v3-font-display)', fontWeight: 400, fontSize: 24, margin: '0 0 4px' }}>{formData.title || 'Job Title'}</h3>
+                  <p style={{ fontSize: 13.5, color: 'var(--jb-v3-fg-3)', margin: 0 }}>
                     {formData.companyName || 'Company Name'} · {formData.location || 'Location'}{formData.isRemote && ' · Remote'}
                   </p>
 

@@ -5,14 +5,12 @@ import { BillingService } from './billing.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UserDocument } from '../schemas/user.schema';
 import { CreateCheckoutSessionDto, CreateBillingPortalDto, CancelSubscriptionDto } from './dto';
-import { EmployerBillingService } from '../employer-billing/employer-billing.service';
 
 @ApiTags('billing')
 @Controller('billing')
 export class BillingController {
   constructor(
     private readonly billingService: BillingService,
-    private readonly employerBillingService: EmployerBillingService,
   ) {}
 
   @Get('plans')
@@ -26,7 +24,7 @@ export class BillingController {
   @Get('employer-plans')
   @ApiOperation({ summary: 'Get the public employer plan catalog from Stripe' })
   async getEmployerPlans() {
-    const result = await this.employerBillingService.getPlansCatalog();
+    const result = await this.billingService.getEmployerPlansCatalog();
     return { plans: result };
   }
 

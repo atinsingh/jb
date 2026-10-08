@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule } from '@nestjs/config';
+import { BillingModule } from '../billing/billing.module';
 import { EmployerBillingController } from './employer-billing.controller';
 import { EmployerBillingService } from './employer-billing.service';
 import {
@@ -14,6 +15,7 @@ import {
       { name: EmployerSubscription.name, schema: EmployerSubscriptionSchema },
     ]),
     ConfigModule,
+    BillingModule,
   ],
   controllers: [EmployerBillingController],
   providers: [EmployerBillingService],

@@ -92,7 +92,7 @@ export class PublicJobsController {
     const j: any = await this.jobModel
       .findOne({ _id: id, isActive: true })
       .select(
-        'title companyName companyLogo location city country isRemote remoteScope jobType salary salaryDisclosed experience description requirements preferredSkills externalUrl originalApplyUrl canonicalUrl attributionText createdAt',
+        'title companyName companyLogo location city country isRemote remoteScope jobType salary salaryDisclosed experience description requirements preferredSkills externalUrl originalApplyUrl canonicalUrl attributionText createdAt importMethod',
       )
       .lean()
       .exec();
@@ -130,6 +130,7 @@ export class PublicJobsController {
       requirements: Array.isArray(j.requirements) ? j.requirements : [],
       skills: Array.isArray(j.preferredSkills) ? j.preferredSkills.slice(0, 6) : [],
       applyUrl: j.originalApplyUrl || j.externalUrl || j.canonicalUrl || null,
+      acceptsDirectApplications: j.importMethod === 'employer_direct',
       attribution: j.attributionText || null,
       postedAt: j.createdAt || null,
       similar: similar.map((s: any) => ({

@@ -8,11 +8,13 @@ import {
 } from './schemas/employer-job.schema';
 import { IngestionModule } from '../ingestion/ingestion.module';
 import { LLMModule } from '../llm/llm.module';
+import { EmployerApplicant, EmployerApplicantSchema } from '../employer-pipeline/schemas/employer-applicant.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: EmployerJob.name, schema: EmployerJobSchema },
+      { name: EmployerApplicant.name, schema: EmployerApplicantSchema },
     ]),
     IngestionModule,
     // Supplies JobDescriptionGeneratorService for the AI-drafted JD endpoint.

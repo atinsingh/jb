@@ -4,7 +4,6 @@ import { getModelToken } from '@nestjs/mongoose';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { BillingService } from '../billing.service';
 import { PinoLogger } from 'nestjs-pino';
-import { EmployerBillingService } from '../../employer-billing/employer-billing.service';
 import { Types } from 'mongoose';
 
 describe('BillingService', () => {
@@ -14,6 +13,8 @@ describe('BillingService', () => {
 
   const mockUserModel = {
     findById: jest.fn(),
+    findOneAndUpdate: jest.fn(async (filter: any) => ({ _id: filter._id })),
+    updateOne: jest.fn().mockResolvedValue({}),
     findByIdAndUpdate: jest.fn(),
     findOne: jest.fn(),
   };
@@ -68,15 +69,6 @@ describe('BillingService', () => {
         },
         { provide: getModelToken('UsageRecord'), useValue: mockUsageModel },
         { provide: PinoLogger, useValue: mockLogger },
-        // BillingService routes employer-tagged webhook events here; these unit
-        // tests only exercise candidate paths, so a stub is enough.
-        {
-          provide: EmployerBillingService,
-          useValue: {
-            applyStripeSubscription: jest.fn(),
-            recordInvoice: jest.fn(),
-          },
-        },
       ],
     }).compile();
 

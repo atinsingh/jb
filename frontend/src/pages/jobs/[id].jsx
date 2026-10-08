@@ -7,6 +7,8 @@ import { useRouter } from 'next/router';
 import PublicLayout from '@/components/layout/PublicLayout';
 import { appRoute } from '@/components/app/appRoutes';
 import { API_URL } from '@/config/api';
+import { useAuth } from '@/context/AuthContext';
+import { applyToJob, getMyApplications } from '@/services/api';
 
 /**
  * Job detail.
@@ -43,6 +45,35 @@ export default function JobDetail() {
   const { id } = router.query;
   const [job, setJob] = useState(null);
   const [state, setState] = useState('loading'); // loading | ready | missing | error
+  const { user, loading: authLoading } = useAuth();
+  const [applying, setApplying] = useState(false);
+  const [applied, setApplied] = useState(false);
+  const [checkingApplications, setCheckingApplications] = useState(false);
+  const [applyError, setApplyError] = useState(null);
+
+  useEffect(() => {
+    setApplied(false);
+    setApplyError(null);
+    if (!job?.acceptsDirectApplications || !user) return undefined;
+    let live = true;
+    setCheckingApplications(true);
+    getMyApplications({})
+      .then((result) => {
+        if (live) setApplied(result.applications.some((application) => String(application.jobId?._id || application.jobId) === String(id)));
+      })
+      .catch((error) => { if (live) setApplyError(error.message); })
+      .finally(() => { if (live) setCheckingApplications(false); });
+    return () => { live = false; };
+  }, [id, job?.acceptsDirectApplications, user]);
+
+  const apply = async () => {
+    if (applying || applied) return;
+    setApplying(true);
+    setApplyError(null);
+    try { await applyToJob(id); setApplied(true); }
+    catch (error) { setApplyError(error.message); }
+    finally { setApplying(false); }
+  };
 
   useEffect(() => {
     if (!id) return undefined;
@@ -197,13 +228,23 @@ export default function JobDetail() {
                     ) : (
                       <span className="jd__nosalary">Salary not disclosed</span>
                     )}
-                    <span className="jd__matchline">
+                    {job.acceptsDirectApplications ? <>
+                      {user ? <>
+                        <p className="jd__p">Your primary resume and profile details will be shared with the employer.</p>
+                        <button type="button" className="jd__btn jd__btn--green" onClick={apply} disabled={authLoading || checkingApplications || applying || applied}>
+                          {applied ? 'Applied' : applying ? 'Submitting…' : 'Apply on Jobocate'}
+                        </button>
+                      </> : <Link href={`/app/login?redirect=${encodeURIComponent(`/jobs/${id}`)}`} className="jd__btn jd__btn--green">Sign in to apply</Link>}
+                      {applied && <p role="status" className="jd__p">Application submitted. The employer can now review it.</p>}
+                      {applyError && <p role="alert" className="jd__p">{applyError}</p>}
+                    </> : <><span className="jd__matchline">
                       <span className="jd__matchnum" aria-hidden="true">92</span>
                       match · sign in to reveal
                     </span>
                     <Link href={appRoute('App Sign Up.dc.html')} className="jd__btn jd__btn--green">
                       See your match &amp; apply →
                     </Link>
+                    </>}
                     {job.applyUrl && (
                       <a
                         href={job.applyUrl}
@@ -236,8 +277,7 @@ export default function JobDetail() {
 
                   <p className="jd__verified">
                     <span className="jd__tick" aria-hidden="true">✓</span>
-                    Listed from the employer’s own careers page — you apply direct, never a
-                    third-party board.
+                    {job.acceptsDirectApplications ? 'Posted by the employer. Apply here on Jobocate.' : 'Listed from the employer’s own careers page — you apply direct, never a third-party board.'}
                   </p>
                   {job.attribution && <p className="jd__attr">{job.attribution}</p>}
                 </aside>
