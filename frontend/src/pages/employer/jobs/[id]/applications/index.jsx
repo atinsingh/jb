@@ -58,39 +58,54 @@ export default function JobApplications() {
   const [assessmentLoading, setAssessmentLoading] = useState(false);
   const [preview, setPreview] = useState({ status: 'NOT_RUN' });
   const [previewFile, setPreviewFile] = useState(null);
-  const [savedFileName, setSavedFileName] = useState(null);
+  const [reviewSessions, setReviewSessions] = useState([]);
+  const [selectedReview, setSelectedReview] = useState(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
   const [previewBusy, setPreviewBusy] = useState(false);
   const [assessmentBusy, setAssessmentBusy] = useState(false);
   const previewAbort = useRef(null);
+  const previewInput = useRef(null);
   const { status: sandboxStatus, error: sandboxError } = useEmployerAtsSandboxRelease(() => {
     previewAbort.current?.abort();
     previewAbort.current = null;
   });
 
   useEffect(() => {
-    if (!jobId || sandboxStatus !== 'ready') return undefined;
+    const sessionId = router.query.review;
+    if (!jobId || !sessionId) {
+      setSelectedReview(null);
+      setPreview({ status: 'NOT_RUN' });
+      setReviewLoading(false);
+      return undefined;
+    }
     let cancelled = false;
-    employerPipelineApi.savedAtsPreview(jobId)
+    setReviewLoading(true);
+    setSelectedReview(null);
+    employerPipelineApi.savedAtsPreview(jobId, sessionId)
       .then((saved) => {
         if (cancelled || !saved?.saved) return;
-        setSavedFileName(saved.fileName);
+        setSelectedReview(saved);
+        setPreview(saved.assessment);
       })
-      .catch((err) => { if (!cancelled) setActionError(err); });
+      .catch((err) => { if (!cancelled) setActionError(err); })
+      .finally(() => { if (!cancelled) setReviewLoading(false); });
     return () => { cancelled = true; };
-  }, [jobId, sandboxStatus]);
+  }, [jobId, router.query.review]);
 
   const load = useCallback(async () => {
     if (!jobId) return;
     setLoading(true);
     setError(null);
     try {
-      const [jobRes, listRes] = await Promise.all([
+      const [jobRes, listRes, reviews] = await Promise.all([
         employerJobsApi.get(jobId).catch(() => null),
         employerPipelineApi.list({ jobId }),
+        employerPipelineApi.savedAtsPreview(jobId),
       ]);
       const list = Array.isArray(listRes) ? listRes : listRes?.applicants || [];
       setJob(jobRes?.job || jobRes || null);
       setApplications(list);
+      setReviewSessions(reviews.sessions || []);
       setSelectedId((prev) => prev ?? (list[0]?._id || null));
     } catch (err) {
       setError(err);
@@ -177,27 +192,43 @@ export default function JobApplications() {
     }
   };
 
-  const runAtsPreview = async () => {
-    if (!jobId || (!previewFile && !savedFileName) || previewBusy || sandboxStatus !== 'ready') return;
-    const file = previewFile;
+  const openReview = (sessionId) => router.push({
+    pathname: router.pathname, query: { ...router.query, review: sessionId },
+  }, undefined, { shallow: true, scroll: false });
+
+  const openApplicant = (id) => {
+    setSelectedId(id);
+    const { review, ...query } = router.query;
+    if (review) router.push({ pathname: router.pathname, query }, undefined, { shallow: true, scroll: false });
+  };
+
+  const runAtsPreview = async (sessionId) => {
+    if (!jobId || (!previewFile && !sessionId) || previewBusy || sandboxStatus !== 'ready') return;
+    const file = sessionId ? null : previewFile;
+    const previousAssessment = preview;
     const abort = new AbortController();
     previewAbort.current = abort;
     setPreviewBusy(true);
-    setPreview({ status: 'RUNNING' });
+    if (sessionId) setPreview((current) => ({ ...current, status: 'RUNNING' }));
     setActionError(null);
     try {
-      const result = await employerPipelineApi.previewAts(jobId, file, { signal: abort.signal });
+      const result = await employerPipelineApi.previewAts(jobId, file, { signal: abort.signal, sessionId });
       setPreview(result);
       if (file) {
-        setSavedFileName(file.name);
         setPreviewFile(null);
+        if (previewInput.current) previewInput.current.value = '';
       }
+      const history = await employerPipelineApi.savedAtsPreview(jobId);
+      setReviewSessions(history.sessions || []);
+      if (result.sessionId === router.query.review) {
+        setSelectedReview(await employerPipelineApi.savedAtsPreview(jobId, result.sessionId));
+      } else if (result.sessionId) await openReview(result.sessionId);
       setAssessmentBudget(await employerPipelineApi.assessmentBudget().catch(() => assessmentBudget));
     } catch (err) {
       if (err.name !== 'AbortError') {
         setActionError(err);
-        setPreview({ status: 'ATS_FAILED', ats: { status: 'ATS_FAILED' }, aiContent: { status: 'NOT_RUN' } });
       }
+      setPreview(previousAssessment);
     } finally {
       if (previewAbort.current === abort) previewAbort.current = null;
       setPreviewBusy(false);
@@ -241,13 +272,13 @@ export default function JobApplications() {
                 <div className="preview-head">
                   <div>
                     <h2>Ad-hoc ATS preview</h2>
-                    <p>Upload a PDF or DOCX to score it against this job. This does not create an applicant or application.</p>
+                    <p>Upload a PDF or DOCX to review against this job. Each upload is saved under Uploaded reviews so you can return to its results.</p>
                   </div>
                   <button
                     type="button"
                     className="primary"
-                    disabled={(!previewFile && !savedFileName) || previewBusy || sandboxStatus !== 'ready'}
-                    onClick={runAtsPreview}
+                    disabled={!previewFile || previewBusy || sandboxStatus !== 'ready'}
+                    onClick={() => runAtsPreview()}
                   >
                     {previewBusy ? 'Scoring…' : 'Score uploaded resume'}
                   </button>
@@ -258,16 +289,10 @@ export default function JobApplications() {
                     type="file"
                     accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     aria-label="Upload resume for ATS preview"
+                    ref={previewInput}
                     onChange={(event) => setPreviewFile(event.target.files?.[0] || null)}
                   />
                 </label>
-                {savedFileName && <p>Saved resume: {savedFileName}. You can score it again without uploading.</p>}
-                <ResumeAssessmentPanel
-                  title="Preview result"
-                  assessment={preview}
-                  budget={assessmentBudget}
-                  busy={previewBusy}
-                />
               </section>
             )}
             {!loading && !error && applications.length === 0 && (
@@ -275,14 +300,12 @@ export default function JobApplications() {
                 tone="dark"
                 title="No applications yet"
                 hint="Nobody has applied yet. You can still score a resume against this job with the upload above."
-                action={(
-                  <Link href="/employer/screening" className="ghost-link">Open screening</Link>
-                )}
               />
             )}
 
-            {!loading && !error && applications.length > 0 && (
+            {!loading && !error && (applications.length > 0 || reviewSessions.length > 0) && (
               <>
+                {applications.length > 0 && (
                 <div className="toolbar">
                   <label className="search">
                     <span>Search</span>
@@ -302,9 +325,13 @@ export default function JobApplications() {
                     </select>
                   </label>
                 </div>
+                )}
 
                 <div className="split">
+                  <div>
+                  {applications.length > 0 && (
                   <section className="list" aria-label="Applicants">
+                    <h2 className="list-title">Applications ({applications.length})</h2>
                     {filteredApplications.length === 0 ? (
                       <p className="empty-filter">No applications match your filters.</p>
                     ) : filteredApplications.map((application) => {
@@ -313,8 +340,8 @@ export default function JobApplications() {
                         <button
                           key={application._id}
                           type="button"
-                          className={on ? 'row on' : 'row'}
-                          onClick={() => setSelectedId(application._id)}
+                          className={on && !router.query.review ? 'row on' : 'row'}
+                          onClick={() => openApplicant(application._id)}
                         >
                           <span className="avatar" aria-hidden>{initialsOf(application.candidateName)}</span>
                           <span className="who">
@@ -326,7 +353,49 @@ export default function JobApplications() {
                       );
                     })}
                   </section>
+                  )}
+                  {reviewSessions.length > 0 && (
+                    <section className="list review-list" aria-label="Uploaded reviews">
+                      <h2 className="list-title">Uploaded reviews ({reviewSessions.length})</h2>
+                      {reviewSessions.map((session) => (
+                        <button type="button" key={session.sessionId}
+                          className={`row review-row ${router.query.review === session.sessionId ? 'on' : ''}`}
+                          aria-pressed={router.query.review === session.sessionId}
+                          onClick={() => openReview(session.sessionId)}>
+                          <span className="review-mark" aria-hidden>↗</span>
+                          <span className="who">
+                            <strong>{session.fileName}</strong>
+                            <em>{new Date(session.createdAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}</em>
+                            <em>Uploaded review · {session.assessment?.status === 'COMPLETE' ? 'Complete' : 'View results'}</em>
+                          </span>
+                        </button>
+                      ))}
+                    </section>
+                  )}
+                  </div>
 
+                  {router.query.review ? (
+                    <section className="detail review-detail" aria-label="Uploaded review detail">
+                      {reviewLoading ? <LoadingState label="Loading saved review…" /> : selectedReview && (
+                        <>
+                          <div className="review-heading">
+                            <span className="review-label">Uploaded review</span>
+                            <h2>{selectedReview.fileName}</h2>
+                            <p>Saved {new Date(selectedReview.createdAt).toLocaleString('en-US')}. Opening this review uses no credits.</p>
+                          </div>
+                          <ResumeAssessmentPanel title="Saved review results" assessment={preview} budget={assessmentBudget} busy={previewBusy} />
+                          <details className="resume-text"><summary>View extracted resume</summary><pre>{selectedReview.resumeText}</pre></details>
+                          <div className="review-rerun">
+                            <p>Re-running uses employer credits and replaces this review’s results.</p>
+                            <button className="ghost" type="button" disabled={previewBusy || sandboxStatus !== 'ready'}
+                              onClick={() => runAtsPreview(selectedReview.sessionId)}>
+                              {previewBusy ? 'Scoring…' : 'Re-run uploaded review'}
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </section>
+                  ) : (
                   <section className="detail" aria-label="Applicant detail">
                     {selectedApplication ? (
                       <>
@@ -409,6 +478,7 @@ export default function JobApplications() {
                       <EmptyState tone="dark" title="No application selected" hint="Select an applicant to view details and run ATS match." />
                     )}
                   </section>
+                  )}
                 </div>
               </>
             )}
@@ -448,6 +518,19 @@ export default function JobApplications() {
         }
         .row:last-child { border-bottom: 0; }
         .row.on, .row:hover { background: var(--jb-v3-accent-soft); }
+        .list-title { margin: 0; padding: 16px; font-size: 14px; font-weight: 600; border-bottom: 1px solid var(--jb-v3-line); }
+        .review-list { margin-top: 18px; }
+        .review-row { grid-template-columns: 36px minmax(0, 1fr); }
+        .who strong, .review-heading h2 { overflow-wrap: anywhere; }
+        .review-mark, .review-label { color: var(--jb-v3-accent); background: var(--jb-v3-accent-soft); border-radius: 8px; }
+        .review-mark { display: grid; place-items: center; width: 36px; height: 36px; }
+        .review-detail { padding: 22px; border-top: 3px solid var(--jb-v3-accent); }
+        .review-heading h2 { margin: 14px 0 8px; font-size: 22px; }
+        .review-heading p, .review-rerun p { color: var(--jb-v3-fg-3); font-size: 12px; line-height: 1.6; }
+        .review-label { padding: 5px 9px; font-size: 11px; }
+        .resume-text { margin: 18px 0; border-top: 1px solid var(--jb-v3-line); padding-top: 18px; }
+        .resume-text summary { cursor: pointer; font-size: 13px; }
+        .resume-text pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 13px; line-height: 1.7; }
         .avatar {
           width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid var(--jb-v3-line-2);
           font-family: var(--jb-v3-font-mono); font-size: 11px; color: var(--jb-v3-fg-2);
@@ -478,6 +561,8 @@ export default function JobApplications() {
         @media (max-width: 860px) {
           .content { padding: 32px 18px 64px; }
           .split { grid-template-columns: 1fr; }
+          .preview-head { flex-direction: column; }
+          .upload input { max-width: 100%; }
         }
       `}</style>
     </>

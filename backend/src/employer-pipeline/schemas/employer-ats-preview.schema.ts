@@ -22,7 +22,9 @@ export class EmployerAtsPreview {
 
   @Prop({ type: MongooseSchema.Types.Mixed })
   assessment?: Record<string, unknown>;
+
+  createdAt?: Date;
 }
 
 export const EmployerAtsPreviewSchema = SchemaFactory.createForClass(EmployerAtsPreview);
-EmployerAtsPreviewSchema.index({ ownerId: 1, jobId: 1 }, { unique: true });
+EmployerAtsPreviewSchema.index({ ownerId: 1, jobId: 1, createdAt: -1 });

@@ -73,7 +73,8 @@ export default function useEmployerAtsSandboxRelease(onPause) {
     const onVisibility = () => {
       if (document.visibilityState === 'visible') renew(true);
     };
-    const onRouteChange = () => {
+    const onRouteChange = (_url, { shallow } = {}) => {
+      if (shallow) return;
       leaving = true;
       release();
     };

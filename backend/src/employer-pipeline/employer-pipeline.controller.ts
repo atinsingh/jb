@@ -112,10 +112,10 @@ export class EmployerPipelineController {
   }
 
   @Get('resume-assessment/preview')
-  @ApiOperation({ summary: 'Restore the last uploaded ATS preview for a job' })
-  async savedPreview(@Query('jobId') jobId: string, @Request() req) {
+  @ApiOperation({ summary: 'List uploaded résumé reviews or reopen a saved session' })
+  async savedPreview(@Query('jobId') jobId: string, @Query('sessionId') sessionId: string, @Request() req) {
     if (!jobId) throw new BadRequestException('jobId is required');
-    return this.resumeAssessmentService.getSavedPreview(req.user._id.toString(), jobId);
+    return this.resumeAssessmentService.getSavedPreview(req.user._id.toString(), jobId, sessionId);
   }
 
   @Post('resume-assessment/preview')
@@ -144,6 +144,7 @@ export class EmployerPipelineController {
   @ApiResponse({ status: 404, description: 'Job not found' })
   async previewResume(
     @Query('jobId') jobId: string,
+    @Query('sessionId') sessionId: string,
     @UploadedFile() file: Express.Multer.File,
     @Request() req,
   ) {
@@ -151,7 +152,7 @@ export class EmployerPipelineController {
     const ownerId = req.user._id.toString();
     return file
       ? this.resumeAssessmentService.previewFromUpload(ownerId, jobId, file)
-      : this.resumeAssessmentService.rerunSavedPreview(ownerId, jobId);
+      : this.resumeAssessmentService.rerunSavedPreview(ownerId, jobId, sessionId);
   }
 
   @Get(':id')

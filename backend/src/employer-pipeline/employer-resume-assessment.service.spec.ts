@@ -22,11 +22,26 @@ describe('EmployerResumeAssessmentService', () => {
   };
   const artifactModel = { findOne: jest.fn() };
   const employerJobModel = { findOne: jest.fn() };
-  let savedPreview: any;
+  let savedPreviews: any[];
+  const matches = (row: any, filter: any) => Object.entries(filter)
+    .every(([key, value]) => String(row[key]) === String(value));
   const previewModel = {
-    findOne: jest.fn(() => query(savedPreview)),
-    updateOne: jest.fn((_filter: any, update: any) => {
-      savedPreview = { ...(savedPreview || {}), ...(update.$set || {}) };
+    create: jest.fn(async (data: any) => {
+      const row = { ...data, _id: new Types.ObjectId(), createdAt: new Date() };
+      savedPreviews.unshift(row);
+      return row;
+    }),
+    find: jest.fn((filter: any) => ({
+      ...query(savedPreviews.filter((row) => matches(row, filter))),
+      select: jest.fn().mockReturnThis(), sort: jest.fn().mockReturnThis(),
+    })),
+    findOne: jest.fn((filter: any) => ({
+      ...query(savedPreviews.find((row) => matches(row, filter))),
+      sort: jest.fn().mockReturnThis(),
+    })),
+    updateOne: jest.fn((filter: any, update: any) => {
+      const row = savedPreviews.find((item) => matches(item, filter));
+      if (row) Object.assign(row, update.$set);
       return query({ acknowledged: true, modifiedCount: 1 });
     }),
   };
@@ -50,7 +65,7 @@ describe('EmployerResumeAssessmentService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    savedPreview = null;
+    savedPreviews = [];
     applicantModel.findOne.mockReset();
     applicantModel.updateOne.mockReset();
     artifactModel.findOne.mockReset();
@@ -406,6 +421,50 @@ describe('EmployerResumeAssessmentService', () => {
     expect(rerun).toEqual(expect.objectContaining({ preview: true, status: 'PARTIAL' }));
     expect(parser.extractText).not.toHaveBeenCalled();
     expect(gateway.assess).toHaveBeenCalledTimes(2);
+  });
+
+  it('retains separate upload sessions and reopens the exact saved resume and results without scoring again', async () => {
+    gateway.assess.mockResolvedValueOnce({ status: 'COMPLETE', semanticMatch: 71, harness: 'ats' });
+    const file = { originalname: 'ada.pdf', mimetype: 'application/pdf', buffer: Buffer.from('%PDF') } as Express.Multer.File;
+    const first: any = await service.previewFromUpload(String(OWNER), String(JOB), file);
+    parser.extractText.mockResolvedValueOnce('Second resume with different experience.');
+    gateway.assess.mockResolvedValueOnce({ status: 'COMPLETE', semanticMatch: 88, harness: 'ats' });
+    const second: any = await service.previewFromUpload(String(OWNER), String(JOB), { ...file, originalname: 'grace.pdf' });
+
+    const history: any = await service.getSavedPreview(String(OWNER), String(JOB));
+    expect(history.sessions).toHaveLength(2);
+    expect(history.sessions.map((session: any) => session.fileName)).toEqual(['grace.pdf', 'ada.pdf']);
+    expect(history.sessions.map((session: any) => session.sessionId)).toEqual([second.sessionId, first.sessionId]);
+    expect(first.sessionId).not.toBe(second.sessionId);
+    expect(history.sessions[0]).not.toHaveProperty('resumeText');
+    const restored: any = await (service as any).getSavedPreview(String(OWNER), String(JOB), first.sessionId);
+    expect(restored.resumeText).toContain('Reliable backend engineer');
+    expect(restored.assessment.runId).toBe(first.runId);
+    expect(restored.assessment.ats.semanticMatch).toBe(71);
+    expect(restored.assessment.aiContent.status).toBe('COMPLETE');
+    expect(gateway.assess).toHaveBeenCalledTimes(2);
+    expect(applicantModel.updateOne).not.toHaveBeenCalled();
+
+    gateway.assess.mockResolvedValueOnce({ status: 'COMPLETE', semanticMatch: 79, harness: 'ats' });
+    await (service as any).rerunSavedPreview(String(OWNER), String(JOB), first.sessionId);
+    expect(gateway.assess.mock.calls[2][0].resumeContent).toContain('Reliable backend engineer');
+    const after: any = await (service as any).getSavedPreview(String(OWNER), String(JOB), second.sessionId);
+    expect(after.assessment.ats.semanticMatch).toBe(88);
+    expect(savedPreviews).toHaveLength(2);
+  });
+
+  it('scopes saved sessions to their owner and job on both viewing and explicit rerun', async () => {
+    const first: any = await service.previewFromUpload(String(OWNER), String(JOB), {
+      originalname: 'ada.pdf', mimetype: 'application/pdf', buffer: Buffer.from('%PDF'),
+    } as Express.Multer.File);
+    gateway.assess.mockClear();
+    for (const method of ['getSavedPreview', 'rerunSavedPreview']) {
+      await expect((service as any)[method](String(OTHER_OWNER), String(JOB), first.sessionId))
+        .rejects.toBeInstanceOf(NotFoundException);
+      await expect((service as any)[method](String(OWNER), String(APPLICANT), first.sessionId))
+        .rejects.toBeInstanceOf(NotFoundException);
+    }
+    expect(gateway.assess).not.toHaveBeenCalled();
   });
 
   it('keeps the heuristic result when ATS matching is interrupted by sandbox release', async () => {

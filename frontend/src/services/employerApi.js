@@ -112,8 +112,8 @@ export const employerPipelineApi = {
       body: JSON.stringify({ leaseId }),
     });
   },
-  savedAtsPreview: (jobId) =>
-    apiCall(`/api/employer/applicants/resume-assessment/preview${qs({ jobId })}`),
+  savedAtsPreview: (jobId, sessionId) =>
+    apiCall(`/api/employer/applicants/resume-assessment/preview${qs({ jobId, sessionId })}`),
   releaseAtsSandboxKeepalive: async (leaseId) => {
     try {
       const token = atsReleaseToken || await getAccessToken();
@@ -146,7 +146,7 @@ export const employerPipelineApi = {
     const headers = {};
     if (token) headers.Authorization = `Bearer ${token}`;
     const response = await fetch(
-      `${API_URL}/api/employer/applicants/resume-assessment/preview?jobId=${encodeURIComponent(jobId)}`,
+      `${API_URL}/api/employer/applicants/resume-assessment/preview${qs({ jobId, sessionId: options.sessionId })}`,
       { method: 'POST', headers, body: form, signal: options.signal },
     );
     if (!response.ok) {

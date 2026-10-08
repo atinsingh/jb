@@ -60,39 +60,48 @@ export class EmployerResumeAssessmentService {
     return this.atsRuntime?.releaseSandbox(ownerId, leaseId) || { released: false };
   }
 
-  async getSavedPreview(ownerIdValue: string, jobIdValue: string) {
+  async getSavedPreview(ownerIdValue: string, jobIdValue: string, sessionId?: string) {
     const ownerId = this.asObjectId(ownerIdValue);
     const jobId = this.asObjectId(jobIdValue);
     await this.previewJob(ownerId, jobId);
-    const saved: any = await this.previewModel
-      .findOne({ ownerId, jobId })
-      .lean()
-      .exec();
-    if (!saved) return { saved: false };
+    if (sessionId) {
+      const saved = await this.previewModel
+        .findOne({ _id: this.asObjectId(sessionId), ownerId, jobId }).lean().exec();
+      if (!saved) throw new NotFoundException('Saved résumé review not found');
+      return { saved: true, ...this.previewSummary(saved), resumeText: saved.resumeText };
+    }
+    const saved = await this.previewModel.find({ ownerId, jobId })
+      .select('fileName assessment createdAt').sort({ createdAt: -1, _id: -1 }).lean().exec();
+    const sessions = saved.map((session) => this.previewSummary(session));
+    return { saved: sessions.length > 0, ...sessions[0], sessions };
+  }
+
+  private previewSummary(session: any) {
     return {
-      saved: true,
-      fileName: saved.fileName,
-      assessment: saved.assessment || { status: 'NOT_RUN' },
+      sessionId: String(session._id), fileName: session.fileName, createdAt: session.createdAt,
+      assessment: session.assessment || { status: 'NOT_RUN' },
     };
   }
 
-  async rerunSavedPreview(ownerIdValue: string, jobIdValue: string) {
+  async rerunSavedPreview(ownerIdValue: string, jobIdValue: string, sessionId?: string) {
     const ownerId = this.asObjectId(ownerIdValue);
     const jobId = this.asObjectId(jobIdValue);
     const job = await this.previewJob(ownerId, jobId);
     const saved: any = await this.previewModel
-      .findOne({ ownerId, jobId })
+      .findOne({ ownerId, jobId, ...(sessionId ? { _id: this.asObjectId(sessionId) } : {}) })
+      .sort({ createdAt: -1, _id: -1 })
       .lean()
       .exec();
     if (!saved?.resumeText) throw new NotFoundException('No saved résumé preview');
-    return this.scorePreview(ownerIdValue, job, saved.resumeText, saved.resumeHash);
+    const result = await this.scorePreview(ownerIdValue, job, saved.resumeText, saved.resumeHash, saved._id);
+    return { ...result, sessionId: String(saved._id), fileName: saved.fileName, createdAt: saved.createdAt };
   }
 
   async previewFromUpload(
     ownerIdValue: string,
     jobIdValue: string,
     file: Express.Multer.File,
-  ): Promise<PersistedResumeAssessment & { preview: true }> {
+  ) {
     if (!file) {
       throw new BadRequestException('No résumé file uploaded');
     }
@@ -119,23 +128,12 @@ export class EmployerResumeAssessmentService {
     }
 
     const resumeHash = this.sha256(resumeText);
-    await this.previewModel
-      .updateOne(
-        { ownerId, jobId },
-        {
-          $set: {
-            ownerId,
-            jobId,
-            fileName: file.originalname,
-            resumeText,
-            resumeHash,
-            assessment: null,
-          },
-        },
-        { upsert: true },
-      )
-      .exec();
-    return this.scorePreview(ownerIdValue, job, resumeText, resumeHash);
+    const saved = await this.previewModel.create({
+      ownerId, jobId, fileName: file.originalname, resumeText, resumeHash,
+      assessment: { status: 'NOT_RUN' },
+    });
+    const result = await this.scorePreview(ownerIdValue, job, resumeText, resumeHash, saved._id);
+    return { ...result, sessionId: String(saved._id), fileName: saved.fileName, createdAt: saved.createdAt };
   }
 
   private async previewJob(ownerId: Types.ObjectId | string, jobId: Types.ObjectId | string) {
@@ -152,6 +150,7 @@ export class EmployerResumeAssessmentService {
     job: any,
     resumeText: string,
     resumeHash: string,
+    sessionId: Types.ObjectId,
   ): Promise<PersistedResumeAssessment & { preview: true }> {
     const runId = randomUUID();
     const base = {
@@ -169,7 +168,7 @@ export class EmployerResumeAssessmentService {
         ats: { status: 'NOT_RUN' as const, reason: 'NO_JOB_DESCRIPTION', harness: 'ats' as const },
         aiContent: { status: 'NOT_RUN' as const, reason: 'NO_JOB_DESCRIPTION' },
       };
-      await this.savePreviewResult(ownerIdValue, job._id, resumeHash, result);
+      await this.savePreviewResult(ownerIdValue, job._id, sessionId, result);
       return result;
     }
     const descriptionHash = this.sha256(jobDescription);
@@ -223,19 +222,19 @@ export class EmployerResumeAssessmentService {
       ats,
       aiContent,
     };
-    await this.savePreviewResult(ownerIdValue, job._id, resumeHash, result);
+    await this.savePreviewResult(ownerIdValue, job._id, sessionId, result);
     return result;
   }
 
   private async savePreviewResult(
     ownerIdValue: string,
     jobId: Types.ObjectId,
-    resumeHash: string,
+    sessionId: Types.ObjectId,
     assessment: PersistedResumeAssessment & { preview: true },
   ) {
     await this.previewModel
       .updateOne(
-        { ownerId: this.asObjectId(ownerIdValue), jobId, resumeHash },
+        { _id: sessionId, ownerId: this.asObjectId(ownerIdValue), jobId },
         { $set: { assessment } },
       )
       .exec();
