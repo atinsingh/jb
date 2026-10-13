@@ -41,6 +41,7 @@ async def analyze(payload: dict) -> dict:
     from app.services.improver import extract_job_keywords
     from app.services.parser import parse_resume_to_json
     from app.services.refiner import analyze_keyword_gaps, calculate_keyword_match
+    import app.services.parser as resume_parser
 
     # Add proxy attribution without changing Resume-Matcher scoring inputs.
     router, _ = get_router()
@@ -53,6 +54,23 @@ async def analyze(payload: dict) -> dict:
         headers = dict(params.get("extra_headers") or {})
         headers["x-litellm-tags"] = ",".join(payload.get("tags") or ["harness=ats"])
         params["extra_headers"] = headers
+
+    # Our proxy aliases have no max_output_tokens in LiteLLM's registry, so
+    # Resume-Matcher falls back to 4096 and long résumé JSON truncates into
+    # retries that outlast the sandbox exec timeout. Restore the parser's own
+    # default budget (Resume-Matcher's DEFAULT_JSON_MAX_TOKENS).
+    resume_parser.get_safe_max_tokens = lambda _model, requested=8192, config=None: requested
+
+    # The per-key slot frees just after a sequential call returns, so a
+    # max_parallel_requests 429 is a race: retry in seconds, not the proxy's minute.
+    original_sleep = router._time_to_sleep_before_retry
+
+    def quick_slot_retry(e, remaining_retries, num_retries, *args, **kwargs):
+        if "max_parallel_requests" in str(e):
+            return min(0.5 * 2 ** (num_retries - remaining_retries), 4)
+        return original_sleep(e, remaining_retries, num_retries, *args, **kwargs)
+
+    router._time_to_sleep_before_retry = quick_slot_retry
 
     # Owner keys permit one request at a time. Parallel dispatch would make
     # the second call hit the proxy limit and enter a costly retry delay.
