@@ -1,5 +1,66 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, IsArray, IsBoolean, IsNumber, IsEmail } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsString,
+  IsOptional,
+  IsArray,
+  IsBoolean,
+  IsNumber,
+  IsEmail,
+  IsInt,
+  Min,
+  Max,
+  MaxLength,
+  ArrayMaxSize,
+  ValidateNested,
+} from 'class-validator';
+
+export class ConciergeProfileDto {
+  @IsBoolean()
+  @IsOptional()
+  published?: boolean;
+
+  @IsString()
+  @MaxLength(120)
+  @IsOptional()
+  headline?: string;
+
+  @IsString()
+  @MaxLength(2000)
+  @IsOptional()
+  bio?: string;
+
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsString({ each: true })
+  @MaxLength(40, { each: true })
+  @IsOptional()
+  specialties?: string[];
+
+  @IsInt()
+  @Min(0)
+  @Max(60)
+  @IsOptional()
+  yearsExperience?: number;
+
+  @IsInt()
+  @Min(10)
+  @Max(1000)
+  @IsOptional()
+  hourlyRate?: number;
+
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsString({ each: true })
+  @MaxLength(40, { each: true })
+  @IsOptional()
+  languages?: string[];
+
+  @IsString()
+  @MaxLength(64)
+  @IsOptional()
+  timezone?: string;
+}
 
 export class UpdateProfileDto {
   @ApiProperty({ description: 'User full name', required: false })
@@ -105,5 +166,11 @@ export class UpdateProfileDto {
   @IsString({ each: true })
   @IsOptional()
   preferredJobTypes?: string[];
+
+  @ApiProperty({ description: 'Employer concierge profile', required: false, type: ConciergeProfileDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ConciergeProfileDto)
+  conciergeProfile?: ConciergeProfileDto;
 }
 

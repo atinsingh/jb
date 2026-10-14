@@ -246,6 +246,12 @@ export const AuthProvider = ({ children }) => {
     if (redirectTo) landing.searchParams.set('redirect', redirectTo);
     if (role) landing.searchParams.set('role', role);
 
+    // The previous Google session is already in the cookie jar. Starting
+    // another provider round trip on top of it leaves those chunks behind.
+    // scope: 'local' drops only this browser's copy; it does not revoke
+    // other devices.
+    await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: { redirectTo: landing.toString() },

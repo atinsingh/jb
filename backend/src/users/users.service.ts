@@ -77,7 +77,15 @@ export class UsersService {
       'preferredJobTypes',
       'autoApply',
       'minMatchScore',
+      'conciergeProfile',
     ];
+
+    const concierge = updateProfileDto.conciergeProfile;
+    if (concierge?.published === true && !this.isConciergeProfilePublishable(concierge)) {
+      throw new BadRequestException(
+        'Add a headline, a bio of at least 80 characters, one specialty and an hourly rate before publishing your concierge profile.',
+      );
+    }
 
     const filteredUpdates: any = {};
     allowedFields.forEach((field) => {
@@ -102,6 +110,20 @@ export class UsersService {
     this.logger.log(`Profile updated for user: ${updatedUser.email} (ID: ${userId})`);
     this.logger.debug(`updateProfile() completed successfully`);
     return updatedUser;
+  }
+
+  private isConciergeProfilePublishable(concierge: {
+    headline?: string;
+    bio?: string;
+    specialties?: string[];
+    hourlyRate?: number;
+  }): boolean {
+    return (
+      !!concierge.headline?.trim() &&
+      (concierge.bio?.trim().length ?? 0) >= 80 &&
+      !!concierge.specialties?.some((s) => s?.trim()) &&
+      concierge.hourlyRate != null
+    );
   }
 
   async updateProfilePicture(

@@ -87,6 +87,32 @@ test('settings saves basic account details and starts a plan upgrade', async ({ 
   }
 });
 
+test('settings publishes a concierge profile only once its checklist is complete', async ({ page }) => {
+  const user = { name: 'Employer Review', email: 'employer@example.com', phone: '', location: '' };
+  let saved: any = null;
+  await page.route('**/api/users/profile', (route) => {
+    if (route.request().method() !== 'PATCH') return route.fulfill({ json: { user } });
+    saved = route.request().postDataJSON();
+    return route.fulfill({ json: { user: { ...user, conciergeProfile: saved.conciergeProfile } } });
+  });
+  await page.goto('/employer/settings');
+  const panel = page.getByRole('region', { name: 'Concierge profile' });
+  const publish = panel.getByRole('checkbox', { name: 'Publish profile' });
+  await expect(publish).toBeDisabled();
+  await panel.getByLabel('Headline', { exact: true }).fill('Hiring coach for early-career tech teams');
+  await panel.getByLabel(/^Bio/).fill('I help early-career teams hire well with structured interviews, clear role scopes, and honest feedback on every application.');
+  await panel.getByLabel('Specialties', { exact: true }).fill('Resume reviews, Interview prep');
+  await panel.getByLabel('Hourly rate (USD)', { exact: true }).fill('75');
+  await expect(publish).toBeEnabled();
+  await publish.check();
+  await panel.getByRole('button', { name: 'Save concierge profile' }).click();
+  await expect(panel.getByRole('status')).toHaveText('Concierge profile saved.');
+  await expect.poll(() => saved?.conciergeProfile).toMatchObject({
+    published: true, specialties: ['Resume reviews', 'Interview prep'], hourlyRate: 75,
+  });
+  expect(typeof saved.conciergeProfile.hourlyRate).toBe('number');
+});
+
 test('one employer can post jobs for different companies without a company profile', async ({ page, employerUser }) => {
   const jobs: string[] = [];
   const title = uniqueId('company-role');

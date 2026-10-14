@@ -36,7 +36,13 @@ export async function middleware(request) {
     const url = request.nextUrl.clone();
     url.pathname = target.slice(0, target.indexOf('?'));
     url.search = target.slice(target.indexOf('?'));
-    return NextResponse.redirect(url);
+    const redirect = NextResponse.redirect(url);
+    // updateSession may be expiring a poisoned auth cookie. A bare redirect
+    // drops those Set-Cookie headers, and the oversized jar is sent again.
+    for (const cookie of response.cookies.getAll()) {
+      redirect.cookies.set(cookie);
+    }
+    return redirect;
   }
 
   return response;

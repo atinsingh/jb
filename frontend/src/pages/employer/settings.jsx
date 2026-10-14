@@ -10,6 +10,9 @@ import styles from '@/components/employer/EmployerWorkspace.module.css';
 import { employerProfileApi, employerBillingApi } from '@/services/employerApi';
 
 const fields = [['name', 'Full name', 'text'], ['phone', 'Phone', 'tel'], ['location', 'Location', 'text']];
+const splitList = (text) => text.split(',').map((item) => item.trim()).filter(Boolean);
+const browserTimezone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+const emptyConcierge = { published: false, headline: '', bio: '', specialties: '', yearsExperience: '', hourlyRate: '', languages: '', timezone: '' };
 
 export default function EmployerSettings() {
   const router = useRouter();
@@ -24,6 +27,10 @@ export default function EmployerSettings() {
   const [planError, setPlanError] = useState(null);
   const [cycle, setCycle] = useState('monthly');
   const [choosing, setChoosing] = useState(null);
+  const [concierge, setConcierge] = useState(emptyConcierge);
+  const [conciergeSaved, setConciergeSaved] = useState(false);
+  const [conciergeSaving, setConciergeSaving] = useState(false);
+  const [conciergeError, setConciergeError] = useState(null);
 
   const loadAccount = async () => {
     setError(null);
@@ -31,6 +38,17 @@ export default function EmployerSettings() {
       const { user } = await employerProfileApi.get();
       setProfile(user);
       setForm(Object.fromEntries(fields.map(([key]) => [key, user[key] || ''])));
+      const current = user.conciergeProfile || {};
+      setConcierge({
+        published: !!current.published,
+        headline: current.headline || '',
+        bio: current.bio || '',
+        specialties: (current.specialties || []).join(', '),
+        yearsExperience: current.yearsExperience ?? '',
+        hourlyRate: current.hourlyRate ?? '',
+        languages: (current.languages || []).join(', '),
+        timezone: current.timezone || browserTimezone(),
+      });
     } catch (err) { setError(err); }
   };
   const loadPlan = async () => {
@@ -52,6 +70,29 @@ export default function EmployerSettings() {
       setSaved(true);
     } catch (err) { setSaveError(err); }
     finally { setSaving(false); }
+  };
+  const editConcierge = (key) => (event) => {
+    setConciergeSaved(false);
+    setConcierge((previous) => ({ ...previous, [key]: event.target.type === 'checkbox' ? event.target.checked : event.target.value }));
+  };
+  const saveConcierge = async (event) => {
+    event.preventDefault();
+    setConciergeSaving(true); setConciergeSaved(false); setConciergeError(null);
+    try {
+      const { user } = await employerProfileApi.update({ conciergeProfile: {
+        published: conciergeReady && concierge.published,
+        headline: concierge.headline.trim(),
+        bio: concierge.bio.trim(),
+        specialties: splitList(concierge.specialties),
+        yearsExperience: concierge.yearsExperience === '' ? undefined : Number(concierge.yearsExperience),
+        hourlyRate: concierge.hourlyRate === '' ? undefined : Number(concierge.hourlyRate),
+        languages: splitList(concierge.languages),
+        timezone: concierge.timezone.trim() || browserTimezone(),
+      } });
+      setProfile(user);
+      setConciergeSaved(true);
+    } catch (err) { setConciergeError(err); }
+    finally { setConciergeSaving(false); }
   };
   const upgrade = async (plan) => {
     setChoosing(plan); setPlanError(null);
@@ -76,6 +117,15 @@ export default function EmployerSettings() {
   const periodEnd = subscription?.renewsAt && new Date(subscription.renewsAt);
   const periodEndLabel = periodEnd && !Number.isNaN(periodEnd.getTime()) && periodEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 
+  const rate = Number(concierge.hourlyRate);
+  const checklist = [
+    ['Headline', concierge.headline.trim().length > 0],
+    ['Bio of at least 80 characters', concierge.bio.trim().length >= 80],
+    ['At least one specialty', splitList(concierge.specialties).length > 0],
+    ['Hourly rate between $10 and $1,000', Number.isInteger(rate) && rate >= 10 && rate <= 1000],
+  ];
+  const conciergeReady = checklist.every(([, done]) => done);
+
   return (
     <>
       <Head><title>Employer settings · Jobocate</title></Head>
@@ -97,6 +147,32 @@ export default function EmployerSettings() {
                 <InlineError error={saveError} />
                 {saved && <p role="status">Account details saved.</p>}
                 <button type="submit" className={styles.primary} disabled={saving}>{saving ? 'Saving…' : 'Save details'}</button>
+              </form>
+            )}
+          </section>
+          <section aria-label="Concierge profile" className={styles.panel}>
+            <h2>Concierge profile</h2>
+            <p>Candidates see this profile when they book an hourly concierge session.</p>
+            {error ? <ErrorState error={error} onRetry={loadAccount} tone="dark" /> : !profile ? <LoadingState tone="dark" /> : (
+              <form onSubmit={saveConcierge}>
+                <ul aria-label="Profile checklist" className="checklist">
+                  {checklist.map(([label, done]) => <li key={label}><span>{label}</span><strong>{done ? 'Done' : 'To do'}</strong></li>)}
+                </ul>
+                <label><span>Headline</span><input type="text" maxLength={120} value={concierge.headline} onChange={editConcierge('headline')} /></label>
+                <label><span>Bio</span><span>
+                  <textarea rows={4} maxLength={2000} value={concierge.bio} aria-describedby="concierge-bio-count" onChange={editConcierge('bio')} />
+                  <small id="concierge-bio-count">{concierge.bio.trim().length}/80 characters minimum</small>
+                </span></label>
+                <label><span>Specialties</span><input type="text" placeholder="Resume reviews, Interview prep" value={concierge.specialties} onChange={editConcierge('specialties')} /></label>
+                <label><span>Years of experience</span><input type="number" min={0} max={60} step={1} value={concierge.yearsExperience} onChange={editConcierge('yearsExperience')} /></label>
+                <label><span>Hourly rate (USD)</span><input type="number" min={10} max={1000} step={1} value={concierge.hourlyRate} onChange={editConcierge('hourlyRate')} /></label>
+                <label><span>Languages</span><input type="text" placeholder="English, French" value={concierge.languages} onChange={editConcierge('languages')} /></label>
+                <label><span>Timezone</span><input type="text" value={concierge.timezone} onChange={editConcierge('timezone')} /></label>
+                <label className="check"><input type="checkbox" checked={concierge.published} disabled={!conciergeReady} onChange={editConcierge('published')} /><span>Publish profile</span></label>
+                {!conciergeReady && <p>Complete every checklist item to publish.</p>}
+                <InlineError error={conciergeError} />
+                {conciergeSaved && <p role="status">Concierge profile saved.</p>}
+                <button type="submit" className={styles.primary} disabled={conciergeSaving}>{conciergeSaving ? 'Saving…' : 'Save concierge profile'}</button>
               </form>
             )}
           </section>
@@ -138,11 +214,17 @@ export default function EmployerSettings() {
         section { scroll-margin-top: 110px; }
         h2 { margin-bottom: 22px !important; }
         label { display: grid; grid-template-columns: 150px minmax(0, 1fr); align-items: center; gap: 20px; padding: 14px 0; font-size: 13px; border-bottom: 1px solid var(--jb-v3-line); }
-        input, select { width: 100%; border: 1px solid var(--jb-v3-line-2); border-radius: 8px; background: var(--jb-v3-control); color: var(--jb-v3-fg); padding: 9px 11px; font: inherit; font-size: 13px; }
-        input:focus-visible, select:focus-visible { outline: 2px solid var(--jb-v3-accent); outline-offset: 2px; }
+        input, select, textarea { width: 100%; border: 1px solid var(--jb-v3-line-2); border-radius: 8px; background: var(--jb-v3-control); color: var(--jb-v3-fg); padding: 9px 11px; font: inherit; font-size: 13px; }
+        input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--jb-v3-accent); outline-offset: 2px; }
         input[readonly] { color: var(--jb-v3-fg-3); }
         form :global(button) { margin-top: 18px; }
         .cycle { max-width: 400px; border: 0; }
+        .check { grid-template-columns: auto 1fr; }
+        .check input { width: auto; }
+        .checklist { display: grid; gap: 6px; margin: 0 0 8px; padding: 0; list-style: none; font-size: 13px; }
+        .checklist li { display: flex; justify-content: space-between; gap: 12px; }
+        .checklist strong { font-weight: 500; }
+        small { display: block; margin-top: 6px; color: var(--jb-v3-fg-3); font-size: 12px; }
         .plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
         article { padding: 24px; background: var(--jb-v3-bg); border: 1px solid var(--jb-v3-line); border-radius: 12px; }
         h3 { margin: 0; font-size: 19px; font-weight: 500; }

@@ -11,6 +11,11 @@ Jobocate is a two-sided AI job platform: candidates get eligibility-aware matche
 3. **Cover the goal, not every line.** One focused test (or a small suite) that proves the behavior is enough. Do not add per-function, per-branch, or snapshot bloat. Do not test framework wiring, getters, or CSS class names unless that *is* the bug.
 4. **No migrations / backfills for older shapes.** The product is not live. Change the current schema, DTOs, and UI to match the task. Do not write `db:migrate-*` scripts, dual-read old+new fields, or compatibility layers for previous implementations unless the user explicitly asks.
 5. **Find code with graphify before grepping the whole tree.** A knowledge graph lives at `graphify-out/` (`graph.json`, `GRAPH_REPORT.md`). It is generated and **not** version-controlled, so a fresh clone has to build it once with `graphify update .` from the repo root. Use it to locate modules, callers, and paths. Broad search is a fallback after a graph query, or when the graph is clearly stale for the files you just added.
+6. **Delegate implementation to Haiku subagents.** The main (Opus) session plans, splits the work, reviews diffs, and runs the final test bar; the hands-on work goes to subagents.
+   - Every `Agent` call in this repo passes `model: "haiku"` (Haiku 5.5, `claude-haiku-5-5`). Never spawn subagents on Opus or Sonnet unless the user asks for it.
+   - **At most 10 subagents at a time.** Launch independent slices in parallel in one message, up to 10; queue the rest until earlier ones finish. Workflows follow the same 10-agent cap.
+   - Give each subagent a self-contained brief: the goal, the exact files it owns, the failing test to make pass, and the rules above (smallest change, tests first, no migrations). Do not give two concurrent subagents the same file.
+   - Opus still reads every returned diff and re-runs the relevant tests before reporting done; a subagent's "it passes" is not verification.
 
 ## Graphify — find things here first
 

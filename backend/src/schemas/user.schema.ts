@@ -126,6 +126,33 @@ export class User {
   @Prop({ type: [String], default: undefined })
   achievements?: string[];
 
+  // Employer concierge listing (hourly sessions). Replaced wholesale on each save;
+  // the publish rules live in UsersService.updateProfile.
+  @Prop({
+    type: {
+      _id: false,
+      published: { type: Boolean, default: false },
+      headline: String,
+      bio: String,
+      specialties: [String],
+      yearsExperience: Number,
+      hourlyRate: Number,
+      languages: [String],
+      timezone: String,
+    },
+    default: undefined,
+  })
+  conciergeProfile?: {
+    published?: boolean;
+    headline?: string;
+    bio?: string;
+    specialties?: string[];
+    yearsExperience?: number;
+    hourlyRate?: number;
+    languages?: string[];
+    timezone?: string;
+  };
+
   // Subscription info (denormalized for quick access)
   @Prop({ enum: ['FREE', 'PRO'], default: 'FREE' })
   currentPlanType?: PlanType;
