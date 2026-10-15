@@ -648,4 +648,35 @@ export class BillingService {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
   }
+
+  // Canada-only Express account. Destination charges need card_payments and transfers.
+  async createConnectOnboardingLink(user: UserDocument): Promise<{ url: string }> {
+    let accountId = user.stripeConnectAccountId;
+    if (!accountId) {
+      const account = await this.stripe.accounts.create({
+        type: 'express',
+        country: 'CA',
+        email: user.email,
+        capabilities: { card_payments: { requested: true }, transfers: { requested: true } },
+      });
+      accountId = account.id;
+      await this.userModel.findByIdAndUpdate(user._id, { $set: { stripeConnectAccountId: accountId } });
+      user.stripeConnectAccountId = accountId;
+    }
+    const link = await this.stripe.accountLinks.create({
+      account: accountId,
+      type: 'account_onboarding',
+      return_url: `${this.frontendUrl}/employer/settings?connect=return`,
+      refresh_url: `${this.frontendUrl}/employer/settings?connect=refresh`,
+    });
+    return { url: link.url };
+  }
+
+  async getConnectStatus(user: UserDocument): Promise<{ payoutsEnabled: boolean; chargesEnabled: boolean; detailsSubmitted: boolean }> {
+    if (!user.stripeConnectAccountId) return { payoutsEnabled: false, chargesEnabled: false, detailsSubmitted: false };
+    const account = await this.stripe.accounts.retrieve(user.stripeConnectAccountId);
+    const status = { payoutsEnabled: !!account.payouts_enabled, chargesEnabled: !!account.charges_enabled, detailsSubmitted: !!account.details_submitted };
+    await this.userModel.findByIdAndUpdate(user._id, { $set: { connectPayoutsEnabled: status.payoutsEnabled } });
+    return status;
+  }
 }
