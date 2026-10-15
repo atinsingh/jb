@@ -102,7 +102,7 @@ test('settings publishes a concierge profile only once its checklist is complete
   await panel.getByLabel('Headline', { exact: true }).fill('Hiring coach for early-career tech teams');
   await panel.getByLabel(/^Bio/).fill('I help early-career teams hire well with structured interviews, clear role scopes, and honest feedback on every application.');
   await panel.getByLabel('Specialties', { exact: true }).fill('Resume reviews, Interview prep');
-  await panel.getByLabel('Hourly rate (USD)', { exact: true }).fill('75');
+  await panel.getByLabel('Hourly rate (CAD)', { exact: true }).fill('75');
   await expect(publish).toBeEnabled();
   await publish.check();
   await panel.getByRole('button', { name: 'Save concierge profile' }).click();

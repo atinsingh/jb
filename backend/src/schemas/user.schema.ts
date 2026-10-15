@@ -170,6 +170,13 @@ export class User {
   @Prop()
   stripeCustomerId?: string;
 
+  // Stripe Connect Express account that receives concierge payouts. Separate from stripeCustomerId.
+  @Prop()
+  stripeConnectAccountId?: string;
+
+  @Prop({ default: false })
+  connectPayoutsEnabled?: boolean;
+
   // Serializes checkout creation across workspaces and backend workers.
   @Prop({ type: Date })
   checkoutLockUntil?: Date;

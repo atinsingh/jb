@@ -228,6 +228,8 @@ export const employerBillingApi = {
       method: 'POST',
       body: JSON.stringify({ returnUrl: `${window.location.origin}/employer/settings` }),
     }),
+  connect: () => apiCall('/api/employer/billing/connect'),
+  connectOnboard: () => apiCall('/api/employer/billing/connect/onboard', { method: 'POST' }),
 };
 
 /* ----------------------------------------------------------------- audit --- */
