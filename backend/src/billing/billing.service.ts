@@ -73,7 +73,7 @@ export class BillingService {
         current: false,
         levers: [
           ['Job slots', String(limits.jobSlotsLimit)], ['Team seats', String(limits.seatsLimit)],
-          ['Employer AI credits / mo', String(limits.aiBudgetCreditsLimit)],
+          ['Employer credits / mo', String(limits.aiBudgetCreditsLimit)],
           ['Sourcing credits', String(limits.sourcingCreditsLimit)],
         ] as Array<[string, string]>,
       }];

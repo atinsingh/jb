@@ -36,8 +36,8 @@ export class LLMQuotaService {
         : {
             message:
               balance.status === 'unavailable'
-                ? 'AI credits are temporarily unavailable.'
-                : 'Your AI credits are exhausted.',
+                ? 'Credits are temporarily unavailable.'
+                : 'Your credits are exhausted.',
           }),
     };
   }

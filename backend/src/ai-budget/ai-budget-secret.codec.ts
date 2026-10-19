@@ -36,7 +36,7 @@ export class AiBudgetSecretCodec {
     try {
       const [version, iv, tag, payload] = value.split('.');
       if (version !== 'v1' || !iv || !tag || !payload) {
-        throw new Error('Invalid encrypted AI budget key');
+        throw new Error('Invalid encrypted usage key');
       }
       const decipher = createDecipheriv(
         'aes-256-gcm',

@@ -102,8 +102,8 @@ async function bootstrap() {
     .addTag('applications', 'Job application management endpoints')
     .addTag('matching', 'Job matching and recommendations endpoints')
     .addTag('agents', 'Agent endpoints for managing candidate applications')
-    .addTag('cover-letters', 'AI Cover Letter generation endpoints')
-    .addTag('resume-builder', 'AI Resume Builder endpoints')
+    .addTag('cover-letters', 'Cover letter generation endpoints')
+    .addTag('resume-builder', 'Resume builder endpoints')
     .addTag('health', 'Health check endpoint')
     .build();
 

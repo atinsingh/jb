@@ -32,7 +32,7 @@ export class LiteLlmVirtualKeyClient {
       }
     }
     throw new ServiceUnavailableException(
-      'Employer AI key management returned no owner key.',
+      'Employer key management returned no owner key.',
     );
   }
 
@@ -65,7 +65,7 @@ export class LiteLlmVirtualKeyClient {
       info.budget_reset_at || info.budget_reset_time || info.reset_at;
     const resetAt = resetValue ? new Date(resetValue) : undefined;
     if (resetAt && Number.isNaN(resetAt.getTime()))
-      throw new ServiceUnavailableException('Invalid AI credit renewal date.');
+      throw new ServiceUnavailableException('Invalid credit renewal date.');
     return {
       spendUsd: this.number(info.spend),
       limitUsd: this.number(info.max_budget),
@@ -149,7 +149,7 @@ export class LiteLlmVirtualKeyClient {
         : NaN;
     if (!Number.isFinite(parsed) || parsed < 0)
       throw new ServiceUnavailableException(
-        'Invalid AI credit accounting response.',
+        'Invalid credit accounting response.',
       );
     return parsed;
   }

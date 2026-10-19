@@ -22,7 +22,7 @@ test('jobs displays measured credits, including exhaustion and an unavailable ba
     route.fulfill({ json: budget }));
   await page.route('**/api/employer/billing/plans', route => route.fulfill({ json: { currentPlan: 'free', plans: [{ key: 'free', name: 'Free' }] } }));
   await page.goto('/employer/jobs');
-  const balance = page.getByRole('region', { name: 'Employer AI credits' });
+  const balance = page.getByRole('region', { name: 'Employer credits' });
   await expect(balance).toContainText('37 credits remaining');
   await expect(balance).toContainText('Free plan includes 100 credits per month');
   await expect(balance).toContainText('63 used');

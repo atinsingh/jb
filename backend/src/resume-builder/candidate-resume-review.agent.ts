@@ -286,7 +286,7 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
       'Use sections personal, summary, experience, skills, education, projects, achievements, certifications, or languages.',
       `Produce ${this.desiredAnnotationCount(input.resumeText)}-${Math.max(10, this.desiredAnnotationCount(input.resumeText))} useful annotations. Cover different bullets and sections; do not repeat the same issue.`,
       'Keep each explanation under 80 words, each annotation message under 35 words, and each fix under 45 words. Quote only the shortest consecutive source passage that identifies the issue. Return compact JSON without a reasoning narrative. Read the required context together where practical; do not repeatedly read unchanged files.',
-      'AI-written-content detection is outside this session. Do not score it or create AI-detection comments.',
+      'Writing-style detection is outside this session. Do not score writing style or comment on whether the text sounds generated.',
       WORKSPACE_VOICE_RULE,
     ].join('\n');
     const files: HarnessContextFile[] = [

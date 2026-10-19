@@ -423,7 +423,7 @@ describe('Resume harness (e2e)', () => {
     expect(events.at(-1)).toEqual({
       type: 'error',
       code: 'AI_BUDGET_EXHAUSTED',
-      message: 'Your monthly AI budget is exhausted. No AI work was started.',
+      message: 'Your monthly allowance is exhausted. Nothing was started.',
       budget: exhausted,
     });
     expect(box.execs).toHaveLength(beforeExecs);

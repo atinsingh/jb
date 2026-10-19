@@ -58,7 +58,7 @@ export const PACKAGE_CONFIG = {
     price: 29,
     maxBulkOperations: 100,
     agentType: AgentType.AI,
-    features: ['Enhanced matching', 'Bulk operations', 'AI agent support'],
+    features: ['Enhanced matching', 'Bulk operations', 'Agent support'],
   },
   [PackageType.PREMIUM]: {
     name: 'Premium',

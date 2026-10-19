@@ -19,7 +19,7 @@ test('candidate v1 navigation and explicit résumé modes fit desktop and mobile
   await page.screenshot({ path: 'tmp/v1-resume-desktop.png', fullPage: true });
   await page.getByRole('button', { name: /Compare Resume/ }).click();
   await expect(page.locator('input[type=file]')).toHaveCount(1);
-  await page.getByRole('button', { name: /AI Generate Resume/ }).click();
+  await page.getByRole('button', { name: /Jobocate Generate Resume/ }).click();
   await expect(page.getByTestId('model-select')).toBeVisible();
   await page.reload();
   await expect(page.getByTestId('model-select')).toBeVisible();

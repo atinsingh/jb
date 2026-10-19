@@ -1240,7 +1240,8 @@ test.describe("résumé session history", () => {
 
     let generated = page.getByTestId(`resume-session-${SESSION.id}`);
     await expect(generated).toContainText("Backend engineer résumé");
-    await expect(generated).toContainText("AI-generated");
+    await expect(generated).toContainText("Generated");
+    await expect(generated).not.toContainText("AI-generated");
     await expect(generated).toContainText("1 revision");
     await expect(generated).not.toContainText("Codex");
     await expect(generated).not.toContainText("anthropic/");
@@ -1396,7 +1397,7 @@ test.describe("résumé session history", () => {
     );
     await expect(
       page.getByTestId(`resume-session-${SESSION.id}`),
-    ).toContainText("AI-generated");
+    ).toContainText("Generated");
   });
 
   test("hiding or leaving the page keeps the active résumé session available", async ({

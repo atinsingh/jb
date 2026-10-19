@@ -55,7 +55,7 @@ export class ResumeHarnessController {
   }
 
   @Get('budget')
-  @ApiOperation({ summary: 'Current monthly AI budget and remaining allowance' })
+  @ApiOperation({ summary: 'Current monthly allowance and remaining balance' })
   budget(@Request() req) {
     return this.service.budget(this.userId(req));
   }

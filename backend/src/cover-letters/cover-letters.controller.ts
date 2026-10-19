@@ -67,7 +67,7 @@ export class CoverLettersController {
   }
 
   @Post('generate')
-  @ApiOperation({ summary: 'Generate a new cover letter with AI' })
+  @ApiOperation({ summary: 'Generate a new cover letter' })
   @ApiResponse({ status: 201, description: 'Cover letter generated successfully' })
   @ApiResponse({ status: 400, description: 'Invalid input' })
   async generate(
@@ -91,7 +91,7 @@ export class CoverLettersController {
   }
 
   @Post(':id/regenerate')
-  @ApiOperation({ summary: 'Regenerate an existing cover letter with AI' })
+  @ApiOperation({ summary: 'Regenerate an existing cover letter' })
   @ApiResponse({ status: 201, description: 'Cover letter regenerated successfully' })
   @ApiResponse({ status: 404, description: 'Cover letter not found' })
   async regenerate(@Param('id') id: string, @Request() req) {

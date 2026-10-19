@@ -17,7 +17,7 @@ AiOperationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 export class AiOperationCancelledException extends ConflictException {
   readonly code = 'AI_OPERATION_CANCELLED';
-  constructor() { super({ code: 'AI_OPERATION_CANCELLED', message: 'Operation cancelled. Any AI usage already incurred is still counted.' }); }
+  constructor() { super({ code: 'AI_OPERATION_CANCELLED', message: 'Operation cancelled. Any usage already incurred is still counted.' }); }
 }
 
 type Context = { cancelled: boolean; cleanup: Map<string, () => Promise<void>>; finalizers: Map<string, () => Promise<unknown>>; stopping?: Promise<void> };
