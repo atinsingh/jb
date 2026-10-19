@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   compareResume,
   getResumeById,
@@ -391,9 +391,11 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
   const [sourceBlob, setSourceBlob] = useState(null);
   const [sourceError, setSourceError] = useState('');
   const [sourceBusy, setSourceBusy] = useState(false);
+  const compareRequest = useRef(0);
 
   const runComparison = useCallback(async (id = resumeId, jd = jobDescription, url = jobUrl) => {
     if (!id) return;
+    const request = ++compareRequest.current;
     setBusy(true);
     setComparing(true);
     setMessage('');
@@ -401,23 +403,29 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
       const context = { jobDescription: jd.trim(), jobUrl: url.trim() };
       if (resume && (context.jobDescription !== (resume.source?.jobDescription || '') || context.jobUrl !== (resume.source?.jobUrl || ''))) {
         const updated = await updateResume(id, { source: { ...resume.source, ...context } });
+        if (request !== compareRequest.current) return;
         setResume(withoutDuplicatedExperienceText(updated));
       }
       const result = await compareResume(id, { ...context, forceRefresh: true });
+      if (request !== compareRequest.current) return;
       if (Object.keys(result.details || {}).length) setResume((current) => withoutDuplicatedExperienceText({ ...current, ...result.details }));
       setAssessment(result);
     } catch (cause) {
+      if (request !== compareRequest.current) return;
       setMessage(cause?.message || 'Comparison is temporarily unavailable.');
     } finally {
-      void onComparisonSettled?.();
-      setComparing(false);
-      setBusy(false);
+      if (request === compareRequest.current) {
+        void onComparisonSettled?.();
+        setComparing(false);
+        setBusy(false);
+      }
     }
   }, [resumeId, jobDescription, jobUrl, resume, onComparisonSettled]);
 
   useEffect(() => {
     if (!resumeId) return;
     let cancelled = false;
+    const request = ++compareRequest.current;
     setBusy(true);
     setComparing(true);
     setAssessment(null);
@@ -429,19 +437,19 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
         setJobDescription(document.source?.jobDescription || '');
         setJobUrl(document.source?.jobUrl || '');
         if (!document.source?.jobDescription?.trim() && !document.source?.jobUrl?.trim()) {
-          setComparing(false);
+          if (!cancelled && request === compareRequest.current) setComparing(false);
           return null;
         }
         return compareResume(resumeId, {});
       })
       .then((result) => {
-        if (cancelled || !result) return;
+        if (cancelled || request !== compareRequest.current || !result) return;
         if (Object.keys(result.details || {}).length) setResume((current) => withoutDuplicatedExperienceText({ ...current, ...result.details }));
         setAssessment(result);
       })
-      .catch((cause) => !cancelled && setMessage(cause?.message || 'Could not open this resume.'))
+      .catch((cause) => !cancelled && request === compareRequest.current && setMessage(cause?.message || 'Could not open this resume.'))
       .finally(() => {
-        if (!cancelled) {
+        if (!cancelled && request === compareRequest.current) {
           void onComparisonSettled?.();
           setComparing(false);
           setBusy(false);

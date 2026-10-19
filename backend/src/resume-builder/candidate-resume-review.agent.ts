@@ -91,6 +91,26 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
       }).sort({ createdAt: -1 }).lean().exec();
       if (completed?.result) return completed.result as CandidateResumeReviewResult;
     }
+    const inflight = await this.sessionModel.find({
+      userId: input.userId,
+      resumeId: input.resumeId,
+      status: { $in: ['provisioning', 'active'] },
+    }).exec();
+    const sameJob = options.forceRefresh ? undefined : inflight.find((row) =>
+      row.jobDescriptionHash === jobDescriptionHash && row.resumeTextHash === resumeTextHash);
+    if (sameJob) {
+      const joined = await this.waitForReview(sameJob._id);
+      if (joined) return joined;
+    }
+    const replaced = inflight.filter((row) => row !== sameJob);
+    for (const row of replaced) {
+      row.status = 'failed';
+      row.failureReason = 'SUPERSEDED';
+      await row.save();
+      if (row.sandboxId) {
+        try { await this.sandbox.destroy(row.sandboxId); } catch { /* the running review observes SUPERSEDED */ }
+      }
+    }
     const alias = await this.aliases.resolveAutomaticForUser(input.userId);
     const adapter = this.registry.forProvider(alias.provider);
     const session = await this.sessionModel.create({
@@ -113,9 +133,8 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
     const reviewTurns = { count: 0, max: maxReviewTurns };
 
     try {
-      return await this.budget.withCandidateLease(
+      return await this.withReviewLease(
         input.userId,
-        'candidate_ats_review',
         {
           harness: adapter.id,
           alias: alias.alias,
@@ -124,7 +143,9 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
           sessionId,
           runId,
         },
+        replaced.length > 0,
         async (access, tags) => {
+          await this.stopIfReplaced(sessionId);
           const boot = adapter.bootstrap({
             purpose: 'resume-review',
             sessionId,
@@ -264,6 +285,43 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
         fix: hideWorkspaceFiles(annotation.fix),
       })),
     };
+  }
+
+  private async waitForReview(id: unknown): Promise<CandidateResumeReviewResult | null> {
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const current = await this.sessionModel.findOne({ _id: id }).sort({ createdAt: -1 }).lean().exec();
+      if (current?.status === 'completed' && current.result) return current.result as CandidateResumeReviewResult;
+      if (!current || current.status === 'failed' || current.failureReason === 'SUPERSEDED') return null;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    return null;
+  }
+
+  private async stopIfReplaced(id: string) {
+    const current = await this.sessionModel.findOne({ _id: id }).sort({ createdAt: -1 }).lean().exec();
+    if (current?.failureReason === 'SUPERSEDED') {
+      throw new ServiceUnavailableException('This comparison was replaced by a newer job.');
+    }
+  }
+
+  private withReviewLease<T>(
+    userId: string,
+    attribution: { harness: string; alias: string; model: string; effort: string; sessionId: string; runId: string },
+    replaced: boolean,
+    run: Parameters<AiBudgetService['withCandidateLease']>[3],
+  ): Promise<T> {
+    const start = () => this.budget.withCandidateLease(userId, 'candidate_ats_review', attribution, run) as Promise<T>;
+    if (!replaced) return start();
+    const claim = async (attempt: number): Promise<T> => {
+      try {
+        return await start();
+      } catch (error) {
+        if (attempt >= 40 || (error as { code?: string }).code !== 'AI_BUDGET_OPERATION_IN_PROGRESS') throw error;
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        return claim(attempt + 1);
+      }
+    };
+    return claim(0);
   }
 
   private reviewFiles(input: CandidateResumeReviewInput): HarnessContextFile[] {

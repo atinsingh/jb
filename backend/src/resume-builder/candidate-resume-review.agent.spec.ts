@@ -17,7 +17,7 @@ describe('LiteLlmCandidateResumeReviewAgent session runtime', () => {
     failureReason: undefined as string | undefined,
     save: jest.fn(),
   };
-  const sessionModel = { create: jest.fn(), findOne: jest.fn() };
+  const sessionModel = { create: jest.fn(), findOne: jest.fn(), find: jest.fn() };
   let agent: LiteLlmCandidateResumeReviewAgent;
 
   const reviewJson = (annotations: any[]) => JSON.stringify({
@@ -54,6 +54,7 @@ describe('LiteLlmCandidateResumeReviewAgent session runtime', () => {
     session.save.mockResolvedValue(undefined);
     sessionModel.create.mockResolvedValue(session);
     sessionModel.findOne.mockReturnValue({ sort: () => ({ lean: () => ({ exec: async () => null }) }) });
+    sessionModel.find.mockReturnValue({ exec: async () => [] });
     sandbox.exec.mockResolvedValue({
       exitCode: 0, stderr: '', stdout: reviewJson([
         { id: 'one', section: 'experience', severity: 'warning', message: 'Too vague', fix: 'Name the outcome', quote: 'Built payment services for clients' },
@@ -233,13 +234,41 @@ describe('LiteLlmCandidateResumeReviewAgent session runtime', () => {
     expect(sandbox.provision).not.toHaveBeenCalled();
   });
 
+  it('starts a review for a changed job instead of failing while the previous comparison is still running', async () => {
+    let busy = true;
+    budget.withCandidateLease.mockImplementation(async (_u, _s, _a, run) => {
+      if (busy) throw Object.assign(new Error('Another operation is already running for this account. Nothing was started.'), { code: 'AI_BUDGET_OPERATION_IN_PROGRESS' });
+      return run({ apiKey: 'candidate-key' }, ['usageContext=candidate_ats_review']);
+    });
+    const running = {
+      _id: 'running-session', status: 'active', sandboxId: 'running-box',
+      jobDescriptionHash: 'old-job', resumeTextHash: 'old-resume',
+      failureReason: undefined as string | undefined,
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+    sessionModel.find.mockReturnValue({ exec: async () => [running] });
+    sandbox.destroy.mockImplementation(async (id: string) => {
+      if (id === 'running-box') busy = false;
+    });
+
+    const result = await agent.review({
+      userId: 'user-1', resumeId: 'resume-1', resumeText: 'Built payment services for clients',
+      jobDescription: 'New role',
+    } as any);
+
+    expect(running.status).toBe('failed');
+    expect(running.failureReason).toBe('SUPERSEDED');
+    expect(sandbox.destroy).toHaveBeenCalledWith('running-box');
+    expect(result.sessionId).toBe('compare-session-1');
+  });
+
   it('starts a new paid review only when refresh is explicitly requested', async () => {
     const result = await agent.review({
       userId: 'user-1', resumeId: 'resume-1', resumeText: 'Built payment services for clients',
       jobDescription: 'Backend engineer',
     }, { forceRefresh: true });
     expect(result.sessionId).toBe('compare-session-1');
-    expect(sessionModel.findOne).not.toHaveBeenCalled();
+    expect(sessionModel.findOne).not.toHaveBeenCalledWith(expect.objectContaining({ status: 'completed' }));
     expect(quota.consumeCredit).not.toHaveBeenCalled();
   });
 
