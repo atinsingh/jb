@@ -39,6 +39,7 @@ describe('ContextFilesService', () => {
     expect(agents).toMatch(/answer.*question/i);
     expect(agents).toMatch(/only edit.*resume\.tex.*request/i);
     expect(agents).toMatch(/what (?:you )?changed/i);
+    expect(agents).toMatch(/never name workspace files/i);
     expect(agents).not.toMatch(/one-line summary/i);
   });
 

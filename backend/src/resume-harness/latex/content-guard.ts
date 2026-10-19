@@ -150,7 +150,7 @@ export function findContentProblems(input: ContentGuardInput): string[] {
   // other career evidence for the agent to use.
   if (candidateHasCareerEvidence === false) {
     problems.push(
-      'CANDIDATE.md contains no career facts; import a resume or add experience, education, skills, certifications, or achievements before publishing a PDF',
+      'Your profile has no career facts; import a resume or add experience, education, skills, certifications, or achievements before publishing a PDF',
     );
   }
 
@@ -200,7 +200,7 @@ export function findContentProblems(input: ContentGuardInput): string[] {
         !candidateSections.has(normalizeHeading(sourceHeading))
       ) {
         problems.push(
-          `the resume has a ${section[1]} section but CANDIDATE.md has no ${sourceHeading} facts`,
+          `the resume has a ${section[1]} section but your profile has no ${sourceHeading} facts`,
         );
       }
     }
@@ -210,7 +210,7 @@ export function findContentProblems(input: ContentGuardInput): string[] {
     );
     if (hasSummary && !candidateHasCareerEvidence) {
       problems.push(
-        'the resume has a Summary section but CANDIDATE.md contains no career evidence to summarize',
+        'the resume has a Summary section but your profile contains no career evidence to summarize',
       );
     }
 
@@ -236,7 +236,7 @@ export function findContentProblems(input: ContentGuardInput): string[] {
       const instructionSupportsEntry = userFacts.toLowerCase().includes(location.toLowerCase()) &&
         userFacts.toLowerCase().includes(entry[2].toLowerCase());
       if (!source.toLowerCase().includes(location.toLowerCase()) && !instructionSupportsEntry) {
-        problems.push(`${heading} entry location "${location}" has no source in CANDIDATE.md; remove the location`);
+        problems.push(`${heading} entry location "${location}" has no source in your profile; remove the location`);
       }
     }
   }

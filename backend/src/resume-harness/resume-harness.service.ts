@@ -38,6 +38,7 @@ import {
   TEX_PATH,
 } from './latex/latex.service';
 import { findContentProblems, hasCareerEvidence } from './latex/content-guard';
+import { hideWorkspaceFiles, WORKSPACE_VOICE_RULE } from './workspace-voice';
 import {
   HarnessActivity,
   HarnessContextFile,
@@ -1174,13 +1175,13 @@ export class ResumeHarnessService {
       onEvent?.({ type: 'activity', activity });
     };
     onEvent?.({ type: 'phase', phase: 'writing' });
-    let summary = await this.invoke(
+    let summary = hideWorkspaceFiles((await this.invoke(
       adapter,
       boot,
       session.sandboxId!,
       prompt,
       onEvent ? forwardEvent : undefined,
-    );
+    )) || '');
 
     let latex = await this.currentLatex(session);
     let placeholderDraft = this.isPlaceholderDraft(
@@ -1222,7 +1223,7 @@ export class ResumeHarnessService {
         (!placeholderDraft &&
           content.some(
             (problem) =>
-              !problem.startsWith('CANDIDATE.md contains no career facts'),
+              !problem.startsWith('Your profile has no career facts'),
           ))) &&
       attempt < MAX_COMPILE_REPAIRS;
       attempt++
@@ -1243,7 +1244,7 @@ export class ResumeHarnessService {
         prompt,
         onEvent ? forwardEvent : undefined,
       );
-      if (!summary) summary = repairSummary;
+      if (!summary) summary = hideWorkspaceFiles(repairSummary || '');
       onEvent?.({ type: 'phase', phase: 'compiling' });
       compile = await this.latex.compile(session.sandboxId!);
       latex = await this.currentLatex(session);
@@ -1579,6 +1580,8 @@ export class ResumeHarnessService {
       '',
       sparseDraftInstruction,
       sparseDraftInstruction ? '' : undefined,
+      WORKSPACE_VOICE_RULE,
+      '',
       'Instruction:',
       instruction,
       '',

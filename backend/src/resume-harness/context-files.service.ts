@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { HarnessContextFile, HarnessId } from './harness/harness.types';
+import { WORKSPACE_VOICE_RULE } from './workspace-voice';
 import { hasCareerEvidence } from './latex/content-guard';
 
 /** One resolved knob choice, with the sentence the harness is given for it. */
@@ -160,6 +161,7 @@ and do not work around a broken package by deleting the section that uses it.
 - Mention a build problem only when one remains unresolved. Do not reduce a
   successful response to "build succeeded" or "done".
 - Keep the response concise, usually two to five sentences or a short list.
+- ${WORKSPACE_VOICE_RULE}
 
 ## Content rules
 

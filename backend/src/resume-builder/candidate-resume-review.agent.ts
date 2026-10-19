@@ -9,6 +9,7 @@ import { HarnessRegistry } from '../resume-harness/harness/harness.registry';
 import { HarnessAdapter, HarnessContextFile, ResolvedModelAlias } from '../resume-harness/harness/harness.types';
 import { ModelAliasService } from '../resume-harness/model-alias.service';
 import { SANDBOX_WORKDIR, SandboxService } from '../resume-harness/sandbox/sandbox.service';
+import { hideWorkspaceFiles, WORKSPACE_VOICE_RULE } from '../resume-harness/workspace-voice';
 import type { ResumeComparisonAnnotation } from './resume-comparison.service';
 import {
   CandidateAtsReviewSession,
@@ -246,17 +247,22 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
       modelAlias: alias.alias,
       ats: {
         score: this.score(ats.subScores.sectionCompleteness),
-        explanation: detailed.atsExplanation,
-        findings: ats.suggestions.map((message, index) => ({ code: `AGENT_ATS_${index + 1}`, message })),
+        explanation: hideWorkspaceFiles(detailed.atsExplanation),
+        findings: ats.suggestions.map((message, index) => ({ code: `AGENT_ATS_${index + 1}`, message: hideWorkspaceFiles(message) })),
       },
       match: {
         coverage: this.score(ats.semanticMatch),
-        explanation: detailed.matchExplanation,
+        explanation: hideWorkspaceFiles(detailed.matchExplanation),
         matched: detailed.matched,
         missing,
         keywordCount,
       },
-      annotations: annotations.map((annotation, index) => ({ ...annotation, id: `agent-${index + 1}` })),
+      annotations: annotations.map((annotation, index) => ({
+        ...annotation,
+        id: `agent-${index + 1}`,
+        message: hideWorkspaceFiles(annotation.message),
+        fix: hideWorkspaceFiles(annotation.fix),
+      })),
     };
   }
 
@@ -281,6 +287,7 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
       `Produce ${this.desiredAnnotationCount(input.resumeText)}-${Math.max(10, this.desiredAnnotationCount(input.resumeText))} useful annotations. Cover different bullets and sections; do not repeat the same issue.`,
       'Keep each explanation under 80 words, each annotation message under 35 words, and each fix under 45 words. Quote only the shortest consecutive source passage that identifies the issue. Return compact JSON without a reasoning narrative. Read the required context together where practical; do not repeatedly read unchanged files.',
       'AI-written-content detection is outside this session. Do not score it or create AI-detection comments.',
+      WORKSPACE_VOICE_RULE,
     ].join('\n');
     const files: HarnessContextFile[] = [
       { path: 'AGENTS.md', contents: `${rules}\n` },
@@ -294,7 +301,7 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
   }
 
   private reviewPrompt(): string {
-    return 'Perform the Compare Resume assessment now. Inspect ORIGINAL_RESUME.pdf or ORIGINAL_RESUME.docx when present, then read RESUME.txt, JOB.txt, and ATS_RESULT.json. Return only the JSON contract from AGENTS.md. Every annotation quote must be copied exactly from RESUME.txt.';
+    return `Perform the Compare Resume assessment now. Inspect ORIGINAL_RESUME.pdf or ORIGINAL_RESUME.docx when present, then read RESUME.txt, JOB.txt, and ATS_RESULT.json. Return only the JSON contract from AGENTS.md. Every annotation quote must be copied exactly from RESUME.txt. ${WORKSPACE_VOICE_RULE}`;
   }
 
   private async requestReview(
@@ -314,7 +321,7 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
           adapter,
           boot,
           sandboxId,
-          'The prior response was not valid complete JSON for the required review contract. Inspect the original résumé file when present, then read RESUME.txt, JOB.txt and ATS_RESULT.json again. Return one complete compact JSON object only, with atsExplanation, matchExplanation, matched, missing, and annotations. Use short messages and fixes, exact résumé quotes, no markdown or prose outside JSON.',
+          `The prior response was not valid complete JSON for the required review contract. Inspect the original résumé file when present, then read RESUME.txt, JOB.txt and ATS_RESULT.json again. Return one complete compact JSON object only, with atsExplanation, matchExplanation, matched, missing, and annotations. Use short messages and fixes, exact résumé quotes, no markdown or prose outside JSON. ${WORKSPACE_VOICE_RULE}`,
           turns,
         );
       }

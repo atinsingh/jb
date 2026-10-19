@@ -116,6 +116,36 @@ describe('LiteLlmCandidateResumeReviewAgent session runtime', () => {
     }));
   });
 
+  it('does not leave container filenames in compare comments', async () => {
+    sandbox.exec.mockResolvedValueOnce({
+      exitCode: 0,
+      stdout: JSON.stringify({
+        atsExplanation: 'ATS_RESULT.json shows gaps from MISSING_SECTIONS.json.',
+        matchExplanation: 'JOB.txt asks for AWS.',
+        matched: ['TypeScript'],
+        missing: ['AWS'],
+        annotations: [{
+          id: 'one', section: 'experience', severity: 'warning',
+          message: 'JOB.txt requires AWS',
+          fix: 'Add AWS only if RESUME.txt already shows it',
+          quote: 'Built payment services for clients',
+        }],
+      }),
+    });
+    const result = await agent.review({
+      userId: 'user-1', resumeId: 'resume-1', resumeText: 'Built payment services for clients', jobDescription: 'TypeScript and AWS',
+    });
+    const spoken = [
+      result.ats.explanation, result.match.explanation,
+      ...result.annotations.map((item) => `${item.message} ${item.fix}`),
+    ].join(' ');
+    expect(spoken).not.toMatch(/JOB\.txt|RESUME\.txt|ATS_RESULT\.json|MISSING_SECTIONS\.json/);
+    expect(result.annotations[0].message).toContain('the job description');
+    expect(result.annotations[0].quote).toBe('Built payment services for clients');
+    const rules = adapter.bootstrap.mock.calls[0][0].contextFiles.find((file: any) => file.path === 'AGENTS.md').contents;
+    expect(rules).toMatch(/never name workspace files/i);
+  });
+
   it('rejects invented metrics in a fix even when its quotation is grounded', async () => {
     sandbox.exec.mockResolvedValueOnce({ exitCode: 0, stderr: '', stdout: reviewJson([
       { id: 'bad', section: 'experience', severity: 'warning', message: 'Add reliability', fix: 'Achieved 99.95% uptime for 500 customers', quote: 'Built payment services for clients' },
