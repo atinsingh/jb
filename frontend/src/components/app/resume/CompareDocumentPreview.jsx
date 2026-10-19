@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 const tones = {
   red: { background: 'rgba(217, 72, 95, .35)', border: '#D9485F' },
@@ -149,7 +149,7 @@ async function renderPdf(blob, container, signal, width) {
     if (signal.aborted) break;
     const page = await pdf.getPage(number);
     const natural = page.getViewport({ scale: 1 });
-    const scale = Math.min(1.45, Math.min(760, width) / natural.width);
+    const scale = Math.min(1.45, width / natural.width);
     const viewport = page.getViewport({ scale });
     const sheet = document.createElement('div');
     sheet.className = 'compare-pdf-page';
@@ -231,8 +231,51 @@ function renderStructuredResume(resume, container) {
   container.appendChild(documentView);
 }
 
+export function placeComment(rect) {
+  const margin = 8;
+  const boxWidth = Math.min(310, window.innerWidth - margin * 2);
+  const spaceBelow = window.innerHeight - rect.bottom - margin;
+  const spaceAbove = rect.top - margin;
+  const below = spaceBelow >= 120 || spaceBelow >= spaceAbove;
+  const maxHeight = Math.max(96, Math.min(280, below ? spaceBelow : spaceAbove));
+  return {
+    top: below ? rect.bottom + margin : Math.max(margin, rect.top - margin - maxHeight),
+    left: Math.min(window.innerWidth - boxWidth - margin, Math.max(margin, rect.left)),
+    width: boxWidth,
+    maxHeight,
+  };
+}
+
+function fitDocxPages(root, available) {
+  const pages = [...root.querySelectorAll('section.docx')];
+  if (!pages.length || available <= 0) return;
+  const wrapper = root.querySelector('.docx-wrapper');
+  if (wrapper) {
+    wrapper.style.width = '100%';
+    wrapper.style.minWidth = '0';
+    wrapper.style.maxWidth = '100%';
+    wrapper.style.padding = '0';
+    wrapper.style.overflow = 'hidden';
+  }
+  for (const page of pages) {
+    page.style.margin = '0';
+    const natural = page.offsetWidth || parseFloat(page.style.width) || 0;
+    if (!natural || natural <= available) continue;
+    const scale = available / natural;
+    const height = page.offsetHeight || parseFloat(page.style.minHeight) || 0;
+    const slot = document.createElement('div');
+    slot.style.cssText = `width:100%;height:${Math.ceil(height * scale)}px;overflow:hidden;display:flex;justify-content:center`;
+    page.style.transform = `scale(${scale})`;
+    page.style.transformOrigin = 'top center';
+    page.parentNode.insertBefore(slot, page);
+    slot.appendChild(page);
+  }
+}
+
 export default function CompareDocumentPreview({ blob, filename, annotations, resume }) {
+  const scrollRef = useRef(null);
   const containerRef = useRef(null);
+  const tooltipRef = useRef(null);
   const originalResume = useRef(resume);
   const [tooltip, setTooltip] = useState(null);
   const [error, setError] = useState('');
@@ -240,18 +283,37 @@ export default function CompareDocumentPreview({ blob, filename, annotations, re
   const [width, setWidth] = useState(0);
   const showTooltip = (annotationsForMark, rect) => setTooltip({
     annotations: annotationsForMark,
-    top: Math.min(window.innerHeight - 180, rect.bottom + 8),
-    left: Math.min(window.innerWidth - 330, Math.max(8, rect.left)),
+    ...placeComment(rect),
   });
   const hideTooltip = () => setTooltip(null);
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const observer = new ResizeObserver(([entry]) => setWidth(Math.floor(entry.contentRect.width)));
-    observer.observe(container);
+    const scroll = scrollRef.current;
+    if (!scroll) return;
+    const measure = () => {
+      const style = getComputedStyle(scroll);
+      const pad = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+      const next = Math.max(0, Math.floor(scroll.clientWidth - pad));
+      setWidth((current) => (current === next ? current : next));
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(scroll);
+    measure();
     return () => observer.disconnect();
   }, []);
+
+  useLayoutEffect(() => {
+    const node = tooltipRef.current;
+    if (!node || !tooltip) return;
+    const overflow = node.getBoundingClientRect().bottom - (window.innerHeight - 8);
+    if (overflow <= 1) return;
+    setTooltip((current) => {
+      if (!current) return current;
+      const next = Math.max(96, current.maxHeight - overflow);
+      if (next >= current.maxHeight - 1) return current;
+      return { ...current, maxHeight: next };
+    });
+  }, [tooltip]);
 
   useEffect(() => {
     if (!blob || !containerRef.current || !width) return;
@@ -274,6 +336,7 @@ export default function CompareDocumentPreview({ blob, filename, annotations, re
       }
       if (controller.signal.aborted) return;
       container.replaceChildren(...staging.childNodes);
+      if (normalizedFilename.endsWith('.docx')) fitDocxPages(container, width);
       setRenderVersion((version) => version + 1);
     };
     render().catch(() => !controller.signal.aborted && setError('Could not render the uploaded document.'));
@@ -293,26 +356,40 @@ export default function CompareDocumentPreview({ blob, filename, annotations, re
     annotate(container, annotations, originalResume.current, showTooltip, hideTooltip);
   }, [annotations, renderVersion]);
 
+  useEffect(() => {
+    if (!tooltip) return undefined;
+    const hide = () => setTooltip(null);
+    const scroll = scrollRef.current;
+    scroll?.addEventListener('scroll', hide, { passive: true });
+    window.addEventListener('scroll', hide, { passive: true });
+    window.addEventListener('resize', hide);
+    return () => {
+      scroll?.removeEventListener('scroll', hide);
+      window.removeEventListener('scroll', hide);
+      window.removeEventListener('resize', hide);
+    };
+  }, [tooltip]);
+
   return (
     <section data-testid="compare-document-preview" style={{ minWidth: 0, border: '1px solid var(--jb-v3-line)', borderRadius: 12, background: 'var(--jb-v3-panel)', padding: 16 }}>
       <h3 style={{ margin: '0 0 5px', fontSize: 16 }}>Uploaded resume</h3>
       <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--jb-v3-fg-3)' }}>Colored areas show where to review the original file. Hover or focus a highlight for a suggested fix.</p>
       {error && <div role="alert">{error}</div>}
-      <div className="compare-document-scroll" style={{ overflow: 'auto', scrollbarGutter: 'stable', maxHeight: 760, background: '#e7e9ee', padding: 12 }}>
-        <div ref={containerRef} style={{ display: 'grid', justifyItems: 'center', gap: 16 }} />
+      <div ref={scrollRef} className="compare-document-scroll" style={{ overflowX: 'hidden', overflowY: 'auto', minWidth: 0, maxHeight: 760, background: '#e7e9ee', padding: 12 }}>
+        <div ref={containerRef} style={{ display: 'grid', justifyItems: 'center', gap: 16, width: '100%', minWidth: 0 }} />
       </div>
       {tooltip && (
-        <div role="tooltip" style={{ position: 'fixed', zIndex: 1000, top: tooltip.top, left: tooltip.left, width: 310, padding: 12, background: 'var(--jb-v3-panel)', color: 'var(--jb-v3-fg)', border: `1px solid ${tones[tooltip.annotations[0]?.color]?.border || tones.blue.border}`, boxShadow: '0 12px 34px #0003', fontSize: 12, lineHeight: 1.5 }}>
+        <div ref={tooltipRef} role="tooltip" style={{ position: 'fixed', zIndex: 1000, top: tooltip.top, left: tooltip.left, width: tooltip.width, maxHeight: tooltip.maxHeight, overflowY: 'auto', pointerEvents: 'none', padding: 12, background: 'var(--jb-v3-panel)', color: 'var(--jb-v3-fg)', border: `1px solid ${tones[tooltip.annotations[0]?.color]?.border || tones.blue.border}`, boxShadow: '0 12px 34px #0003', fontSize: 12, lineHeight: 1.5 }}>
           {tooltip.annotations.map((annotation) => <div key={annotation.id} style={{ marginBottom: 8 }}><strong>{annotation.message}</strong><br />{annotation.fix}</div>)}
         </div>
       )}
       <style jsx global>{`
-        .compare-pdf-page { position: relative; flex: none; background: white; box-shadow: 0 3px 12px #0002; }
+        .compare-pdf-page { position: relative; flex: none; max-width: 100%; overflow: hidden; background: white; box-shadow: 0 3px 12px #0002; }
         .compare-pdf-text-layer { position: absolute; inset: 0; overflow: clip; line-height: 1; text-align: initial; transform-origin: 0 0; --min-font-size: 1; --min-font-size-inv: 1; --text-scale-factor: var(--total-scale-factor); }
         .compare-pdf-text-layer span, .compare-pdf-text-layer br { position: absolute; color: transparent; white-space: pre; transform-origin: 0 0; cursor: text; }
         .compare-pdf-text-layer > span { font-size: calc(var(--text-scale-factor) * var(--font-height)); transform: rotate(var(--rotate)) scaleX(var(--scale-x)); }
         .compare-pdf-text-layer mark { color: transparent !important; }
-        .compare-document-scroll .docx-wrapper { width: max-content; min-width: 100%; padding: 0; background: transparent; }
+        .compare-document-scroll .docx-wrapper { width: 100%; min-width: 0; max-width: 100%; padding: 0; background: transparent; }
         .compare-document-scroll .docx { box-shadow: 0 3px 12px #0002; }
         .structured-resume-fallback { box-sizing: border-box; width: min(760px, 100%); min-height: 920px; padding: 52px 58px; background: white; color: #171717; box-shadow: 0 3px 12px #0002; font-family: Arial, sans-serif; }
         .structured-resume-fallback section { margin-bottom: 18px; }

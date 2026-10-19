@@ -10,7 +10,7 @@ import {
   updateResume,
 } from '@/services/resumeApi';
 import { uploadResume } from '@/services/api';
-import CompareDocumentPreview from './CompareDocumentPreview';
+import CompareDocumentPreview, { placeComment } from './CompareDocumentPreview';
 
 const colors = {
   red: { border: '#D9485F', bg: 'color-mix(in srgb, #D9485F 8%, transparent)', label: 'Fix first' },
@@ -21,6 +21,8 @@ const emptyAnnotations = [];
 
 const input = {
   width: '100%',
+  minWidth: 0,
+  boxSizing: 'border-box',
   border: '1px solid var(--jb-v3-line)',
   borderRadius: 10,
   background: 'var(--jb-v3-panel)',
@@ -115,7 +117,7 @@ function CompareUpload({ onOpen }) {
         Upload your resume and add the role you have in mind. Get clear scores and practical feedback.
       </p>
       <div style={{ border: '1px solid var(--jb-v3-line)', borderRadius: 14, padding: 26, background: 'var(--jb-v3-panel)' }}>
-        <label style={{ display: 'block', border: '1px dashed var(--jb-v3-line-2)', borderRadius: 10, padding: 24, fontSize: 13, fontWeight: 600 }}>
+        <label style={{ display: 'block', overflow: 'hidden', minWidth: 0, border: '1px dashed var(--jb-v3-line-2)', borderRadius: 10, padding: 24, fontSize: 13, fontWeight: 600 }}>
           <span style={{ display: 'block', marginBottom: 12 }}>01 / Your resume</span>
         <input
           aria-label="Existing resume"
@@ -123,7 +125,7 @@ function CompareUpload({ onOpen }) {
           accept=".pdf,.docx"
           disabled={busy}
           onChange={(event) => setFile(event.target.files?.[0] || null)}
-          style={{ width: '100%', fontSize: 13 }}
+          style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', fontSize: 13 }}
         />
           <span style={{ display: 'block', marginTop: 12, color: 'var(--jb-v3-fg-3)', fontWeight: 400, fontSize: 12 }}>PDF or DOCX · up to 5 MB</span>
         </label>
@@ -145,6 +147,7 @@ function CompareUpload({ onOpen }) {
 }
 
 function AnnotationMarker({ section, annotations }) {
+  const [tip, setTip] = useState(null);
   if (!annotations.length) return null;
   const priority = { red: 3, amber: 2, blue: 1 };
   const color = annotations.reduce(
@@ -152,23 +155,29 @@ function AnnotationMarker({ section, annotations }) {
     'blue',
   );
   const tone = colors[color];
+  const open = (event) => setTip(placeComment(event.currentTarget.getBoundingClientRect()));
   return (
     <span
       className="comparison-annotation"
       data-testid={`annotation-${section}`}
       tabIndex={0}
+      onMouseEnter={open}
+      onMouseLeave={() => setTip(null)}
+      onFocus={open}
+      onBlur={() => setTip(null)}
       style={{ position: 'relative', color: tone.border, fontSize: 11, fontWeight: 800, cursor: 'help' }}
     >
       ● {tone.label}
-      <span
+      {tip && <span
         role="tooltip"
         className="comparison-tooltip"
         style={{
-          position: 'absolute', zIndex: 5, top: 22, right: 0, width: 300,
+          position: 'fixed', zIndex: 1000, top: tip.top, left: tip.left, width: tip.width,
+          maxHeight: tip.maxHeight, overflowY: 'auto', pointerEvents: 'none',
           padding: 12, border: `1px solid ${tone.border}`, borderRadius: 10,
           background: 'var(--jb-v3-panel)', color: 'var(--jb-v3-fg)',
           boxShadow: '0 12px 34px color-mix(in srgb, var(--jb-v3-fg) 16%, transparent)',
-          opacity: 0, visibility: 'hidden', pointerEvents: 'none', lineHeight: 1.45,
+          lineHeight: 1.45,
         }}
       >
         {annotations.map((item) => (
@@ -528,9 +537,6 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
   return (
     <div>
       <style jsx global>{`
-        .comparison-annotation:hover .comparison-tooltip,
-        .comparison-annotation:focus .comparison-tooltip,
-        .comparison-annotation:focus-within .comparison-tooltip { opacity: 1 !important; visibility: visible !important; }
         .compare-loading-panel { display: grid; align-content: start; gap: 11px; padding: 16px; border: 1px solid var(--jb-v3-line); background: var(--jb-v3-panel); border-radius: 3px; }
         .compare-loading-line { display: block; height: 11px; border-radius: 3px; background: linear-gradient(100deg, var(--jb-v3-line) 15%, color-mix(in srgb, var(--jb-v3-line) 35%, var(--jb-v3-panel)) 48%, var(--jb-v3-line) 80%); background-size: 220% 100%; animation: compare-loading-sweep 1.5s ease-in-out infinite; }
         .compare-loading-track { height: 3px; overflow: hidden; background: var(--jb-v3-line); margin-top: 11px; }
@@ -539,6 +545,7 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
         @keyframes compare-loading-travel { from { transform: translateX(-100%); } to { transform: translateX(270%); } }
         @media (prefers-reduced-motion: reduce) { .compare-loading-line, .compare-loading-track::after { animation: none; } }
         .compare-resume-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 370px); gap: 18px; align-items: start; }
+        .compare-resume-layout > * { min-width: 0; }
         @media (max-width: 900px) {
           .compare-resume-layout { grid-template-columns: minmax(0, 1fr); }
           .compare-resume-aside { position: static !important; }
@@ -569,7 +576,7 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
       )}
       {validationError && <div role="alert" style={{ marginBottom: 14, color: 'var(--jb-v3-danger)' }}>{validationError}</div>}
       <div className="compare-resume-layout" aria-busy={comparing}>
-        <div style={{ display: 'grid', gap: 12 }}>
+        <div style={{ display: 'grid', gap: 12, minWidth: 0 }}>
           <>
           {sourceBlob ? (
             <CompareDocumentPreview blob={sourceBlob} filename={resume.source?.originalFilename || 'resume.pdf'} annotations={annotations} resume={resume} />
@@ -578,7 +585,7 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
               <div>{sourceError} Re-upload the original PDF or DOCX to preview it here.</div>
               <label style={{ display: 'block', marginTop: 10, fontSize: 13 }}>
                 Re-upload original resume
-                <input type="file" accept=".pdf,.doc,.docx" disabled={sourceBusy} onChange={(event) => reattachSource(event.target.files?.[0])} style={{ display: 'block', marginTop: 6 }} />
+                <input type="file" accept=".pdf,.doc,.docx" disabled={sourceBusy} onChange={(event) => reattachSource(event.target.files?.[0])} style={{ display: 'block', marginTop: 6, maxWidth: '100%', minWidth: 0 }} />
               </label>
             </div>
           ) : !assessment && !message ? (
