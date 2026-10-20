@@ -70,6 +70,11 @@ export interface StartSessionInput {
   templateKey?: string;
   /** Initial knob choices over that template. */
   vibe?: VibeState;
+  /**
+   * Server-built facts appended to the candidate file. Not accepted from the
+   * public start DTO, so a browser cannot supply biographical text.
+   */
+  candidateAddendum?: string;
 }
 
 export interface RunTurnInput {
@@ -306,7 +311,10 @@ export class ResumeHarnessService {
     // Built before the session document because the session records the name,
     // which later turns check the finished résumé actually contains.
     const context = await this.candidateContext.build(userId);
-    const candidateMarkdown = this.withTarget(context.markdown, resolvedInput);
+    let candidateMarkdown = this.withTarget(context.markdown, resolvedInput);
+    if (input.candidateAddendum?.trim()) {
+      candidateMarkdown = `${candidateMarkdown.trim()}\n\n${input.candidateAddendum.trim()}\n`;
+    }
 
     // One live container per user. A second Start (or a harness change)
     // replaces the old box rather than stacking until TTL.
@@ -1509,18 +1517,12 @@ export class ResumeHarnessService {
       this.logger.warn(
         `${adapter.id} exited ${result.exitCode}: ${result.stderr?.slice(0, 400)}`,
       );
-      const detail = (parsed?.error || streamError || result.stderr || result.stdout || 'unknown harness error')
-        .trim()
-        .slice(0, 400);
-      throw new ServiceUnavailableException(
-        `${adapter.displayName} failed before the résumé could be verified: ${detail}`,
-      );
+      const detail = [result.stderr, parsed?.error, streamError, result.stdout].filter(Boolean).join('\n');
+      throw new ServiceUnavailableException(publicTurnFailure(detail));
     }
     if (parsed) {
       const failure = parsed.error || streamError;
-      if (failure) throw new ServiceUnavailableException(
-        `${adapter.displayName} failed before the résumé could be verified: ${failure.slice(0, 240)}`,
-      );
+      if (failure) throw new ServiceUnavailableException(publicTurnFailure(failure));
       return parsed.response?.slice(-6000);
     }
     return (result.stdout || '').trim().slice(-6000) || undefined;
@@ -1844,4 +1846,13 @@ export class ResumeHarnessService {
       archivedAt: session.archivedAt,
     };
   }
+}
+
+function publicTurnFailure(detail: string): string {
+  const text = detail.replace(/\s+/g, ' ').trim();
+  if (/timed out|timeout/i.test(text)) return 'The résumé could not be finished in time. Try again.';
+  if (!text || /claude code|opencode|\bcodex\b|docker|harness/i.test(text)) {
+    return 'The résumé could not be verified. Try again.';
+  }
+  return text.slice(0, 240);
 }

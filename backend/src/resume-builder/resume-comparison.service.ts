@@ -12,6 +12,10 @@ import { StorageService } from '../storage';
 import { randomUUID } from 'crypto';
 import { extname } from 'path';
 import { CandidateResumeReviewAgent } from './candidate-resume-review.agent';
+import { CandidateAtsReviewSession, CandidateAtsReviewSessionDocument } from './schemas/candidate-ats-review-session.schema';
+import { ResumeHarnessService } from '../resume-harness/resume-harness.service';
+import { ModelAliasService } from '../resume-harness/model-alias.service';
+import { correctionInstruction, importedResumeFacts } from './compare-correction';
 
 export type ResumeComparisonAnnotation = {
   id: string;
@@ -35,7 +39,44 @@ export class ResumeComparisonService {
     private readonly ats: AtsParseabilityService,
     private readonly matcher: AtsMatchService,
     private readonly agentReview: CandidateResumeReviewAgent,
+    private readonly harness: ResumeHarnessService,
+    private readonly aliases: ModelAliasService,
+    @InjectModel(CandidateAtsReviewSession.name)
+    private readonly reviews: Model<CandidateAtsReviewSessionDocument>,
   ) {}
+
+  async prepareCorrection(resumeId: string, userId: string, templateKey?: string) {
+    const resume = await this.resumeModel
+      .findOne({ _id: resumeId, userId: new Types.ObjectId(userId) })
+      .exec();
+    if (!resume) throw new NotFoundException('Resume not found');
+    if (resume.creationMethod !== 'imported') {
+      throw new BadRequestException('Only an imported résumé can be corrected from a comparison.');
+    }
+    const review = await this.reviews
+      .findOne({ userId: new Types.ObjectId(userId), resumeId, status: 'completed' })
+      .sort({ createdAt: -1 })
+      .exec();
+    if (!review?.result) {
+      throw new BadRequestException('Compare this résumé before generating a corrected version.');
+    }
+    const alias = await this.aliases.resolveAutomaticForUser(userId);
+    const jobDescription = resume.source?.jobDescription?.trim();
+    const jobUrl = resume.source?.jobUrl?.trim();
+    const session = await this.harness.startSession(userId, {
+      model: alias.model,
+      effort: alias.effort,
+      ...(templateKey?.trim() ? { templateKey: templateKey.trim() } : {}),
+      ...(resume.name?.trim() ? { targetRole: resume.name.trim() } : {}),
+      ...(jobDescription ? { jobDescription } : {}),
+      ...(!jobDescription && jobUrl ? { jobUrl } : {}),
+      candidateAddendum: importedResumeFacts(resume),
+    });
+    return {
+      session,
+      instruction: correctionInstruction(review.result.annotations || []),
+    };
+  }
 
   async attachSource(resumeId: string, userId: string, file: Express.Multer.File) {
     const resume = await this.resumeModel

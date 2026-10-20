@@ -1,11 +1,19 @@
 import { BadRequestException, Body, Controller, Get, Param, Post, Request, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { IsOptional, IsString, MaxLength } from 'class-validator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { extname } from 'path';
 import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ResumeComparisonService } from './resume-comparison.service';
+
+class CorrectResumeDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  templateKey?: string;
+}
 
 @ApiTags('resume-builder')
 @ApiBearerAuth()
@@ -35,6 +43,16 @@ export class ResumeComparisonController {
     response.setHeader('Content-Disposition', 'inline');
     response.setHeader('Cache-Control', 'private, no-store');
     response.send(source.buffer);
+  }
+
+  @Post(':id/correct')
+  @ApiOperation({ summary: 'Start a corrected résumé in a generate template from the latest comparison' })
+  correct(
+    @Param('id') id: string,
+    @Body() body: CorrectResumeDto,
+    @Request() req: any,
+  ) {
+    return this.comparison.prepareCorrection(id, req.user._id.toString(), body?.templateKey);
   }
 
   @Post(':id/compare')

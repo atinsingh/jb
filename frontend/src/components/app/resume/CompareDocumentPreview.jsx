@@ -166,8 +166,9 @@ async function renderPdf(blob, container, signal, width) {
     if (signal.aborted) break;
     sheet.appendChild(canvas);
     const layer = document.createElement('div');
-    layer.className = 'compare-pdf-text-layer';
+    layer.className = 'compare-pdf-text-layer textLayer';
     layer.style.setProperty('--total-scale-factor', String(scale));
+    layer.style.setProperty('--scale-factor', String(scale));
     sheet.appendChild(layer);
     container.appendChild(sheet);
     const textLayer = new pdfjs.TextLayer({ textContentSource: await page.getTextContent(), container: layer, viewport });
@@ -251,22 +252,22 @@ function fitDocxPages(root, available) {
   if (!pages.length || available <= 0) return;
   const wrapper = root.querySelector('.docx-wrapper');
   if (wrapper) {
-    wrapper.style.width = '100%';
-    wrapper.style.minWidth = '0';
-    wrapper.style.maxWidth = '100%';
+    wrapper.style.width = 'max-content';
+    wrapper.style.maxWidth = 'none';
     wrapper.style.padding = '0';
-    wrapper.style.overflow = 'hidden';
+    wrapper.style.background = 'transparent';
   }
   for (const page of pages) {
+    page.style.maxWidth = 'none';
     page.style.margin = '0';
-    const natural = page.offsetWidth || parseFloat(page.style.width) || 0;
-    if (!natural || natural <= available) continue;
+    const natural = page.scrollWidth || page.offsetWidth || parseFloat(page.style.width) || 0;
+    if (!natural || natural <= available + 1) continue;
     const scale = available / natural;
     const height = page.offsetHeight || parseFloat(page.style.minHeight) || 0;
     const slot = document.createElement('div');
-    slot.style.cssText = `width:100%;height:${Math.ceil(height * scale)}px;overflow:hidden;display:flex;justify-content:center`;
+    slot.style.cssText = `width:${Math.floor(available)}px;height:${Math.ceil(height * scale)}px;overflow:hidden`;
     page.style.transform = `scale(${scale})`;
-    page.style.transformOrigin = 'top center';
+    page.style.transformOrigin = 'top left';
     page.parentNode.insertBefore(slot, page);
     slot.appendChild(page);
   }
@@ -384,12 +385,15 @@ export default function CompareDocumentPreview({ blob, filename, annotations, re
         </div>
       )}
       <style jsx global>{`
-        .compare-pdf-page { position: relative; flex: none; max-width: 100%; overflow: hidden; background: white; box-shadow: 0 3px 12px #0002; }
-        .compare-pdf-text-layer { position: absolute; inset: 0; overflow: clip; line-height: 1; text-align: initial; transform-origin: 0 0; --min-font-size: 1; --min-font-size-inv: 1; --text-scale-factor: var(--total-scale-factor); }
-        .compare-pdf-text-layer span, .compare-pdf-text-layer br { position: absolute; color: transparent; white-space: pre; transform-origin: 0 0; cursor: text; }
-        .compare-pdf-text-layer > span { font-size: calc(var(--text-scale-factor) * var(--font-height)); transform: rotate(var(--rotate)) scaleX(var(--scale-x)); }
-        .compare-pdf-text-layer mark { color: transparent !important; }
-        .compare-document-scroll .docx-wrapper { width: 100%; min-width: 0; max-width: 100%; padding: 0; background: transparent; }
+        .compare-pdf-page { position: relative; flex: none; overflow: hidden; background: white; box-shadow: 0 3px 12px #0002; }
+        .compare-pdf-text-layer { position: absolute; inset: 0; overflow: clip; line-height: 1; text-align: initial; transform-origin: 0 0; z-index: 1; --min-font-size: 1; --min-font-size-inv: 1; --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size)); }
+        .compare-pdf-text-layer :is(span, br) { position: absolute; color: transparent; white-space: pre; transform-origin: 0 0; cursor: text; }
+        .compare-pdf-text-layer .markedContent { display: contents; }
+        .compare-pdf-text-layer > :not(.markedContent),
+        .compare-pdf-text-layer .markedContent span:not(.markedContent) { z-index: 1; --font-height: 0; font-size: calc(var(--text-scale-factor) * var(--font-height)); --scale-x: 1; --rotate: 0deg; transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv)); }
+        .compare-pdf-text-layer mark { color: transparent !important; background: color-mix(in srgb, #4263EB 28%, transparent); }
+        .compare-document-scroll .docx-wrapper { width: max-content; max-width: none; padding: 0; background: transparent; }
+        .compare-document-scroll section.docx { max-width: none; }
         .compare-document-scroll .docx { box-shadow: 0 3px 12px #0002; }
         .structured-resume-fallback { box-sizing: border-box; width: min(760px, 100%); min-height: 920px; padding: 52px 58px; background: white; color: #171717; box-shadow: 0 3px 12px #0002; font-family: Arial, sans-serif; }
         .structured-resume-fallback section { margin-bottom: 18px; }

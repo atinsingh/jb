@@ -85,8 +85,6 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
       const completed = await this.sessionModel.findOne({
         userId: input.userId,
         resumeId: input.resumeId,
-        jobDescriptionHash,
-        resumeTextHash,
         status: 'completed',
       }).sort({ createdAt: -1 }).lean().exec();
       if (completed?.result) return completed.result as CandidateResumeReviewResult;

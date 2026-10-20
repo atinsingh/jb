@@ -23,9 +23,9 @@ export default function HomeV3() {
         </div>
         <div className={styles.videoFrame}>
           <div className={styles.windowBar}><span className={styles.windowDots} aria-hidden="true">● ● ●</span><span>Jobocate / Resume comparison</span><span>Product walkthrough</span></div>
-          <video autoPlay muted loop playsInline preload="metadata" poster="/demo/resume-comparison-poster.jpg?v=google-walkthrough" aria-label="Google sign-in, resume comparison and highlighted PDF feedback using Harkit Singh Chhabra’s resume">
-            <source src="/demo/resume-comparison.webm?v=google-walkthrough" type="video/webm" />
-            <track kind="captions" src="/demo/resume-comparison.vtt?v=google-walkthrough" srcLang="en" label="English" default />
+          <video autoPlay muted loop playsInline preload="metadata" poster="/demo/resume-comparison-poster.jpg?v=product-walkthrough-5" aria-label="Upload a resume, add a job description, and review scores with highlighted feedback">
+            <source src="/demo/resume-comparison.webm?v=product-walkthrough-5" type="video/webm" />
+            <track kind="captions" src="/demo/resume-comparison.vtt?v=product-walkthrough-5" srcLang="en" label="English" default />
             Your browser does not support video. Read the walkthrough below.
           </video>
         </div>
@@ -33,6 +33,25 @@ export default function HomeV3() {
           <li><span>01</span><div><h3>Bring your resume</h3><p>Upload your existing PDF or DOCX.</p></div></li>
           <li><span>02</span><div><h3>Add the role</h3><p>Paste a job description or posting link.</p></div></li>
           <li><span>03</span><div><h3>Find your next edit</h3><p>Review scores, missing skills and highlighted feedback.</p></div></li>
+        </ol>
+      </section>
+      <section id="generate-demo" className={styles.demo} aria-labelledby="generate-demo-heading">
+        <div className={styles.sectionHeading}>
+          <div><p className={styles.eyebrow}>Create</p><h2 id="generate-demo-heading">From profile to a resume.</h2></div>
+          <p>Your experience. A template.<br />A document you can keep editing.</p>
+        </div>
+        <div className={styles.videoFrame}>
+          <div className={styles.windowBar}><span className={styles.windowDots} aria-hidden="true">● ● ●</span><span>Jobocate / Resume generation</span><span>Product walkthrough</span></div>
+          <video autoPlay muted loop playsInline preload="metadata" poster="/demo/resume-generate-poster.jpg?v=product-walkthrough-2" aria-label="Choose a template, generate a resume, and review the ATS match">
+            <source src="/demo/resume-generate.webm?v=product-walkthrough-2" type="video/webm" />
+            <track kind="captions" src="/demo/resume-generate.vtt?v=product-walkthrough-2" srcLang="en" label="English" default />
+            Your browser does not support video. Read the walkthrough below.
+          </video>
+        </div>
+        <ol className={styles.steps}>
+          <li><span>01</span><div><h3>Choose a template</h3><p>Pick a layout. Your content stays with it.</p></div></li>
+          <li><span>02</span><div><h3>Add the role</h3><p>Name the job and paste the description.</p></div></li>
+          <li><span>03</span><div><h3>Review the PDF</h3><p>Read the finished resume, then keep refining it.</p></div></li>
         </ol>
       </section>
       <section id="candidates" className={styles.features} aria-label="Candidate tools">

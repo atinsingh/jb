@@ -5,10 +5,12 @@ import {
   compareResume,
   getResumeById,
   importResume,
+  prepareCompareCorrection,
   uploadCompareSource,
   getCompareSource,
   updateResume,
 } from '@/services/resumeApi';
+import { compareCorrectionKey, getResumeTemplates } from '@/services/resumeHarnessApi';
 import { uploadResume } from '@/services/api';
 import CompareDocumentPreview, { placeComment } from './CompareDocumentPreview';
 
@@ -156,10 +158,18 @@ function AnnotationMarker({ section, annotations }) {
   );
   const tone = colors[color];
   const open = (event) => setTip(placeComment(event.currentTarget.getBoundingClientRect()));
+  const tooltipStyle = tip ? {
+    position: 'fixed', zIndex: 1000, top: tip.top, left: tip.left, width: tip.width,
+    maxHeight: tip.maxHeight, overflowY: 'auto', pointerEvents: 'none',
+    padding: 12, border: '1px solid ' + tone.border, borderRadius: 10,
+    background: 'var(--jb-v3-panel)', color: 'var(--jb-v3-fg)',
+    boxShadow: '0 12px 34px color-mix(in srgb, var(--jb-v3-fg) 16%, transparent)',
+    lineHeight: 1.45,
+  } : null;
   return (
     <span
       className="comparison-annotation"
-      data-testid={`annotation-${section}`}
+      data-testid={'annotation-' + section}
       tabIndex={0}
       onMouseEnter={open}
       onMouseLeave={() => setTip(null)}
@@ -167,25 +177,18 @@ function AnnotationMarker({ section, annotations }) {
       onBlur={() => setTip(null)}
       style={{ position: 'relative', color: tone.border, fontSize: 11, fontWeight: 800, cursor: 'help' }}
     >
-      ● {tone.label}
-      {tip && <span
-        role="tooltip"
-        className="comparison-tooltip"
-        style={{
-          position: 'fixed', zIndex: 1000, top: tip.top, left: tip.left, width: tip.width,
-          maxHeight: tip.maxHeight, overflowY: 'auto', pointerEvents: 'none',
-          padding: 12, border: `1px solid ${tone.border}`, borderRadius: 10,
-          background: 'var(--jb-v3-panel)', color: 'var(--jb-v3-fg)',
-          boxShadow: '0 12px 34px color-mix(in srgb, var(--jb-v3-fg) 16%, transparent)',
-          lineHeight: 1.45,
-        }}
-      >
-        {annotations.map((item) => (
-          <span key={item.id} style={{ display: 'block', marginBottom: 8 }}>
-            {item.quote && <b>“{item.quote}” — </b>}{item.message} <b>{item.fix}</b>
-          </span>
-        ))}
-      </span>
+      {'● ' + tone.label}
+      {tip ? (
+        <span role="tooltip" className="comparison-tooltip" style={tooltipStyle}>
+          {annotations.map((item) => (
+            <span key={item.id} style={{ display: 'block', marginBottom: 8 }}>
+              {item.quote ? <strong>{item.quote + ' — '}</strong> : null}
+              {item.message + ' '}
+              <strong>{item.fix}</strong>
+            </span>
+          ))}
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -379,7 +382,7 @@ function validateDetails(resume) {
   return '';
 }
 
-export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonSettled }) {
+export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonSettled, onCorrected }) {
   const [resume, setResume] = useState(null);
   const [assessment, setAssessment] = useState(null);
   const [jobDescription, setJobDescription] = useState('');
@@ -391,7 +394,41 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
   const [sourceBlob, setSourceBlob] = useState(null);
   const [sourceError, setSourceError] = useState('');
   const [sourceBusy, setSourceBusy] = useState(false);
+  const [templates, setTemplates] = useState([]);
+  const [templateKey, setTemplateKey] = useState('');
+  const [correcting, setCorrecting] = useState(false);
   const compareRequest = useRef(0);
+
+  useEffect(() => {
+    if (!assessment || templates.length) return undefined;
+    let cancelled = false;
+    getResumeTemplates()
+      .then((list) => {
+        if (cancelled) return;
+        const rows = Array.isArray(list) ? list : [];
+        setTemplates(rows);
+        setTemplateKey((current) => current || rows[0]?.key || '');
+      })
+      .catch(() => {
+        if (!cancelled) setTemplates([]);
+      });
+    return () => { cancelled = true; };
+  }, [assessment, templates.length]);
+
+  const correct = async () => {
+    if (!resumeId || correcting) return;
+    setCorrecting(true);
+    setMessage('');
+    try {
+      const prepared = await prepareCompareCorrection(resumeId, templateKey ? { templateKey } : {});
+      window.sessionStorage.setItem(compareCorrectionKey(prepared.session.id), prepared.instruction);
+      onCorrected?.(prepared.session.id);
+    } catch (cause) {
+      setMessage(cause?.message || 'A corrected résumé could not be started.');
+    } finally {
+      setCorrecting(false);
+    }
+  };
 
   const runComparison = useCallback(async (id = resumeId, jd = jobDescription, url = jobUrl) => {
     if (!id) return;
@@ -587,7 +624,7 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
         <div style={{ display: 'grid', gap: 12, minWidth: 0 }}>
           <>
           {sourceBlob ? (
-            <CompareDocumentPreview blob={sourceBlob} filename={resume.source?.originalFilename || 'resume.pdf'} annotations={annotations} resume={resume} />
+            <CompareDocumentPreview blob={sourceBlob} filename={resume.source?.originalFilename || 'resume.pdf'} annotations={comparing ? emptyAnnotations : annotations} resume={resume} />
           ) : sourceError ? (
             <div role="status" style={{ padding: 12, border: '1px solid var(--jb-v3-line)' }}>
               <div>{sourceError} Re-upload the original PDF or DOCX to preview it here.</div>
@@ -671,7 +708,7 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
 
         <aside className="compare-resume-aside" style={{ position: 'sticky', top: 18, border: '1px solid var(--jb-v3-line)', borderRadius: 10, padding: 16, background: 'var(--jb-v3-panel)' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: 15 }}>Comparison</h3>
-          {comparing && !assessment ? <ComparisonLoading scores /> : <>
+          {comparing ? <ComparisonLoading scores /> : <>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9, marginBottom: 14 }}>
             <Score label="ATS Match Percentage" value={assessment?.ats?.score} suffix="%" testId="compare-ats-score" cardTestId="compare-ats-card" caption="Document compatibility" />
             <Score label="Job Match" value={assessment?.match?.coverage} suffix="%" testId="compare-match-score" cardTestId="compare-match-card" caption="Required skills covered" />
@@ -680,8 +717,8 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
           {(assessment?.ats?.explanation || assessment?.match?.explanation) && (
             <details data-testid="comparison-score-reasons" style={{ fontSize: 11.5, margin: '0 0 12px' }}>
               <summary style={{ cursor: 'pointer', fontWeight: 700 }}>How scoring works</summary>
-              {assessment?.ats?.explanation && <p><b>ATS:</b> {assessment.ats.explanation}</p>}
-              {assessment?.match?.explanation && <p><b>Job match:</b> {assessment.match.explanation}</p>}
+              {assessment?.ats?.explanation ? <p><strong>ATS:</strong> {assessment.ats.explanation}</p> : null}
+              {assessment?.match?.explanation ? <p><strong>Job match:</strong> {assessment.match.explanation}</p> : null}
             </details>
           )}
           <AiPatternBreakdown result={assessment?.aiContent} />
@@ -711,6 +748,21 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
           <button type="button" onClick={() => runComparison()} disabled={busy || (!jobDescription.trim() && !jobUrl.trim())} style={{ ...button, width: '100%', marginTop: 10, opacity: busy || (!jobDescription.trim() && !jobUrl.trim()) ? 0.55 : 1 }}>
             {comparing ? 'Comparing…' : 'Refresh comparison'}
           </button>
+          {assessment && (
+            <div style={{ marginTop: 14 }}>
+              {!!templates.length && (
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700 }}>
+                  Template
+                  <select aria-label="Corrected résumé template" value={templateKey} onChange={(event) => setTemplateKey(event.target.value)} disabled={correcting} style={{ ...input, marginTop: 6 }}>
+                    {templates.map((template) => <option key={template.key} value={template.key}>{template.name}</option>)}
+                  </select>
+                </label>
+              )}
+              <button type="button" data-testid="compare-correct" onClick={correct} disabled={correcting || comparing} style={{ ...button, width: '100%', marginTop: 10, opacity: correcting || comparing ? 0.55 : 1 }}>
+                {correcting ? 'Starting corrected résumé…' : 'Generate corrected résumé'}
+              </button>
+            </div>
+          )}
 
         </aside>
       </div>

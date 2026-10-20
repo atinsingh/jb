@@ -54,6 +54,9 @@ describe('ResumeComparisonService', () => {
     source: 'agent-session', sessionId: 'review-1', harness: 'opencode', modelAlias: 'automatic',
     ats: { explanation: 'Review of the original document.' }, match: { explanation: 'Review against the job.' }, annotations: [],
   }) };
+  const harness = { startSession: jest.fn() };
+  const aliases = { resolveAutomaticForUser: jest.fn() };
+  const reviews = { findOne: jest.fn() };
 
   let service: ResumeComparisonService;
 
@@ -71,6 +74,9 @@ describe('ResumeComparisonService', () => {
       new AtsParseabilityService(),
       new AtsMatchService(),
       agent,
+      harness,
+      aliases,
+      reviews,
     );
 
   });
@@ -227,6 +233,39 @@ describe('ResumeComparisonService', () => {
     await expect(service.compare('resume-1', userId, {})).rejects.toBeInstanceOf(
       BadRequestException,
     );
+  });
+
+  it('starts a template session from the uploaded résumé and the latest review fixes', async () => {
+    resumeModel.findOne.mockReturnValue({ exec: () => Promise.resolve({
+      ...resume,
+      name: 'Backend résumé',
+      source: { jobDescription: 'Backend engineer' },
+    }) });
+    reviews.findOne.mockReturnValue({ sort: () => ({ exec: async () => ({
+      result: { annotations: [{ message: 'Vague', fix: 'Name the billing system.', quote: 'Built APIs.' }] },
+    }) }) });
+    aliases.resolveAutomaticForUser.mockResolvedValue({ model: 'nova', effort: 'low' });
+    harness.startSession.mockResolvedValue({ id: 'session-1' });
+
+    const prepared = await service.prepareCorrection('resume-1', userId, 'classic');
+
+    expect(harness.startSession).toHaveBeenCalledWith(userId, expect.objectContaining({
+      model: 'nova',
+      effort: 'low',
+      templateKey: 'classic',
+      targetRole: 'Backend résumé',
+      jobDescription: 'Backend engineer',
+      candidateAddendum: expect.stringContaining('Acme'),
+    }));
+    expect(prepared.instruction).toContain('Name the billing system.');
+    expect(prepared.session.id).toBe('session-1');
+  });
+
+  it('does not start a corrected résumé before a comparison exists', async () => {
+    reviews.findOne.mockReturnValue({ sort: () => ({ exec: async () => null }) });
+
+    await expect(service.prepareCorrection('resume-1', userId, 'classic')).rejects.toBeInstanceOf(BadRequestException);
+    expect(harness.startSession).not.toHaveBeenCalled();
   });
 
   it('does not expose another user\'s imported resume', async () => {

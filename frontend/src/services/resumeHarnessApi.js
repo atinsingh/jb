@@ -55,6 +55,9 @@ export const getHarnessBudget = () => apiCall("/api/resume-harness/budget");
 export const getResumeTemplates = () =>
   apiCall("/api/resume-harness/templates");
 
+export const compareCorrectionKey = (sessionId) =>
+  `jobocate.compareCorrection.${sessionId}`;
+
 /**
  * POST /api/resume-harness/sessions
  * { model, effort, targetRole?, jobDescription?, jobUrl?, carryFromSessionId?,

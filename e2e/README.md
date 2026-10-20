@@ -120,9 +120,9 @@ db.jobs.deleteMany({ title: /e2e-auto/ })
 db.jobprofiles.deleteMany({ profileName: /e2e-auto/ })
 ```
 
-The suite does **not** clean up after itself. That is deliberate: when a test
-fails, the state that produced it is still there to inspect. Sweep periodically
-with the queries above.
+Mongo rows are left in place so a failed run can still be inspected. Sweep
+them periodically with the queries above. Supabase auth users tagged `e2e-auto`
+are deleted at the end of the run; accounts without that tag are kept.
 
 ## Adding a page
 

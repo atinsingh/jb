@@ -215,6 +215,29 @@ describe('LiteLlmCandidateResumeReviewAgent session runtime', () => {
     })).rejects.toThrow(/contradicts the original résumé/i);
   });
 
+  it('reopens the latest completed review when the extracted text no longer matches', async () => {
+    const prior = {
+      result: {
+        source: 'agent-session', sessionId: 'saved-review', harness: 'claude-code',
+        modelAlias: 'anthropic/claude-haiku-4-5/low', ats: { score: 70, findings: [] },
+        match: { coverage: 60, matched: [], missing: [], keywordCount: 0 }, annotations: [],
+      },
+    };
+    sessionModel.findOne.mockReturnValue({ sort: () => ({ lean: () => ({ exec: async () => prior }) }) });
+
+    const result = await agent.review({
+      userId: 'user-1', resumeId: 'resume-1',
+      resumeText: 'A later extraction of the same file',
+      jobDescription: 'A different posting',
+    });
+
+    expect(result.sessionId).toBe('saved-review');
+    expect(sessionModel.create).not.toHaveBeenCalled();
+    expect(sessionModel.findOne).toHaveBeenCalledWith({
+      userId: 'user-1', resumeId: 'resume-1', status: 'completed',
+    });
+  });
+
   it('reuses a completed identical review on reopen without consuming another credit', async () => {
     const prior = {
       result: {
