@@ -31,6 +31,10 @@ export default function EmployerSettings() {
   const [conciergeSaved, setConciergeSaved] = useState(false);
   const [conciergeSaving, setConciergeSaving] = useState(false);
   const [conciergeError, setConciergeError] = useState(null);
+  const [payouts, setPayouts] = useState(null);
+  const [payoutError, setPayoutError] = useState(null);
+  const [payoutsBusy, setPayoutsBusy] = useState(false);
+  const [bookings, setBookings] = useState([]);
 
   const loadAccount = async () => {
     setError(null);
@@ -59,7 +63,25 @@ export default function EmployerSettings() {
     if (current.status === 'fulfilled') setCycle(current.value.subscription?.billingCycle || 'monthly');
     setPlanError(current.status === 'rejected' ? current.reason : plans.status === 'rejected' ? plans.reason : null);
   };
-  useEffect(() => { loadAccount(); loadPlan(); }, []);
+  const loadPayouts = async () => {
+    try {
+      setPayouts(await employerBillingApi.connect());
+      setPayoutError(null);
+    } catch (err) { setPayoutError(err); }
+    try { setBookings((await employerBillingApi.conciergeBookings()).bookings || []); } catch { setBookings([]); }
+  };
+  const startPayouts = async () => {
+    setPayoutsBusy(true); setPayoutError(null);
+    try {
+      const result = await employerBillingApi.connectOnboard();
+      if (!result.url) throw new Error('Payout setup is unavailable. Please try again.');
+      window.location.assign(result.url);
+    } catch (err) { setPayoutError(err); setPayoutsBusy(false); }
+  };
+  useEffect(() => { loadAccount(); loadPlan(); loadPayouts(); }, []);
+  useEffect(() => {
+    if (router.isReady && router.query.connect === 'refresh') startPayouts();
+  }, [router.isReady, router.query.connect]);
 
   const save = async (event) => {
     event.preventDefault();
@@ -122,7 +144,8 @@ export default function EmployerSettings() {
     ['Headline', concierge.headline.trim().length > 0],
     ['Bio of at least 80 characters', concierge.bio.trim().length >= 80],
     ['At least one specialty', splitList(concierge.specialties).length > 0],
-    ['Hourly rate between $10 and $1,000', Number.isInteger(rate) && rate >= 10 && rate <= 1000],
+    ['Hourly rate between CA$10 and CA$1,000', Number.isInteger(rate) && rate >= 10 && rate <= 1000],
+    ['Payouts enabled', !!payouts?.payoutsEnabled],
   ];
   const conciergeReady = checklist.every(([, done]) => done);
 
@@ -152,7 +175,16 @@ export default function EmployerSettings() {
           </section>
           <section aria-label="Concierge profile" className={styles.panel}>
             <h2>Concierge profile</h2>
-            <p>Candidates see this profile when they book an hourly concierge session.</p>
+            <p>Candidates see this profile when they book an hourly concierge session. Payouts go to a Canadian Stripe account.</p>
+            <p>{router.query.connect === 'return' ? 'Back from Stripe. ' : ''}{payouts?.payoutsEnabled ? 'Payouts enabled.' : payouts?.detailsSubmitted ? 'Stripe has your details. Payouts are not enabled yet.' : 'Payouts are not set up.'}</p>
+            <InlineError error={payoutError} />
+            <button type="button" className={styles.primary} onClick={startPayouts} disabled={payoutsBusy}>{payoutsBusy ? 'Opening Stripe…' : payouts?.detailsSubmitted ? 'Update payouts' : 'Set up payouts'}</button>
+            <h3>Bookings</h3>
+            {bookings.length === 0 ? <p>No concierge bookings yet.</p> : (
+              <ul aria-label="Concierge bookings">
+                {bookings.map((booking) => <li key={booking.id}>{booking.counterpartName} bought {booking.hours}h for CA${(booking.amountCents / 100).toFixed(0)}. You receive CA${((booking.amountCents - booking.feeCents) / 100).toFixed(0)}.</li>)}
+              </ul>
+            )}
             {error ? <ErrorState error={error} onRetry={loadAccount} tone="dark" /> : !profile ? <LoadingState tone="dark" /> : (
               <form onSubmit={saveConcierge}>
                 <ul aria-label="Profile checklist" className="checklist">
@@ -165,7 +197,7 @@ export default function EmployerSettings() {
                 </span></label>
                 <label><span>Specialties</span><input type="text" placeholder="Resume reviews, Interview prep" value={concierge.specialties} onChange={editConcierge('specialties')} /></label>
                 <label><span>Years of experience</span><input type="number" min={0} max={60} step={1} value={concierge.yearsExperience} onChange={editConcierge('yearsExperience')} /></label>
-                <label><span>Hourly rate (USD)</span><input type="number" min={10} max={1000} step={1} value={concierge.hourlyRate} onChange={editConcierge('hourlyRate')} /></label>
+                <label><span>Hourly rate (CAD)</span><input type="number" min={10} max={1000} step={1} value={concierge.hourlyRate} onChange={editConcierge('hourlyRate')} /></label>
                 <label><span>Languages</span><input type="text" placeholder="English, French" value={concierge.languages} onChange={editConcierge('languages')} /></label>
                 <label><span>Timezone</span><input type="text" value={concierge.timezone} onChange={editConcierge('timezone')} /></label>
                 <label className="check"><input type="checkbox" checked={concierge.published} disabled={!conciergeReady} onChange={editConcierge('published')} /><span>Publish profile</span></label>

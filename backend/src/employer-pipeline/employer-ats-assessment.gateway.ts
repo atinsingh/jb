@@ -13,6 +13,7 @@ import {
   AiBudgetExhaustedException,
   AiBudgetOperationInProgressException,
 } from '../ai-budget/ai-budget.errors';
+import { hideWorkspaceFiles } from '../resume-harness/workspace-voice';
 
 export type AtsAssessmentStatus =
   | 'NOT_RUN'
@@ -192,7 +193,7 @@ export class EmployerAtsGateway implements EmployerAtsAssessmentGateway {
       semanticMatch: result.semanticMatch,
       subScores: result.subScores,
       gaps: result.keywordGaps,
-      suggestions: result.suggestions,
+      suggestions: (result.suggestions || []).map((item) => hideWorkspaceFiles(item)),
       modelAlias: run.alias,
       effort: run.effort,
       harness: 'ats',

@@ -24,6 +24,7 @@ describe('UsersService (concierge profile)', () => {
 
   const selectMock = jest.fn();
   const userModel: any = {
+    findById: jest.fn(async () => ({ connectPayoutsEnabled: true })),
     findByIdAndUpdate: jest.fn(() => ({ select: selectMock })),
   };
 
@@ -56,6 +57,14 @@ describe('UsersService (concierge profile)', () => {
     await expect(
       service.updateProfile('user-1', { conciergeProfile: incomplete } as any),
     ).rejects.toThrow(BadRequestException);
+    expect(userModel.findByIdAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it('rejects publishing before payouts are enabled', async () => {
+    userModel.findById.mockResolvedValueOnce({ connectPayoutsEnabled: false });
+    await expect(
+      service.updateProfile('user-1', { conciergeProfile: validConcierge } as any),
+    ).rejects.toThrow(/Set up payouts/);
     expect(userModel.findByIdAndUpdate).not.toHaveBeenCalled();
   });
 

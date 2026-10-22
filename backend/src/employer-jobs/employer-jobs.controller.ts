@@ -54,7 +54,7 @@ export class EmployerJobsController {
   @Post('generate-description')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
-    summary: 'AI-draft a job description from what the employer has entered',
+    summary: 'Draft a job description from what the employer has entered',
     description:
       'Drafts description/responsibilities/requirements/benefits from the ' +
       'title, company, location and skills already typed into the post-a-job ' +

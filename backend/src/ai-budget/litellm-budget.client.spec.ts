@@ -213,7 +213,7 @@ describe('LiteLlmBudgetClient', () => {
         statusCode: 503,
         code: 'AI_BUDGET_UNAVAILABLE',
         message:
-          'AI budget is temporarily unavailable. No AI work was started.',
+          'Usage is temporarily unavailable. Nothing was started.',
       });
     },
   );

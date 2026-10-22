@@ -4,7 +4,7 @@ import type { AiBudgetSnapshot } from './ai-budget.service';
 export const AI_BUDGET_UNAVAILABLE_RESPONSE = Object.freeze({
   statusCode: 503,
   code: 'AI_BUDGET_UNAVAILABLE' as const,
-  message: 'AI budget is temporarily unavailable. No AI work was started.',
+  message: 'Usage is temporarily unavailable. Nothing was started.',
 });
 
 export class AiBudgetUnavailableException extends ServiceUnavailableException {
@@ -22,7 +22,7 @@ export class AiBudgetSettlementPendingException extends ServiceUnavailableExcept
   readonly code = 'AI_USAGE_RECONCILING';
 
   constructor(cause?: unknown) {
-    super({ statusCode: 503, code: 'AI_USAGE_RECONCILING', message: 'AI usage is being reconciled. Your saved result is retained; reopen it before starting another paid operation.' });
+    super({ statusCode: 503, code: 'AI_USAGE_RECONCILING', message: 'Usage is being reconciled. Your saved result is retained; reopen it before starting another paid operation.' });
     if (cause !== undefined) (this as Error & { cause?: unknown }).cause = cause;
   }
 }
@@ -35,7 +35,7 @@ export class AiBudgetExhaustedException extends HttpException {
       {
         statusCode: 402,
         code: 'AI_BUDGET_EXHAUSTED',
-        message: 'Your monthly AI budget is exhausted. No AI work was started.',
+        message: 'Your monthly allowance is exhausted. Nothing was started.',
         budget: snapshot,
       },
       402,
@@ -66,7 +66,7 @@ export class AiBudgetOperationInProgressException extends HttpException {
         statusCode: 409,
         code: 'AI_BUDGET_OPERATION_IN_PROGRESS',
         message:
-          'Another AI operation is already running for this account. No AI work was started.',
+          'Another operation is already running for this account. Nothing was started.',
       },
       409,
     );

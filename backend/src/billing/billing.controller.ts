@@ -4,7 +4,7 @@ import { Request as ExpressRequest } from 'express';
 import { BillingService } from './billing.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UserDocument } from '../schemas/user.schema';
-import { CreateCheckoutSessionDto, CreateBillingPortalDto, CancelSubscriptionDto } from './dto';
+import { CreateCheckoutSessionDto, CreateBillingPortalDto, CancelSubscriptionDto, BuyConciergeHoursDto } from './dto';
 
 @ApiTags('billing')
 @Controller('billing')
@@ -12,6 +12,30 @@ export class BillingController {
   constructor(
     private readonly billingService: BillingService,
   ) {}
+
+  @Get('concierge/coaches')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Published concierge coaches who can be paid' })
+  async conciergeCoaches() {
+    return { coaches: await this.billingService.listPayableConcierges() };
+  }
+
+  @Post('concierge/checkout')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Buy concierge hours. Jobocate keeps 20 percent; the coach receives the rest.' })
+  async conciergeCheckout(@Request() req: any, @Body() dto: BuyConciergeHoursDto) {
+    return this.billingService.createConciergeCheckout(req.user as UserDocument, dto.employerId, dto.hours);
+  }
+
+  @Get('concierge/bookings')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Concierge hours this candidate has bought' })
+  async conciergeBookings(@Request() req: any) {
+    return { bookings: await this.billingService.listConciergeBookings(req.user._id.toString(), 'candidate') };
+  }
 
   @Get('plans')
   @ApiOperation({ summary: 'Get all available subscription plans' })

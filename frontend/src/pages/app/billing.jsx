@@ -149,7 +149,7 @@ export default function AppBilling() {
         </div>
 
         <p style={{ color: 'var(--jb-v3-fg-2)', fontSize: 13 }}>One Paid membership covers candidate and employer workspaces.</p>
-        <p style={{ color: 'var(--jb-v3-fg-3)', fontSize: 12 }}>Candidate and employer AI credits are counted separately.</p>
+        <p style={{ color: 'var(--jb-v3-fg-3)', fontSize: 12 }}>Candidate and employer credits are counted separately.</p>
 
         {budget && (
           <div data-testid="billing-budget" style={{ ...mono(11, '0'), marginBottom: 18 }}>

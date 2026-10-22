@@ -22,7 +22,7 @@ test('jobs displays measured credits, including exhaustion and an unavailable ba
     route.fulfill({ json: budget }));
   await page.route('**/api/employer/billing/plans', route => route.fulfill({ json: { currentPlan: 'free', plans: [{ key: 'free', name: 'Free' }] } }));
   await page.goto('/employer/jobs');
-  const balance = page.getByRole('region', { name: 'Employer AI credits' });
+  const balance = page.getByRole('region', { name: 'Employer credits' });
   await expect(balance).toContainText('37 credits remaining');
   await expect(balance).toContainText('Free plan includes 100 credits per month');
   await expect(balance).toContainText('63 used');
@@ -95,6 +95,8 @@ test('settings publishes a concierge profile only once its checklist is complete
     saved = route.request().postDataJSON();
     return route.fulfill({ json: { user: { ...user, conciergeProfile: saved.conciergeProfile } } });
   });
+  await page.route('**/api/employer/billing/connect', (route) => route.fulfill({ json: { payoutsEnabled: true, chargesEnabled: true, detailsSubmitted: true } }));
+  await page.route('**/api/employer/billing/concierge/bookings', (route) => route.fulfill({ json: { bookings: [] } }));
   await page.goto('/employer/settings');
   const panel = page.getByRole('region', { name: 'Concierge profile' });
   const publish = panel.getByRole('checkbox', { name: 'Publish profile' });
@@ -102,7 +104,7 @@ test('settings publishes a concierge profile only once its checklist is complete
   await panel.getByLabel('Headline', { exact: true }).fill('Hiring coach for early-career tech teams');
   await panel.getByLabel(/^Bio/).fill('I help early-career teams hire well with structured interviews, clear role scopes, and honest feedback on every application.');
   await panel.getByLabel('Specialties', { exact: true }).fill('Resume reviews, Interview prep');
-  await panel.getByLabel('Hourly rate (USD)', { exact: true }).fill('75');
+  await panel.getByLabel('Hourly rate (CAD)', { exact: true }).fill('75');
   await expect(publish).toBeEnabled();
   await publish.check();
   await panel.getByRole('button', { name: 'Save concierge profile' }).click();

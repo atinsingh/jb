@@ -68,6 +68,7 @@ describe('BillingService', () => {
           useValue: mockSubscriptionModel,
         },
         { provide: getModelToken('UsageRecord'), useValue: mockUsageModel },
+        { provide: getModelToken('ConciergeBooking'), useValue: {} },
         { provide: PinoLogger, useValue: mockLogger },
       ],
     }).compile();

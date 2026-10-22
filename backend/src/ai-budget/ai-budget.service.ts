@@ -96,7 +96,7 @@ export class AiBudgetService {
     const plan = getEmployerPlan(subscription.plan);
     if (!plan)
       throw new AiBudgetConfigurationError(
-        'Employer AI plan is not configured',
+        'Employer plan is not configured',
       );
     return plan.modelTier;
   }
@@ -157,7 +157,7 @@ export class AiBudgetService {
       servicePolicy.ownerType !== ownerType
     ) {
       throw new AiBudgetConfigurationError(
-        `AI budget service is not active and metered: ${service}`,
+        `Usage service is not active and metered: ${service}`,
       );
     }
 
@@ -301,7 +301,7 @@ export class AiBudgetService {
         const plan = getEmployerPlan(sub.plan);
         if (!plan)
           throw new AiBudgetConfigurationError(
-            'Employer AI plan is not configured',
+            'Employer plan is not configured',
           );
         limitCredits = plan.limits.aiBudgetCreditsLimit;
       }

@@ -972,6 +972,18 @@ describe('ResumeHarnessService', () => {
     expect(command).toMatch(/unsupported|untrusted/i);
   });
 
+  it('tells the candidate a turn timed out without naming the harness or Docker', async () => {
+    await start('claude-code');
+    sandbox.exec.mockResolvedValueOnce({
+      exitCode: 1,
+      stdout: '',
+      stderr: 'Docker command timed out after 120 seconds.',
+    });
+
+    await expect(service.runTurn('u1', 'sess-1', { instruction: 'Build it' }))
+      .rejects.toThrow('The résumé could not be finished in time. Try again.');
+  });
+
   it('fails the turn when the harness command exits non-zero instead of compiling stale output', async () => {
     const session = await start('opencode');
     sandbox.exec.mockResolvedValueOnce({

@@ -68,6 +68,12 @@ export const compareResume = async (id, payload = {}, headers = {}) =>
     body: JSON.stringify(payload),
   });
 
+export const prepareCompareCorrection = async (id, payload = {}) =>
+  apiCall(`/api/resume-builder/${id}/correct`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
 // POST /api/resume-builder/:id/generate-pdf  ->  { pdfUrl }
 export const generateResumePdf = async (id) =>
   apiCall(`/api/resume-builder/${id}/generate-pdf`, { method: 'POST' });

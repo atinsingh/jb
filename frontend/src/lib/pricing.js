@@ -19,7 +19,7 @@ export const CANDIDATE_PRICING = {
     per: '/mo',
     tagline: 'Everything to start your search the smart way.',
     highlights: [
-      'AI resume builder',
+      'Resume builder',
       'Smart job matching',
       '10 auto-apply credits / mo',
       'Application tracker',
@@ -34,7 +34,7 @@ export const CANDIDATE_PRICING = {
     highlights: [
       'Unlimited job matching',
       '150 auto-apply credits / mo',
-      'AI cover letters',
+      'Cover letters',
       'Per-role personalization',
     ],
   },
@@ -47,7 +47,7 @@ export const CANDIDATE_PRICING = {
     highlights: [
       'Unlimited auto-apply',
       'Advanced personalization',
-      'Full AI interview prep',
+      'Full interview prep',
       'Salary & offer insights',
     ],
   },
@@ -69,7 +69,7 @@ export const EMPLOYER_PRICING = {
   summary: 'Pay per job post or subscribe for ongoing hiring.',
   highlights: [
     'Job posting & promotion',
-    'AI candidate matching',
+    'Candidate matching',
     'Hiring pipeline & collaboration',
     'Recruitment analytics',
   ],

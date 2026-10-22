@@ -86,6 +86,12 @@ export class UsersService {
         'Add a headline, a bio of at least 80 characters, one specialty and an hourly rate before publishing your concierge profile.',
       );
     }
+    if (concierge?.published === true) {
+      const existing = await this.userModel.findById(userId);
+      if (!existing?.connectPayoutsEnabled) {
+        throw new BadRequestException('Set up payouts before publishing your concierge profile.');
+      }
+    }
 
     const filteredUpdates: any = {};
     allowedFields.forEach((field) => {

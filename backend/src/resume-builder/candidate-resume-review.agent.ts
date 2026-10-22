@@ -9,6 +9,7 @@ import { HarnessRegistry } from '../resume-harness/harness/harness.registry';
 import { HarnessAdapter, HarnessContextFile, ResolvedModelAlias } from '../resume-harness/harness/harness.types';
 import { ModelAliasService } from '../resume-harness/model-alias.service';
 import { SANDBOX_WORKDIR, SandboxService } from '../resume-harness/sandbox/sandbox.service';
+import { hideWorkspaceFiles, WORKSPACE_VOICE_RULE } from '../resume-harness/workspace-voice';
 import type { ResumeComparisonAnnotation } from './resume-comparison.service';
 import {
   CandidateAtsReviewSession,
@@ -84,11 +85,29 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
       const completed = await this.sessionModel.findOne({
         userId: input.userId,
         resumeId: input.resumeId,
-        jobDescriptionHash,
-        resumeTextHash,
         status: 'completed',
       }).sort({ createdAt: -1 }).lean().exec();
       if (completed?.result) return completed.result as CandidateResumeReviewResult;
+    }
+    const inflight = await this.sessionModel.find({
+      userId: input.userId,
+      resumeId: input.resumeId,
+      status: { $in: ['provisioning', 'active'] },
+    }).exec();
+    const sameJob = options.forceRefresh ? undefined : inflight.find((row) =>
+      row.jobDescriptionHash === jobDescriptionHash && row.resumeTextHash === resumeTextHash);
+    if (sameJob) {
+      const joined = await this.waitForReview(sameJob._id);
+      if (joined) return joined;
+    }
+    const replaced = inflight.filter((row) => row !== sameJob);
+    for (const row of replaced) {
+      row.status = 'failed';
+      row.failureReason = 'SUPERSEDED';
+      await row.save();
+      if (row.sandboxId) {
+        try { await this.sandbox.destroy(row.sandboxId); } catch { /* the running review observes SUPERSEDED */ }
+      }
     }
     const alias = await this.aliases.resolveAutomaticForUser(input.userId);
     const adapter = this.registry.forProvider(alias.provider);
@@ -112,9 +131,8 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
     const reviewTurns = { count: 0, max: maxReviewTurns };
 
     try {
-      return await this.budget.withCandidateLease(
+      return await this.withReviewLease(
         input.userId,
-        'candidate_ats_review',
         {
           harness: adapter.id,
           alias: alias.alias,
@@ -123,7 +141,9 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
           sessionId,
           runId,
         },
+        replaced.length > 0,
         async (access, tags) => {
+          await this.stopIfReplaced(sessionId);
           const boot = adapter.bootstrap({
             purpose: 'resume-review',
             sessionId,
@@ -246,18 +266,60 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
       modelAlias: alias.alias,
       ats: {
         score: this.score(ats.subScores.sectionCompleteness),
-        explanation: detailed.atsExplanation,
-        findings: ats.suggestions.map((message, index) => ({ code: `AGENT_ATS_${index + 1}`, message })),
+        explanation: hideWorkspaceFiles(detailed.atsExplanation),
+        findings: ats.suggestions.map((message, index) => ({ code: `AGENT_ATS_${index + 1}`, message: hideWorkspaceFiles(message) })),
       },
       match: {
         coverage: this.score(ats.semanticMatch),
-        explanation: detailed.matchExplanation,
+        explanation: hideWorkspaceFiles(detailed.matchExplanation),
         matched: detailed.matched,
         missing,
         keywordCount,
       },
-      annotations: annotations.map((annotation, index) => ({ ...annotation, id: `agent-${index + 1}` })),
+      annotations: annotations.map((annotation, index) => ({
+        ...annotation,
+        id: `agent-${index + 1}`,
+        message: hideWorkspaceFiles(annotation.message),
+        fix: hideWorkspaceFiles(annotation.fix),
+      })),
     };
+  }
+
+  private async waitForReview(id: unknown): Promise<CandidateResumeReviewResult | null> {
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const current = await this.sessionModel.findOne({ _id: id }).sort({ createdAt: -1 }).lean().exec();
+      if (current?.status === 'completed' && current.result) return current.result as CandidateResumeReviewResult;
+      if (!current || current.status === 'failed' || current.failureReason === 'SUPERSEDED') return null;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    return null;
+  }
+
+  private async stopIfReplaced(id: string) {
+    const current = await this.sessionModel.findOne({ _id: id }).sort({ createdAt: -1 }).lean().exec();
+    if (current?.failureReason === 'SUPERSEDED') {
+      throw new ServiceUnavailableException('This comparison was replaced by a newer job.');
+    }
+  }
+
+  private withReviewLease<T>(
+    userId: string,
+    attribution: { harness: string; alias: string; model: string; effort: string; sessionId: string; runId: string },
+    replaced: boolean,
+    run: Parameters<AiBudgetService['withCandidateLease']>[3],
+  ): Promise<T> {
+    const start = () => this.budget.withCandidateLease(userId, 'candidate_ats_review', attribution, run) as Promise<T>;
+    if (!replaced) return start();
+    const claim = async (attempt: number): Promise<T> => {
+      try {
+        return await start();
+      } catch (error) {
+        if (attempt >= 40 || (error as { code?: string }).code !== 'AI_BUDGET_OPERATION_IN_PROGRESS') throw error;
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        return claim(attempt + 1);
+      }
+    };
+    return claim(0);
   }
 
   private reviewFiles(input: CandidateResumeReviewInput): HarnessContextFile[] {
@@ -280,7 +342,8 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
       'Use sections personal, summary, experience, skills, education, projects, achievements, certifications, or languages.',
       `Produce ${this.desiredAnnotationCount(input.resumeText)}-${Math.max(10, this.desiredAnnotationCount(input.resumeText))} useful annotations. Cover different bullets and sections; do not repeat the same issue.`,
       'Keep each explanation under 80 words, each annotation message under 35 words, and each fix under 45 words. Quote only the shortest consecutive source passage that identifies the issue. Return compact JSON without a reasoning narrative. Read the required context together where practical; do not repeatedly read unchanged files.',
-      'AI-written-content detection is outside this session. Do not score it or create AI-detection comments.',
+      'Writing-style detection is outside this session. Do not score writing style or comment on whether the text sounds generated.',
+      WORKSPACE_VOICE_RULE,
     ].join('\n');
     const files: HarnessContextFile[] = [
       { path: 'AGENTS.md', contents: `${rules}\n` },
@@ -294,7 +357,7 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
   }
 
   private reviewPrompt(): string {
-    return 'Perform the Compare Resume assessment now. Inspect ORIGINAL_RESUME.pdf or ORIGINAL_RESUME.docx when present, then read RESUME.txt, JOB.txt, and ATS_RESULT.json. Return only the JSON contract from AGENTS.md. Every annotation quote must be copied exactly from RESUME.txt.';
+    return `Perform the Compare Resume assessment now. Inspect ORIGINAL_RESUME.pdf or ORIGINAL_RESUME.docx when present, then read RESUME.txt, JOB.txt, and ATS_RESULT.json. Return only the JSON contract from AGENTS.md. Every annotation quote must be copied exactly from RESUME.txt. ${WORKSPACE_VOICE_RULE}`;
   }
 
   private async requestReview(
@@ -314,7 +377,7 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
           adapter,
           boot,
           sandboxId,
-          'The prior response was not valid complete JSON for the required review contract. Inspect the original résumé file when present, then read RESUME.txt, JOB.txt and ATS_RESULT.json again. Return one complete compact JSON object only, with atsExplanation, matchExplanation, matched, missing, and annotations. Use short messages and fixes, exact résumé quotes, no markdown or prose outside JSON.',
+          `The prior response was not valid complete JSON for the required review contract. Inspect the original résumé file when present, then read RESUME.txt, JOB.txt and ATS_RESULT.json again. Return one complete compact JSON object only, with atsExplanation, matchExplanation, matched, missing, and annotations. Use short messages and fixes, exact résumé quotes, no markdown or prose outside JSON. ${WORKSPACE_VOICE_RULE}`,
           turns,
         );
       }

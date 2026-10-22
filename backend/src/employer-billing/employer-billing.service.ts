@@ -61,6 +61,18 @@ export class EmployerBillingService {
     return this.billing.createBillingPortalSession(await this.billing.getAccount(ownerId), returnUrl || this.frontendUrl + '/employer/settings');
   }
 
+  getConnectStatus(ownerId: string) {
+    return this.billing.getAccount(ownerId).then((user) => this.billing.getConnectStatus(user));
+  }
+
+  createConnectOnboarding(ownerId: string) {
+    return this.billing.getAccount(ownerId).then((user) => this.billing.createConnectOnboardingLink(user));
+  }
+
+  conciergeBookings(ownerId: string) {
+    return this.billing.listConciergeBookings(ownerId, 'employer');
+  }
+
   async getPlans(ownerId: string) {
     const [sub, plans] = await Promise.all([this.getOrCreateSubscription(ownerId), this.getPlansCatalog()]);
     return { currentPlan: sub.plan, billingCycle: sub.billingCycle, plans: plans.map(plan => ({ ...plan, current: sub.plan === plan.key })) };

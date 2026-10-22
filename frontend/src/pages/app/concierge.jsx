@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import AppTopNav from '@/components/app/AppTopNav';
 import { appRoute } from '@/components/app/appRoutes';
 import { LoadingState, EmptyState, ErrorState } from '@/components/app/AppStates';
-import { getMyMatches, getConciergeActivity } from '@/services/conciergeApi';
+import { getMyMatches, getConciergeActivity, getConciergeCoaches, buyConciergeHours } from '@/services/conciergeApi';
 
 /* ------------------------------------------------- static product content --- */
 // What the concierge service does — fixed offering copy, not user data.
@@ -105,10 +106,15 @@ const eventToActivity = (e) => {
 
 /* ---------------------------------------------------------- component --- */
 export default function AppConcierge() {
+  const router = useRouter();
   const [picks, setPicks] = useState([]);
   const [activity, setActivity] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [coaches, setCoaches] = useState([]);
+  const [coachError, setCoachError] = useState(null);
+  const [hoursByCoach, setHoursByCoach] = useState({});
+  const [buying, setBuying] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -146,12 +152,25 @@ export default function AppConcierge() {
     };
 
     load();
+    getConciergeCoaches().then((res) => { if (!cancelled) setCoaches(res?.coaches || []); }).catch((err) => { if (!cancelled) setCoachError(err); });
     return () => {
       cancelled = true;
     };
   }, []);
 
   const card = { background: 'var(--jb-v3-panel)', border: '1px solid var(--jb-v3-line)', borderRadius: 2 };
+  const buy = async (id) => {
+    setBuying(id);
+    setCoachError(null);
+    try {
+      const result = await buyConciergeHours(id, Number(hoursByCoach[id] || 1));
+      if (!result.url) throw new Error('Checkout is unavailable. Please try again.');
+      window.location.assign(result.url);
+    } catch (err) {
+      setCoachError(err);
+      setBuying(null);
+    }
+  };
 
   return (
     <>
@@ -257,6 +276,29 @@ export default function AppConcierge() {
                   </Link>
                 </div>
               </div>
+            </div>
+
+            </div>
+
+            <div style={{ ...card, padding: 26, marginBottom: 16 }}>
+              <h2 style={{ fontSize: 19, fontWeight: 700, margin: '0 0 8px' }}>Book a coach</h2>
+              <p style={{ fontSize: 13, color: 'var(--jb-v3-fg-2)', margin: '0 0 16px' }}>You pay the hourly rate in CAD. Jobocate keeps 20%. The coach receives 80%.</p>
+              {router.query.paid && <p role="status">Payment received. Your hours are saved.</p>}
+              {router.query.canceled && <p>Checkout canceled. You have not been charged.</p>}
+              {coachError && <ErrorState error={coachError} />}
+              {coaches.length === 0 ? <p style={{ fontSize: 14, color: 'var(--jb-v3-fg-3)' }}>No coaches are available for booking yet.</p> : coaches.map((coach) => (
+                <article key={coach.id} style={{ display: 'grid', gap: 8, padding: '16px 0', borderTop: '1px solid var(--jb-v3-line)' }}>
+                  <strong>{coach.name}</strong>
+                  <span>{coach.headline}</span>
+                  <span style={{ fontSize: 13, color: 'var(--jb-v3-fg-2)' }}>{coach.bio}</span>
+                  <span>CA${coach.hourlyRate}/hour{coach.specialties?.length ? ` · ${coach.specialties.join(', ')}` : ''}</span>
+                  <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    Hours
+                    <input aria-label={`Hours with ${coach.name}`} type="number" min={1} max={40} step={1} value={hoursByCoach[coach.id] || 1} onChange={(event) => setHoursByCoach((previous) => ({ ...previous, [coach.id]: event.target.value }))} style={{ width: 80 }} />
+                  </label>
+                  <button type="button" onClick={() => buy(coach.id)} disabled={buying === coach.id} style={{ justifySelf: 'start', font: 'inherit', fontWeight: 700, color: 'var(--jb-v3-accent-ink)', background: 'var(--jb-v3-accent)', border: 'none', borderRadius: 2, padding: '10px 14px', cursor: 'pointer' }}>{buying === coach.id ? 'Opening checkout…' : `Pay CA$${coach.hourlyRate * Number(hoursByCoach[coach.id] || 1)}`}</button>
+                </article>
+              ))}
             </div>
 
             {/* WHAT YOUR CONCIERGE DOES */}

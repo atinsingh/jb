@@ -73,6 +73,7 @@ export default defineConfig({
     : [['html', { open: 'never' }], ['list']],
 
   globalSetup: require.resolve('./support/global-setup'),
+  globalTeardown: require.resolve('./support/global-teardown'),
 
   use: {
     baseURL: FRONTEND_URL,

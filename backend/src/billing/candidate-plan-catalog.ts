@@ -15,9 +15,9 @@ type Entitlement = {
 };
 
 const commonFree: Entitlement[] = [
-  { featureKey: 'ai_resume_optimization', featureName: 'AI Resume Optimization', type: 'boolean', value: false },
-  { featureKey: 'ai_cover_letter', featureName: 'AI Cover Letter', type: 'boolean', value: false },
-  { featureKey: 'ai_interview_prep', featureName: 'AI Interview Prep', type: 'boolean', value: false },
+  { featureKey: 'ai_resume_optimization', featureName: 'Resume optimization', type: 'boolean', value: false },
+  { featureKey: 'ai_cover_letter', featureName: 'Cover letters', type: 'boolean', value: false },
+  { featureKey: 'ai_interview_prep', featureName: 'Interview prep', type: 'boolean', value: false },
   { featureKey: 'human_agent_support', featureName: 'Human Agent Support', type: 'boolean', value: false },
   { featureKey: 'priority_job_matching', featureName: 'Priority Job Matching', type: 'boolean', value: false },
   { featureKey: 'resume_templates_premium', featureName: 'Premium Resume Templates', type: 'boolean', value: false },
@@ -32,9 +32,9 @@ const commonFree: Entitlement[] = [
 ];
 
 const commonPaid: Entitlement[] = [
-  { featureKey: 'ai_resume_optimization', featureName: 'AI Resume Optimization', type: 'boolean', value: true },
-  { featureKey: 'ai_cover_letter', featureName: 'AI Cover Letter', type: 'boolean', value: true },
-  { featureKey: 'ai_interview_prep', featureName: 'AI Interview Prep', type: 'boolean', value: false },
+  { featureKey: 'ai_resume_optimization', featureName: 'Resume optimization', type: 'boolean', value: true },
+  { featureKey: 'ai_cover_letter', featureName: 'Cover letters', type: 'boolean', value: true },
+  { featureKey: 'ai_interview_prep', featureName: 'Interview prep', type: 'boolean', value: false },
   { featureKey: 'human_agent_support', featureName: 'Human Agent Support', type: 'boolean', value: false },
   { featureKey: 'priority_job_matching', featureName: 'Priority Job Matching', type: 'boolean', value: true },
   { featureKey: 'resume_templates_premium', featureName: 'Premium Resume Templates', type: 'boolean', value: false },
@@ -57,15 +57,15 @@ export async function reconcileCandidatePlans(
 ): Promise<void> {
   const catalogue = [
     {
-      type: 'FREE', name: 'Free', description: 'Get started with essential job search and AI features',
-      priceMonthly: 0, priceYearly: 0, features: ['Basic job search', 'Monthly AI allowance'],
+      type: 'FREE', name: 'Free', description: 'Get started with essential job search tools',
+      priceMonthly: 0, priceYearly: 0, features: ['Basic job search', 'Monthly allowance'],
       isActive: true, sortOrder: 0, entitlements: commonFree,
     },
     {
-      type: 'PRO', name: 'Paid', description: 'More capacity for an active AI-powered job search',
+      type: 'PRO', name: 'Paid', description: 'More capacity for an active job search',
       priceMonthly: stripe.monthly.amountUsd, priceYearly: stripe.yearly.amountUsd,
       stripePriceIdMonthly: stripe.monthly.priceId, stripePriceIdYearly: stripe.yearly.priceId,
-      features: ['Everything in Free', 'Higher monthly AI allowance', 'Priority job matching'],
+      features: ['Everything in Free', 'Higher monthly allowance', 'Priority job matching'],
       isActive: true, sortOrder: 1, entitlements: commonPaid,
     },
   ] as const;

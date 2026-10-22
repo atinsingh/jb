@@ -77,6 +77,15 @@ export const getConciergeActivity = async (params = {}) => {
   return apiCall(`/api/applications/activity${qs ? `?${qs}` : ''}`);
 };
 
+export const getConciergeCoaches = () => apiCall('/api/billing/concierge/coaches');
+
+export const buyConciergeHours = (employerId, hours) => apiCall('/api/billing/concierge/checkout', {
+  method: 'POST',
+  body: JSON.stringify({ employerId, hours }),
+});
+
+export const getMyConciergeBookings = () => apiCall('/api/billing/concierge/bookings');
+
 /* -------------------------------------------------- Entitlements --- */
 
 // GET /api/entitlements → { planType, entitlements }

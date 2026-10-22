@@ -43,12 +43,12 @@ export class OwnerLlmService {
     feature: LLMFeature,
     task: (context: OwnerModelContext) => Promise<T>,
   ): Promise<T> {
-    if (!ownerId) throw new Error('An authenticated AI owner is required');
+    if (!ownerId) throw new Error('An authenticated account is required');
     const ownerType = modelOwner(feature);
     const current = this.context.getStore();
     if (current) {
       if (current.ownerId !== ownerId || current.ownerType !== ownerType)
-        throw new Error('AI owner cannot change during a logical operation');
+        throw new Error('The account cannot change during a logical operation');
       return task(current);
     }
     const tier = await this.budget.ownerTier(ownerType, ownerId);

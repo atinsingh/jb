@@ -27,10 +27,10 @@ export default function EmployerCredits() {
   };
   useEffect(() => { load(); }, []);
   const reset = budget?.resetAt && new Date(budget.resetAt);
-  return <section aria-label="Employer AI credits" className={styles.panel}>
+  return <section aria-label="Employer credits" className={styles.panel}>
     <div className={styles.creditRow}>
       <div>
-        <h2>Employer AI credits</h2>
+        <h2>Employer credits</h2>
         {loading ? <p className={styles.muted}>Loading credit balance…</p> : error ? <p role="status" className={styles.muted}>Credit balance unavailable</p> : <>
           <p className={styles.creditValue}>{budget.remainingCredits.toLocaleString()} credits remaining</p>
           <p className={styles.muted}>{planName ? planName + ' plan includes ' : 'Monthly employer allowance: '}{budget.limitCredits.toLocaleString()}{planName ? ' credits per month' : ' credits'} · {budget.spentCredits.toLocaleString()} used</p>
@@ -42,8 +42,8 @@ export default function EmployerCredits() {
       </div>
     </div>
     {!loading && !error && <>
-      <progress aria-label="Employer AI credits used" className={styles.creditProgress} value={Math.min(budget.spentCredits, budget.limitCredits)} max={budget.limitCredits || 1} />
-      <p className={styles.muted}>{reset && Number.isFinite(reset.getTime()) ? 'Resets ' + reset.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) + ' (UTC)' : 'Reset date unavailable'} · Used for AI job descriptions and résumé reviews.</p>
+      <progress aria-label="Employer credits used" className={styles.creditProgress} value={Math.min(budget.spentCredits, budget.limitCredits)} max={budget.limitCredits || 1} />
+      <p className={styles.muted}>{reset && Number.isFinite(reset.getTime()) ? 'Resets ' + reset.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) + ' (UTC)' : 'Reset date unavailable'} · Used for job descriptions and résumé reviews.</p>
     </>}
     <p className={styles.muted}>Candidate and employer credits are counted separately. One Paid membership upgrades both workspaces.</p>
   </section>;

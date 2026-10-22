@@ -81,6 +81,27 @@ export class EmployerBillingController {
     return this.employerBillingService.getPlans(ownerId);
   }
 
+  @Get('concierge/bookings')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Hours candidates have bought from this concierge profile' })
+  async conciergeBookings(@Request() req) {
+    return { bookings: await this.employerBillingService.conciergeBookings(req.user._id.toString()) };
+  }
+
+  @Get('connect')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Whether this employer can receive concierge payouts' })
+  async connectStatus(@Request() req) {
+    return this.employerBillingService.getConnectStatus(req.user._id.toString());
+  }
+
+  @Post('connect/onboard')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Stripe Express onboarding link for a Canadian concierge payout account' })
+  async connectOnboard(@Request() req) {
+    return this.employerBillingService.createConnectOnboarding(req.user._id.toString());
+  }
+
   @Get('invoices')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get billing invoices' })

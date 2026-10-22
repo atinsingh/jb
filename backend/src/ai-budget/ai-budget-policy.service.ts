@@ -207,7 +207,7 @@ export class AiBudgetPolicyService {
     } catch (error) {
       if (error instanceof AiBudgetConfigurationError) throw error;
       throw new AiBudgetConfigurationError(
-        `Invalid AI budget policy at ${policyPath}`,
+        `Invalid usage policy at ${policyPath}`,
         error,
       );
     }
@@ -216,7 +216,7 @@ export class AiBudgetPolicyService {
   tier(tier: string): TierBudgetPolicy {
     const policy = this.policy.tiers[tier as AiBudgetTier];
     if (!policy) {
-      throw new AiBudgetConfigurationError(`Unknown AI budget tier: ${tier}`);
+      throw new AiBudgetConfigurationError(`Unknown usage tier: ${tier}`);
     }
     return policy;
   }
@@ -263,7 +263,7 @@ export class AiBudgetPolicyService {
       .estimates as readonly AiBudgetEstimatePolicy[]) {
       if (!aliases.has(estimate.alias)) {
         throw new AiBudgetConfigurationError(
-          `AI budget estimate references inactive LiteLLM alias: ${estimate.alias}`,
+          `Usage estimate references inactive LiteLLM alias: ${estimate.alias}`,
         );
       }
     }
