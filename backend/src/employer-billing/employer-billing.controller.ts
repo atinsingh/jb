@@ -81,6 +81,13 @@ export class EmployerBillingController {
     return this.employerBillingService.getPlans(ownerId);
   }
 
+  @Get('concierge/bookings')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Hours candidates have bought from this concierge profile' })
+  async conciergeBookings(@Request() req) {
+    return { bookings: await this.employerBillingService.conciergeBookings(req.user._id.toString()) };
+  }
+
   @Get('connect')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Whether this employer can receive concierge payouts' })

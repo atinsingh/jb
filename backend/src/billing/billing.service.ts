@@ -8,6 +8,8 @@ import { User, UserDocument } from '../schemas/user.schema';
 import { SubscriptionPlan, SubscriptionPlanDocument } from '../schemas/subscription-plan.schema';
 import { UserSubscription, UserSubscriptionDocument } from '../schemas/user-subscription.schema';
 import { UsageRecord, UsageRecordDocument } from '../schemas/usage-record.schema';
+import { ConciergeBooking, ConciergeBookingDocument } from './schemas/concierge-booking.schema';
+import { conciergeCharge } from './concierge-fee';
 import { EMPLOYER_PLANS } from '../employer-billing/employer-plans';
 import { CreateCheckoutSessionDto, CancelSubscriptionDto } from './dto';
 import {
@@ -36,6 +38,8 @@ export class BillingService {
     private subscriptionModel: Model<UserSubscriptionDocument>,
     @InjectModel(UsageRecord.name)
     private usageModel: Model<UsageRecordDocument>,
+    @InjectModel(ConciergeBooking.name)
+    private bookingModel: Model<ConciergeBookingDocument>,
     private configService: ConfigService,
   ) {
     const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY', '');
@@ -458,6 +462,10 @@ export class BillingService {
   }
 
   private async handleCheckoutCompleted(session: Stripe.Checkout.Session): Promise<void> {
+    if (session.metadata?.kind === 'concierge') {
+      await this.recordConciergeBooking(session);
+      return;
+    }
     const userId = session.metadata?.userId;
     const planId = session.metadata?.planId;
     const planType = session.metadata?.planType as PlanType;
@@ -678,5 +686,103 @@ export class BillingService {
     const status = { payoutsEnabled: !!account.payouts_enabled, chargesEnabled: !!account.charges_enabled, detailsSubmitted: !!account.details_submitted };
     await this.userModel.findByIdAndUpdate(user._id, { $set: { connectPayoutsEnabled: status.payoutsEnabled } });
     return status;
+  }
+
+  async listPayableConcierges() {
+    const coaches = await this.userModel.find({
+      'conciergeProfile.published': true,
+      connectPayoutsEnabled: true,
+    }).select('name conciergeProfile');
+    return coaches.map((coach) => ({
+      id: coach._id.toString(),
+      name: coach.name || 'Coach',
+      headline: coach.conciergeProfile?.headline,
+      bio: coach.conciergeProfile?.bio,
+      specialties: coach.conciergeProfile?.specialties || [],
+      yearsExperience: coach.conciergeProfile?.yearsExperience,
+      hourlyRate: coach.conciergeProfile?.hourlyRate,
+      languages: coach.conciergeProfile?.languages || [],
+      timezone: coach.conciergeProfile?.timezone,
+    }));
+  }
+
+  async createConciergeCheckout(candidate: UserDocument, employerId: string, hours: number): Promise<{ url: string }> {
+    if (candidate.role !== 'ROLE_CANDIDATE') throw new BadRequestException('Only a candidate can buy concierge hours');
+    if (!Number.isInteger(hours) || hours < 1 || hours > 40) throw new BadRequestException('Buy between 1 and 40 hours');
+    if (candidate._id.toString() === employerId) throw new BadRequestException('You cannot buy hours from yourself');
+    const employer = await this.userModel.findById(employerId);
+    const rate = employer?.conciergeProfile?.hourlyRate;
+    if (!employer?.conciergeProfile?.published || !employer.connectPayoutsEnabled || !employer.stripeConnectAccountId || rate == null) {
+      throw new BadRequestException('This coach is not available for booking');
+    }
+    const { feeCents } = conciergeCharge(rate, hours);
+    const customerId = await this.createOrGetStripeCustomer(candidate);
+    const session = await this.stripe.checkout.sessions.create({
+      mode: 'payment',
+      customer: customerId,
+      line_items: [{
+        quantity: hours,
+        price_data: {
+          currency: 'cad',
+          unit_amount: rate * 100,
+          product_data: { name: `Concierge hour with ${employer.name || 'coach'}` },
+        },
+      }],
+      payment_intent_data: {
+        application_fee_amount: feeCents,
+        transfer_data: { destination: employer.stripeConnectAccountId },
+      },
+      metadata: {
+        kind: 'concierge',
+        candidateId: candidate._id.toString(),
+        employerId: employer._id.toString(),
+        hours: String(hours),
+        hourlyRate: String(rate),
+      },
+      success_url: `${this.frontendUrl}/app/concierge?paid=1`,
+      cancel_url: `${this.frontendUrl}/app/concierge?canceled=1`,
+    });
+    return { url: session.url! };
+  }
+
+  async listConciergeBookings(userId: string, side: 'candidate' | 'employer') {
+    const filter = side === 'employer' ? { employerId: new Types.ObjectId(userId) } : { candidateId: new Types.ObjectId(userId) };
+    const bookings = await this.bookingModel.find(filter).sort({ createdAt: -1 }).limit(20);
+    const otherIds = bookings.map((booking) => side === 'employer' ? booking.candidateId : booking.employerId);
+    const people = await this.userModel.find({ _id: { $in: otherIds } }).select('name');
+    const names = new Map(people.map((person) => [person._id.toString(), person.name || (side === 'employer' ? 'Candidate' : 'Coach')]));
+    return bookings.map((booking) => ({
+      id: booking._id.toString(),
+      hours: booking.hours,
+      hourlyRate: booking.hourlyRate,
+      amountCents: booking.amountCents,
+      feeCents: booking.feeCents,
+      currency: booking.currency,
+      createdAt: (booking as ConciergeBookingDocument & { createdAt?: Date }).createdAt,
+      counterpartName: names.get((side === 'employer' ? booking.candidateId : booking.employerId).toString()) || (side === 'employer' ? 'Candidate' : 'Coach'),
+    }));
+  }
+
+  private async recordConciergeBooking(session: Stripe.Checkout.Session): Promise<void> {
+    if (await this.bookingModel.findOne({ stripeSessionId: session.id })) return;
+    const hours = Number(session.metadata?.hours);
+    const hourlyRate = Number(session.metadata?.hourlyRate);
+    const candidateId = session.metadata?.candidateId;
+    const employerId = session.metadata?.employerId;
+    if (!candidateId || !employerId || !Number.isInteger(hours) || !Number.isInteger(hourlyRate)) {
+      this.logger.error({ sessionId: session.id }, 'Concierge checkout missing metadata');
+      return;
+    }
+    const charge = conciergeCharge(hourlyRate, hours);
+    await this.bookingModel.create({
+      candidateId: new Types.ObjectId(candidateId),
+      employerId: new Types.ObjectId(employerId),
+      hours,
+      hourlyRate,
+      amountCents: session.amount_total ?? charge.amountCents,
+      feeCents: charge.feeCents,
+      currency: 'cad',
+      stripeSessionId: session.id,
+    });
   }
 }

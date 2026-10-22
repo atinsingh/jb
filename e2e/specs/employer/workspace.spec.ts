@@ -95,6 +95,8 @@ test('settings publishes a concierge profile only once its checklist is complete
     saved = route.request().postDataJSON();
     return route.fulfill({ json: { user: { ...user, conciergeProfile: saved.conciergeProfile } } });
   });
+  await page.route('**/api/employer/billing/connect', (route) => route.fulfill({ json: { payoutsEnabled: true, chargesEnabled: true, detailsSubmitted: true } }));
+  await page.route('**/api/employer/billing/concierge/bookings', (route) => route.fulfill({ json: { bookings: [] } }));
   await page.goto('/employer/settings');
   const panel = page.getByRole('region', { name: 'Concierge profile' });
   const publish = panel.getByRole('checkbox', { name: 'Publish profile' });

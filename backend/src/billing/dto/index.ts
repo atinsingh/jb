@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsEnum, IsOptional, IsUrl, IsBoolean } from 'class-validator';
+import { IsString, IsEnum, IsOptional, IsUrl, IsBoolean, IsInt, Min, Max } from 'class-validator';
 
 type BillingCycle = 'monthly' | 'yearly';
 
@@ -35,6 +35,18 @@ export class CancelSubscriptionDto {
   @IsOptional()
   @IsBoolean()
   cancelAtPeriodEnd?: boolean = true;
+}
+
+export class BuyConciergeHoursDto {
+  @ApiProperty({ description: 'Employer whose concierge profile is being booked' })
+  @IsString()
+  employerId: string;
+
+  @ApiProperty({ description: 'Whole hours to buy, from 1 to 40' })
+  @IsInt()
+  @Min(1)
+  @Max(40)
+  hours: number;
 }
 
 export class ChangePlanDto {

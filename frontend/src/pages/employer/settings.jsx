@@ -34,6 +34,7 @@ export default function EmployerSettings() {
   const [payouts, setPayouts] = useState(null);
   const [payoutError, setPayoutError] = useState(null);
   const [payoutsBusy, setPayoutsBusy] = useState(false);
+  const [bookings, setBookings] = useState([]);
 
   const loadAccount = async () => {
     setError(null);
@@ -67,6 +68,7 @@ export default function EmployerSettings() {
       setPayouts(await employerBillingApi.connect());
       setPayoutError(null);
     } catch (err) { setPayoutError(err); }
+    try { setBookings((await employerBillingApi.conciergeBookings()).bookings || []); } catch { setBookings([]); }
   };
   const startPayouts = async () => {
     setPayoutsBusy(true); setPayoutError(null);
@@ -143,6 +145,7 @@ export default function EmployerSettings() {
     ['Bio of at least 80 characters', concierge.bio.trim().length >= 80],
     ['At least one specialty', splitList(concierge.specialties).length > 0],
     ['Hourly rate between CA$10 and CA$1,000', Number.isInteger(rate) && rate >= 10 && rate <= 1000],
+    ['Payouts enabled', !!payouts?.payoutsEnabled],
   ];
   const conciergeReady = checklist.every(([, done]) => done);
 
@@ -176,6 +179,12 @@ export default function EmployerSettings() {
             <p>{router.query.connect === 'return' ? 'Back from Stripe. ' : ''}{payouts?.payoutsEnabled ? 'Payouts enabled.' : payouts?.detailsSubmitted ? 'Stripe has your details. Payouts are not enabled yet.' : 'Payouts are not set up.'}</p>
             <InlineError error={payoutError} />
             <button type="button" className={styles.primary} onClick={startPayouts} disabled={payoutsBusy}>{payoutsBusy ? 'Opening Stripe…' : payouts?.detailsSubmitted ? 'Update payouts' : 'Set up payouts'}</button>
+            <h3>Bookings</h3>
+            {bookings.length === 0 ? <p>No concierge bookings yet.</p> : (
+              <ul aria-label="Concierge bookings">
+                {bookings.map((booking) => <li key={booking.id}>{booking.counterpartName} bought {booking.hours}h for CA${(booking.amountCents / 100).toFixed(0)}. You receive CA${((booking.amountCents - booking.feeCents) / 100).toFixed(0)}.</li>)}
+              </ul>
+            )}
             {error ? <ErrorState error={error} onRetry={loadAccount} tone="dark" /> : !profile ? <LoadingState tone="dark" /> : (
               <form onSubmit={saveConcierge}>
                 <ul aria-label="Profile checklist" className="checklist">

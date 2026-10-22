@@ -13,6 +13,7 @@ import {
   UserSubscriptionSchema,
 } from '../schemas/user-subscription.schema';
 import { UsageRecord, UsageRecordSchema } from '../schemas/usage-record.schema';
+import { ConciergeBooking, ConciergeBookingSchema } from './schemas/concierge-booking.schema';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { UsageRecord, UsageRecordSchema } from '../schemas/usage-record.schema';
       { name: SubscriptionPlan.name, schema: SubscriptionPlanSchema },
       { name: UserSubscription.name, schema: UserSubscriptionSchema },
       { name: UsageRecord.name, schema: UsageRecordSchema },
+      { name: ConciergeBooking.name, schema: ConciergeBookingSchema },
     ]),
     ConfigModule,
   ],

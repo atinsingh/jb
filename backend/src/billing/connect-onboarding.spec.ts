@@ -27,6 +27,7 @@ describe('Connect onboarding', () => {
         { provide: getModelToken('SubscriptionPlan'), useValue: {} },
         { provide: getModelToken('UserSubscription'), useValue: {} },
         { provide: getModelToken('UsageRecord'), useValue: {} },
+        { provide: getModelToken('ConciergeBooking'), useValue: {} },
       ],
     }).compile();
     service = module.get(BillingService);

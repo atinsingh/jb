@@ -230,6 +230,7 @@ export const employerBillingApi = {
     }),
   connect: () => apiCall('/api/employer/billing/connect'),
   connectOnboard: () => apiCall('/api/employer/billing/connect/onboard', { method: 'POST' }),
+  conciergeBookings: () => apiCall('/api/employer/billing/concierge/bookings'),
 };
 
 /* ----------------------------------------------------------------- audit --- */
