@@ -255,6 +255,11 @@ export default function JobDetail() {
                         Or apply on {titleCase(job.company)}’s site ↗
                       </a>
                     )}
+                    {user?.role === 'ROLE_CANDIDATE' && user?.currentPlanType === 'PRO' && (
+                      <Link href={`/app/resume?mode=generate&jobId=${id}`} className="jd__btn jd__btn--ghost">
+                        Generate résumé
+                      </Link>
+                    )}
                   </div>
 
                   <div className="jd__glance">

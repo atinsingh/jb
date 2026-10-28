@@ -5,6 +5,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Job, JobDocument } from '../schemas/job.schema';
+import { plainJobText } from '../monitors/plain-job-text';
 
 /**
  * Public job listing for the marketing /jobs page.
@@ -126,7 +127,7 @@ export class PublicJobsController {
       jobType: j.jobType || null,
       salary: j.salaryDisclosed ? j.salary || null : null,
       experience: j.experience || null,
-      description: j.description || '',
+      description: plainJobText(j.description || ''),
       requirements: Array.isArray(j.requirements) ? j.requirements : [],
       skills: Array.isArray(j.preferredSkills) ? j.preferredSkills.slice(0, 6) : [],
       applyUrl: j.originalApplyUrl || j.externalUrl || j.canonicalUrl || null,

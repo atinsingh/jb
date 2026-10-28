@@ -5,6 +5,8 @@ import { useAiOperation } from "@/hooks/useAiOperation";
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
+import { API_URL } from "@/config/api";
+import { useAuth } from "@/context/AuthContext";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import AppTopNav from "@/components/app/AppTopNav";
@@ -133,6 +135,7 @@ const ACTIVE_SESSION_KEY = "jobocate.resumeHarness.activeSessionId";
 
 export default function AppResume() {
   const router = useRouter();
+  const { user } = useAuth();
   const importedResumeId =
     router.isReady && typeof router.query.id === "string" ? router.query.id : "";
   const compareMode = router.query.mode === "compare" || !!importedResumeId;
@@ -151,6 +154,23 @@ export default function AppResume() {
   const [targetRole, setTargetRole] = useState("");
   const [jobDescription, setJobDescription] = useState("");
   const [jobUrl, setJobUrl] = useState("");
+
+  useEffect(() => {
+    if (!router.isReady || typeof router.query.jobId !== "string") return undefined;
+    if (user?.role !== "ROLE_CANDIDATE" || user?.currentPlanType !== "PRO") return undefined;
+    let live = true;
+    fetch(`${API_URL}/api/public/jobs/${router.query.jobId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((job) => {
+        if (!live || !job) return;
+        setTargetRole(job.title || "");
+        setJobDescription(typeof job.description === "string" ? job.description.slice(0, 8000) : "");
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [router.isReady, router.query.jobId, user?.role, user?.currentPlanType]);
   const [companyUrl, setCompanyUrl] = useState("");
 
   const [session, setSession] = useState(null);
@@ -298,7 +318,9 @@ export default function AppResume() {
     }
     const requestedSessionId =
       typeof router.query.session === "string" ? router.query.session
-        : generateMode ? window.sessionStorage.getItem(ACTIVE_SESSION_KEY) || "" : "";
+        : generateMode && typeof router.query.jobId !== "string"
+          ? window.sessionStorage.getItem(ACTIVE_SESSION_KEY) || ""
+          : "";
     if (!requestedSessionId) {
       setSessionRestoreDone(true);
       return undefined;
@@ -409,6 +431,11 @@ export default function AppResume() {
           ? { jobDescription: composedPastedJobDescription() }
           : {}),
         ...(jobUrl.trim() ? { jobUrl: jobUrl.trim() } : {}),
+        ...(typeof router.query.jobId === "string" &&
+        user?.role === "ROLE_CANDIDATE" &&
+        user?.currentPlanType === "PRO"
+          ? { publicJobId: router.query.jobId }
+          : {}),
         ...(sourceSessionId ? { carryFromSessionId: sourceSessionId } : {}),
         // These are also sent while carrying. They begin as the source
         // session's look, and any visible setup change must be honoured.

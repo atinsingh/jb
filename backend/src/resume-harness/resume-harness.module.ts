@@ -54,6 +54,7 @@ import {
   UserPreferencesSchema,
 } from '../schemas/user-preferences.schema';
 import { User, UserSchema } from '../schemas/user.schema';
+import { Job, JobSchema } from '../schemas/job.schema';
 import { ResumeSandboxReaperService } from './resume-sandbox-reaper.service';
 import { IngestionModule } from '../ingestion/ingestion.module';
 import { JobDescriptionResolverService } from './job-description-resolver.service';
@@ -69,6 +70,7 @@ import { ModelAliasModule } from './model-alias.module';
       { name: ResumeHarnessSession.name, schema: ResumeHarnessSessionSchema },
       { name: ResumeTemplate.name, schema: ResumeTemplateSchema },
       { name: User.name, schema: UserSchema },
+      { name: Job.name, schema: JobSchema },
       { name: UserPreferences.name, schema: UserPreferencesSchema },
     ]),
   ],

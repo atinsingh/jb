@@ -37,8 +37,10 @@ test('a website application reaches the job applicant list and opening it does n
       const visitor = await anonymous.newPage();
       await visitor.goto(new URL(`/jobs/${jobId}`, page.url() === 'about:blank' ? 'http://localhost:3000' : page.url()).href);
       await expect(visitor.getByRole('link', { name: 'Sign in to apply' })).toHaveAttribute('href', `/app/login?redirect=${encodeURIComponent(`/jobs/${jobId}`)}`);
+      await expect(visitor.getByRole('link', { name: 'Generate résumé' })).toHaveCount(0);
     } finally { await anonymous.close(); }
     await page.goto(`/jobs/${jobId}`);
+    await expect(page.getByRole('link', { name: 'Generate résumé' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Apply on Jobocate', exact: true }).click();
     await expect(page.getByRole('status')).toContainText('Application submitted');
     const applications = await api.get<any>('/api/applications/my-applications', candidateUser.token);
