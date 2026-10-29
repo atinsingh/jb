@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { GreenhouseMonitorService } from './providers/greenhouse-monitor.service';
@@ -13,6 +13,7 @@ import {
   JOB_MONITORS,
   JOBID_MONITORS,
   CRON_MONITORS,
+  CRON_MONITORS_TZ,
 } from '../queue/cron-queue.constants';
 
 @Injectable()
@@ -35,17 +36,20 @@ export class MonitorScheduler implements OnModuleInit {
    */
   async onModuleInit(): Promise<void> {
     if (!this.cronQueue) return;
-    await this.cronQueue.add(
-      JOB_MONITORS,
-      {},
-      { repeat: { cron: CRON_MONITORS }, jobId: JOBID_MONITORS },
-    );
+    const repeat = { cron: CRON_MONITORS, tz: CRON_MONITORS_TZ };
+    const existing = await this.cronQueue.getRepeatableJobs();
+    for (const job of existing) {
+      if (job.name === JOB_MONITORS && (job.cron !== repeat.cron || job.tz !== repeat.tz)) {
+        await this.cronQueue.removeRepeatableByKey(job.key);
+      }
+    }
+    await this.cronQueue.add(JOB_MONITORS, {}, { repeat, jobId: JOBID_MONITORS });
   }
 
-  // Runs every hour by default; disable via MONITORS_CRON_DISABLE=true
-  @Cron(CronExpression.EVERY_HOUR, {
+  // 08:00, 14:00, 20:00 America/New_York. Disable via MONITORS_CRON_DISABLE=true.
+  @Cron(CRON_MONITORS, {
     name: 'job-monitors',
-    timeZone: 'UTC',
+    timeZone: CRON_MONITORS_TZ,
   })
   async handleCron() {
     // Queues own scheduling when enabled → decorator no-ops to avoid double run.

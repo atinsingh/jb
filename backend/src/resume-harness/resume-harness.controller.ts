@@ -21,8 +21,13 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Response } from 'express';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Job, JobDocument } from '../schemas/job.schema';
 import { ResumeHarnessService } from './resume-harness.service';
+import { ModelAliasService } from './model-alias.service';
+import { listingResumeInput } from './listing-resume';
 import {
   ApplyVibeDto,
   RunTurnDto,
@@ -44,7 +49,11 @@ import {
 @UseGuards(JwtAuthGuard)
 @UseInterceptors(AiOperationInterceptor)
 export class ResumeHarnessController {
-  constructor(private readonly service: ResumeHarnessService) {}
+  constructor(
+    private readonly service: ResumeHarnessService,
+    private readonly modelAlias: ModelAliasService,
+    @InjectModel(Job.name) private readonly jobs: Model<JobDocument>,
+  ) {}
 
   @Get('options')
   @ApiOperation({
@@ -82,8 +91,19 @@ export class ResumeHarnessController {
     description: 'Effort is unsupported by the model',
   })
   @ApiResponse({ status: 403, description: 'Model not permitted on this plan' })
-  start(@Request() req, @Body() dto: StartSessionDto) {
-    return this.service.startSession(this.userId(req), dto);
+  async start(@Request() req, @Body() dto: StartSessionDto) {
+    const input = dto.publicJobId ? await this.inputForListing(req, dto) : dto;
+    return this.service.startSession(this.userId(req), input);
+  }
+
+  /** Paid callers only. Reads the cached listing; does not fetch or start the agent itself. */
+  private async inputForListing(req: any, dto: StartSessionDto) {
+    const tier = await this.modelAlias.tierFor(this.userId(req));
+    const job = await this.jobs
+      .findOne({ _id: dto.publicJobId, isActive: true })
+      .select('title description')
+      .lean();
+    return listingResumeInput(tier, job, dto);
   }
 
   @Get('sessions')

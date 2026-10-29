@@ -5,6 +5,10 @@ import { Model } from 'mongoose';
 import { Job, JobDocument } from '../../schemas/job.schema';
 import { JobGeoService } from '../../geography/job-geo.service';
 import { extractSkills } from '../../matching/skill-taxonomy';
+import { plainJobText } from '../plain-job-text';
+
+// shortcut: four public boards, set GREENHOUSE_BOARDS for a different market
+const DEFAULT_GREENHOUSE_BOARDS = ['stripe', 'airbnb', 'gitlab', 'notion'];
 
 @Injectable()
 export class GreenhouseMonitorService {
@@ -40,7 +44,7 @@ export class GreenhouseMonitorService {
           const existed = await this.jobModel.exists({ externalId });
           const companyName = board || job?.offices?.[0]?.name || 'Unknown';
           const location = job?.location?.name || 'Not specified';
-          const description = job.content || '';
+          const description = plainJobText(job.content || '');
           const g = this.geo.normalize({ location, description, title: job.title });
           const doc = {
             title: job.title,
@@ -61,6 +65,8 @@ export class GreenhouseMonitorService {
             // makes self-hosted employers reachable.
             originalApplyUrl: `https://job-boards.greenhouse.io/${board}/jobs/${job.id}`,
             externalId,
+            isExternal: true,
+            importMethod: 'official_api',
             scrapedAt: new Date(),
             skills: extractSkills(`${job.title}\n${description}`),
             companyLogo: this.geo.deriveLogo(companyName, job.absolute_url),
@@ -76,9 +82,10 @@ export class GreenhouseMonitorService {
             needsGeoReview: g.needsGeoReview,
             geoEvidence: g.geoEvidence,
           };
+          // isActive only on insert: a later sync must not revive a listing expiration already turned off.
           await this.jobModel.findOneAndUpdate(
             { externalId },
-            doc,
+            { $set: doc, $setOnInsert: { isActive: true } },
             { upsert: true, new: true },
           );
           upserts++;
@@ -101,9 +108,7 @@ export class GreenhouseMonitorService {
 
   private resolveBoards(input: string[], envValue?: string): string[] {
     if (input && input.length) return input;
-    if (envValue) {
-      return envValue.split(',').map((s) => s.trim()).filter(Boolean);
-    }
-    return [];
+    const fromEnv = (envValue || '').split(',').map((s) => s.trim()).filter(Boolean);
+    return fromEnv.length ? fromEnv : DEFAULT_GREENHOUSE_BOARDS;
   }
 }

@@ -3,7 +3,7 @@ import { MonitorCronProcessor } from './monitor.cron.processor';
 import { JOB_MONITORS, JOBID_MONITORS, CRON_MONITORS } from '../queue/cron-queue.constants';
 
 /**
- * Cron → Bull repeatable-job conversion for the hourly job monitors.
+ * Cron → Bull repeatable-job conversion for the thrice-daily job monitors.
  * Verifies: extracted method does the work; @Cron early-returns when queues own
  * scheduling and runs the method otherwise; onModuleInit registers the
  * repeatable job only when a queue is present; the processor calls the method.
@@ -64,17 +64,27 @@ describe('MonitorScheduler cron/queue conversion', () => {
     expect(spy).not.toHaveBeenCalled();
   });
 
-  it('onModuleInit registers the repeatable job with a stable jobId when a queue is present', async () => {
+  it('onModuleInit registers the thrice-daily Eastern schedule and drops a stale hourly job', async () => {
     const d = makeDeps();
-    const queue = { add: jest.fn().mockResolvedValue({ id: JOBID_MONITORS }) };
+    const queue = {
+      add: jest.fn().mockResolvedValue({ id: JOBID_MONITORS }),
+      getRepeatableJobs: jest.fn().mockResolvedValue([
+        { name: JOB_MONITORS, cron: '0 * * * *', tz: 'UTC', key: 'hourly' },
+        { name: 'reminders', cron: '0 * * * *', key: 'keep' },
+      ]),
+      removeRepeatableByKey: jest.fn().mockResolvedValue(undefined),
+    };
     const s = new MonitorScheduler(d.greenhouse as any, d.lever as any, d.workday as any, d.appEvents as any, queue as any);
     await s.onModuleInit();
+    expect(queue.removeRepeatableByKey).toHaveBeenCalledTimes(1);
+    expect(queue.removeRepeatableByKey).toHaveBeenCalledWith('hourly');
     expect(queue.add).toHaveBeenCalledTimes(1);
     expect(queue.add).toHaveBeenCalledWith(
       JOB_MONITORS,
       {},
-      { repeat: { cron: CRON_MONITORS }, jobId: JOBID_MONITORS },
+      { repeat: { cron: '0 8,14,20 * * *', tz: 'America/New_York' }, jobId: JOBID_MONITORS },
     );
+    expect(CRON_MONITORS).toBe('0 8,14,20 * * *');
   });
 
   it('onModuleInit does nothing when no queue is injected', async () => {

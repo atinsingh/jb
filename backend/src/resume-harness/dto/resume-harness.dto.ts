@@ -85,6 +85,15 @@ export class StartSessionDto {
   @MaxLength(2000)
   jobUrl?: string;
 
+  /**
+   * A job already stored for /jobs. Paid plans only. The server loads the
+   * stored title and description and does not fetch jobUrl.
+   */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsMongoId()
+  publicJobId?: string;
+
   @ApiPropertyOptional({
     description:
       'Template to write to. Omitted means the carried session’s template, ' +

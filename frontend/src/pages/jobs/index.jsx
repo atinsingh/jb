@@ -144,7 +144,7 @@ export default function FindJobs() {
         <link rel="canonical" href="https://jobocate.com/jobs" />
       </Head>
 
-      <PublicLayout surface="v3">
+      <PublicLayout surface="v3" candidateNav>
         <div className={`jb ${styles.page}`}>
           <div className={styles.headRow}>
             <h1>Jobs</h1>

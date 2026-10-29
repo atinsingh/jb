@@ -41,8 +41,10 @@ export const JOBID_INGESTION_EXPIRY = 'cron:ingestion-expiry';
 export const JOBID_REMINDERS = 'cron:reminders';
 export const JOBID_ANALYTICS = 'cron:analytics';
 
-// ── Cron expressions (must match the original @Cron intervals exactly) ────────
-export const CRON_MONITORS = '0 * * * *'; // CronExpression.EVERY_HOUR
+// ── Cron expressions (must match the @Cron intervals exactly) ────────────────
+/** 08:00, 14:00, 20:00. Pair with CRON_MONITORS_TZ. Page views do not fetch. */
+export const CRON_MONITORS = '0 8,14,20 * * *';
+export const CRON_MONITORS_TZ = 'America/New_York';
 export const CRON_INGESTION_POLL = '*/30 * * * *'; // CronExpression.EVERY_30_MINUTES
 export const CRON_INGESTION_EXPIRY = '0 */6 * * *'; // CronExpression.EVERY_6_HOURS
 export const CRON_REMINDERS = '0 * * * *'; // CronExpression.EVERY_HOUR
