@@ -139,6 +139,7 @@ export class User {
       hourlyRate: Number,
       languages: [String],
       timezone: String,
+      durations: [{ _id: false, minutes: Number, url: String }],
     },
     default: undefined,
   })
@@ -151,6 +152,7 @@ export class User {
     hourlyRate?: number;
     languages?: string[];
     timezone?: string;
+    durations?: { minutes: number; url: string }[];
   };
 
   // Subscription info (denormalized for quick access)

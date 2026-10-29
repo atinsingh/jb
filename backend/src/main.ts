@@ -3,6 +3,7 @@
 // the right values. See src/load-env.ts.
 import { REPO_ROOT } from './load-env';
 import { NestFactory } from '@nestjs/core';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
@@ -33,6 +34,7 @@ async function bootstrap() {
       rawBody: true, // Preserve raw request body (req.rawBody) for Stripe webhook signature verification
     });
     earlyLogger.log('App module created successfully');
+    app.useWebSocketAdapter(new IoAdapter(app));
 
     // Serve locally-stored uploads (StorageService local driver) at /uploads/*.
     // No-op for the s3 driver, which returns absolute/presigned URLs instead.

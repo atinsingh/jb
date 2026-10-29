@@ -12,7 +12,40 @@ export class ConciergeBooking {
   employerId: Types.ObjectId;
 
   @Prop({ required: true })
-  hours: number;
+  minutes: number;
+
+  @Prop({ required: true })
+  durationUrl: string;
+
+  @Prop({ default: 'unscheduled' })
+  status: string;
+
+  @Prop()
+  paymentIntentId?: string;
+
+  @Prop()
+  startsAt?: Date;
+
+  @Prop()
+  endsAt?: Date;
+
+  @Prop()
+  scheduledAt?: Date;
+
+  @Prop()
+  rescheduleUrl?: string;
+
+  @Prop()
+  cancelUrl?: string;
+
+  @Prop()
+  calendlyEventUri?: string;
+
+  @Prop()
+  payoutTransferId?: string;
+
+  @Prop()
+  paidOutAt?: Date;
 
   @Prop({ required: true })
   hourlyRate: number;
@@ -31,3 +64,9 @@ export class ConciergeBooking {
 }
 
 export const ConciergeBookingSchema = SchemaFactory.createForClass(ConciergeBooking);
+
+// One unpaid unscheduled booking per pair. A second insert loses and that payment is refunded.
+ConciergeBookingSchema.index(
+  { candidateId: 1, employerId: 1 },
+  { unique: true, partialFilterExpression: { status: 'unscheduled' } },
+);

@@ -9,7 +9,9 @@ import { SubscriptionPlan, SubscriptionPlanDocument } from '../schemas/subscript
 import { UserSubscription, UserSubscriptionDocument } from '../schemas/user-subscription.schema';
 import { UsageRecord, UsageRecordDocument } from '../schemas/usage-record.schema';
 import { ConciergeBooking, ConciergeBookingDocument } from './schemas/concierge-booking.schema';
-import { conciergeCharge } from './concierge-fee';
+import { conciergeCharge, conciergeDurationAllowed, conciergeDurationLabel, conciergeDurationLink } from './concierge-fee';
+import { presentConciergeBooking } from './concierge-payout';
+import { sendConciergeHoursBooked } from './concierge-booking-mail';
 import { EMPLOYER_PLANS } from '../employer-billing/employer-plans';
 import { CreateCheckoutSessionDto, CancelSubscriptionDto } from './dto';
 import {
@@ -703,86 +705,179 @@ export class BillingService {
       hourlyRate: coach.conciergeProfile?.hourlyRate,
       languages: coach.conciergeProfile?.languages || [],
       timezone: coach.conciergeProfile?.timezone,
+      durations: (coach.conciergeProfile?.durations || [])
+        .filter((row) => conciergeDurationAllowed(Number(row.minutes)) && conciergeDurationLink(row.url))
+        .map((row) => row.minutes),
     }));
   }
 
-  async createConciergeCheckout(candidate: UserDocument, employerId: string, hours: number): Promise<{ url: string }> {
-    if (candidate.role !== 'ROLE_CANDIDATE') throw new BadRequestException('Only a candidate can buy concierge hours');
-    if (!Number.isInteger(hours) || hours < 1 || hours > 40) throw new BadRequestException('Buy between 1 and 40 hours');
+  async createConciergeCheckout(candidate: UserDocument, employerId: string, minutes: number): Promise<{ url: string }> {
+    if (candidate.role !== 'ROLE_CANDIDATE') throw new BadRequestException('Only a candidate can buy a concierge session');
     if (candidate._id.toString() === employerId) throw new BadRequestException('You cannot buy hours from yourself');
     const employer = await this.userModel.findById(employerId);
     const rate = employer?.conciergeProfile?.hourlyRate;
-    if (!employer?.conciergeProfile?.published || !employer.connectPayoutsEnabled || !employer.stripeConnectAccountId || rate == null) {
-      throw new BadRequestException('This coach is not available for booking');
-    }
-    const { feeCents } = conciergeCharge(rate, hours);
+    const offering = (employer?.conciergeProfile?.durations || []).find((row) => row.minutes === minutes && conciergeDurationLink(row.url));
+    const payable = !!employer?.conciergeProfile?.published && !!employer.connectPayoutsEnabled && !!employer.stripeConnectAccountId && rate != null;
+    if (payable && !offering) throw new BadRequestException('This concierge does not offer that duration');
+    if (!payable || !offering) throw new BadRequestException('This coach is not available for booking');
+    const open = await this.bookingModel.findOne({
+      candidateId: candidate._id,
+      employerId: new Types.ObjectId(employerId),
+      status: 'unscheduled',
+    });
+    if (open?.durationUrl) throw new BadRequestException('Book your current session before buying another');
+    const { amountCents, feeCents } = conciergeCharge(rate, minutes);
     const customerId = await this.createOrGetStripeCustomer(candidate);
     const session = await this.stripe.checkout.sessions.create({
       mode: 'payment',
       customer: customerId,
       line_items: [{
-        quantity: hours,
+        quantity: 1,
         price_data: {
           currency: 'cad',
-          unit_amount: rate * 100,
-          product_data: { name: `Concierge hour with ${employer.name || 'coach'}` },
+          unit_amount: amountCents,
+          product_data: { name: `Concierge session (${conciergeDurationLabel(minutes)}) with ${employer.name || 'coach'}` },
         },
       }],
-      payment_intent_data: {
-        application_fee_amount: feeCents,
-        transfer_data: { destination: employer.stripeConnectAccountId },
-      },
       metadata: {
         kind: 'concierge',
         candidateId: candidate._id.toString(),
         employerId: employer._id.toString(),
-        hours: String(hours),
+        minutes: String(minutes),
         hourlyRate: String(rate),
+        durationUrl: offering.url,
+        feeCents: String(feeCents),
       },
-      success_url: `${this.frontendUrl}/app/concierge?paid=1`,
+      success_url: `${this.frontendUrl}/app/concierge?paid=1&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${this.frontendUrl}/app/concierge?canceled=1`,
     });
     return { url: session.url! };
   }
 
+  async markConciergeBookingScheduled(candidateId: string, bookingId: string) {
+    if (!Types.ObjectId.isValid(bookingId)) throw new BadRequestException('Choose a booking you paid for');
+    const booking = await this.bookingModel.findOne({ _id: new Types.ObjectId(bookingId), candidateId: new Types.ObjectId(candidateId) });
+    if (!booking) throw new BadRequestException('Choose a booking you paid for');
+    if (!booking.scheduledAt) {
+      booking.scheduledAt = new Date();
+      await booking.save();
+    }
+    return { id: booking._id.toString(), scheduledAt: booking.scheduledAt };
+  }
+
   async listConciergeBookings(userId: string, side: 'candidate' | 'employer') {
+    if (side === 'candidate') {
+      const candidate = await this.userModel.findById(userId);
+      if (candidate) {
+        try { await this.syncPaidConciergeCheckouts(candidate); } catch (err) {
+          this.logger.warn(`Could not confirm concierge checkouts: ${err instanceof Error ? err.message : err}`);
+        }
+      }
+    }
     const filter = side === 'employer' ? { employerId: new Types.ObjectId(userId) } : { candidateId: new Types.ObjectId(userId) };
     const bookings = await this.bookingModel.find(filter).sort({ createdAt: -1 }).limit(20);
     const otherIds = bookings.map((booking) => side === 'employer' ? booking.candidateId : booking.employerId);
-    const people = await this.userModel.find({ _id: { $in: otherIds } }).select('name');
-    const names = new Map(people.map((person) => [person._id.toString(), person.name || (side === 'employer' ? 'Candidate' : 'Coach')]));
-    return bookings.map((booking) => ({
-      id: booking._id.toString(),
-      hours: booking.hours,
-      hourlyRate: booking.hourlyRate,
-      amountCents: booking.amountCents,
-      feeCents: booking.feeCents,
-      currency: booking.currency,
-      createdAt: (booking as ConciergeBookingDocument & { createdAt?: Date }).createdAt,
-      counterpartName: names.get((side === 'employer' ? booking.candidateId : booking.employerId).toString()) || (side === 'employer' ? 'Candidate' : 'Coach'),
-    }));
+    const people = await this.userModel.find({ _id: { $in: otherIds } }).select('name conciergeProfile');
+    const byId = new Map(people.map((person) => [person._id.toString(), person]));
+    return bookings.map((booking) => {
+      const otherId = (side === 'employer' ? booking.candidateId : booking.employerId).toString();
+      const other = byId.get(otherId);
+      return {
+        id: booking._id.toString(),
+        minutes: booking.minutes,
+        durationUrl: booking.durationUrl,
+        hourlyRate: booking.hourlyRate,
+        amountCents: booking.amountCents,
+        feeCents: booking.feeCents,
+        currency: booking.currency,
+        scheduledAt: booking.scheduledAt,
+        createdAt: (booking as ConciergeBookingDocument & { createdAt?: Date }).createdAt,
+        counterpartId: otherId,
+        counterpartName: other?.name || (side === 'employer' ? 'Candidate' : 'Coach'),
+        ...presentConciergeBooking(booking, new Date()),
+      };
+    });
   }
 
-  private async recordConciergeBooking(session: Stripe.Checkout.Session): Promise<void> {
-    if (await this.bookingModel.findOne({ stripeSessionId: session.id })) return;
-    const hours = Number(session.metadata?.hours);
+  private async syncPaidConciergeCheckouts(candidate: UserDocument) {
+    if (!candidate.stripeCustomerId) return;
+    const listed = await this.stripe.checkout.sessions.list({ customer: candidate.stripeCustomerId, limit: 20 });
+    for (const session of listed.data) {
+      if (session.payment_status !== 'paid' || session.metadata?.kind !== 'concierge') continue;
+      if (session.metadata.candidateId !== candidate._id.toString()) continue;
+      await this.recordConciergeBooking(session);
+    }
+  }
+
+  private async recordConciergeBooking(session: Stripe.Checkout.Session): Promise<boolean> {
+    if (await this.bookingModel.findOne({ stripeSessionId: session.id })) return false;
+    const minutes = Number(session.metadata?.minutes);
     const hourlyRate = Number(session.metadata?.hourlyRate);
+    const durationUrl = session.metadata?.durationUrl || '';
     const candidateId = session.metadata?.candidateId;
     const employerId = session.metadata?.employerId;
-    if (!candidateId || !employerId || !Number.isInteger(hours) || !Number.isInteger(hourlyRate)) {
+    if (!candidateId || !employerId || !conciergeDurationAllowed(minutes) || !Number.isInteger(hourlyRate) || !conciergeDurationLink(durationUrl)) {
       this.logger.error({ sessionId: session.id }, 'Concierge checkout missing metadata');
+      return false;
+    }
+    const pair = { candidateId: new Types.ObjectId(candidateId), employerId: new Types.ObjectId(employerId) };
+    const open = await this.bookingModel.findOne({ ...pair, status: 'unscheduled' });
+    if (open) {
+      await this.refundDuplicateConciergeCheckout(session);
+      return false;
+    }
+    const charge = conciergeCharge(hourlyRate, minutes);
+    const storedFee = Number(session.metadata?.feeCents);
+    const paymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
+    try {
+      await this.bookingModel.create({
+        ...pair,
+        minutes,
+        durationUrl,
+        hourlyRate,
+        amountCents: session.amount_total ?? charge.amountCents,
+        feeCents: Number.isInteger(storedFee) ? storedFee : charge.feeCents,
+        currency: 'cad',
+        stripeSessionId: session.id,
+        paymentIntentId,
+        status: 'unscheduled',
+      });
+    } catch (err) {
+      if ((err as { code?: number }).code !== 11000) throw err;
+      if (await this.bookingModel.findOne({ stripeSessionId: session.id })) return false;
+      await this.refundDuplicateConciergeCheckout(session);
+      return false;
+    }
+    try { await this.notifyConciergeBooking(candidateId, employerId, minutes, durationUrl); } catch (err) {
+      this.logger.warn(`Concierge booking email failed: ${err instanceof Error ? err.message : err}`);
+    }
+    return true;
+  }
+
+  private async refundDuplicateConciergeCheckout(session: Stripe.Checkout.Session) {
+    const paymentIntent = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
+    if (!paymentIntent) {
+      this.logger.error({ sessionId: session.id }, 'Duplicate concierge checkout has no payment to refund');
       return;
     }
-    const charge = conciergeCharge(hourlyRate, hours);
-    await this.bookingModel.create({
-      candidateId: new Types.ObjectId(candidateId),
-      employerId: new Types.ObjectId(employerId),
-      hours,
-      hourlyRate,
-      amountCents: session.amount_total ?? charge.amountCents,
-      feeCents: charge.feeCents,
-      currency: 'cad',
-      stripeSessionId: session.id,
-    });
+    try {
+      await this.stripe.refunds.create({ payment_intent: paymentIntent });
+    } catch (err) {
+      if ((err as { code?: string }).code === 'charge_already_refunded') return;
+      throw err;
+    }
+  }
+
+  private async notifyConciergeBooking(candidateId: string, employerId: string, minutes: number, durationUrl: string) {
+    const candidate = await this.userModel.findById(candidateId);
+    const employer = await this.userModel.findById(employerId);
+    const details = {
+      minutes,
+      durationUrl,
+      coachName: employer?.name || 'your concierge',
+      candidateName: candidate?.name || 'A candidate',
+    };
+    if (candidate?.email) await sendConciergeHoursBooked(candidate.email, { ...details, audience: 'candidate' });
+    if (employer?.email) await sendConciergeHoursBooked(employer.email, { ...details, audience: 'concierge' });
   }
 }

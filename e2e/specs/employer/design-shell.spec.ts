@@ -10,7 +10,7 @@ test.describe('Employer v3 workspace shell', () => {
     for (const route of ['/employer/dashboard', '/employer/jobs', '/employer/settings', '/employer/jobs/post']) {
       await page.goto(route, { waitUntil: 'domcontentloaded' });
       await expect(page.getByRole('navigation', { name: 'Employer primary' }).getByRole('link'))
-        .toHaveText(['Dashboard', 'Jobs', 'Settings']);
+        .toHaveText(['Dashboard', 'Jobs', 'Bookings', 'Messages', 'Settings']);
       await expect(page.locator('#emapp')).toHaveCSS('background-color', 'rgb(11, 11, 12)');
       await expect(page.locator('#emapp')).toHaveCSS('color', 'rgb(245, 245, 244)');
       await expectNoHorizontalOverflow(page, route);

@@ -880,6 +880,9 @@ export default function AppResume() {
           >
             Compare your resume with a role, or create your next version.
           </p>
+          <p style={{ margin: "0 0 28px" }}>
+            <Link href="/app/concierge" style={{ fontWeight: 700, color: T.accent }}>Talk to a concierge</Link>
+          </p>
           <BudgetSummary
             budget={budget}
             estimate={

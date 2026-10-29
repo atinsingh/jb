@@ -10,6 +10,7 @@ import { useAuth } from '@/context/AuthContext';
 // V1 visibility only: other candidate routes remain available directly.
 const NAV = [
   ['Dashboard', '/app/dashboard'],
+  ['Concierge', '/app/concierge'],
   ['Resume', '/app/resume'],
   ['Library', '/app/resume-library'],
   ['Preferences', '/app/preferences'],

@@ -10,6 +10,7 @@ import { Model } from 'mongoose';
 import { User, UserDocument, UserRole } from '../schemas/user.schema';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { AppLoggerService } from '../common/logger/logger.service';
+import { conciergeDurationsReady } from '../billing/concierge-fee';
 
 @Injectable()
 export class UsersService {
@@ -81,9 +82,12 @@ export class UsersService {
     ];
 
     const concierge = updateProfileDto.conciergeProfile;
+    if (concierge?.durations?.length && !conciergeDurationsReady(concierge)) {
+      throw new BadRequestException('Each meeting length needs a 15-minute step and a Calendly or Google link.');
+    }
     if (concierge?.published === true && !this.isConciergeProfilePublishable(concierge)) {
       throw new BadRequestException(
-        'Add a headline, a bio of at least 80 characters, one specialty and an hourly rate before publishing your concierge profile.',
+        'Add a headline, a bio of at least 80 characters, one specialty, an hourly rate, and at least one meeting length with a Calendly or Google link before publishing your concierge profile.',
       );
     }
     if (concierge?.published === true) {
@@ -123,12 +127,14 @@ export class UsersService {
     bio?: string;
     specialties?: string[];
     hourlyRate?: number;
+    durations?: { minutes?: number; url?: string }[];
   }): boolean {
     return (
       !!concierge.headline?.trim() &&
       (concierge.bio?.trim().length ?? 0) >= 80 &&
       !!concierge.specialties?.some((s) => s?.trim()) &&
-      concierge.hourlyRate != null
+      concierge.hourlyRate != null &&
+      conciergeDurationsReady(concierge)
     );
   }
 

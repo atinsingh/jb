@@ -17,6 +17,7 @@ const validConcierge = {
   hourlyRate: 150,
   languages: ['English'],
   timezone: 'America/Toronto',
+  durations: [{ minutes: 60, url: 'https://calendly.com/coach/60' }],
 };
 
 describe('UsersService (concierge profile)', () => {
@@ -76,6 +77,13 @@ describe('UsersService (concierge profile)', () => {
       { $set: { conciergeProfile: validConcierge } },
       expect.any(Object),
     );
+  });
+
+  it('rejects a duration link that is not Calendly or Google', async () => {
+    await expect(service.updateProfile('user-1', {
+      conciergeProfile: { ...validConcierge, durations: [{ minutes: 30, url: 'https://zoom.us/j/1' }] },
+    } as any)).rejects.toThrow(/Calendly or Google/);
+    expect(userModel.findByIdAndUpdate).not.toHaveBeenCalled();
   });
 
   describe('UpdateProfileDto validation of conciergeProfile', () => {
