@@ -65,7 +65,6 @@ export class GreenhouseMonitorService {
             // makes self-hosted employers reachable.
             originalApplyUrl: `https://job-boards.greenhouse.io/${board}/jobs/${job.id}`,
             externalId,
-            isActive: true,
             isExternal: true,
             importMethod: 'official_api',
             scrapedAt: new Date(),
@@ -83,9 +82,10 @@ export class GreenhouseMonitorService {
             needsGeoReview: g.needsGeoReview,
             geoEvidence: g.geoEvidence,
           };
+          // isActive only on insert: a later sync must not revive a listing expiration already turned off.
           await this.jobModel.findOneAndUpdate(
             { externalId },
-            doc,
+            { $set: doc, $setOnInsert: { isActive: true } },
             { upsert: true, new: true },
           );
           upserts++;

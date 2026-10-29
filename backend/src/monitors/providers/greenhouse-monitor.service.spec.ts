@@ -57,8 +57,14 @@ describe('GreenhouseMonitorService', () => {
     await monitor.run();
     expect(jobs.findOneAndUpdate).toHaveBeenCalledWith(
       { externalId: 'greenhouse:1' },
-      expect.objectContaining({ description: 'Build APIs', isActive: true, isExternal: true }),
+      {
+        $set: expect.not.objectContaining({ isActive: true }),
+        $setOnInsert: { isActive: true },
+      },
       { upsert: true, new: true },
+    );
+    expect(jobs.findOneAndUpdate.mock.calls[0][1].$set).toEqual(
+      expect.objectContaining({ description: 'Build APIs', isExternal: true }),
     );
   });
 });
