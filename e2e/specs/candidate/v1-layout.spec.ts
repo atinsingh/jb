@@ -2,6 +2,7 @@ import { test, expect, storage, expectNoHorizontalOverflow } from '../../fixture
 
 test.use({ storageState: storage.candidate });
 const destinations = ['/app/dashboard', '/app/concierge', '/app/resume', '/app/resume-library', '/app/preferences', '/app/settings', '/app/billing'];
+const navHrefs = ['/app/dashboard', '/jobs', '/app/concierge', '/app/resume', '/app/resume-library', '/app/preferences', '/app/settings', '/app/billing'];
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/auth/me', r => r.fulfill({ json: { user: { id: 'candidate-layout', role: 'ROLE_CANDIDATE' } } }));
   await page.route('**/api/resume-harness/options', r => r.fulfill({ json: { models: [{ model: 'test-model', label: 'Test model', efforts: ['low'] }], sandboxAvailable: true, profile: { ready: true, missing: [], optionalGaps: [] } } }));
@@ -17,7 +18,7 @@ test('candidate v1 navigation and explicit résumé modes fit desktop and mobile
   await page.goto('/app/resume');
   const nav = page.getByRole('navigation', { name: 'Candidate navigation' });
   await expect(nav).toBeVisible();
-  expect(await nav.locator('a').evaluateAll(links => links.map(a => a.getAttribute('href')))).toEqual(destinations);
+  expect(await nav.locator('a').evaluateAll(links => links.map(a => a.getAttribute('href')))).toEqual(navHrefs);
   await expect(page.getByTestId('model-select')).toBeHidden();
   await page.screenshot({ path: 'tmp/v1-resume-desktop.png', fullPage: true });
   await page.getByRole('button', { name: /Compare Resume/ }).click();
@@ -32,6 +33,29 @@ test('candidate v1 navigation and explicit résumé modes fit desktop and mobile
     for (const link of await nav.locator('a').all()) await expect(link).toBeVisible();
     if (width === 1280) await page.screenshot({ path: 'tmp/v1-generate-desktop.png', fullPage: true });
   }
+});
+
+test('signed-in candidate opens Jobs from the nav, and a paid candidate can generate a résumé', async ({ page }) => {
+  const job = { id: 'job-142', title: 'Engineer', company: 'Acme', location: 'Remote', isRemote: true, jobType: 'Full-time', salary: null };
+  await page.route('**/api/public/jobs?*', r => r.fulfill({ json: { jobs: [job], total: 1, pages: 1 } }));
+  await page.route('**/api/public/jobs/job-142', r => r.fulfill({ json: { ...job, company: 'acme', description: 'Build APIs', skills: [], requirements: [], similar: [], acceptsDirectApplications: false } }));
+  await page.goto('/app/dashboard');
+  const nav = page.getByRole('navigation', { name: 'Candidate navigation' });
+  await nav.getByRole('link', { name: 'Jobs', exact: true }).click();
+  await expect(page).toHaveURL(/\/jobs$/);
+  await expect(nav.getByRole('link', { name: 'Jobs', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('heading', { name: 'Jobs' })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Engineer/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Generate résumé' })).toHaveCount(0);
+  await page.getByRole('link', { name: /Engineer/ }).click();
+  await expect(page).toHaveURL(/\/jobs\/job-142$/);
+  await expect(nav.getByRole('link', { name: 'Jobs', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('link', { name: 'Generate résumé' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /See your match/ })).toHaveAttribute('href', '/app/resume?mode=generate&jobId=job-142');
+  await page.unroute('**/api/auth/me');
+  await page.route('**/api/auth/me', r => r.fulfill({ json: { user: { id: 'paid-layout', role: 'ROLE_CANDIDATE', currentPlanType: 'PRO' } } }));
+  await page.reload();
+  await expect(page.getByRole('link', { name: 'Generate résumé' })).toHaveAttribute('href', '/app/resume?mode=generate&jobId=job-142');
 });
 
 test('candidate can return to Dashboard after leaving it', async ({ page }) => {

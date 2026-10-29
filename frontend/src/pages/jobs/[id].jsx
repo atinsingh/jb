@@ -9,6 +9,7 @@ import { appRoute } from '@/components/app/appRoutes';
 import { API_URL } from '@/config/api';
 import { useAuth } from '@/context/AuthContext';
 import { applyToJob, getMyApplications } from '@/services/api';
+import { getSubscription } from '@/services/billingApi';
 
 /**
  * Job detail.
@@ -46,10 +47,23 @@ export default function JobDetail() {
   const [job, setJob] = useState(null);
   const [state, setState] = useState('loading'); // loading | ready | missing | error
   const { user, loading: authLoading } = useAuth();
+  const [listedPaid, setListedPaid] = useState(false);
   const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState(false);
   const [checkingApplications, setCheckingApplications] = useState(false);
   const [applyError, setApplyError] = useState(null);
+
+  useEffect(() => {
+    if (user?.role !== 'ROLE_CANDIDATE') return undefined;
+    let live = true;
+    getSubscription()
+      .then((data) => { if (live && data?.currentPlan === 'PRO') setListedPaid(true); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [user?.role]);
+
+  const paid = user?.role === 'ROLE_CANDIDATE' && (user?.currentPlanType === 'PRO' || listedPaid);
+  const resumeForJob = `/app/resume?mode=generate&jobId=${id}`;
 
   useEffect(() => {
     setApplied(false);
@@ -113,7 +127,7 @@ export default function JobDetail() {
         )}
       </Head>
 
-      <PublicLayout surface="v3">
+      <PublicLayout surface="v3" candidateNav>
         <div className="jd">
           {state === 'loading' && (
             <div className="jd__state" aria-busy="true">Loading role…</div>
@@ -237,13 +251,16 @@ export default function JobDetail() {
                       </> : <Link href={`/app/login?redirect=${encodeURIComponent(`/jobs/${id}`)}`} className="jd__btn jd__btn--green">Sign in to apply</Link>}
                       {applied && <p role="status" className="jd__p">Application submitted. The employer can now review it.</p>}
                       {applyError && <p role="alert" className="jd__p">{applyError}</p>}
-                    </> : <><span className="jd__matchline">
-                      <span className="jd__matchnum" aria-hidden="true">92</span>
-                      match · sign in to reveal
-                    </span>
-                    <Link href={appRoute('App Sign Up.dc.html')} className="jd__btn jd__btn--green">
-                      See your match &amp; apply →
-                    </Link>
+                    </> : <>
+                      {!user && (
+                        <span className="jd__matchline">
+                          <span className="jd__matchnum" aria-hidden="true">92</span>
+                          match · sign in to reveal
+                        </span>
+                      )}
+                      <Link href={user ? resumeForJob : appRoute('App Sign Up.dc.html')} className="jd__btn jd__btn--green">
+                        {paid ? 'Generate résumé' : 'See your match & apply →'}
+                      </Link>
                     </>}
                     {job.applyUrl && (
                       <a
@@ -255,8 +272,8 @@ export default function JobDetail() {
                         Or apply on {titleCase(job.company)}’s site ↗
                       </a>
                     )}
-                    {user?.role === 'ROLE_CANDIDATE' && user?.currentPlanType === 'PRO' && (
-                      <Link href={`/app/resume?mode=generate&jobId=${id}`} className="jd__btn jd__btn--ghost">
+                    {paid && job.acceptsDirectApplications && (
+                      <Link href={resumeForJob} className="jd__btn jd__btn--green">
                         Generate résumé
                       </Link>
                     )}

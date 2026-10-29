@@ -2,6 +2,8 @@
 
 import SiteNav from '@/components/site/SiteNav';
 import SiteFooter from '@/components/site/SiteFooter';
+import AppTopNav from '@/components/app/AppTopNav';
+import { useAuth } from '@/context/AuthContext';
 
 /**
  * The shared chrome for every public (marketing / legal / logged-out) page.
@@ -25,12 +27,15 @@ import SiteFooter from '@/components/site/SiteFooter';
  * @param {'candidate'|'employer'} variant — passed to SiteNav; 'employer'
  *   promotes the hiring CTA on the employer funnel pages.
  */
-export default function PublicLayout({ children, variant = 'candidate', surface = 'flightplan' }) {
+export default function PublicLayout({ children, variant = 'candidate', surface = 'flightplan', candidateNav = false }) {
+  const { user, loading } = useAuth();
+  // Signed-in candidates keep the app nav on /jobs. Logged-out visitors and other roles stay on the public nav.
+  const inCandidateApp = candidateNav && !loading && user?.role === 'ROLE_CANDIDATE';
   return (
     <div className={`${surface === 'v3' ? 'jb-dark jbv3-chrome jb-public' : 'jb-dark'} ${variant === 'candidate' ? 'jb-candidate' : ''}`}>
-      <SiteNav variant={variant} />
+      {inCandidateApp ? <AppTopNav /> : <SiteNav variant={variant} />}
       <main id="main">{children}</main>
-      <SiteFooter />
+      {inCandidateApp ? null : <SiteFooter />}
 
       <style jsx>{`
         .jb-dark {
