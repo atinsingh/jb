@@ -1,4 +1,7 @@
 import { URLS } from '../playwright.config';
+import { E2E_MARKER, e2eAuthUserIds } from './e2e-auth-users';
+
+export { E2E_MARKER };
 
 /**
  * Thin API client used to ARRANGE state for browser tests.
@@ -23,14 +26,9 @@ export interface TestUser {
 export const TEST_PASSWORD = 'E2ePassw0rd!2026';
 
 /**
- * Every artifact this suite creates carries this marker.
- *
- * The suite runs against a developer's real dev database, so its data must be
- * both collision-proof and identifiable after the fact. Anything containing
- * this string is safe to delete.
+ * Every artifact this suite creates carries `e2e-auto`, so it is collision-proof
+ * and safe to delete from the dev database and from Supabase Auth.
  */
-export const E2E_MARKER = 'e2e-auto';
-
 /** A unique, marked identifier — safe to create repeatedly without collisions. */
 export function uniqueId(prefix: string): string {
   const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
@@ -166,6 +164,61 @@ export async function createUser(role: Role, prefix: string): Promise<TestUser> 
 
   const token = await login(email, TEST_PASSWORD);
   return { name, email, password: TEST_PASSWORD, role, token };
+}
+
+function supabaseAdminHeaders(): Record<string, string> {
+  return {
+    apikey: SUPABASE_SERVICE_ROLE_KEY as string,
+    Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+  };
+}
+
+async function supabaseAdmin(path: string, init?: RequestInit): Promise<Response> {
+  const url = `${SUPABASE_URL}/auth/v1${path}`;
+  const headers = { ...supabaseAdminHeaders(), ...init?.headers };
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const res = await fetch(url, { ...init, headers });
+    if (res.status !== 429 || attempt === 4) return res;
+    await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+  }
+  throw new Error('supabaseAdmin retry fell through');
+}
+
+/**
+ * Delete every Supabase auth user tagged `e2e-auto`.
+ *
+ * shortcut: lists at most 50 pages (10k users), raise the cap if a dev project exceeds that.
+ * Real accounts and the homepage demo user (no marker) are left alone.
+ */
+export async function deleteE2EAuthUsers(): Promise<number> {
+  requireSupabaseEnv();
+
+  const pages: Array<Array<{ id: string; email?: string }>> = [];
+  for (let page = 1; page <= 50; page++) {
+    const res = await supabaseAdmin(`/admin/users?page=${page}&per_page=200`);
+    if (!res.ok) {
+      throw new Error(`Supabase list users failed (${res.status}): ${await res.text()}`);
+    }
+    const body = (await res.json()) as { users?: Array<{ id: string; email?: string }> };
+    const users = body.users ?? [];
+    pages.push(users);
+    if (users.length < 200) break;
+  }
+
+  const ids = e2eAuthUserIds(pages);
+  const queue = [...ids];
+  const workers = Array.from({ length: 8 }, async () => {
+    for (;;) {
+      const id = queue.pop();
+      if (!id) return;
+      const res = await supabaseAdmin(`/admin/users/${id}`, { method: 'DELETE' });
+      if (!res.ok && res.status !== 404) {
+        throw new Error(`Supabase delete user failed (${res.status}): ${await res.text()}`);
+      }
+    }
+  });
+  await Promise.all(workers);
+  return ids.length;
 }
 
 /** Exchange email + password for a Supabase access token. */

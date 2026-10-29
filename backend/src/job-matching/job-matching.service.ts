@@ -55,7 +55,7 @@ export class JobMatchingService {
         matchScore: matchResult.matchScore || 0,
         matchedSkills: matchResult.matchedSkills || [],
         missingSkills: matchResult.missingSkills || [],
-        reasoning: matchResult.reasoning || 'Match calculated by AI',
+        reasoning: matchResult.reasoning || 'Automatic match',
       };
     } catch (error) {
       console.error('Match calculation error:', error);

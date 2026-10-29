@@ -101,6 +101,19 @@ describe('EmployerAtsGateway', () => {
     expect(quota.consumeCredit).not.toHaveBeenCalled();
   });
 
+  it('does not return container filenames in recommendations', async () => {
+    matcher.analyze.mockResolvedValueOnce({
+      semanticMatch: 78,
+      subScores: { keywordMatch: 80, skillsCoverage: 76, sectionCompleteness: 74 },
+      keywordGaps: ['Kubernetes'],
+      injectableKeywords: [],
+      suggestions: ['See JOB.txt for the requirement.'],
+    });
+    const result = await gateway.assess(input);
+    expect(result.suggestions?.join(' ')).not.toMatch(/JOB\.txt/);
+    expect(result.suggestions?.[0]).toContain('the job description');
+  });
+
   it('does not dispatch Resume-Matcher when the employer pool is exhausted', async () => {
     runtime.prepare.mockResolvedValue({
       status: 'BUDGET_EXHAUSTED',

@@ -12,6 +12,7 @@
 .secondary:hover { background: var(--jb-v3-sunk); }
 .note { color: var(--jb-v3-fg-3); font-size: 12px; margin-top: 20px; }
 .demo { max-width: 1040px; margin: auto; scroll-margin-top: 90px; }
+.demo + .demo { margin-top: 78px; }
 .sectionHeading { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 26px; }
 .sectionHeading .eyebrow { margin-bottom: 10px; }
 .sectionHeading h2, .features h2, .closing h2 { font-weight: 500; letter-spacing: -.04em; font-size: 30px; line-height: 1.25; margin: 0; }

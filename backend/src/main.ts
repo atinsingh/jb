@@ -3,6 +3,7 @@
 // the right values. See src/load-env.ts.
 import { REPO_ROOT } from './load-env';
 import { NestFactory } from '@nestjs/core';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
@@ -33,6 +34,7 @@ async function bootstrap() {
       rawBody: true, // Preserve raw request body (req.rawBody) for Stripe webhook signature verification
     });
     earlyLogger.log('App module created successfully');
+    app.useWebSocketAdapter(new IoAdapter(app));
 
     // Serve locally-stored uploads (StorageService local driver) at /uploads/*.
     // No-op for the s3 driver, which returns absolute/presigned URLs instead.
@@ -102,8 +104,8 @@ async function bootstrap() {
     .addTag('applications', 'Job application management endpoints')
     .addTag('matching', 'Job matching and recommendations endpoints')
     .addTag('agents', 'Agent endpoints for managing candidate applications')
-    .addTag('cover-letters', 'AI Cover Letter generation endpoints')
-    .addTag('resume-builder', 'AI Resume Builder endpoints')
+    .addTag('cover-letters', 'Cover letter generation endpoints')
+    .addTag('resume-builder', 'Resume builder endpoints')
     .addTag('health', 'Health check endpoint')
     .build();
 

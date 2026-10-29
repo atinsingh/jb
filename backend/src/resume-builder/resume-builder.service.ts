@@ -516,7 +516,7 @@ Provide enhanced education entries with:
 
       // Preserve the prior behavior of hard-failing when nothing usable comes
       // back (this flow has no soft fallback).
-      throw new Error('AI generation failed');
+      throw new Error('Generation failed');
     } catch (error) {
       this.logger.error(`Error regenerating ${regenerateDto.section}:`, error);
       throw new Error(`Failed to regenerate ${regenerateDto.section}`);

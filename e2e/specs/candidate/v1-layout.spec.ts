@@ -1,13 +1,16 @@
 import { test, expect, storage, expectNoHorizontalOverflow } from '../../fixtures/test';
 
 test.use({ storageState: storage.candidate });
-const destinations = ['/app/dashboard', '/app/resume', '/app/resume-library', '/app/preferences', '/app/settings', '/app/billing'];
+const destinations = ['/app/dashboard', '/app/concierge', '/app/resume', '/app/resume-library', '/app/preferences', '/app/settings', '/app/billing'];
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/auth/me', r => r.fulfill({ json: { user: { id: 'candidate-layout', role: 'ROLE_CANDIDATE' } } }));
   await page.route('**/api/resume-harness/options', r => r.fulfill({ json: { models: [{ model: 'test-model', label: 'Test model', efforts: ['low'] }], sandboxAvailable: true, profile: { ready: true, missing: [], optionalGaps: [] } } }));
   await page.route('**/api/resume-harness/templates', r => r.fulfill({ json: [] }));
   await page.route('**/api/resume-harness/sessions', r => r.fulfill({ json: [] }));
   await page.route('**/api/resume-builder', r => r.fulfill({ json: [{ id: 'layout-resume', name: 'Layout resume', status: 'active', template: 'modern', updatedAt: '2026-09-29' }] }));
+  await page.route('**/api/matching/matches**', r => r.fulfill({ json: { matches: [], total: 0 } }));
+  await page.route('**/api/applications/activity**', r => r.fulfill({ json: { events: [], total: 0 } }));
+  await page.route('**/api/billing/concierge/coaches**', r => r.fulfill({ json: { coaches: [], feeRate: 0.2 } }));
 });
 
 test('candidate v1 navigation and explicit résumé modes fit desktop and mobile', async ({ page }) => {
@@ -19,7 +22,7 @@ test('candidate v1 navigation and explicit résumé modes fit desktop and mobile
   await page.screenshot({ path: 'tmp/v1-resume-desktop.png', fullPage: true });
   await page.getByRole('button', { name: /Compare Resume/ }).click();
   await expect(page.locator('input[type=file]')).toHaveCount(1);
-  await page.getByRole('button', { name: /AI Generate Resume/ }).click();
+  await page.getByRole('button', { name: /Jobocate Generate Resume/ }).click();
   await expect(page.getByTestId('model-select')).toBeVisible();
   await page.reload();
   await expect(page.getByTestId('model-select')).toBeVisible();

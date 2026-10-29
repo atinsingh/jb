@@ -297,7 +297,7 @@ export class ResumeBuilderController {
   }
 
   @Post(':id/regenerate-section')
-  @ApiOperation({ summary: 'Regenerate a section using AI' })
+  @ApiOperation({ summary: 'Regenerate a section' })
   @ApiResponse({ status: 200, description: 'Section regenerated successfully' })
   async regenerateSection(
     @Param('id') id: string,

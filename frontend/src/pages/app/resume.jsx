@@ -19,6 +19,7 @@ import {
   getResumeTemplates,
   restoreHarnessRevision,
   revertResumeLook,
+  compareCorrectionKey,
   startHarnessSession,
   streamHarnessTurn,
   streamTemplateChange,
@@ -469,8 +470,8 @@ export default function AppResume() {
     return parts.join("\n\n");
   };
 
-  const send = async () => {
-    const text = instruction.trim();
+  const send = async (preset) => {
+    const text = (typeof preset === "string" ? preset : instruction).trim();
     if (!session || sessionOver || !text || busy || budgetBlocked) return;
 
     setError(null);
@@ -545,6 +546,14 @@ export default function AppResume() {
       setPhase("ready");
     }
   };
+
+  useEffect(() => {
+    if (!session?.id || session.status !== "active" || session.revision || session.conversation?.length || phase !== "ready" || busy || budgetBlocked) return;
+    const text = window.sessionStorage.getItem(compareCorrectionKey(session.id));
+    if (!text) return;
+    window.sessionStorage.removeItem(compareCorrectionKey(session.id));
+    void send(text);
+  }, [session?.id, session?.status, session?.revision, phase, busy, budgetBlocked]);
 
   /**
    * Choose a template before the session exists.
@@ -871,6 +880,9 @@ export default function AppResume() {
           >
             Compare your resume with a role, or create your next version.
           </p>
+          <p style={{ margin: "0 0 28px" }}>
+            <Link href="/app/concierge" style={{ fontWeight: 700, color: T.accent }}>Talk to a concierge</Link>
+          </p>
           <BudgetSummary
             budget={budget}
             estimate={
@@ -896,6 +908,7 @@ export default function AppResume() {
             resumeId={importedResumeId}
             onComparisonSettled={loadBudget}
             onOpen={(id) => router.replace({ pathname: "/app/resume", query: { mode: "compare", id } })}
+            onCorrected={(sessionId) => router.push({ pathname: "/app/resume", query: { session: sessionId } })}
           />
         ) : !session && generateMode ? (
           optionsError ? <ErrorState error={optionsError} onRetry={loadOptions} /> : <Setup

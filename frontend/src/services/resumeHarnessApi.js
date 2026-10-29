@@ -55,6 +55,9 @@ export const getHarnessBudget = () => apiCall("/api/resume-harness/budget");
 export const getResumeTemplates = () =>
   apiCall("/api/resume-harness/templates");
 
+export const compareCorrectionKey = (sessionId) =>
+  `jobocate.compareCorrection.${sessionId}`;
+
 /**
  * POST /api/resume-harness/sessions
  * { model, effort, targetRole?, jobDescription?, jobUrl?, carryFromSessionId?,
@@ -167,7 +170,7 @@ const streamPost = async (path, payload, onEvent, headers = {}, idleTimeoutMs = 
       const { done, value } = await Promise.race([
         reader.read(),
         new Promise((_, reject) => {
-          timer = setTimeout(() => reject(new Error("The AI stream stopped responding. Reopen the session to check its saved state.")), idleTimeoutMs);
+          timer = setTimeout(() => reject(new Error("The session stopped responding. Reopen it to check its saved state.")), idleTimeoutMs);
         }),
       ]).finally(() => clearTimeout(timer));
       if (done) break;

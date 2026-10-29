@@ -65,6 +65,7 @@ describe('one membership across candidate and employer workspaces', () => {
         updateOne: jest.fn(async (_filter: any, value: any) => { if (membership) Object.assign(membership, value); }),
       } },
       { provide: getModelToken('UsageRecord'), useValue: {} },
+      { provide: getModelToken('ConciergeBooking'), useValue: {} },
       { provide: getModelToken('EmployerSubscription'), useValue: { findOneAndUpdate: jest.fn(() => ({ exec: async () => meters })), findOne: jest.fn(async () => meters) } },
     ] }).compile();
     candidate = module.get(BillingService); employer = module.get(EmployerBillingService);

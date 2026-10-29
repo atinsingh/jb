@@ -42,7 +42,7 @@ test('both billing views explain shared Paid access and offer management', async
   await expect(page.getByRole('button', { name: /^Upgrade to/ })).toHaveCount(0);
   await page.route('**/api/employer/applicants/resume-assessment/budget', route => route.fulfill({ json: { status: 'READY', limitCredits: 400, spentCredits: 5, remainingCredits: 395, resetAt: '2026-11-01T00:00:00.000Z' } }));
   await page.goto('/employer/jobs');
-  const credits = page.getByRole('region', { name: 'Employer AI credits' });
+  const credits = page.getByRole('region', { name: 'Employer credits' });
   await expect(credits).toContainText('395 credits remaining');
   await expect(credits.getByRole('link', { name: 'Manage subscription', exact: true })).toBeVisible();
   await expect(credits.getByRole('link', { name: 'Upgrade plan', exact: true })).toHaveCount(0);

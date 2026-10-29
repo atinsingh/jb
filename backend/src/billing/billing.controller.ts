@@ -1,17 +1,95 @@
-import { Controller, Get, Post, Body, UseGuards, Req, RawBodyRequest, Headers, HttpCode, HttpStatus, Param, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Req, RawBodyRequest, Headers, HttpCode, HttpStatus, Param, Request, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiExcludeEndpoint } from '@nestjs/swagger';
 import { Request as ExpressRequest } from 'express';
 import { BillingService } from './billing.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UserDocument } from '../schemas/user.schema';
-import { CreateCheckoutSessionDto, CreateBillingPortalDto, CancelSubscriptionDto } from './dto';
+import { CreateCheckoutSessionDto, CreateBillingPortalDto, CancelSubscriptionDto, BuyConciergeHoursDto, SendConciergeMessageDto } from './dto';
+import { conciergePlatformFeeRate } from './concierge-fee';
+import { ConciergeMessagesService } from './concierge-messages.service';
+import { ConciergeScheduleService } from './concierge-schedule.service';
+import { ConciergePayoutService } from './concierge-payout.service';
 
 @ApiTags('billing')
 @Controller('billing')
 export class BillingController {
   constructor(
     private readonly billingService: BillingService,
+    private readonly messages: ConciergeMessagesService,
+    private readonly schedule: ConciergeScheduleService,
+    private readonly payouts: ConciergePayoutService,
   ) {}
+
+  @Get('concierge/coaches')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Published concierge coaches who can be paid' })
+  async conciergeCoaches() {
+    return { coaches: await this.billingService.listPayableConcierges(), feeRate: conciergePlatformFeeRate() };
+  }
+
+  @Post('concierge/checkout')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Buy one concierge duration. The charge stays on Jobocate until the monthly payout.' })
+  async conciergeCheckout(@Request() req: any, @Body() dto: BuyConciergeHoursDto) {
+    return this.billingService.createConciergeCheckout(req.user as UserDocument, dto.employerId, dto.minutes);
+  }
+
+  @Post('concierge/bookings/:id/scheduled')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Candidate confirms they booked this paid session on the calendar link' })
+  async markConciergeBookingScheduled(@Request() req: any, @Param('id') id: string) {
+    return this.billingService.markConciergeBookingScheduled(req.user._id.toString(), id);
+  }
+
+  @Post('concierge/bookings/:id/cancel')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Cancel a concierge session that has not started and return the payment' })
+  async cancelConciergeBooking(@Request() req: any, @Param('id') id: string) {
+    return this.payouts.cancelBooking(req.user, id);
+  }
+
+  @Post('concierge/bookings/:id/missed')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Candidate reports, within one day of the end, that the session did not happen' })
+  async reportConciergeMissed(@Request() req: any, @Param('id') id: string) {
+    return this.payouts.reportMissed(req.user, id);
+  }
+
+  @Post('concierge/calendly/webhook')
+  @HttpCode(HttpStatus.OK)
+  @ApiExcludeEndpoint()
+  async calendlyWebhook(@Req() req: RawBodyRequest<ExpressRequest>, @Headers('calendly-webhook-signature') signature: string) {
+    return this.payouts.handleCalendlyWebhook(req.rawBody?.toString('utf8') || '', signature);
+  }
+
+  @Get('concierge/bookings')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Concierge hours this candidate has bought' })
+  async conciergeBookings(@Request() req: any) {
+    return { bookings: await this.billingService.listConciergeBookings(req.user._id.toString(), 'candidate'), sessions: await this.schedule.list(req.user._id.toString(), 'candidate') };
+  }
+
+  @Get('concierge/messages')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Messages with a concierge the candidate has paid' })
+  async listConciergeMessages(@Request() req: any, @Query('with') otherId: string) {
+    return { messages: await this.messages.list(req.user, otherId) };
+  }
+
+  @Post('concierge/messages')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Send a message to a concierge the candidate has paid' })
+  async sendConciergeMessage(@Request() req: any, @Body() dto: SendConciergeMessageDto) {
+    return this.messages.send(req.user, dto.with, dto.body);
+  }
 
   @Get('plans')
   @ApiOperation({ summary: 'Get all available subscription plans' })

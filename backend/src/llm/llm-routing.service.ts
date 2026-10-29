@@ -249,7 +249,7 @@ export class LLMRoutingService {
   }
 
   getProviderForFeature(feature: LLMFeature, ownerId: string): LLMProvider {
-    if (!ownerId) throw new Error('An authenticated AI owner is required');
+    if (!ownerId) throw new Error('An authenticated account is required');
     this.getFeatureConfig(feature);
     return {
       getName: () => 'litellm',

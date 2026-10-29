@@ -366,7 +366,7 @@ Resume Information:
     }
 
     // Build system prompt
-    const systemPrompt = `You are an AI Interview Buddy, a helpful assistant that helps candidates prepare for job interviews. 
+    const systemPrompt = `You are Interview Buddy, a helpful assistant that helps candidates prepare for job interviews. 
 
 ${jobInfo ? `Context about the job application:\n${jobInfo}\n` : ''}
 ${resumeInfo ? `Candidate's Resume:\n${resumeInfo}\n` : ''}
@@ -402,7 +402,7 @@ Keep your responses concise, practical, and actionable. Focus on helping them su
       // eslint-disable-next-line no-console
       console.warn(`[interview-buddy] AI chat unavailable: ${error?.message || error}`);
       return (
-        "I'm temporarily unable to reach the AI service, so here's some general guidance while it recovers:\n\n" +
+        "I'm temporarily unable to reach the service, so here's some general guidance while it recovers:\n\n" +
         '• Structure behavioral answers with STAR — Situation, Task, Action, Result.\n' +
         '• Lead with the outcome and quantify impact where you can.\n' +
         '• Tie each answer back to the specific role and company.\n' +

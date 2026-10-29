@@ -17,6 +17,7 @@ const validConcierge = {
   hourlyRate: 150,
   languages: ['English'],
   timezone: 'America/Toronto',
+  durations: [{ minutes: 60, url: 'https://calendly.com/coach/60' }],
 };
 
 describe('UsersService (concierge profile)', () => {
@@ -24,6 +25,7 @@ describe('UsersService (concierge profile)', () => {
 
   const selectMock = jest.fn();
   const userModel: any = {
+    findById: jest.fn(async () => ({ connectPayoutsEnabled: true })),
     findByIdAndUpdate: jest.fn(() => ({ select: selectMock })),
   };
 
@@ -59,6 +61,14 @@ describe('UsersService (concierge profile)', () => {
     expect(userModel.findByIdAndUpdate).not.toHaveBeenCalled();
   });
 
+  it('rejects publishing before payouts are enabled', async () => {
+    userModel.findById.mockResolvedValueOnce({ connectPayoutsEnabled: false });
+    await expect(
+      service.updateProfile('user-1', { conciergeProfile: validConcierge } as any),
+    ).rejects.toThrow(/Set up payouts/);
+    expect(userModel.findByIdAndUpdate).not.toHaveBeenCalled();
+  });
+
   it('saves a complete published concierge profile as a whole object', async () => {
     await service.updateProfile('user-1', { conciergeProfile: validConcierge } as any);
 
@@ -67,6 +77,13 @@ describe('UsersService (concierge profile)', () => {
       { $set: { conciergeProfile: validConcierge } },
       expect.any(Object),
     );
+  });
+
+  it('rejects a duration link that is not Calendly or Google', async () => {
+    await expect(service.updateProfile('user-1', {
+      conciergeProfile: { ...validConcierge, durations: [{ minutes: 30, url: 'https://zoom.us/j/1' }] },
+    } as any)).rejects.toThrow(/Calendly or Google/);
+    expect(userModel.findByIdAndUpdate).not.toHaveBeenCalled();
   });
 
   describe('UpdateProfileDto validation of conciergeProfile', () => {

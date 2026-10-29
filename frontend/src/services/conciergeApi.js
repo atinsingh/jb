@@ -77,6 +77,65 @@ export const getConciergeActivity = async (params = {}) => {
   return apiCall(`/api/applications/activity${qs ? `?${qs}` : ''}`);
 };
 
+export const CONCIERGE_DURATION_MINUTES = Array.from({ length: 32 }, (_, index) => (index + 1) * 15);
+
+export const conciergeDurationLabel = (minutes) => {
+  const value = Number(minutes);
+  if (!Number.isFinite(value)) return 'session';
+  if (value < 60) return `${value} min`;
+  const hours = Math.floor(value / 60);
+  const rest = value % 60;
+  const hourLabel = `${hours} hour${hours === 1 ? '' : 's'}`;
+  return rest ? `${hourLabel} ${rest} min` : hourLabel;
+};
+
+export const conciergeDurationPrice = (hourlyRate, minutes) => (Number(hourlyRate) * Number(minutes)) / 60;
+
+export const conciergeCad = (amount) => (Number.isInteger(Number(amount)) ? String(Number(amount)) : Number(amount).toFixed(2));
+
+export const conciergeDurationLinkOk = (url) => {
+  const raw = String(url || '').trim();
+  if (/["'<>\u0000-\u001F\u007F]/.test(raw)) return false;
+  try {
+    const host = new URL(raw).hostname.toLowerCase().replace(/^www\./, '');
+    return ['calendly.com', 'meet.google.com', 'calendar.google.com', 'calendar.app.google'].includes(host);
+  } catch {
+    return false;
+  }
+};
+
+export const getConciergeCoaches = () => apiCall('/api/billing/concierge/coaches');
+
+export const buyConciergeHours = (employerId, minutes) => apiCall('/api/billing/concierge/checkout', {
+  method: 'POST',
+  body: JSON.stringify({ employerId, minutes }),
+});
+
+export const getMyConciergeBookings = () => apiCall('/api/billing/concierge/bookings');
+
+export const markConciergeBookingScheduled = (id) => apiCall(`/api/billing/concierge/bookings/${id}/scheduled`, { method: 'POST' });
+
+export const cancelConciergeBooking = (id) => apiCall(`/api/billing/concierge/bookings/${id}/cancel`, { method: 'POST' });
+
+export const reportConciergeMissed = (id) => apiCall(`/api/billing/concierge/bookings/${id}/missed`, { method: 'POST' });
+
+export const conciergeBookUrl = (url, bookingId) => {
+  try {
+    const next = new URL(url);
+    if (next.hostname.replace(/^www\./, '') === 'calendly.com') next.searchParams.set('utm_content', bookingId);
+    return next.toString();
+  } catch {
+    return url;
+  }
+};
+
+export const getConciergeMessages = (withId) => apiCall(`/api/billing/concierge/messages?with=${encodeURIComponent(withId)}`);
+
+export const sendConciergeMessage = (withId, body) => apiCall('/api/billing/concierge/messages', {
+  method: 'POST',
+  body: JSON.stringify({ with: withId, body }),
+});
+
 /* -------------------------------------------------- Entitlements --- */
 
 // GET /api/entitlements → { planType, entitlements }

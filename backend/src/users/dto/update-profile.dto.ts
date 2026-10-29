@@ -11,9 +11,22 @@ import {
   Min,
   Max,
   MaxLength,
+  Matches,
   ArrayMaxSize,
   ValidateNested,
 } from 'class-validator';
+
+export class ConciergeDurationDto {
+  @IsInt()
+  @Min(15)
+  @Max(480)
+  minutes: number;
+
+  @IsString()
+  @MaxLength(500)
+  @Matches(/^https?:\/\/(?:www\.)?(?:calendly\.com|meet\.google\.com|calendar\.google\.com|calendar\.app\.google)(?:\/[^\s"'<>]*)?$/i)
+  url: string;
+}
 
 export class ConciergeProfileDto {
   @IsBoolean()
@@ -60,6 +73,13 @@ export class ConciergeProfileDto {
   @MaxLength(64)
   @IsOptional()
   timezone?: string;
+
+  @IsArray()
+  @ArrayMaxSize(32)
+  @ValidateNested({ each: true })
+  @Type(() => ConciergeDurationDto)
+  @IsOptional()
+  durations?: ConciergeDurationDto[];
 }
 
 export class UpdateProfileDto {

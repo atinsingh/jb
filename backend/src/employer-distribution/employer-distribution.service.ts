@@ -32,7 +32,7 @@ const CHANNEL_CATALOG = [
   {
     key: 'ziprecruiter',
     name: 'ZipRecruiter',
-    tagline: 'AI matching to candidates',
+    tagline: 'Matching to candidates',
     sponsorable: true,
   },
   {

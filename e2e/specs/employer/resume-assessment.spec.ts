@@ -104,14 +104,14 @@ test.describe('Employer screening resume assessment', () => {
     await expect(page.getByText('Assessment has not run.')).toBeVisible();
     await expect(page.getByText(/75 of 100 remaining/i)).toBeVisible();
     await expect(page.getByText(/resets Oct 1/i)).toBeVisible();
-    await expect(page.getByText(/local AI-content heuristic uses none/i)).toBeVisible();
+    await expect(page.getByText(/local content-pattern check uses none/i)).toBeVisible();
     await page.getByRole('button', { name: 'Run resume assessment' }).click();
 
     await expect(page.getByText('ATS semantic match')).toBeVisible();
     await expect(page.getByText('71/100')).toBeVisible();
     await expect(page.getByText('Good to submit')).toBeVisible();
     await expect(
-      page.getByText('AI-content likelihood (directional)'),
+      page.getByText('Content pattern score'),
     ).toBeVisible();
     await expect(page.getByText('42/100')).toBeVisible();
     await expect(page.getByText(/false positives and false negatives/i)).toBeVisible();
@@ -200,12 +200,12 @@ test.describe('Employer screening resume assessment', () => {
 
     await page.goto('/employer/screening');
     await page.getByText('Ada Lovelace').click();
-    await expect(page.getByText(/AI credits exhausted/i)).toBeVisible();
+    await expect(page.getByText(/credits exhausted/i)).toBeVisible();
     await page.getByRole('button', { name: 'Run resume assessment' }).click();
 
     await expect(page.getByText('Partial assessment')).toBeVisible();
     await expect(page.getByText('63/100')).toBeVisible();
-    await expect(page.getByText(/local AI-content heuristic uses none/i)).toBeVisible();
+    await expect(page.getByText(/local content-pattern check uses none/i)).toBeVisible();
     await expect(page.getByText(/ATS match was not run because/i)).toBeVisible();
   });
 
@@ -450,7 +450,7 @@ test.describe('Employer screening resume assessment', () => {
 
     await page.goto(`/employer/jobs/${jobId}/applications`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: 'Backend Engineer' })).toBeVisible();
-    await expect(page.getByText('AI credits: 100 of 100 remaining this month.')).toBeVisible();
+    await expect(page.getByText('credits: 100 of 100 remaining this month.')).toBeVisible();
     expect(budgetBeforeReady).toBe(false);
   });
 

@@ -228,6 +228,15 @@ export const employerBillingApi = {
       method: 'POST',
       body: JSON.stringify({ returnUrl: `${window.location.origin}/employer/settings` }),
     }),
+  connect: () => apiCall('/api/employer/billing/connect'),
+  connectOnboard: () => apiCall('/api/employer/billing/connect/onboard', { method: 'POST' }),
+  conciergeBookings: () => apiCall('/api/employer/billing/concierge/bookings'),
+  cancelConciergeBooking: (id) => apiCall(`/api/employer/billing/concierge/bookings/${id}/cancel`, { method: 'POST' }),
+  conciergeMessages: (withId) => apiCall(`/api/employer/billing/concierge/messages?with=${encodeURIComponent(withId)}`),
+  sendConciergeMessage: (withId, body) => apiCall('/api/employer/billing/concierge/messages', {
+    method: 'POST',
+    body: JSON.stringify({ with: withId, body }),
+  }),
 };
 
 /* ----------------------------------------------------------------- audit --- */

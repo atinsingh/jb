@@ -6,7 +6,7 @@ test.use({ storageState: storage.employer });
 test('employer navigation keeps three pages without administrative page notes', async ({ page }) => {
   await page.goto('/employer/dashboard');
   await expect(page.getByRole('navigation', { name: 'Employer primary' }).getByRole('link'))
-    .toHaveText(['Dashboard', 'Jobs', 'Settings']);
+    .toHaveText(['Dashboard', 'Jobs', 'Bookings', 'Messages', 'Settings']);
   await expect(page.getByRole('heading', { name: 'Employer dashboard' })).toBeVisible();
   await expect(page.getByText('Muted pages', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Your workspace' })).toHaveCount(0);
@@ -22,7 +22,7 @@ test('jobs displays measured credits, including exhaustion and an unavailable ba
     route.fulfill({ json: budget }));
   await page.route('**/api/employer/billing/plans', route => route.fulfill({ json: { currentPlan: 'free', plans: [{ key: 'free', name: 'Free' }] } }));
   await page.goto('/employer/jobs');
-  const balance = page.getByRole('region', { name: 'Employer AI credits' });
+  const balance = page.getByRole('region', { name: 'Employer credits' });
   await expect(balance).toContainText('37 credits remaining');
   await expect(balance).toContainText('Free plan includes 100 credits per month');
   await expect(balance).toContainText('63 used');
@@ -95,20 +95,33 @@ test('settings publishes a concierge profile only once its checklist is complete
     saved = route.request().postDataJSON();
     return route.fulfill({ json: { user: { ...user, conciergeProfile: saved.conciergeProfile } } });
   });
+  await page.route('**/api/employer/billing/connect', (route) => route.fulfill({ json: { payoutsEnabled: true, chargesEnabled: true, detailsSubmitted: true } }));
+  await page.route('**/api/employer/billing/concierge/bookings', (route) => route.fulfill({ json: { bookings: [] } }));
   await page.goto('/employer/settings');
   const panel = page.getByRole('region', { name: 'Concierge profile' });
   const publish = panel.getByRole('checkbox', { name: 'Publish profile' });
-  await expect(publish).toBeDisabled();
+  await expect(publish).toBeEnabled();
   await panel.getByLabel('Headline', { exact: true }).fill('Hiring coach for early-career tech teams');
   await panel.getByLabel(/^Bio/).fill('I help early-career teams hire well with structured interviews, clear role scopes, and honest feedback on every application.');
   await panel.getByLabel('Specialties', { exact: true }).fill('Resume reviews, Interview prep');
-  await panel.getByLabel('Hourly rate (USD)', { exact: true }).fill('75');
+  await panel.getByLabel('Hourly rate (CAD)', { exact: true }).fill('75');
+  await panel.getByLabel('Calendar link', { exact: true }).fill('https://calendly.com/coach/intro');
+  await panel.getByRole('button', { name: 'Add a duration' }).click();
+  await panel.getByLabel('Duration', { exact: true }).selectOption('60');
+  await panel.getByLabel('Calendar link', { exact: true }).fill('https://meet.google.com/abc-defg-hij');
+  await panel.getByRole('button', { name: 'Add a duration' }).click();
+  await expect(panel.getByRole('button', { name: 'Update' })).toHaveCount(2);
+  await expect(panel.getByRole('button', { name: 'Delete' })).toHaveCount(2);
   await expect(publish).toBeEnabled();
   await publish.check();
   await panel.getByRole('button', { name: 'Save concierge profile' }).click();
   await expect(panel.getByRole('status')).toHaveText('Concierge profile saved.');
   await expect.poll(() => saved?.conciergeProfile).toMatchObject({
     published: true, specialties: ['Resume reviews', 'Interview prep'], hourlyRate: 75,
+    durations: [
+      { minutes: 30, url: 'https://calendly.com/coach/intro' },
+      { minutes: 60, url: 'https://meet.google.com/abc-defg-hij' },
+    ],
   });
   expect(typeof saved.conciergeProfile.hourlyRate).toBe('number');
 });

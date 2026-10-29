@@ -53,7 +53,7 @@ export const EMPLOYER_PLANS: EmployerPlan[] = [
 
 for (const plan of EMPLOYER_PLANS) {
   if (!Number.isSafeInteger(plan.limits.aiBudgetCreditsLimit) || plan.limits.aiBudgetCreditsLimit <= 0) {
-    throw new Error(`Employer plan ${plan.key} must have a positive integer AI credit allowance`);
+    throw new Error(`Employer plan ${plan.key} must have a positive integer credit allowance`);
   }
 }
 

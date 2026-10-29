@@ -518,6 +518,52 @@ test.describe("résumé AI budget", () => {
 });
 
 test.describe("Compare Resume manual workflow", () => {
+  test("starts a corrected résumé in a generate template from the comparison fixes", async ({ page }) => {
+    await stubHarnessApi(page);
+    const { PDFDocument } = require("../../../backend/node_modules/pdf-lib");
+    const pdf = await PDFDocument.create();
+    pdf.addPage([600, 800]).drawText("Jordan Reyes", { x: 50, y: 700, size: 12 });
+    const source = Buffer.from(await pdf.save());
+    const imported = {
+      id: "correct-compare", name: "Imported profile", creationMethod: "imported",
+      fullName: "Jordan Reyes", summary: "Built APIs.", skills: ["TypeScript"],
+      experience: [{ title: "Engineer", company: "Acme", achievements: ["Built APIs."] }],
+      certifications: [], achievements: [],
+      source: { originalFilename: "resume.pdf", fileExtension: ".pdf", jobDescription: "TypeScript engineer" },
+    };
+    await page.route("**/api/resume-builder/correct-compare/compare/source", (route: Route) =>
+      route.fulfill({ body: source, contentType: "application/pdf" }),
+    );
+    await page.route("**/api/resume-builder/correct-compare/compare", (route: Route) =>
+      route.fulfill({ json: {
+        resumeId: imported.id,
+        ats: { score: 72, findings: [], missingSections: [] },
+        match: { coverage: 61 },
+        aiContent: { composite: 47, signals: {} },
+        annotations: [{ id: "fix-1", section: "experience", severity: "warning", color: "amber", quote: "Built APIs.", message: "Vague", fix: "Name the billing system." }],
+      } }),
+    );
+    await page.route("**/api/resume-builder/correct-compare", (route: Route) => {
+      if (route.request().url().endsWith("/correct")) return route.fallback();
+      return route.fulfill({ json: imported });
+    });
+    await page.route("**/api/resume-builder/correct-compare/correct", (route: Route) =>
+      route.fulfill({ json: {
+        session: { id: "sess-e2e-1" },
+        instruction: "Apply the review fixes. Name the billing system.",
+      } }),
+    );
+
+    await page.goto("/app/resume?mode=compare&id=correct-compare", { waitUntil: "domcontentloaded" });
+    await expect(page.getByTestId("compare-ats-score")).toHaveText("72%");
+    await expect(page.getByLabel("Corrected résumé template")).toHaveValue("classic-serif");
+    const turn = page.waitForRequest((request) =>
+      request.method() === "POST" && request.url().includes("/turns/stream"));
+    await page.getByTestId("compare-correct").click();
+    await expect(page).toHaveURL(/session=sess-e2e-1/);
+    expect((await turn).postDataJSON().instruction).toContain("Name the billing system.");
+  });
+
   test("keeps comparison results and extracted fields in a loading state until the comparison response arrives", async ({ page }) => {
     await stubHarnessApi(page);
     const { PDFDocument } = require("../../../backend/node_modules/pdf-lib");
@@ -571,8 +617,9 @@ test.describe("Compare Resume manual workflow", () => {
     comparisonHeld = new Promise<void>((resolve) => { releaseComparison = resolve; });
     await page.getByRole("button", { name: "Refresh comparison", exact: true }).click();
     await expect(page.getByTestId("comparison-pending")).toBeVisible();
+    await expect(page.getByTestId("comparison-score-loading")).toBeVisible();
+    await expect(page.getByTestId("compare-ats-score")).toHaveCount(0);
     expect(await preview.count()).toBe(1);
-    await expect(page.getByTestId("compare-ats-score")).toHaveText("72%");
     releaseComparison();
     await expect(page.getByTestId("comparison-pending")).toHaveCount(0);
   });
@@ -1240,7 +1287,8 @@ test.describe("résumé session history", () => {
 
     let generated = page.getByTestId(`resume-session-${SESSION.id}`);
     await expect(generated).toContainText("Backend engineer résumé");
-    await expect(generated).toContainText("AI-generated");
+    await expect(generated).toContainText("Generated");
+    await expect(generated).not.toContainText("AI-generated");
     await expect(generated).toContainText("1 revision");
     await expect(generated).not.toContainText("Codex");
     await expect(generated).not.toContainText("anthropic/");
@@ -1396,7 +1444,7 @@ test.describe("résumé session history", () => {
     );
     await expect(
       page.getByTestId(`resume-session-${SESSION.id}`),
-    ).toContainText("AI-generated");
+    ).toContainText("Generated");
   });
 
   test("hiding or leaving the page keeps the active résumé session available", async ({
