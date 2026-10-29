@@ -12,7 +12,7 @@ import { createCheckout, getPlans } from '@/services/billingApi';
 // Safe two-tier fallback while the live catalogue is loading.
 // ---------------------------------------------------------------------------
 const PLAN_DATA = [
-  { key: 'free', name: 'Free', tagline: 'Essential search tools with a $0.50 monthly credit allowance.', monthly: 0, annual: 0, popular: false },
+  { key: 'free', name: 'Free', tagline: 'Essential search tools with a $1.00 monthly credit allowance.', monthly: 0, annual: 0, popular: false },
   { key: 'paid', name: 'Paid', tagline: 'More capacity with a $4 monthly credit allowance.', monthly: 10, annual: 100, popular: true },
 ];
 
@@ -31,7 +31,7 @@ const DELTA_DATA = {
     items: [
       { title: 'Resume builder', desc: 'ATS-friendly resumes in minutes.' },
       { title: 'Smart job matching', desc: 'Roles ranked by fit, every day.' },
-      { title: '$0.50 credit allowance / mo', desc: 'Measured model spend renews every month.' },
+      { title: '$1.00 credit allowance / mo', desc: '100 credits, enough for one resume. Measured model spend renews every month.' },
       { title: 'Application tracker', desc: 'Your whole pipeline in one board.' },
     ],
   },

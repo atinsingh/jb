@@ -91,6 +91,8 @@ export const AuthProvider = ({ children }) => {
       if (loadedForRef.current === session.user.id) return;
 
       const localUser = await fetchLocalUser(session.access_token);
+      // login() may have resolved the workspace while this request was in flight.
+      if (loadedForRef.current === session.user.id) return;
       loadedForRef.current = session.user.id;
       setUser(localUser);
     },
@@ -108,7 +110,7 @@ export const AuthProvider = ({ children }) => {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (!active) return;
 
       if (event === 'SIGNED_OUT') {
@@ -117,8 +119,12 @@ export const AuthProvider = ({ children }) => {
         return;
       }
 
-      await applySession(session);
-      setLoading(false);
+      // Do not await here. signInWithPassword holds the auth lock until this
+      // callback returns, so an awaited profile fetch never lets email/password
+      // login finish. Google sign-in does not take this path.
+      void applySession(session).finally(() => {
+        if (active) setLoading(false);
+      });
     });
 
     return () => {
@@ -190,11 +196,18 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async (email, password, { role } = {}) => {
+    const normalizedEmail = String(email || '').trim();
+    // A leftover provider cookie jar makes the next password session unreadable
+    // to middleware. OAuth already clears it; email/password has to as well.
+    await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
     const { data, error } = await supabase.auth.signInWithPassword({
-      email,
+      email: normalizedEmail,
       password,
     });
     if (error) throw new Error(error.message);
+    if (!data.session) {
+      throw new Error('Confirm your email from the link we sent, then sign in with your password.');
+    }
 
     const localUser = role
       ? await switchWorkspace(role, data.session)

@@ -139,7 +139,7 @@ describe('one membership across candidate and employer workspaces', () => {
     };
     const aliases = { tierFor: (id: string) => candidate.reconcileCandidateTier(id), listForTier: async () => [{ alias: 'bedrock/nova-2-lite/low' }] };
     const budget = new AiBudgetService(model as any, new AiBudgetPolicyService(), telemetry as any, { encrypt: (key: string) => key, decrypt: (key: string) => key } as any, aliases as any, employer);
-    expect(await budget.statusCandidate(userId)).toMatchObject({ limit: 50, remaining: 50 });
+    expect(await budget.statusCandidate(userId)).toMatchObject({ limit: 100, remaining: 100 });
     expect(await budget.statusOwner('employer', userId)).toMatchObject({ limit: 100, remaining: 100 });
     used.set('candidate:' + userId, 7); used.set('employer:' + userId, 5);
     await checkout('employer'); await publish();
@@ -147,7 +147,7 @@ describe('one membership across candidate and employer workspaces', () => {
     expect(await budget.statusOwner('employer', userId)).toMatchObject({ limit: 400, spent: 5, remaining: 395 });
     expect(accounts.size).toBe(2);
     await publish('canceled', 'customer.subscription.deleted');
-    expect(await budget.statusCandidate(userId)).toMatchObject({ limit: 50, spent: 7, remaining: 43 });
+    expect(await budget.statusCandidate(userId)).toMatchObject({ limit: 100, spent: 7, remaining: 93 });
     expect(await budget.statusOwner('employer', userId)).toMatchObject({ limit: 100, spent: 5, remaining: 95 });
   });
 

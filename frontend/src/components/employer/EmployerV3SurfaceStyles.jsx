@@ -41,8 +41,22 @@ export default function EmployerV3SurfaceStyles() {
       div:has(> #employer-v3-shell[data-v3-page='true']) main textarea::placeholder {
         color: var(--jb-v3-fg-3) !important;
       }
-      div:has(> #employer-v3-shell[data-v3-page='true']) main [style*='border-radius'] {
-        border-radius: 2px !important;
+      div:has(> #employer-v3-shell[data-v3-page='true']) .em-blue-btn,
+      div:has(> #employer-v3-shell[data-v3-page='true']) main [style*='background: #4263EB'],
+      div:has(> #employer-v3-shell[data-v3-page='true']) main [style*='background: #4263eb'],
+      div:has(> #employer-v3-shell[data-v3-page='true']) main [style*='background: rgb(66, 99, 235)'],
+      div:has(> #employer-v3-shell[data-v3-page='true']) main [style*='background-color: rgb(66, 99, 235)'] {
+        background: var(--jb-v3-accent) !important;
+        background-color: var(--jb-v3-accent) !important;
+        color: var(--jb-v3-accent-ink) !important;
+        border-color: var(--jb-v3-accent) !important;
+      }
+      div:has(> #employer-v3-shell[data-v3-page='true']) .em-blue-btn:hover {
+        background: var(--jb-v3-accent-hover) !important;
+        background-color: var(--jb-v3-accent-hover) !important;
+      }
+      div:has(> #employer-v3-shell[data-v3-page='true']) .em-ghost:hover {
+        background: var(--jb-v3-control) !important;
       }
       div:has(> #employer-v3-shell[data-v3-page='true']) main [style*='background: rgb(255, 254, 251)'],
       div:has(> #employer-v3-shell[data-v3-page='true']) main [style*='background: rgb(251, 248, 241)'],

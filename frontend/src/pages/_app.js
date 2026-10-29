@@ -127,7 +127,7 @@ export default function App({ Component, pageProps }) {
             <meta name="description" content="Jobocate - Find your dream job today" />
           </Head>
           {isAppSurface ? (
-            <div className={`jb jbv3 ${router.pathname.startsWith('/app') ? 'jb-candidate' : ''}`} style={{ display: 'contents' }}>
+            <div className={`jb jbv3 ${router.pathname.startsWith('/app') ? 'jb-candidate' : router.pathname.startsWith('/employer') ? 'jb-employer' : ''}`} style={{ display: 'contents' }}>
               {page}
             </div>
           ) : (

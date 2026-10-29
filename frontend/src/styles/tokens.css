@@ -773,6 +773,8 @@ html[data-jb-theme='light'] .jbv3-chrome {
 .jb-candidate.jbv3,
 .jb-candidate.jbv3-chrome,
 .jb-candidate .jbv3,
+.jb-employer.jbv3,
+.jb-employer .jbv3,
 .jb-public.jbv3-chrome {
   --jb-v3-bg: #111214;
   --jb-v3-panel: #191a1d;
@@ -803,6 +805,8 @@ html[data-jb-theme='light'] .jbv3-chrome {
 html[data-jb-theme='light'] .jb-candidate.jbv3,
 html[data-jb-theme='light'] .jb-candidate.jbv3-chrome,
 html[data-jb-theme='light'] .jb-candidate .jbv3,
+html[data-jb-theme='light'] .jb-employer.jbv3,
+html[data-jb-theme='light'] .jb-employer .jbv3,
 html[data-jb-theme='light'] .jb-public.jbv3-chrome {
   --jb-v3-bg: #fafaf9;
   --jb-v3-panel: #ffffff;

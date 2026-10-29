@@ -155,6 +155,23 @@ describe('AI budget policy', () => {
     }
   });
 
+  it('gives a free candidate 100 credits, enough to start one resume on every estimated model', () => {
+    const service = new AiBudgetPolicyService();
+    const allowance = service.tier('FREE').maxBudgetCredits;
+    expect(allowance).toBe(100);
+    const aliases = [
+      'anthropic/claude-haiku-4-5/low',
+      'anthropic/claude-sonnet-4-6/low',
+      'anthropic/claude-sonnet-4-6/high',
+      'bedrock/nova-2-lite/low',
+    ];
+    for (const alias of aliases) {
+      const estimate = service.estimate(alias, 'resume_agent_turn');
+      expect(estimate.kind).toBe('range');
+      expect(estimate.maxCredits).toBeLessThanOrEqual(allowance);
+    }
+  });
+
   it('serves immutable tier, service, and estimate lookups with a usage fallback', () => {
     const directory = mkdtempSync(join(tmpdir(), 'ai-budget-policy-'));
     const policyPath = join(directory, 'ai-budget.yaml');

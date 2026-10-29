@@ -6,7 +6,9 @@ lowRemainingRatio: 0.2
 
 tiers:
   FREE:
-    maxBudgetCredits: 50
+    # 100 credits = $1.00. The previous 50-credit allowance was spent before one
+    # resume generation finished; every resume_agent_turn estimate max must fit.
+    maxBudgetCredits: 100
     budgetDuration: 1mo
   PRO:
     maxBudgetCredits: 400
