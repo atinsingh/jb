@@ -3,6 +3,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import axios from 'axios';
 import { Model } from 'mongoose';
 import { Job, JobDocument } from '../../schemas/job.schema';
+import { resolveCountry } from '../../geography/geo.constants';
+import { isPostedToday, MAX_OPEN_MARKET_PER_COMPANY } from '../fresh-canada-listing';
 
 type WorkdaySite = { tenant: string; site: string };
 
@@ -32,7 +34,7 @@ export class WorkdayMonitorService {
         fetched += count.fetched;
         upserts += count.upserts;
         newExternalIds.push(...count.newExternalIds);
-        perSite[key] = count.fetched;
+        perSite[key] = count.upserts;
       } catch (err: any) {
         this.logger.warn(`Workday fetch failed for ${key}: ${err.message}`);
       }
@@ -57,6 +59,7 @@ export class WorkdayMonitorService {
     const limit = 50;
     let fetched = 0;
     let upserts = 0;
+    let kept = 0;
     const newExternalIds: string[] = [];
 
     // Typical Workday listings endpoint
@@ -69,6 +72,13 @@ export class WorkdayMonitorService {
       if (postings.length === 0) break;
 
       for (const job of postings) {
+        if (kept >= MAX_OPEN_MARKET_PER_COMPANY) break;
+        const location = job?.locations?.[0]?.displayName || job?.locations?.[0]?.name || 'Not specified';
+        const postedRaw = job.postedOn || job.startDate;
+        if (resolveCountry(location) !== 'CA' || !isPostedToday(postedRaw)) continue;
+        const postedAt = typeof postedRaw === 'string' && /^posted today$/i.test(postedRaw.trim())
+          ? new Date()
+          : new Date(postedRaw);
         const externalId = `workday:${site.tenant}:${job.id}`;
         const existed = await this.jobModel.exists({ externalId });
         let description = job?.externalPath || '';
@@ -93,13 +103,14 @@ export class WorkdayMonitorService {
         const doc = {
           title: job.title,
           companyName: job?.hiringOrganization?.name || site.tenant,
-          location: job?.locations?.[0]?.displayName || job?.locations?.[0]?.name || 'Not specified',
+          location,
           description,
           source: 'Workday',
           jobType,
           externalUrl,
           canonicalUrl,
           externalId,
+          postedAt,
           scrapedAt: new Date(),
         };
 
@@ -109,14 +120,14 @@ export class WorkdayMonitorService {
           { upsert: true, new: true },
         );
         upserts++;
+        kept += 1;
         if (!existed) newExternalIds.push(externalId);
       }
 
       fetched += postings.length;
       offset += postings.length;
 
-      // Stop if less than limit returned (no more pages)
-      if (postings.length < limit) break;
+      if (kept >= MAX_OPEN_MARKET_PER_COMPANY || postings.length < limit) break;
     }
 
     return { fetched, upserts, newExternalIds };

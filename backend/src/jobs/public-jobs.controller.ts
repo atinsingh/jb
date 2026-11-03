@@ -6,6 +6,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Job, JobDocument } from '../schemas/job.schema';
 import { plainJobText } from '../monitors/plain-job-text';
+import { publicListingFilter } from '../monitors/fresh-canada-listing';
 
 /**
  * Public job listing for the marketing /jobs page.
@@ -37,16 +38,20 @@ export class PublicJobsController {
     const perPage = Math.min(parseInt(limit || '10', 10) || 10, 50);
     const current = Math.max(parseInt(page || '1', 10) || 1, 1);
 
-    const filter: Record<string, unknown> = { isActive: true };
+    const filter: Record<string, unknown> = publicListingFilter();
 
+    const clauses: Record<string, unknown>[] = [];
     if (q && q.trim()) {
       const rx = new RegExp(q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-      filter.$or = [{ title: rx }, { companyName: rx }, { description: rx }];
+      clauses.push({ $or: [{ title: rx }, { companyName: rx }, { description: rx }] });
     }
     if (location && location.trim()) {
       const rx = new RegExp(location.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-      // `location` is the free-text label; city/country carry the parsed values.
-      filter.$and = [{ $or: [{ location: rx }, { city: rx }, { country: rx }] }];
+      clauses.push({ $or: [{ location: rx }, { city: rx }, { country: rx }] });
+    }
+    if (clauses.length) {
+      filter.$and = [{ $or: filter.$or }, ...clauses];
+      delete filter.$or;
     }
     if (remote === 'true') filter.isRemote = true;
 
@@ -56,7 +61,7 @@ export class PublicJobsController {
         .select(
           'title companyName companyLogo location city country isRemote jobType salary salaryDisclosed experience externalUrl originalApplyUrl createdAt preferredSkills',
         )
-        .sort({ createdAt: -1 })
+        .sort({ postedAt: -1, createdAt: -1 })
         .skip((current - 1) * perPage)
         .limit(perPage)
         .lean()
@@ -91,7 +96,7 @@ export class PublicJobsController {
     if (!isValidObjectId(id)) throw new NotFoundException('Job not found');
 
     const j: any = await this.jobModel
-      .findOne({ _id: id, isActive: true })
+      .findOne({ _id: id, ...publicListingFilter() })
       .select(
         'title companyName companyLogo location city country isRemote remoteScope jobType salary salaryDisclosed experience description requirements preferredSkills externalUrl originalApplyUrl canonicalUrl attributionText createdAt importMethod',
       )
@@ -107,7 +112,7 @@ export class PublicJobsController {
       ? await this.jobModel
           .find({
             _id: { $ne: j._id },
-            isActive: true,
+            ...publicListingFilter(),
             title: new RegExp(firstWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'),
           })
           .select('title companyName companyLogo location isRemote salary salaryDisclosed')

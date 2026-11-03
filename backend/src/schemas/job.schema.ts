@@ -111,6 +111,9 @@ export class Job {
   @Prop({ default: Date.now })
   scrapedAt?: Date;
 
+  @Prop()
+  postedAt?: Date;
+
   // ---------------------------------------------------------------------------
   // Ingestion platform fields (all additive/optional; legacy docs keep working).
   // ---------------------------------------------------------------------------
