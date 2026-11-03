@@ -16,6 +16,7 @@ describe('MonitorScheduler cron/queue conversion', () => {
     greenhouse: { run: jest.fn().mockResolvedValue({ upserts: 1, newExternalIds: [] }) },
     lever: { run: jest.fn().mockResolvedValue({ upserts: 2, newExternalIds: [] }) },
     workday: { run: jest.fn().mockResolvedValue({ upserts: 3, newExternalIds: [] }) },
+    ashby: { run: jest.fn().mockResolvedValue({ upserts: 4, newExternalIds: [] }) },
     appEvents: { recordEvent: jest.fn() },
   });
 
@@ -27,20 +28,21 @@ describe('MonitorScheduler cron/queue conversion', () => {
     jest.clearAllMocks();
   });
 
-  it('runMonitorsOnce runs the three provider monitors', async () => {
+  it('runMonitorsOnce runs the provider monitors', async () => {
     delete process.env.MONITORS_CRON_DISABLE;
     const d = makeDeps();
-    const s = new MonitorScheduler(d.greenhouse as any, d.lever as any, d.workday as any, d.appEvents as any);
+    const s = new MonitorScheduler(d.greenhouse as any, d.lever as any, d.workday as any, d.ashby as any, d.appEvents as any);
     await s.runMonitorsOnce();
     expect(d.greenhouse.run).toHaveBeenCalledTimes(1);
     expect(d.lever.run).toHaveBeenCalledTimes(1);
     expect(d.workday.run).toHaveBeenCalledTimes(1);
+    expect(d.ashby.run).toHaveBeenCalledTimes(1);
   });
 
   it('runMonitorsOnce honours MONITORS_CRON_DISABLE kill-switch', async () => {
     process.env.MONITORS_CRON_DISABLE = 'true';
     const d = makeDeps();
-    const s = new MonitorScheduler(d.greenhouse as any, d.lever as any, d.workday as any, d.appEvents as any);
+    const s = new MonitorScheduler(d.greenhouse as any, d.lever as any, d.workday as any, d.ashby as any, d.appEvents as any);
     await s.runMonitorsOnce();
     expect(d.greenhouse.run).not.toHaveBeenCalled();
   });
@@ -49,7 +51,7 @@ describe('MonitorScheduler cron/queue conversion', () => {
     delete process.env.QUEUE_ENABLED;
     delete process.env.MONITORS_CRON_DISABLE;
     const d = makeDeps();
-    const s = new MonitorScheduler(d.greenhouse as any, d.lever as any, d.workday as any, d.appEvents as any);
+    const s = new MonitorScheduler(d.greenhouse as any, d.lever as any, d.workday as any, d.ashby as any, d.appEvents as any);
     const spy = jest.spyOn(s, 'runMonitorsOnce').mockResolvedValue(undefined as any);
     await s.handleCron();
     expect(spy).toHaveBeenCalledTimes(1);
@@ -58,7 +60,7 @@ describe('MonitorScheduler cron/queue conversion', () => {
   it('@Cron handler early-returns (no work) when queues are ON', async () => {
     process.env.QUEUE_ENABLED = 'true';
     const d = makeDeps();
-    const s = new MonitorScheduler(d.greenhouse as any, d.lever as any, d.workday as any, d.appEvents as any);
+    const s = new MonitorScheduler(d.greenhouse as any, d.lever as any, d.workday as any, d.ashby as any, d.appEvents as any);
     const spy = jest.spyOn(s, 'runMonitorsOnce').mockResolvedValue(undefined as any);
     await s.handleCron();
     expect(spy).not.toHaveBeenCalled();
@@ -74,7 +76,7 @@ describe('MonitorScheduler cron/queue conversion', () => {
       ]),
       removeRepeatableByKey: jest.fn().mockResolvedValue(undefined),
     };
-    const s = new MonitorScheduler(d.greenhouse as any, d.lever as any, d.workday as any, d.appEvents as any, queue as any);
+    const s = new MonitorScheduler(d.greenhouse as any, d.lever as any, d.workday as any, d.ashby as any, d.appEvents as any, queue as any);
     await s.onModuleInit();
     expect(queue.removeRepeatableByKey).toHaveBeenCalledTimes(1);
     expect(queue.removeRepeatableByKey).toHaveBeenCalledWith('hourly');
@@ -89,7 +91,7 @@ describe('MonitorScheduler cron/queue conversion', () => {
 
   it('onModuleInit does nothing when no queue is injected', async () => {
     const d = makeDeps();
-    const s = new MonitorScheduler(d.greenhouse as any, d.lever as any, d.workday as any, d.appEvents as any);
+    const s = new MonitorScheduler(d.greenhouse as any, d.lever as any, d.workday as any, d.ashby as any, d.appEvents as any);
     await expect(s.onModuleInit()).resolves.toBeUndefined();
   });
 

@@ -3,6 +3,7 @@ import { ApiOperation, ApiTags, ApiQuery, ApiBearerAuth } from '@nestjs/swagger'
 import { GreenhouseMonitorService } from './providers/greenhouse-monitor.service';
 import { LeverMonitorService } from './providers/lever-monitor.service';
 import { WorkdayMonitorService } from './providers/workday-monitor.service';
+import { AshbyMonitorService } from './providers/ashby-monitor.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -19,6 +20,7 @@ export class MonitorController {
     private greenhouse: GreenhouseMonitorService,
     private lever: LeverMonitorService,
     private workday: WorkdayMonitorService,
+    private ashby: AshbyMonitorService,
   ) {}
 
   @Post('greenhouse/trigger')
@@ -43,5 +45,13 @@ export class MonitorController {
     this.logger.log('Triggering Workday monitor');
     const result = await this.workday.run(body?.sites || []);
     return { message: 'Workday monitor completed', result };
+  }
+
+  @Post('ashby/trigger')
+  @ApiOperation({ summary: 'Trigger Ashby monitor once' })
+  async triggerAshby(@Body() body: { boards?: string[] }) {
+    this.logger.log('Triggering Ashby monitor');
+    const result = await this.ashby.run(body?.boards || []);
+    return { message: 'Ashby monitor completed', result };
   }
 }

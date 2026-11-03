@@ -1,5 +1,5 @@
 /** Open-market sources. Employer posts are not in this list and stay on /jobs. */
-export const OPEN_MARKET_SOURCES = ['Greenhouse', 'Lever', 'Workday'] as const;
+export const OPEN_MARKET_SOURCES = ['Greenhouse', 'Lever', 'Workday', 'Ashby'] as const;
 
 export const CANADA_TIME_ZONE = 'America/Toronto';
 
@@ -21,7 +21,7 @@ export function listedInCanada(
   location?: string,
 ): boolean {
   if (geo?.country === 'CA' || (geo?.eligibleCountries || []).includes('CA')) return true;
-  return /\bcanada\b/i.test(location || '');
+  return /\b(canada|ontario|quebec|québec|british columbia|alberta|manitoba|saskatchewan|nova scotia|new brunswick|newfoundland|prince edward island|toronto|vancouver|montr[eé]al|ottawa|calgary|edmonton|winnipeg|halifax)\b/i.test(location || '');
 }
 
 export function isPostedToday(value: unknown, now = new Date()): boolean {

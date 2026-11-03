@@ -5,6 +5,7 @@ import { MonitorController } from './monitor.controller';
 import { GreenhouseMonitorService } from './providers/greenhouse-monitor.service';
 import { LeverMonitorService } from './providers/lever-monitor.service';
 import { WorkdayMonitorService } from './providers/workday-monitor.service';
+import { AshbyMonitorService } from './providers/ashby-monitor.service';
 import { Job, JobSchema } from '../schemas/job.schema';
 import { LoggerModule } from '../common/logger/logger.module';
 import { ApplicationsModule } from '../applications/applications.module';
@@ -31,6 +32,7 @@ import { QUEUE_CRON } from '../queue/cron-queue.constants';
     GreenhouseMonitorService,
     LeverMonitorService,
     WorkdayMonitorService,
+    AshbyMonitorService,
     MonitorScheduler,
     // Processor wired in only when queues are enabled.
     ...(isQueueEnabled() ? [MonitorCronProcessor] : []),

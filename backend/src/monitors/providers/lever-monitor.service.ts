@@ -7,6 +7,9 @@ import { JobGeoService } from '../../geography/job-geo.service';
 import { extractSkills } from '../../matching/skill-taxonomy';
 import { isPostedToday, listedInCanada, MAX_OPEN_MARKET_PER_COMPANY } from '../fresh-canada-listing';
 
+// shortcut: boards that publish on Lever, set LEVER_BOARDS for a different set
+const DEFAULT_LEVER_BOARDS = ['wattpad', 'spotify'];
+
 @Injectable()
 export class LeverMonitorService {
   private readonly logger = new Logger(LeverMonitorService.name);
@@ -49,7 +52,7 @@ export class LeverMonitorService {
           kept += 1;
           const doc = {
             title,
-            companyName: board || 'Unknown',
+            companyName: board === 'spotify' ? 'Spotify' : board === 'wattpad' ? 'Wattpad' : board || 'Unknown',
             location,
             description,
             source: 'Lever',
@@ -99,10 +102,8 @@ export class LeverMonitorService {
 
   private resolveBoards(input: string[], envValue?: string): string[] {
     if (input && input.length) return input;
-    if (envValue) {
-      return envValue.split(',').map((s) => s.trim()).filter(Boolean);
-    }
-    return [];
+    const fromEnv = (envValue || '').split(',').map((s) => s.trim()).filter(Boolean);
+    return fromEnv.length ? fromEnv : DEFAULT_LEVER_BOARDS;
   }
 
   private mapCommitment(commitment: string): string {

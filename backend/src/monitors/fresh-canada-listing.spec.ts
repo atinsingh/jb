@@ -10,6 +10,8 @@ describe('fresh Canada listings', () => {
     expect(isPostedToday(null, now)).toBe(false);
     expect(listedInCanada({ country: 'US', eligibleCountries: ['CA'] }, 'Remote, Canada; Remote, United States')).toBe(true);
     expect(listedInCanada({ country: 'US', eligibleCountries: ['US'] }, 'San Francisco')).toBe(false);
+    expect(listedInCanada(null, 'Dieppe New Brunswick')).toBe(true);
+    expect(listedInCanada(null, 'Ghent')).toBe(false);
   });
 
   it('limits the public list to employer jobs plus today Canada market jobs', () => {
@@ -17,9 +19,9 @@ describe('fresh Canada listings', () => {
     expect(publicListingFilter(now)).toEqual({
       isActive: true,
       $or: [
-        { source: { $nin: ['Greenhouse', 'Lever', 'Workday'] } },
+        { source: { $nin: ['Greenhouse', 'Lever', 'Workday', 'Ashby'] } },
         {
-          source: { $in: ['Greenhouse', 'Lever', 'Workday'] },
+          source: { $in: ['Greenhouse', 'Lever', 'Workday', 'Ashby'] },
           country: 'CA',
           postedAt: { $gte: start, $lt: end },
         },

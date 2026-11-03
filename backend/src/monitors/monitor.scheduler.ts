@@ -5,6 +5,7 @@ import { Queue } from 'bull';
 import { GreenhouseMonitorService } from './providers/greenhouse-monitor.service';
 import { LeverMonitorService } from './providers/lever-monitor.service';
 import { WorkdayMonitorService } from './providers/workday-monitor.service';
+import { AshbyMonitorService } from './providers/ashby-monitor.service';
 import { ApplicationEventsService } from '../applications/application-events.service';
 import { Types } from 'mongoose';
 import { isQueueEnabled } from '../queue/queue.constants';
@@ -24,6 +25,7 @@ export class MonitorScheduler implements OnModuleInit {
     private greenhouse: GreenhouseMonitorService,
     private lever: LeverMonitorService,
     private workday: WorkdayMonitorService,
+    private ashby: AshbyMonitorService,
     private appEvents: ApplicationEventsService,
     // Present only when QUEUE_ENABLED=true (see monitors.module.ts). When absent
     // (@Optional → undefined) the plain @Cron handler owns scheduling as before.
@@ -72,21 +74,25 @@ export class MonitorScheduler implements OnModuleInit {
     const greenhouse = await this.greenhouse.run();
     const lever = await this.lever.run();
     const workday = await this.workday.run();
+    const ashby = await this.ashby.run();
 
     await this.emitNewJobEvents(greenhouse.newExternalIds || []);
     await this.emitNewJobEvents(lever.newExternalIds || []);
     await this.emitNewJobEvents(workday.newExternalIds || []);
+    await this.emitNewJobEvents(ashby.newExternalIds || []);
 
     this.logger.log(
-      `Monitors complete GH:${greenhouse.upserts} LV:${lever.upserts} WD:${workday.upserts}`,
+      `Monitors complete GH:${greenhouse.upserts} LV:${lever.upserts} WD:${workday.upserts} AB:${ashby.upserts}`,
     );
     return {
       greenhouse: greenhouse.upserts,
       lever: lever.upserts,
       workday: workday.upserts,
+      ashby: ashby.upserts,
       perBoard: greenhouse.perBoard,
       perLever: lever.perBoard,
       perSite: workday.perSite,
+      perAshby: ashby.perBoard,
     };
   }
 
