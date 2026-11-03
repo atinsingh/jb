@@ -4,7 +4,7 @@ import axios from 'axios';
 import { Model } from 'mongoose';
 import { Job, JobDocument } from '../../schemas/job.schema';
 import { resolveCountry } from '../../geography/geo.constants';
-import { isPostedToday, MAX_OPEN_MARKET_PER_COMPANY } from '../fresh-canada-listing';
+import { isPostedToday, listedInCanada, MAX_OPEN_MARKET_PER_COMPANY } from '../fresh-canada-listing';
 
 type WorkdaySite = { tenant: string; site: string };
 
@@ -75,7 +75,7 @@ export class WorkdayMonitorService {
         if (kept >= MAX_OPEN_MARKET_PER_COMPANY) break;
         const location = job?.locations?.[0]?.displayName || job?.locations?.[0]?.name || 'Not specified';
         const postedRaw = job.postedOn || job.startDate;
-        if (resolveCountry(location) !== 'CA' || !isPostedToday(postedRaw)) continue;
+        if (!isPostedToday(postedRaw) || !listedInCanada({ country: resolveCountry(location) }, location)) continue;
         const postedAt = typeof postedRaw === 'string' && /^posted today$/i.test(postedRaw.trim())
           ? new Date()
           : new Date(postedRaw);
@@ -110,6 +110,7 @@ export class WorkdayMonitorService {
           externalUrl,
           canonicalUrl,
           externalId,
+          country: 'CA',
           postedAt,
           scrapedAt: new Date(),
         };

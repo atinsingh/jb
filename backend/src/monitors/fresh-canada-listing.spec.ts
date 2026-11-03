@@ -1,4 +1,4 @@
-import { isPostedToday, publicListingFilter, torontoDayRange } from './fresh-canada-listing';
+import { isPostedToday, listedInCanada, publicListingFilter, torontoDayRange } from './fresh-canada-listing';
 
 describe('fresh Canada listings', () => {
   const now = new Date('2026-11-03T17:00:00.000Z');
@@ -8,6 +8,8 @@ describe('fresh Canada listings', () => {
     expect(isPostedToday('2026-11-02T22:00:00-05:00', now)).toBe(false);
     expect(isPostedToday('Posted Today', now)).toBe(true);
     expect(isPostedToday(null, now)).toBe(false);
+    expect(listedInCanada({ country: 'US', eligibleCountries: ['CA'] }, 'Remote, Canada; Remote, United States')).toBe(true);
+    expect(listedInCanada({ country: 'US', eligibleCountries: ['US'] }, 'San Francisco')).toBe(false);
   });
 
   it('limits the public list to employer jobs plus today Canada market jobs', () => {

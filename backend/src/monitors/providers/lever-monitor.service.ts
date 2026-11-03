@@ -5,7 +5,7 @@ import { Model } from 'mongoose';
 import { Job, JobDocument } from '../../schemas/job.schema';
 import { JobGeoService } from '../../geography/job-geo.service';
 import { extractSkills } from '../../matching/skill-taxonomy';
-import { isPostedToday, MAX_OPEN_MARKET_PER_COMPANY } from '../fresh-canada-listing';
+import { isPostedToday, listedInCanada, MAX_OPEN_MARKET_PER_COMPANY } from '../fresh-canada-listing';
 
 @Injectable()
 export class LeverMonitorService {
@@ -44,7 +44,7 @@ export class LeverMonitorService {
           const url = job.hostedUrl || job.applyUrl;
           const workplaceHint = (job?.workplaceType || '') as string; // Lever exposes workplaceType
           const g = this.geo.normalize({ location, description, title, workplaceType: workplaceHint });
-          if (g.country !== 'CA') continue;
+          if (!listedInCanada(g, location)) continue;
           if (kept >= MAX_OPEN_MARKET_PER_COMPANY) break;
           kept += 1;
           const doc = {
@@ -61,7 +61,7 @@ export class LeverMonitorService {
             scrapedAt: new Date(),
             skills: extractSkills(`${title}\n${description}`),
             companyLogo: this.geo.deriveLogo(board, url),
-            country: g.country,
+            country: 'CA',
             region: g.region,
             city: g.city,
             workplaceType: g.workplaceType,

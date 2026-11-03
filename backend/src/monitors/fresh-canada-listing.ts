@@ -16,6 +16,14 @@ export function calendarDay(value: Date, timeZone = CANADA_TIME_ZONE): string {
 }
 
 /** True when the source date falls on today's calendar day in Toronto. */
+export function listedInCanada(
+  geo: { country?: string | null; eligibleCountries?: string[] } | null,
+  location?: string,
+): boolean {
+  if (geo?.country === 'CA' || (geo?.eligibleCountries || []).includes('CA')) return true;
+  return /\bcanada\b/i.test(location || '');
+}
+
 export function isPostedToday(value: unknown, now = new Date()): boolean {
   if (value == null || value === '') return false;
   if (typeof value === 'string' && /^posted today$/i.test(value.trim())) return true;

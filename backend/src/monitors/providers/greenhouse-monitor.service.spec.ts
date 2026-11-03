@@ -72,13 +72,27 @@ describe('GreenhouseMonitorService', () => {
             location: { name: 'Seattle' },
             first_published: posted,
           },
+          {
+            id: 4,
+            title: 'Remote role',
+            absolute_url: 'https://acme.example/jobs/4',
+            content: '<p>Remote</p>',
+            location: { name: 'Remote, Canada; Remote, United States' },
+            first_published: posted,
+          },
         ],
       },
     });
     const { jobs, geo, monitor } = service();
-    geo.normalize.mockImplementation(({ location }) => ({ country: String(location).includes('Canada') ? 'CA' : 'US' }));
+    geo.normalize.mockImplementation(({ location }) => {
+      const name = String(location);
+      if (name.includes('Canada') && name.includes('United States')) {
+        return { country: 'US', eligibleCountries: ['CA'] };
+      }
+      return { country: name.includes('Canada') ? 'CA' : 'US', eligibleCountries: [] };
+    });
     await monitor.run();
-    expect(jobs.findOneAndUpdate).toHaveBeenCalledTimes(1);
+    expect(jobs.findOneAndUpdate).toHaveBeenCalledTimes(2);
     expect(jobs.findOneAndUpdate).toHaveBeenCalledWith(
       { externalId: 'greenhouse:1' },
       {

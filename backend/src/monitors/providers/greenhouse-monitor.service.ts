@@ -6,7 +6,7 @@ import { Job, JobDocument } from '../../schemas/job.schema';
 import { JobGeoService } from '../../geography/job-geo.service';
 import { extractSkills } from '../../matching/skill-taxonomy';
 import { plainJobText } from '../plain-job-text';
-import { isPostedToday, MAX_OPEN_MARKET_PER_COMPANY } from '../fresh-canada-listing';
+import { isPostedToday, listedInCanada, MAX_OPEN_MARKET_PER_COMPANY } from '../fresh-canada-listing';
 
 // shortcut: six public boards, set GREENHOUSE_BOARDS for a different market
 const DEFAULT_GREENHOUSE_BOARDS = ['hootsuite', 'unbounce', 'ritual', 'later', 'stripe', 'gitlab'];
@@ -50,7 +50,7 @@ export class GreenhouseMonitorService {
           const location = job?.location?.name || 'Not specified';
           const description = plainJobText(job.content || '');
           const g = this.geo.normalize({ location, description, title: job.title });
-          if (g.country !== 'CA') continue;
+          if (!listedInCanada(g, location)) continue;
           if (kept >= MAX_OPEN_MARKET_PER_COMPANY) break;
           kept += 1;
           const doc = {
@@ -78,7 +78,7 @@ export class GreenhouseMonitorService {
             scrapedAt: new Date(),
             skills: extractSkills(`${job.title}\n${description}`),
             companyLogo: this.geo.deriveLogo(companyName, job.absolute_url),
-            country: g.country,
+            country: 'CA',
             region: g.region,
             city: g.city,
             workplaceType: g.workplaceType,
