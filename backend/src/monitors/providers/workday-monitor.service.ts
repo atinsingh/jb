@@ -18,6 +18,12 @@ const DEFAULT_WORKDAY_SITES = [
   'thomsonreuters.wd5.myworkdayjobs.com/thomsonreuters/External_Career_Site',
 ];
 
+const WORKDAY_HEADERS = {
+  Accept: 'application/json',
+  'Content-Type': 'application/json',
+  'User-Agent': 'Mozilla/5.0',
+};
+
 const COMPANY_NAMES: Record<string, string> = {
   td: 'TD',
   bmo: 'BMO',
@@ -80,7 +86,11 @@ export class WorkdayMonitorService {
     const base = `https://${site.host}/wday/cxs/${site.tenant}/${site.site}/jobs`;
 
     while (true) {
-      const { data } = await axios.post(base, { appliedFacets: {}, limit, offset, searchText: '' });
+      const { data } = await axios.post(
+        base,
+        { appliedFacets: {}, limit, offset, searchText: '' },
+        { headers: WORKDAY_HEADERS },
+      );
       const postings = Array.isArray(data?.jobPostings) ? data.jobPostings : [];
       if (postings.length === 0) break;
 
@@ -173,7 +183,7 @@ export class WorkdayMonitorService {
 
   private async fetchDetails(site: WorkdaySite, externalPath: string, timeoutMs: number) {
     const url = `https://${site.host}/wday/cxs/${site.tenant}/${site.site}${externalPath}`;
-    const { data } = await axios.get(url, { timeout: timeoutMs });
+    const { data } = await axios.get(url, { timeout: timeoutMs, headers: WORKDAY_HEADERS });
     const info = data?.jobPostingInfo || {};
     return {
       description: plainJobText(info.jobDescription || ''),
