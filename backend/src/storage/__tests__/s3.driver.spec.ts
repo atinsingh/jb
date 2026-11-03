@@ -12,12 +12,12 @@ describe('S3Driver', () => {
         endpoint: 'https://project.storage.supabase.co/storage/v1/s3',
         accessKeyId: 'access',
         secretAccessKey: 'secret',
-        publicBaseUrl:
-          'https://project.supabase.co/storage/v1/object/public/resumes',
       },
       async () => ({
-        s3: { S3Client, PutObjectCommand },
-        presigner: { getSignedUrl: jest.fn() },
+        s3: { S3Client, PutObjectCommand, GetObjectCommand: jest.fn() },
+        presigner: {
+          getSignedUrl: jest.fn().mockResolvedValue('https://signed.example/resume.pdf'),
+        },
       }),
     );
 
@@ -36,9 +36,8 @@ describe('S3Driver', () => {
     expect(PutObjectCommand).toHaveBeenCalledWith(
       expect.objectContaining({ Bucket: 'resumes', Key: 'users/u1/resume.pdf' }),
     );
-    expect(result.url).toBe(
-      'https://project.supabase.co/storage/v1/object/public/resumes/users/u1/resume.pdf',
-    );
+    expect(result.url).toBe('https://signed.example/resume.pdf');
+    expect(result.url).not.toContain('/object/public/');
   });
 
   it('exports a clear install-hint message', () => {
