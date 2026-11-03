@@ -41,6 +41,15 @@ describe('Local upload privacy', () => {
       await request(app.getHttpServer())
         .get('/uploads/alias/user/1.pdf')
         .expect(404);
+      await mkdir(join(root, 'resumes', 'user'), { recursive: true });
+      await writeFile(join(root, 'resumes', 'user', '1.pdf'), '%PDF secret');
+      await request(app.getHttpServer())
+        .get('/uploads/resumes/user/1.pdf')
+        .expect(404);
+      await symlink(join(root, 'resumes'), join(root, 'resume-alias'), 'junction');
+      await request(app.getHttpServer())
+        .get('/uploads/resume-alias/user/1.pdf')
+        .expect(404);
       if (process.platform === 'win32') {
         const shortPath = join(root, 'RESUME~1', 'user', '1.pdf');
         const shortNamesEnabled = await access(shortPath).then(

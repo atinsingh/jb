@@ -73,8 +73,8 @@ describe('LocalDriver', () => {
   });
 
   it('getSignedUrl returns the plain public URL', async () => {
-    const url = await driver.getSignedUrl('resumes/x.pdf', 60);
-    expect(url).toBe('http://localhost:8000/uploads/resumes/x.pdf');
+    const url = await driver.getSignedUrl('notes/x.txt', 60);
+    expect(url).toBe('http://localhost:8000/uploads/notes/x.txt');
   });
 
   it('builds a relative URL when no publicBaseUrl is configured', async () => {

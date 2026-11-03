@@ -4,6 +4,11 @@ import { Readable } from 'stream';
 import { LocalDriver } from './drivers/local.driver';
 import { S3Driver } from './drivers/s3.driver';
 import {
+  isPrivateResumeKey,
+  openResumeObject,
+  sealResumeObject,
+} from './resume-object.codec';
+import {
   PutOptions,
   PutResult,
   StorageDriver,
@@ -20,12 +25,15 @@ export class StorageService implements StorageDriver {
   private readonly logger = new Logger(StorageService.name);
   private readonly driver: StorageDriver;
   private readonly driverName: StorageDriverName;
+  private readonly resumeStorageKey: string;
 
   constructor(private readonly configService: ConfigService) {
     this.driverName = (
       this.configService.get<string>('STORAGE_DRIVER', 'local') || 'local'
     ).toLowerCase() as StorageDriverName;
     this.driver = this.createDriver(this.driverName);
+    this.resumeStorageKey =
+      this.configService.get<string>('RESUME_STORAGE_ENCRYPTION_KEY', '') || '';
     this.logger.log(`Storage driver initialized: ${this.driverName}`);
   }
 
@@ -42,7 +50,6 @@ export class StorageService implements StorageDriver {
         accessKeyId: this.configService.get<string>('S3_ACCESS_KEY_ID'),
         secretAccessKey: this.configService.get<string>('S3_SECRET_ACCESS_KEY'),
         endpoint: this.configService.get<string>('S3_ENDPOINT'),
-        publicBaseUrl: this.configService.get<string>('S3_PUBLIC_BASE_URL'),
         signedUrlTtl: Number(
           this.configService.get<string>('S3_SIGNED_URL_TTL', '3600'),
         ),
@@ -55,19 +62,27 @@ export class StorageService implements StorageDriver {
     });
   }
 
-  put(key: string, buffer: Buffer, options?: PutOptions): Promise<PutResult> {
-    return this.driver.put(key, buffer, options);
+  async put(key: string, buffer: Buffer, options?: PutOptions): Promise<PutResult> {
+    if (!isPrivateResumeKey(key)) return this.driver.put(key, buffer, options);
+    const stored = await this.driver.put(key, sealResumeObject(buffer, this.resumeStorageKey), {
+      ...options,
+      contentType: 'application/octet-stream',
+    });
+    return { key: stored.key, url: '' };
   }
 
-  getBuffer(key: string): Promise<Buffer> {
-    return this.driver.getBuffer(key);
+  async getBuffer(key: string): Promise<Buffer> {
+    const stored = await this.driver.getBuffer(key);
+    return isPrivateResumeKey(key) ? openResumeObject(stored, this.resumeStorageKey) : stored;
   }
 
-  getStream(key: string): Promise<Readable> {
-    return this.driver.getStream(key);
+  async getStream(key: string): Promise<Readable> {
+    if (!isPrivateResumeKey(key)) return this.driver.getStream(key);
+    return Readable.from(await this.getBuffer(key));
   }
 
   getSignedUrl(key: string, ttlSeconds?: number): Promise<string> {
+    if (isPrivateResumeKey(key)) return Promise.resolve('');
     return this.driver.getSignedUrl(key, ttlSeconds);
   }
 

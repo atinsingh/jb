@@ -14,7 +14,7 @@ export interface PutOptions {
 export interface PutResult {
   /** The storage key the object was written under. */
   key: string;
-  /** A resolvable URL for the object (public for local, may be public or signed for s3). */
+  /** Empty for private résumé objects. Signed for s3; a public path for other local objects. */
   url: string;
 }
 
