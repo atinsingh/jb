@@ -46,7 +46,7 @@ describe('WorkdayMonitorService', () => {
     await new WorkdayMonitorService(jobs as any).run();
     expect(axios.post).toHaveBeenCalledWith(
       'https://td.wd3.myworkdayjobs.com/wday/cxs/td/TD_Bank_Careers/jobs',
-      expect.objectContaining({ limit: 50, offset: 0 }),
+      expect.objectContaining({ limit: 20, offset: 0 }),
       expect.objectContaining({ headers: expect.objectContaining({ 'User-Agent': 'Mozilla/5.0' }) }),
     );
     expect(jobs.findOneAndUpdate).toHaveBeenCalledTimes(1);

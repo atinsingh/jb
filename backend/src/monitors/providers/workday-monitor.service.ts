@@ -78,7 +78,7 @@ export class WorkdayMonitorService {
     options: { fetchDetails: boolean; detailTimeout: number },
   ) {
     let offset = 0;
-    const limit = 50;
+    const limit = 20;
     let fetched = 0;
     let upserts = 0;
     let kept = 0;
