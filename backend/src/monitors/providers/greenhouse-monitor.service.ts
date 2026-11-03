@@ -6,9 +6,10 @@ import { Job, JobDocument } from '../../schemas/job.schema';
 import { JobGeoService } from '../../geography/job-geo.service';
 import { extractSkills } from '../../matching/skill-taxonomy';
 import { plainJobText } from '../plain-job-text';
+import { isPostedToday, MAX_OPEN_MARKET_PER_COMPANY } from '../fresh-canada-listing';
 
-// shortcut: four public boards, set GREENHOUSE_BOARDS for a different market
-const DEFAULT_GREENHOUSE_BOARDS = ['stripe', 'airbnb', 'gitlab', 'notion'];
+// shortcut: six public boards, set GREENHOUSE_BOARDS for a different market
+const DEFAULT_GREENHOUSE_BOARDS = ['hootsuite', 'unbounce', 'ritual', 'later', 'stripe', 'gitlab'];
 
 @Injectable()
 export class GreenhouseMonitorService {
@@ -37,15 +38,21 @@ export class GreenhouseMonitorService {
         if (!data?.jobs) continue;
         const jobs = Array.isArray(data.jobs) ? data.jobs : [];
         fetched += jobs.length;
-        perBoard[board] = jobs.length;
+        const ranked = jobs
+          .filter((job) => isPostedToday(job.first_published))
+          .sort((a, b) => new Date(b.first_published).getTime() - new Date(a.first_published).getTime());
+        let kept = 0;
 
-        for (const job of jobs) {
+        for (const job of ranked) {
           const externalId = `greenhouse:${job.id}`;
           const existed = await this.jobModel.exists({ externalId });
           const companyName = board || job?.offices?.[0]?.name || 'Unknown';
           const location = job?.location?.name || 'Not specified';
           const description = plainJobText(job.content || '');
           const g = this.geo.normalize({ location, description, title: job.title });
+          if (g.country !== 'CA') continue;
+          if (kept >= MAX_OPEN_MARKET_PER_COMPANY) break;
+          kept += 1;
           const doc = {
             title: job.title,
             companyName,
@@ -67,6 +74,7 @@ export class GreenhouseMonitorService {
             externalId,
             isExternal: true,
             importMethod: 'official_api',
+            postedAt: new Date(job.first_published),
             scrapedAt: new Date(),
             skills: extractSkills(`${job.title}\n${description}`),
             companyLogo: this.geo.deriveLogo(companyName, job.absolute_url),
@@ -91,6 +99,7 @@ export class GreenhouseMonitorService {
           upserts++;
           if (!existed) newExternalIds.push(externalId);
         }
+        perBoard[board] = kept;
       } catch (err: any) {
         this.logger.warn(`Greenhouse fetch failed for board ${board}: ${err.message}`);
       }

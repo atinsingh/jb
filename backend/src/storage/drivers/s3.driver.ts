@@ -6,10 +6,8 @@ export interface S3DriverConfig {
   region: string;
   accessKeyId?: string;
   secretAccessKey?: string;
-  /** Custom endpoint for S3-compatible stores (MinIO, R2, etc.). */
+  /** Custom endpoint for S3-compatible stores (MinIO, R2, Supabase). */
   endpoint?: string;
-  /** Origin used to build public (unsigned) URLs. */
-  publicBaseUrl?: string;
   /** Default TTL (seconds) for getSignedUrl. */
   signedUrlTtl?: number;
 }
@@ -86,13 +84,6 @@ export class S3Driver implements StorageDriver {
     return this.clientPromise;
   }
 
-  private urlFor(key: string): string {
-    if (this.config.publicBaseUrl) {
-      return `${this.config.publicBaseUrl.replace(/\/+$/, '')}/${key}`;
-    }
-    return `https://${this.config.bucket}.s3.${this.config.region}.amazonaws.com/${key}`;
-  }
-
   async put(key: string, buffer: Buffer, options?: PutOptions): Promise<PutResult> {
     const { s3 } = await this.loadSdk();
     const client = await this.getClient();
@@ -104,7 +95,9 @@ export class S3Driver implements StorageDriver {
         ContentType: options?.contentType,
       }),
     );
-    return { key, url: this.urlFor(key) };
+    // The bucket is private. Callers get a presigned URL, never /object/public.
+    // shortcut: presigned URLs expire with signedUrlTtl; refresh persisted ones (avatars) when they must outlive it.
+    return { key, url: await this.getSignedUrl(key) };
   }
 
   async getBuffer(key: string): Promise<Buffer> {

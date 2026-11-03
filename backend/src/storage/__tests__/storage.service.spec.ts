@@ -86,5 +86,31 @@ describe('StorageService', () => {
       await service.delete(key);
       expect(await service.exists(key)).toBe(false);
     });
+
+    it('encrypts saved resume PDFs and does not hand back a public upload URL', async () => {
+      const sealed = await buildService({
+        STORAGE_DRIVER: 'local',
+        STORAGE_LOCAL_PATH: basePath,
+        PUBLIC_BASE_URL: 'http://cdn.test',
+        RESUME_STORAGE_ENCRYPTION_KEY: 'test-only-resume-storage-key',
+      });
+      const key = 'resumes/r1/1.pdf';
+      const buf = Buffer.from('%PDF-1.4 secret resume');
+
+      const put = await sealed.put(key, buf, { contentType: 'application/pdf' });
+      const raw = await fs.readFile(join(basePath, 'resumes', 'r1', '1.pdf'));
+
+      expect(put.url).not.toContain('/uploads/');
+      expect(put.url).not.toContain('/object/public/');
+      expect(raw.includes(Buffer.from('%PDF'))).toBe(false);
+      expect((await sealed.getBuffer(key)).equals(buf)).toBe(true);
+      expect(await sealed.getSignedUrl(key)).toBe('');
+      const stream = await sealed.getStream(key);
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      expect(Buffer.concat(chunks).equals(buf)).toBe(true);
+    });
   });
 });

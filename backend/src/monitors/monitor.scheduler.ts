@@ -80,6 +80,14 @@ export class MonitorScheduler implements OnModuleInit {
     this.logger.log(
       `Monitors complete GH:${greenhouse.upserts} LV:${lever.upserts} WD:${workday.upserts}`,
     );
+    return {
+      greenhouse: greenhouse.upserts,
+      lever: lever.upserts,
+      workday: workday.upserts,
+      perBoard: greenhouse.perBoard,
+      perLever: lever.perBoard,
+      perSite: workday.perSite,
+    };
   }
 
   private async emitNewJobEvents(externalIds: string[]) {

@@ -33,28 +33,52 @@ describe('GreenhouseMonitorService', () => {
     const { monitor } = service();
     await monitor.run();
     expect((axios.get as jest.Mock).mock.calls.map((call) => call[0])).toEqual([
+      'https://boards-api.greenhouse.io/v1/boards/hootsuite/jobs?content=true',
+      'https://boards-api.greenhouse.io/v1/boards/unbounce/jobs?content=true',
+      'https://boards-api.greenhouse.io/v1/boards/ritual/jobs?content=true',
+      'https://boards-api.greenhouse.io/v1/boards/later/jobs?content=true',
       'https://boards-api.greenhouse.io/v1/boards/stripe/jobs?content=true',
-      'https://boards-api.greenhouse.io/v1/boards/airbnb/jobs?content=true',
       'https://boards-api.greenhouse.io/v1/boards/gitlab/jobs?content=true',
-      'https://boards-api.greenhouse.io/v1/boards/notion/jobs?content=true',
     ]);
   });
 
-  it('stores plain text for a greenhouse html description', async () => {
+  it('stores plain text for a Canada role posted today and skips the rest', async () => {
     process.env.GREENHOUSE_BOARDS = 'acme';
+    const posted = new Date().toISOString();
     (axios.get as jest.Mock).mockResolvedValue({
       data: {
-        jobs: [{
-          id: 1,
-          title: 'Engineer',
-          absolute_url: 'https://acme.example/jobs/1',
-          content: '<p>Build APIs</p>',
-          location: { name: 'Remote' },
-        }],
+        jobs: [
+          {
+            id: 1,
+            title: 'Engineer',
+            absolute_url: 'https://acme.example/jobs/1',
+            content: '<p>Build APIs</p>',
+            location: { name: 'Toronto, Canada' },
+            first_published: posted,
+          },
+          {
+            id: 2,
+            title: 'Old role',
+            absolute_url: 'https://acme.example/jobs/2',
+            content: '<p>Old</p>',
+            location: { name: 'Toronto, Canada' },
+            first_published: new Date(Date.now() - 2 * 864e5).toISOString(),
+          },
+          {
+            id: 3,
+            title: 'US role',
+            absolute_url: 'https://acme.example/jobs/3',
+            content: '<p>US</p>',
+            location: { name: 'Seattle' },
+            first_published: posted,
+          },
+        ],
       },
     });
-    const { jobs, monitor } = service();
+    const { jobs, geo, monitor } = service();
+    geo.normalize.mockImplementation(({ location }) => ({ country: String(location).includes('Canada') ? 'CA' : 'US' }));
     await monitor.run();
+    expect(jobs.findOneAndUpdate).toHaveBeenCalledTimes(1);
     expect(jobs.findOneAndUpdate).toHaveBeenCalledWith(
       { externalId: 'greenhouse:1' },
       {
@@ -64,7 +88,7 @@ describe('GreenhouseMonitorService', () => {
       { upsert: true, new: true },
     );
     expect(jobs.findOneAndUpdate.mock.calls[0][1].$set).toEqual(
-      expect.objectContaining({ description: 'Build APIs', isExternal: true }),
+      expect.objectContaining({ description: 'Build APIs', isExternal: true, country: 'CA', postedAt: new Date(posted) }),
     );
   });
 });
