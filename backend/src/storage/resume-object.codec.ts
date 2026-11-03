@@ -24,11 +24,12 @@ export function sealResumeObject(plain: Buffer, secret: string): Buffer {
 }
 
 export function openResumeObject(stored: Buffer, secret: string): Buffer {
+  // Files saved before sealing are still the original PDF or document.
   if (
     stored.length < MAGIC.length + 12 + 16 ||
     !stored.subarray(0, MAGIC.length).equals(MAGIC)
   ) {
-    throw new Error('Stored resume is not encrypted');
+    return stored;
   }
   const iv = stored.subarray(4, 16);
   const tag = stored.subarray(16, 32);

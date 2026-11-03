@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Readable } from 'stream';
 import { LocalDriver } from './drivers/local.driver';
 import { S3Driver } from './drivers/s3.driver';
+import { makeSupabaseBucketPrivate } from './private-bucket';
 import {
   isPrivateResumeKey,
   openResumeObject,
@@ -21,7 +22,7 @@ import {
  * call-sites depend only on this service and never on a specific backend.
  */
 @Injectable()
-export class StorageService implements StorageDriver {
+export class StorageService implements StorageDriver, OnModuleInit {
   private readonly logger = new Logger(StorageService.name);
   private readonly driver: StorageDriver;
   private readonly driverName: StorageDriverName;
@@ -35,6 +36,26 @@ export class StorageService implements StorageDriver {
     this.resumeStorageKey =
       this.configService.get<string>('RESUME_STORAGE_ENCRYPTION_KEY', '') || '';
     this.logger.log(`Storage driver initialized: ${this.driverName}`);
+  }
+
+  async onModuleInit(): Promise<void> {
+    if (this.driverName !== 's3') return;
+    const supabaseUrl = this.configService.get<string>('SUPABASE_URL');
+    const serviceRoleKey = this.configService.get<string>('SUPABASE_SERVICE_ROLE_KEY');
+    const bucket = this.configService.get<string>('S3_BUCKET');
+    if (!supabaseUrl || !serviceRoleKey || !bucket) return;
+    try {
+      await makeSupabaseBucketPrivate({ supabaseUrl, serviceRoleKey, bucket });
+      this.logger.log(`Supabase bucket ${bucket} is private`);
+    } catch (error) {
+      const message = `Could not confirm the Supabase bucket is private: ${
+        error instanceof Error ? error.message : error
+      }`;
+      if (this.configService.get<string>('NODE_ENV') === 'production') {
+        throw new Error(message);
+      }
+      this.logger.warn(message);
+    }
   }
 
   /** Which driver is active ('local' | 's3'). */
