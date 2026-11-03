@@ -23,6 +23,19 @@ import { getSubscription } from '@/services/billingApi';
  */
 
 const TINTS = ['#4C6EF5', '#0CA678', '#7048E8', '#E8590C', '#2F9E44', '#1098AD', '#D6336C'];
+
+function LogoMark({ company, src, className }) {
+  const [broken, setBroken] = useState(false);
+  const show = src && !broken;
+  return (
+    <span className={className} style={show ? undefined : { background: `${tintFor(company)}33` }}>
+      {show ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt="" onError={() => setBroken(true)} />
+      ) : initials(company)}
+    </span>
+  );
+}
 const tintFor = (name = '') => {
   let h = 0;
   for (let i = 0; i < name.length; i += 1) h = (h * 31 + name.charCodeAt(i)) | 0;
@@ -169,9 +182,7 @@ export default function JobDetail() {
                 {/* ---------------- MAIN ---------------- */}
                 <div className="jd__main">
                   <header className="jd__head">
-                    <span className="jd__logo" style={{ background: `${tintFor(job.company)}33` }}>
-                      {initials(job.company)}
-                    </span>
+                    <LogoMark company={job.company} src={job.logo} className="jd__logo" />
                     <div>
                       <h1 className="jd__h1">{job.title}</h1>
                       <p className="jd__meta">
@@ -217,9 +228,7 @@ export default function JobDetail() {
                       <div className="jd__similar">
                         {job.similar.map((s) => (
                           <Link key={s.id} href={`/jobs/${s.id}`} className="jd__simcard">
-                            <span className="jd__simlogo" style={{ background: `${tintFor(s.company)}33` }}>
-                              {initials(s.company)}
-                            </span>
+                            <LogoMark company={s.company} src={s.logo} className="jd__simlogo" />
                             <span className="jd__simtext">
                               <span className="jd__simtitle">{s.title}</span>
                               <span className="jd__simmeta">
@@ -325,10 +334,11 @@ export default function JobDetail() {
 
           .jd__head { display: flex; gap: 18px; align-items: flex-start; margin-bottom: 16px; }
           .jd__logo {
-            width: 56px; height: 56px; flex: none; border-radius: 12px;
+            width: 56px; height: 56px; flex: none; border-radius: 12px; overflow: hidden;
             display: flex; align-items: center; justify-content: center;
             font-family: var(--jb-font-mono); font-size: 17px; font-weight: 700; color: var(--jb-d-ink);
           }
+          .jd__logo img, .jd__simlogo img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
           .jd__h1 { margin: 0 0 6px; font-family: var(--jb-font-display); font-weight: 400; font-size: clamp(28px, 3.6vw, 42px); line-height: 1.08; }
           .jd__meta { margin: 0; font-size: 15px; color: var(--jb-d-ink-65); }
           .jd__company { color: var(--jb-d-accent); }
@@ -357,7 +367,7 @@ export default function JobDetail() {
           }
           :global(.jd__simcard:hover) { border-color: var(--jb-d-accent); }
           .jd__simlogo {
-            width: 34px; height: 34px; flex: none; border-radius: 8px;
+            width: 34px; height: 34px; flex: none; border-radius: 8px; overflow: hidden;
             display: flex; align-items: center; justify-content: center;
             font-family: var(--jb-font-mono); font-size: 12px; font-weight: 700; color: var(--jb-d-ink);
           }

@@ -143,6 +143,7 @@ export class PublicJobsController {
         id: String(s._id),
         title: s.title,
         company: s.companyName,
+        logo: s.companyLogo || null,
         location: s.isRemote ? 'Remote' : s.location || null,
         salary: s.salaryDisclosed ? s.salary || null : null,
       })),

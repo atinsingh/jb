@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import axios from 'axios';
 import { Model } from 'mongoose';
 import { Job, JobDocument } from '../../schemas/job.schema';
+import { JobGeoService } from '../../geography/job-geo.service';
 import { plainJobText } from '../plain-job-text';
 import { isPostedToday, listedInCanada, MAX_OPEN_MARKET_PER_COMPANY } from '../fresh-canada-listing';
 
@@ -18,7 +19,10 @@ const COMPANY_NAMES: Record<string, string> = {
 export class AshbyMonitorService {
   private readonly logger = new Logger(AshbyMonitorService.name);
 
-  constructor(@InjectModel(Job.name) private jobModel: Model<JobDocument>) {}
+  constructor(
+    @InjectModel(Job.name) private jobModel: Model<JobDocument>,
+    private geo: JobGeoService,
+  ) {}
 
   async run(boardTokens: string[] = []) {
     const boards = this.resolveBoards(boardTokens, process.env.ASHBY_BOARDS);
@@ -44,12 +48,14 @@ export class AshbyMonitorService {
           kept += 1;
           const externalId = `ashby:${job.id}`;
           const existed = await this.jobModel.exists({ externalId });
+          const companyName = COMPANY_NAMES[board] || board.charAt(0).toUpperCase() + board.slice(1);
           const url = job.jobUrl || job.applyUrl;
           await this.jobModel.findOneAndUpdate(
             { externalId },
             {
               title: job.title,
-              companyName: COMPANY_NAMES[board] || board.charAt(0).toUpperCase() + board.slice(1),
+              companyName,
+              companyLogo: this.geo.deriveLogo(companyName, url),
               location: location || 'Canada',
               description: job.descriptionPlain || plainJobText(job.descriptionHtml || ''),
               source: 'Ashby',

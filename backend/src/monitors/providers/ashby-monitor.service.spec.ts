@@ -20,7 +20,8 @@ describe('AshbyMonitorService', () => {
       exists: jest.fn().mockResolvedValue(null),
       findOneAndUpdate: jest.fn().mockResolvedValue({}),
     };
-    return { jobs, monitor: new AshbyMonitorService(jobs as any) };
+    const geo = { deriveLogo: jest.fn().mockReturnValue('https://unavatar.io/koho.com?fallback=false') };
+    return { jobs, monitor: new AshbyMonitorService(jobs as any, geo as any) };
   }
 
   it('fetches the built-in Canadian boards when ASHBY_BOARDS is unset', async () => {
@@ -53,7 +54,7 @@ describe('AshbyMonitorService', () => {
     await monitor.run();
     expect(jobs.findOneAndUpdate).toHaveBeenCalledTimes(1);
     expect(jobs.findOneAndUpdate.mock.calls[0][1]).toEqual(
-      expect.objectContaining({ externalId: 'ashby:ca', country: 'CA', source: 'Ashby', companyName: 'Koho' }),
+      expect.objectContaining({ externalId: 'ashby:ca', country: 'CA', source: 'Ashby', companyName: 'Koho', companyLogo: 'https://unavatar.io/koho.com?fallback=false' }),
     );
   });
 });

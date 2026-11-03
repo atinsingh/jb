@@ -43,7 +43,8 @@ describe('WorkdayMonitorService', () => {
       exists: jest.fn().mockResolvedValue(null),
       findOneAndUpdate: jest.fn().mockResolvedValue({}),
     };
-    await new WorkdayMonitorService(jobs as any).run();
+    const geo = { deriveLogo: jest.fn().mockReturnValue('https://unavatar.io/td.com?fallback=false') };
+    await new WorkdayMonitorService(jobs as any, geo as any).run();
     expect(axios.post).toHaveBeenCalledWith(
       'https://td.wd3.myworkdayjobs.com/wday/cxs/td/TD_Bank_Careers/jobs',
       expect.objectContaining({ limit: 20, offset: 0 }),
@@ -55,6 +56,7 @@ describe('WorkdayMonitorService', () => {
         externalId: 'workday:td:R_1',
         country: 'CA',
         companyName: 'TD',
+        companyLogo: 'https://unavatar.io/td.com?fallback=false',
         description: 'Advise clients',
       }),
     );

@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import axios from 'axios';
 import { Model } from 'mongoose';
 import { Job, JobDocument } from '../../schemas/job.schema';
+import { JobGeoService } from '../../geography/job-geo.service';
 import { resolveCountry } from '../../geography/geo.constants';
 import { plainJobText } from '../plain-job-text';
 import { isPostedToday, listedInCanada, MAX_OPEN_MARKET_PER_COMPANY } from '../fresh-canada-listing';
@@ -38,6 +39,7 @@ export class WorkdayMonitorService {
 
   constructor(
     @InjectModel(Job.name) private jobModel: Model<JobDocument>,
+    private geo: JobGeoService,
   ) {}
 
   async run(sitesInput: string[] = []) {
@@ -122,11 +124,13 @@ export class WorkdayMonitorService {
           }
         }
 
+        const companyName = COMPANY_NAMES[site.tenant] || site.tenant;
         await this.jobModel.findOneAndUpdate(
           { externalId },
           {
             title: job.title,
-            companyName: COMPANY_NAMES[site.tenant] || site.tenant,
+            companyName,
+            companyLogo: this.geo.deriveLogo(companyName, externalUrl),
             location,
             description,
             source: 'Workday',
