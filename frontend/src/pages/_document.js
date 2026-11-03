@@ -35,6 +35,12 @@ export default function Document() {
             self-hosted by next/font in src/pages/_app.js, so there is no
             third-party font origin to connect to. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-VL22FWRFN5" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-VL22FWRFN5');`,
+          }}
+        />
       </Head>
       <body className="antialiased" suppressHydrationWarning>
         <Main />

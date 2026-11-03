@@ -35,12 +35,40 @@ export default function ResetPassword() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState(false);
+  const [linkReady, setLinkReady] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // The fragment is readable immediately; the event may arrive a tick later.
+    let active = true;
+    // Implicit recovery puts type=recovery in the hash. PKCE puts ?code= in the
+    // query, including when Supabase ignores redirectTo and lands on the site root.
     if (typeof window !== 'undefined' && window.location.hash.includes('type=recovery')) {
       setStage('reset');
+    }
+
+    const code = typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('code')
+      : null;
+    if (code) {
+      setStage('reset');
+      setLinkReady(false);
+      supabase.auth.exchangeCodeForSession(code).then(async ({ error: exchangeError }) => {
+        if (!active) return;
+        if (exchangeError) {
+          const { data } = await supabase.auth.getSession();
+          if (!active) return;
+          if (!data.session) {
+            setError('This reset link has expired. Request a new one.');
+            setStage('request');
+            setLinkReady(true);
+            return;
+          }
+        }
+        const clean = new URL(window.location.href);
+        clean.searchParams.delete('code');
+        window.history.replaceState({}, '', `${clean.pathname}${clean.search}${clean.hash}`);
+        setLinkReady(true);
+      });
     }
 
     const {
@@ -49,7 +77,10 @@ export default function ResetPassword() {
       if (event === 'PASSWORD_RECOVERY') setStage('reset');
     });
 
-    return () => subscription?.unsubscribe();
+    return () => {
+      active = false;
+      subscription?.unsubscribe();
+    };
   }, [supabase]);
 
   const handleRequest = async (e) => {
@@ -76,7 +107,7 @@ export default function ResetPassword() {
 
   const handleReset = async (e) => {
     e.preventDefault();
-    if (busy) return;
+    if (busy || !linkReady) return;
 
     if (password !== confirm) {
       setError('Those passwords do not match.');
@@ -247,10 +278,10 @@ export default function ResetPassword() {
 
                       <button
                         type="submit"
-                        disabled={busy}
+                        disabled={busy || !linkReady}
                         className={`${styles.btn} ${styles.btnPrimary}`}
                       >
-                        {busy ? 'Saving' : 'Save password'}
+                        {!linkReady ? 'Checking link' : busy ? 'Saving' : 'Save password'}
                       </button>
                     </form>
                   </>

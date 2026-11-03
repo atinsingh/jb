@@ -24,12 +24,21 @@ import { updateSession } from '@/lib/supabase/middleware';
 import { isProtectedRoute, loginRedirectFor } from '@/lib/auth/routes';
 
 export async function middleware(request) {
+  // Supabase only honors redirectTo when that URL is on the project's allow
+  // list. Otherwise a reset link falls back to the site root with ?code=, and
+  // the homepage has no password form. Move the code onto the reset page
+  // before the browser client can consume it.
+  const { pathname } = request.nextUrl;
+  if (pathname === '/' && request.nextUrl.searchParams.has('code')) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/app/reset-password';
+    return NextResponse.redirect(url);
+  }
+
   // Runs on public routes too: the session-refresh half has to happen
   // everywhere, or a visitor who browses the marketing site long enough returns
   // to /app with an expired cookie.
   const { response, user } = await updateSession(request);
-
-  const { pathname } = request.nextUrl;
 
   if (!user && isProtectedRoute(pathname)) {
     const target = loginRedirectFor(pathname);

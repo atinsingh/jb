@@ -25,6 +25,13 @@ async function hasSession(page: import('@playwright/test').Page): Promise<boolea
 }
 
 test.describe('signing up and in', () => {
+  test('a reset code left on the homepage opens the reset page', async ({ page }) => {
+    await page.goto('/?code=00000000-0000-4000-8000-000000000000', {
+      waitUntil: 'domcontentloaded',
+    });
+    await expect(page).toHaveURL(/\/app\/reset-password\?code=/);
+  });
+
   test('a new candidate can register through the form', async ({ page }) => {
     const email = uniqueEmail('signup-candidate').replace('@example.com', '@jobocate.com');
 
