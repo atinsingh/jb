@@ -100,19 +100,58 @@ export class ContextFilesService {
     return files;
   }
 
+  /**
+   * Chat facts for this session, oldest first. The backend writes this; the
+   * model does not. The last turn wins wherever it conflicts with an earlier
+   * turn or with the account profile.
+   */
+  sessionFacts(instructions: string[]): string {
+    const turns = instructions.map((text) => text.trim()).filter(Boolean);
+    if (!turns.length) {
+      return [
+        '# Session facts',
+        '',
+        'No biographical facts have been stated in this chat.',
+        'Use CANDIDATE.md for every unstated fact.',
+        '',
+      ].join('\n');
+    }
+    const lines = [
+      '# Session facts',
+      '',
+      'These are facts the user stated in this chat, in order.',
+      'A later turn replaces a conflicting earlier turn and the profile.',
+      'Fields the chat does not state still come from CANDIDATE.md.',
+      'Do not write these facts back to the account profile.',
+      '',
+    ];
+    turns.forEach((text, index) => {
+      const last = index === turns.length - 1;
+      lines.push(
+        `## Turn ${index + 1}${last ? ' (latest — wins on conflict)' : ''}`,
+        '',
+        text,
+        '',
+      );
+    });
+    return lines.join('\n');
+  }
+
   /** The rules every harness follows, byte-identical for all three. */
   sharedRules(input: SharedRulesInput): string {
     const { texPath, pdfPath, buildCommand, workdir } = input;
     const sectionRule = hasCareerEvidence(input.candidateMarkdown) === false
-      ? `- CANDIDATE.md has identity but no career facts. In this case, create and
-  maintain a clearly labeled placeholder draft with Summary, Experience, Skills,
-  and Education sections so the candidate can fill them later. Placeholder text
-  is scaffolding, not a factual claim. Never turn the job description into
-  candidate facts, and never imply that its requirements are their experience.`
+      ? `- CANDIDATE.md has identity but no career facts. If SESSION_FACTS.md states
+  career facts, write those sections and do not use a placeholder draft.
+  Otherwise create and maintain a clearly labeled placeholder draft with
+  Summary, Experience, Skills, and Education sections so the candidate can fill
+  them later. Placeholder text is scaffolding, not a factual claim. Never turn
+  the job description into candidate facts, and never imply that its
+  requirements are their experience.`
       : `- A section named Experience, Education, Skills, Certifications or Achievements
-  is allowed only when CANDIDATE.md contains that section. A professional
-  Summary is allowed only when the profile contains career evidence to
-  summarize. Otherwise leave the section out.`;
+  is allowed when CANDIDATE.md or SESSION_FACTS.md supports it. A professional
+  Summary is allowed when either source contains career evidence to summarize.
+  Otherwise leave the section out.`;
     return `# Resume agent rules
 
 You are the candidate's résumé agent and collaborator. Maintain one LaTeX
@@ -165,26 +204,29 @@ and do not work around a broken package by deleting the section that uses it.
 
 ## Content rules
 
-- \`CANDIDATE.md\` holds the candidate's real profile, work history and
-  eligibility, pulled from their account. It is the source of biographical
-  fact. Read it before writing anything, and prefer it over your own guesses.
-- Use only facts present in CANDIDATE.md or explicitly stated as candidate facts
-  in the current instruction. The existing resume is a working artifact, not a
-  source of factual truth: a claim does not become valid because an earlier
-  model wrote it. Do not invent employers, roles, dates, degrees, skills,
-  certifications, metrics or professional characterizations.
+- \`CANDIDATE.md\` holds the account profile. It is the default biography.
+  \`SESSION_FACTS.md\` lists facts the user stated in this chat, oldest first.
+  A later turn replaces a conflicting earlier turn and the profile. Fields
+  the chat does not state still come from CANDIDATE.md. Read both before
+  writing anything, and prefer them over your own guesses.
+- Use only facts present in CANDIDATE.md or SESSION_FACTS.md. The existing
+  resume is a working artifact, not a source of factual truth: a claim does
+  not become valid because an earlier model wrote it. Do not invent employers,
+  roles, dates, degrees, skills, certifications, metrics or professional
+  characterizations.
 - Avoid quality labels such as reliable, scalable, high-throughput, expert,
-  or "at scale" unless CANDIDATE.md explicitly uses them. A numeric metric
-  does not by itself prove those adjectives. Prefer the exact source facts.
+  or "at scale" unless CANDIDATE.md or SESSION_FACTS.md explicitly uses them.
+  A numeric metric does not by itself prove those adjectives. Prefer the exact
+  source facts.
 - A contact location identifies where the candidate is based. It is not a
   workplace or school location. Leave an entry's location blank or omit that
   field unless CANDIDATE.md explicitly states the location for that employer
   or school. Never copy the candidate's city into every entry.
 ${sectionRule}
 - Before finishing, audit every factual claim in ${texPath}. For each claim you
-  must be able to identify its exact source line in CANDIDATE.md or the current
-  instruction. Delete any claim you cannot trace. Do this silently; do not put
-  the audit in the resume.
+  must be able to identify its exact source line in CANDIDATE.md or
+  SESSION_FACTS.md. Delete any claim you cannot trace. Do this silently; do not
+  put the audit in the resume.
 - Keep it ATS-readable: real section headings, no text inside images, no
   multi-column layouts that break linear reading order.
 - Escape LaTeX special characters in candidate-supplied text.

@@ -43,10 +43,10 @@ import {
  * ("shorten the summary", "lead with the Stripe work"), not a form resubmission.
  *
  * The screen asks for the target role, an optional job posting, and
- * instructions. Everything biographical — name, location, LinkedIn, work
- * authorisation, employment history — comes from Settings and Preferences and
- * is injected server-side. Re-asking here would create a second copy that
- * drifts from the account.
+ * instructions. Settings and Preferences are the default biography. The chat
+ * can state or correct facts, including a résumé for someone else, and a
+ * later message replaces a conflicting earlier one. Those facts stay on the
+ * document; they are not written back to Settings.
  *
  * Turns stream. A harness run takes tens of seconds, so the transcript shows
  * the agent's own narration and the phase it is in rather than a spinner that
@@ -1277,7 +1277,7 @@ function RequiredGate({ profile }) {
         }}
       >
         {unknown
-          ? "We could not confirm your profile is complete, so generation is held back. Check that these are filled in — a resume is written from your account, not from this page."
+          ? "We could not confirm your profile is complete, so generation is held back. Check that these are filled in. Settings is the default, and the chat can state or correct facts, including for someone else, once a session starts."
           : "Add your contact details to Settings so your resume has the right information."}
       </p>
 

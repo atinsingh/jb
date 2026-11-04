@@ -122,7 +122,8 @@ export class CandidateContextService {
   private preamble(): string {
     return [
       'Everything below comes from the candidate’s own profile and preferences.',
-      'It is the ONLY source of biographical fact available to you.',
+      'It is the account default. SESSION_FACTS.md replaces a fact below when',
+      'the user states a different one. A later turn in that file wins.',
       '',
       'Do not invent employers, dates, titles, degrees, certifications or',
       'metrics that are not written here. If something a resume would normally',

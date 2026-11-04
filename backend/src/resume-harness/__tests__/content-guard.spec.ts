@@ -253,5 +253,104 @@ Built a payment service.
       candidateMarkdown,
       userFacts: 'I worked at Example Payments in Example City and studied at Example University in Example City.',
     })).toEqual([]);
+    expect(findContentProblems({
+      latex,
+      candidateName: 'Jordan Reyes',
+      candidateMarkdown,
+      userFacts: 'The jobs and the school were in Example City.',
+    })).toEqual([]);
+  });
+
+  it('accepts a chat-sourced résumé for someone else, including sections Settings does not have', () => {
+    const identityOnly = `# Candidate facts\n\n## Identity\n\n- Name: Jordan Reyes\n- Location: Toronto\n`;
+    const chat = [
+      'Write a resume for Jane Doe.',
+      'Experience: engineer at Acme in Ottawa.',
+      'Education: BSc from Example University.',
+      'Skills: TypeScript.',
+      'Certifications: AWS certificate.',
+      'Achievements: awarded for shipping payments.',
+      'Summary: backend engineer who ships payments.',
+    ].join(' ');
+    const latex = String.raw`\documentclass{article}
+\begin{document}
+Jane Doe
+\ressection{Summary}
+Backend engineer who ships payments at Acme.
+\ressection{Experience}
+\resentry{Engineer}{Acme}{2020--2024}{Ottawa}
+Built checkout payments for the storefront.
+\ressection{Education}
+\resentry{BSc}{Example University}{2019}{Ottawa}
+\ressection{Skills}
+TypeScript
+\ressection{Certifications}
+AWS certificate
+\ressection{Achievements}
+Awarded for shipping payments.
+\end{document}`;
+
+    expect(findContentProblems({
+      latex,
+      candidateName: 'Jordan Reyes',
+      candidateMarkdown: identityOnly,
+      userFacts: chat,
+    })).toEqual([]);
+    expect(findContentProblems({
+      latex: latex.replace(/Jane Doe/g, 'Jordan Reyes'),
+      candidateName: 'Jordan Reyes',
+      candidateMarkdown: identityOnly,
+      userFacts: chat,
+    }).join(' ')).toMatch(/Jane Doe/);
+  });
+
+  it('requires the latest cued name and accepts a later employer or skill', () => {
+    const identityOnly = `# Candidate facts\n\n## Identity\n\n- Name: Jordan Reyes\n`;
+    const chat = [
+      'Write a resume for Jane Doe. Experience: engineer at Acme. Skills: TypeScript.',
+      'Change the name to Alicia Chen and the employer to Globex. Skills: Go.',
+    ].join('\n');
+    const corrected = String.raw`\documentclass{article}
+\begin{document}
+Alicia Chen
+\section*{Experience}
+Engineer at Globex, 2020 to 2024. Shipped payments for the storefront team.
+\section*{Skills}
+Go
+\end{document}`;
+    const stale = corrected.replace('Alicia Chen', 'Jane Doe').replace('Globex', 'Acme');
+
+    expect(findContentProblems({
+      latex: corrected,
+      candidateName: 'Jordan Reyes',
+      candidateMarkdown: identityOnly,
+      userFacts: chat,
+    })).toEqual([]);
+    expect(findContentProblems({
+      latex: stale,
+      candidateName: 'Jordan Reyes',
+      candidateMarkdown: identityOnly,
+      userFacts: chat,
+    }).join(' ')).toMatch(/Alicia Chen/);
+  });
+
+  it('still rejects sections that neither Settings nor the chat support', () => {
+    const identityOnly = `# Candidate facts\n\n## Identity\n\n- Name: Jordan Reyes\n`;
+    const latex = String.raw`\documentclass{article}
+\begin{document}
+Jane Doe
+\section*{Experience}
+Engineer at a company the chat never named, 2020 to 2024.
+\end{document}`;
+
+    const problems = findContentProblems({
+      latex,
+      candidateName: 'Jordan Reyes',
+      candidateMarkdown: identityOnly,
+      userFacts: 'Write a resume for Jane Doe.',
+    });
+
+    expect(problems.join(' ')).toMatch(/no Experience facts/i);
+    expect(problems.join(' ')).toMatch(/no career facts/i);
   });
 });

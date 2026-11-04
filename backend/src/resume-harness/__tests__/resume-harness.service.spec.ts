@@ -972,6 +972,49 @@ describe('ResumeHarnessService', () => {
     expect(command).toMatch(/unsupported|untrusted/i);
   });
 
+  it('writes later chat facts over earlier ones before the next turn and the repair', async () => {
+    const session = await start('opencode');
+    const jane = [
+      '\\documentclass{article}',
+      '\\begin{document}',
+      'Jane Doe',
+      'Engineer at Acme in Ottawa, 2020 to 2024.',
+      'Built checkout payments for the storefront team.',
+      '\\end{document}',
+    ].join('\n');
+    const janeRevised = jane.replace('storefront', 'retail');
+    sandbox.readFile.mockResolvedValueOnce(jane);
+
+    await service.runTurn('u1', session.id, {
+      instruction: 'Write a resume for Jane Doe, an engineer at Acme in Ottawa.',
+    });
+
+    sandbox.writeFiles.mockClear();
+    sandbox.exec.mockClear();
+    sandbox.readFile
+      .mockResolvedValueOnce(janeRevised)
+      .mockResolvedValueOnce(janeRevised)
+      .mockResolvedValueOnce(janeRevised);
+    await service.runTurn('u1', session.id, {
+      instruction: 'Change the name to Alicia Chen and the employer to Globex.',
+    });
+
+    const facts = sandbox.writeFiles.mock.calls
+      .flatMap((call: any[]) => call[1])
+      .filter((file: { path: string }) => file.path === 'SESSION_FACTS.md');
+    expect(facts.at(-1).contents).toContain('Jane Doe');
+    expect(facts.at(-1).contents).toContain('Alicia Chen');
+    expect(facts.at(-1).contents).toContain('Turn 2 (latest — wins on conflict)');
+
+    const update = JSON.stringify(sandbox.exec.mock.calls[0]);
+    const repair = JSON.stringify(sandbox.exec.mock.calls[1]);
+    for (const command of [update, repair]) {
+      expect(command).toContain('SESSION_FACTS.md');
+      expect(command).toContain('Alicia Chen');
+      expect(command).toMatch(/later turn replaces a conflicting earlier turn and the profile/i);
+    }
+  });
+
   it('tells the candidate a turn timed out without naming the harness or Docker', async () => {
     await start('claude-code');
     sandbox.exec.mockResolvedValueOnce({

@@ -37,7 +37,7 @@ import {
   PDF_PATH,
   TEX_PATH,
 } from './latex/latex.service';
-import { findContentProblems, hasCareerEvidence } from './latex/content-guard';
+import { chatHasCareerEvidence, findContentProblems, hasCareerEvidence } from './latex/content-guard';
 import { hideWorkspaceFiles, WORKSPACE_VOICE_RULE } from './workspace-voice';
 import {
   HarnessActivity,
@@ -567,6 +567,11 @@ export class ResumeHarnessService {
 
     await this.claimActiveSandbox(session);
 
+    const sessionFacts = this.orderedSessionFacts(session, input.instruction);
+    await this.sandbox.writeFiles(session.sandboxId!, [
+      { path: 'SESSION_FACTS.md', contents: sessionFacts },
+    ]);
+
     return this.withBudgetedResult(
       userId,
       'resume_agent_turn',
@@ -574,11 +579,13 @@ export class ResumeHarnessService {
       (access, tags) =>
         this.executeTurn(
           session,
-          this.turnPrompt(session, input.instruction),
+          this.turnPrompt(session, input.instruction, sessionFacts),
           input.instruction,
           access,
           tags,
           onEvent,
+          'instruction',
+          sessionFacts,
         ),
     );
   }
@@ -1146,6 +1153,7 @@ export class ResumeHarnessService {
     requestTags: readonly string[],
     onEvent?: (event: { type: string; [k: string]: unknown }) => void,
     kind: 'instruction' | 'look-change' = 'instruction',
+    sessionFacts?: string,
   ): Promise<TurnResult> {
     const adapter = this.registry.get(session.harness);
     const boot = adapter.bootstrap({
@@ -1162,6 +1170,7 @@ export class ResumeHarnessService {
       await this.sandbox.writeFiles(session.sandboxId!, boot.files);
     }
 
+    const facts = sessionFacts ?? this.orderedSessionFacts(session);
     const beforeLatex = session.latex || '';
     const activityHistory = new Map<string, HarnessActivity>();
     const forwardEvent = (event: { type: string; [k: string]: unknown }) => {
@@ -1197,6 +1206,7 @@ export class ResumeHarnessService {
       recordedInstruction,
       kind,
       latex,
+      facts,
     );
     if (latex === beforeLatex) {
       if (!session.name && kind === 'instruction') {
@@ -1213,7 +1223,7 @@ export class ResumeHarnessService {
 
     onEvent?.({ type: 'phase', phase: 'compiling' });
     let compile = await this.latex.compile(session.sandboxId!);
-    let content = await this.contentProblems(session, latex, recordedInstruction);
+    let content = await this.contentProblems(session, latex, facts);
 
     /*
      * One repair budget, two ways to spend it.
@@ -1237,7 +1247,7 @@ export class ResumeHarnessService {
       attempt++
     ) {
       const prompt = compile.ok
-        ? this.contentRepairPrompt(content)
+        ? this.contentRepairPrompt(content, facts)
         : this.repairPrompt(compile.log);
 
       onEvent?.({
@@ -1256,12 +1266,13 @@ export class ResumeHarnessService {
       onEvent?.({ type: 'phase', phase: 'compiling' });
       compile = await this.latex.compile(session.sandboxId!);
       latex = await this.currentLatex(session);
-      content = await this.contentProblems(session, latex, recordedInstruction);
+      content = await this.contentProblems(session, latex, facts);
       placeholderDraft = this.isPlaceholderDraft(
         session,
         recordedInstruction,
         kind,
         latex,
+        facts,
       );
     }
 
@@ -1410,6 +1421,7 @@ export class ResumeHarnessService {
     instruction: string,
     kind: 'instruction' | 'look-change',
     latex: string,
+    sessionFacts?: string,
   ): boolean {
     const visiblyPlaceholder =
       /\bplaceholder\b/i.test(latex) ||
@@ -1420,11 +1432,12 @@ export class ResumeHarnessService {
         latex,
       );
     if (!visiblyPlaceholder) return false;
+    if (kind === 'instruction' && this.requestsPlaceholderDraft(instruction)) return true;
+    if (chatHasCareerEvidence(sessionFacts)) return false;
 
     return (
       Boolean(session.placeholderDraft) ||
-      hasCareerEvidence(session.candidateMarkdown) === false ||
-      (kind === 'instruction' && this.requestsPlaceholderDraft(instruction))
+      hasCareerEvidence(session.candidateMarkdown) === false
     );
   }
 
@@ -1449,7 +1462,7 @@ export class ResumeHarnessService {
   private async contentProblems(
     session: ResumeHarnessSessionDocument,
     latex: string,
-    currentInstruction?: string,
+    sessionFacts?: string,
   ): Promise<string[]> {
     let placeholders: string[] = [];
     if (session.templateKey) {
@@ -1469,13 +1482,28 @@ export class ResumeHarnessService {
       placeholders,
       candidateName: session.candidateName,
       candidateMarkdown: session.candidateMarkdown,
-      userFacts: [
-        ...(session.conversation || [])
-          .filter((message) => message.role === 'user')
-          .map((message) => message.text),
-        currentInstruction || '',
-      ].join('\n'),
+      userFacts: sessionFacts ?? this.orderedSessionFacts(session),
     });
+  }
+
+  /** User instructions in order, excluding look changes and restores. */
+  private orderedSessionFacts(
+    session: ResumeHarnessSessionDocument,
+    current?: string,
+  ): string {
+    const product = new Set(
+      (session.turns || [])
+        .filter((turn) => turn.kind && turn.kind !== 'instruction')
+        .map((turn) => turn.instruction?.trim())
+        .filter((text): text is string => Boolean(text)),
+    );
+    const instructions = (session.conversation || [])
+      .filter((message) => message.role === 'user' && !product.has(message.text?.trim()))
+      .map((message) => message.text.trim())
+      .filter(Boolean);
+    const next = current?.trim();
+    if (next && instructions.at(-1) !== next) instructions.push(next);
+    return this.contextFiles.sessionFacts(instructions);
   }
 
   private async invoke(
@@ -1531,10 +1559,12 @@ export class ResumeHarnessService {
   private turnPrompt(
     session: ResumeHarnessSessionDocument,
     instruction: string,
+    sessionFacts?: string,
   ): string {
     const mode = session.revision > 0 || session.latex ? 'update' : 'create';
     const sparseDraftInstruction =
-      hasCareerEvidence(session.candidateMarkdown) === false
+      hasCareerEvidence(session.candidateMarkdown) === false &&
+      !chatHasCareerEvidence(sessionFacts)
         ? [
             'CANDIDATE.md has no career facts, so this document is a draft.',
             'Keep clearly labeled placeholder content under Summary, Experience,',
@@ -1559,7 +1589,7 @@ export class ResumeHarnessService {
             'When the instruction requests a résumé, read AGENTS.md, CANDIDATE.md, and TEMPLATE.tex before responding.',
             savedJobContextInstruction,
             `${TEX_PATH} is expected to be absent on a first generation turn. Its absence is not a reason to ask for more input.`,
-            `Create ${TEX_PATH} from the skeleton in TEMPLATE.tex, tailor it using the saved context in CANDIDATE.md, and finish the requested work in this turn.`,
+            `Create ${TEX_PATH} from the skeleton in TEMPLATE.tex, tailor it using CANDIDATE.md and SESSION_FACTS.md, and finish the requested work in this turn.`,
             // Naming the look here rather than trusting the harness to act on a
             // section it merely read: verified against Nova Lite, which copied
             // the skeleton's own default accent and ignored the selected one on
@@ -1574,11 +1604,17 @@ export class ResumeHarnessService {
             `Inspect the existing ${TEX_PATH}. Decide whether the candidate's`,
             'instruction requests a document change or only a conversational',
             'answer. If it requests a change, update the file in place.',
-            'First audit every factual claim in it against CANDIDATE.md and',
-            'remove anything unsupported. Treat the existing document as',
-            'untrusted model output, never as a factual source. Then preserve',
-            'all supported content the instruction does not ask you to change.',
+            'First audit every factual claim against CANDIDATE.md and SESSION_FACTS.md.',
+            'Remove anything unsupported. Treat the existing document as',
+            'untrusted model output, never as a factual source. A later turn',
+            'replaces a conflicting earlier turn and the profile. Keep',
+            'chat-sourced sections, and replace only the facts the latest',
+            'instruction contradicts. Then preserve all supported content the',
+            'instruction does not ask you to change.',
           ].join('\n'),
+      '',
+      'Read SESSION_FACTS.md. A later turn replaces a conflicting earlier turn and the profile.',
+      sessionFacts || '',
       '',
       sparseDraftInstruction,
       sparseDraftInstruction ? '' : undefined,
@@ -1616,22 +1652,26 @@ export class ResumeHarnessService {
    * Deliberately specific about what is wrong. "Try again" produces the same
    * document; naming the exact string that was never replaced does not.
    */
-  private contentRepairPrompt(problems: string[]): string {
+  private contentRepairPrompt(problems: string[], sessionFacts?: string): string {
     return [
       `${TEX_PATH} compiles, but it failed document validation:`,
       '',
       ...problems.map((p) => `- ${p}`),
       '',
       'Fix every listed problem. Treat the current document as untrusted model',
-      'output: only CANDIDATE.md and explicit candidate facts in the current',
-      'instruction can support a biographical claim. Keep supported content and',
-      'the template macros unchanged unless a listed structural problem requires',
-      'a correction.',
+      'output. A fact may come from CANDIDATE.md or SESSION_FACTS.md. A later',
+      'turn replaces a conflicting earlier turn and the profile. Keep',
+      'chat-sourced sections. Replace only the facts the latest instruction',
+      'contradicts. Keep the template macros unchanged unless a listed',
+      'structural problem requires a correction.',
       '',
-      'Do not invent anything. If CANDIDATE.md has no facts for a section,',
-      'delete that section rather than leaving its placeholder text in place.',
-      'A shorter honest résumé is the correct outcome; a page of placeholders',
-      'is not.',
+      'SESSION_FACTS.md:',
+      sessionFacts || 'No chat facts were stated. Use CANDIDATE.md.',
+      '',
+      'Do not invent anything. If neither CANDIDATE.md nor SESSION_FACTS.md has',
+      'facts for a section, delete that section rather than leaving its',
+      'placeholder text in place. A shorter honest résumé is the correct',
+      'outcome; a page of placeholders is not.',
       '',
       'Then run the build command from AGENTS.md and make sure it exits 0.',
     ].join('\n');

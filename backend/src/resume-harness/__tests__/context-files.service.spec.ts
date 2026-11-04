@@ -119,6 +119,20 @@ describe('ContextFilesService — candidate facts', () => {
     expect(agents).toMatch(/exact source line/i);
     expect(agents).toMatch(/contact location[\s\S]*workplace or school location/i);
     expect(agents).toMatch(/reliable[\s\S]*scalable[\s\S]*source/i);
+    expect(agents).toContain('SESSION_FACTS.md');
+    expect(agents).toMatch(/later turn replaces a conflicting earlier turn and the profile/i);
+  });
+
+  it('marks the latest chat turn as the one that wins', () => {
+    const text = service.sessionFacts([
+      'Write a resume for Jane Doe',
+      'Change the name to Alicia Chen',
+    ]);
+
+    expect(text).toContain('Jane Doe');
+    expect(text).toContain('Alicia Chen');
+    expect(text).toContain('Turn 2 (latest — wins on conflict)');
+    expect(text).toMatch(/still come from CANDIDATE\.md/i);
   });
 
   it('requires a labeled placeholder draft when the profile has identity but no career facts', () => {

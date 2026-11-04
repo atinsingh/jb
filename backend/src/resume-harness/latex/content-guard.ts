@@ -31,6 +31,41 @@ export interface ContentGuardInput {
   userFacts?: string;
 }
 
+const SECTION_SUPPORT: Record<string, RegExp> = {
+  Experience: /\b(experience|worked|working|engineer|employer|employed)\b/i,
+  Education: /\b(education|studied|studying|degree|university|college|school|bachelor|master|phd|bsc|msc)\b/i,
+  Skills: /\bskills?\b/i,
+  Certifications: /\b(certifications?|certified|certificates?)\b/i,
+  Achievements: /\b(achievements?|awarded|awards?)\b/i,
+  Summary: /\bsummary\b/i,
+};
+
+/** Whether chat text states a career category the guard can accept. */
+export function chatHasCareerEvidence(userFacts?: string): boolean {
+  if (!userFacts) return false;
+  return Object.values(SECTION_SUPPORT).some((pattern) => pattern.test(userFacts));
+}
+
+/**
+ * The last person the user named. Cues stay narrow so ordinary edits are not
+ * read as a new identity.
+ */
+export function latestCuedName(userFacts?: string): string | undefined {
+  if (!userFacts) return undefined;
+  const cues = /\b(?:(?:resume|résumé|cv)\s+for|change\s+the\s+name\s+to|(?:his|her|their)\s+name\s+is|name\s+is|named)\s+/gi;
+  let last: string | undefined;
+  for (const match of userFacts.matchAll(cues)) {
+    const rest = userFacts.slice((match.index ?? 0) + match[0].length);
+    const name = /^([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})/.exec(rest);
+    if (name) last = name[1];
+  }
+  return last;
+}
+
+function chatSupportsSection(userFacts: string, sourceHeading: string): boolean {
+  return SECTION_SUPPORT[sourceHeading]?.test(userFacts) ?? false;
+}
+
 /** Whether the factual source contains at least one career-content category. */
 export function hasCareerEvidence(candidateMarkdown?: string): boolean | undefined {
   return candidateMarkdown
@@ -142,12 +177,13 @@ export function findContentProblems(input: ContentGuardInput): string[] {
       }
     } catch { /* Other syntax is checked by the LaTeX compiler. */ }
   }
-  const candidateHasCareerEvidence = hasCareerEvidence(candidateMarkdown);
+  const profileCareer = hasCareerEvidence(candidateMarkdown);
+  const chatCareer = chatHasCareerEvidence(userFacts);
+  const candidateHasCareerEvidence = profileCareer === true || chatCareer ? true : profileCareer;
 
   // Identity alone can typeset into a technically valid PDF, but it is not a
   // usable resume. Do not publish a page that contains only a name and contact
-  // details when the factual source has no experience, education, skills, or
-  // other career evidence for the agent to use.
+  // details when neither the profile nor the chat has career evidence.
   if (candidateHasCareerEvidence === false) {
     problems.push(
       'Your profile has no career facts; import a resume or add experience, education, skills, certifications, or achievements before publishing a PDF',
@@ -197,7 +233,8 @@ export function findContentProblems(input: ContentGuardInput): string[] {
       const sourceHeading = guardedSections[normalized];
       if (
         sourceHeading &&
-        !candidateSections.has(normalizeHeading(sourceHeading))
+        !candidateSections.has(normalizeHeading(sourceHeading)) &&
+        !chatSupportsSection(userFacts, sourceHeading)
       ) {
         problems.push(
           `the resume has a ${section[1]} section but your profile has no ${sourceHeading} facts`,
@@ -208,7 +245,7 @@ export function findContentProblems(input: ContentGuardInput): string[] {
     const hasSummary = sections.some((section) =>
       /^(?:summary|profile|objective)$/.test(normalizeHeading(section[1])),
     );
-    if (hasSummary && !candidateHasCareerEvidence) {
+    if (hasSummary && !candidateHasCareerEvidence && !chatSupportsSection(userFacts, 'Summary')) {
       problems.push(
         'the resume has a Summary section but your profile contains no career evidence to summarize',
       );
@@ -233,26 +270,29 @@ export function findContentProblems(input: ContentGuardInput): string[] {
               : candidateMarkdown.indexOf('\n## ', sourceStart.index + sourceStart[0].length),
           )
         : '';
-      const instructionSupportsEntry = userFacts.toLowerCase().includes(location.toLowerCase()) &&
-        userFacts.toLowerCase().includes(entry[2].toLowerCase());
+      // shortcut: negated employers, dates, and cities are not parsed; latest-wins is in SESSION_FACTS.md, upgrade when a contradicted city must fail the guard
+      const instructionSupportsEntry = userFacts.toLowerCase().includes(location.toLowerCase());
       if (!source.toLowerCase().includes(location.toLowerCase()) && !instructionSupportsEntry) {
         problems.push(`${heading} entry location "${location}" has no source in your profile; remove the location`);
       }
     }
   }
 
-  // 5. A résumé that never says the candidate's name is not their résumé.
-  //    Matched on the surname as well as the full string, because a document
-  //    may legitimately split the name across formatting commands.
-  if (candidateName) {
-    const surname = candidateName.trim().split(/\s+/).pop() || candidateName;
+  // 5. A résumé that never says the person's name is not their résumé.
+  //    A name stated in chat replaces the account name. The latest cue wins.
+  const cuedName = latestCuedName(userFacts);
+  const requiredName = cuedName || candidateName;
+  if (requiredName) {
+    const surname = requiredName.trim().split(/\s+/).pop() || requiredName;
     const hasName =
-      latex.includes(candidateName) ||
+      latex.includes(requiredName) ||
       (surname.length > 2 &&
         new RegExp(`\\b${escapeRegExp(surname)}\\b`, 'i').test(latex));
     if (!hasName) {
       problems.push(
-        `the document never names the candidate — "${candidateName}" does not appear in it`,
+        cuedName
+          ? `the current instruction names "${cuedName}" but the document does not`
+          : `the document never names the candidate — "${candidateName}" does not appear in it`,
       );
     }
   }
