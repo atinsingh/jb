@@ -379,7 +379,7 @@ export class ResumeBuilderService {
   async getSharedResume(slug: string, password?: string): Promise<ResumeDocument> {
     const shareLink = await this.shareLinkModel.findOne({ slug, isActive: true }).exec();
 
-    if (!shareLink) {
+    if (!shareLink || shareLink.isPublic === false) {
       throw new NotFoundException('Resume not found or link expired');
     }
 

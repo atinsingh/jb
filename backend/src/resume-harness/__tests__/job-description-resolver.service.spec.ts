@@ -162,9 +162,36 @@ describe('JobDescriptionResolverService', () => {
       'https://example.com/people/ada/eta',
       'https://example.com/people/ada/theta',
       'https://example.com/people/ada/iota',
+      'https://example.com/other-org',
+      'https://example.com/contact',
     ]);
     expect(result.linksTruncated).toBeUndefined();
-    expect(result.links?.join(' ')).not.toMatch(/features|explore|other-org|contact|stars/);
+    expect(result.links?.join(' ')).not.toMatch(/features|explore|stars/);
+  });
+
+  it('prefers top-level pages on a site root and skips the header', async () => {
+    (fetcher.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      status: 200,
+      contentType: 'text/html',
+      finalUrl: 'https://example.com/',
+      body: `
+        <html><body>
+          <header><a href="/features">Features</a></header>
+          <main>
+            <p>This page has enough visible text to describe the company and its work.</p>
+            <a href="/docs/intro">Intro</a>
+            <a href="/about">About</a>
+          </main>
+        </body></html>`,
+    });
+
+    const result = await service.resolve('https://example.com/');
+
+    expect(result.links).toEqual([
+      'https://example.com/about',
+      'https://example.com/docs/intro',
+    ]);
   });
 
   it('stops after 100 nested pages', async () => {

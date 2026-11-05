@@ -19,7 +19,7 @@ const FETCH_OPTIONS = {
   maxBytes: 1_000_000,
   maxRedirects: 3,
 };
-const LINK_CAP = 100;
+export const FETCHED_LINK_CAP = 100;
 const BLOCKED_PATH = new Set([
   'login',
   'signin',
@@ -97,10 +97,14 @@ export class JobDescriptionResolverService {
     const nested = eligible.filter((href) =>
       this.isUnder(pagePath, new URL(href).pathname),
     );
-    const chosen = this.shallowest(nested.length ? nested : eligible);
-    const links = chosen.slice(0, LINK_CAP);
+    const nestedChosen = this.shallowest(nested);
+    const siblings = this.shallowest(
+      eligible.filter((href) => !nested.includes(href)),
+    ).filter((href) => !this.underAny(href, nestedChosen));
+    const chosen = nested.length ? [...nestedChosen, ...siblings] : this.shallowest(eligible);
+    const links = chosen.slice(0, FETCHED_LINK_CAP);
     if (!links.length) return {};
-    return chosen.length > LINK_CAP
+    return chosen.length > FETCHED_LINK_CAP
       ? { links, linksTruncated: true }
       : { links };
   }
@@ -127,9 +131,20 @@ export class JobDescriptionResolverService {
   }
 
   private isUnder(pagePath: string, pathname: string): boolean {
-    if (pagePath === '/') return false;
+    if (pagePath === '/') {
+      return pathname.split('/').filter(Boolean).length === 1;
+    }
     const base = pagePath.endsWith('/') ? pagePath : `${pagePath}/`;
     return pathname.startsWith(base);
+  }
+
+  private underAny(href: string, parents: string[]): boolean {
+    const path = new URL(href).pathname;
+    return parents.some((parent) => {
+      const base = new URL(parent).pathname;
+      const prefix = base.endsWith('/') ? base : `${base}/`;
+      return path.startsWith(prefix);
+    });
   }
 
   private shallowest(urls: string[]): string[] {

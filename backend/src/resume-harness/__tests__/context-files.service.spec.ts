@@ -129,6 +129,10 @@ describe('ContextFilesService — candidate facts', () => {
       { url: 'https://jobs.example.com/role', text: 'Role' },
     ]);
     expect(fetched).toMatch(/pages linked from that URL/i);
+    expect(service.fetchedPage(
+      [{ url: 'https://jobs.example.com/role', text: 'Role' }],
+      'Stopped reading linked pages once the saved text reached its limit.',
+    )).toMatch(/saved text reached its limit/i);
     expect(agents).toMatch(/later turn replaces a conflicting earlier turn and the profile/i);
   });
 

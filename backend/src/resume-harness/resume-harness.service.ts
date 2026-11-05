@@ -45,7 +45,10 @@ import {
   HarnessId,
   ResolvedModelAlias,
 } from './harness/harness.types';
-import { JobDescriptionResolverService } from './job-description-resolver.service';
+import {
+  FETCHED_LINK_CAP,
+  JobDescriptionResolverService,
+} from './job-description-resolver.service';
 import {
   AiBudgetAttribution,
   AiBudgetService,
@@ -574,7 +577,10 @@ export class ResumeHarnessService {
       { path: 'SESSION_FACTS.md', contents: sessionFacts },
       {
         path: 'FETCHED_PAGE.md',
-        contents: this.contextFiles.fetchedPage(session.fetchedPages || []),
+        contents: this.contextFiles.fetchedPage(
+          session.fetchedPages || [],
+          session.fetchedPageWarning,
+        ),
       },
     ]);
 
@@ -1540,25 +1546,64 @@ export class ResumeHarnessService {
     if (!this.jobDescriptions) return 'We could not read that page.';
     try {
       const resolution = await this.jobDescriptions.resolve(target);
-      const linked = (
-        await Promise.all(
-          (resolution.links || []).map((url) => this.readLinkedPage(url, target)),
-        )
-      ).filter((page): page is { url: string; text: string; from: string } => Boolean(page));
-      if (resolution.description || linked.length) {
+      const linked = await this.readLinkedPages(
+        resolution.links || [],
+        target,
+        resolution.description?.length || 0,
+      );
+      const namedText =
+        resolution.description ||
+        (linked.pages.length ? 'This page had no readable text.' : undefined);
+      if (namedText || linked.pages.length) {
         for (let index = pages.length - 1; index >= 0; index--) {
           if (pages[index].url === target || pages[index].from === target) pages.splice(index, 1);
         }
-        pages.push(...linked);
-        if (resolution.description) pages.push({ url: target, text: resolution.description });
+        pages.push(...linked.pages);
+        if (namedText) pages.push({ url: target, text: namedText });
         while (pages.length > 101) pages.shift();
       }
-      return this.withCrawlWarning(resolution, warning);
+      return this.withCrawlWarning(resolution, warning, linked.stoppedEarly);
     } catch {
       return pages.some((page) => page.url === target)
         ? 'We could not read that page. The previous copy is still available.'
         : 'We could not read that page.';
     }
+  }
+
+  /** shortcut: 8 fetches at a time and 100k characters; raise either when a real list is cut off mid-page. */
+  private async readLinkedPages(
+    links: string[],
+    from: string,
+    used: number,
+  ): Promise<{ pages: { url: string; text: string; from: string }[]; stoppedEarly: boolean }> {
+    const pages: { url: string; text: string; from: string }[] = [];
+    let size = used;
+    let index = 0;
+    let stoppedEarly = false;
+    while (index < links.length) {
+      if (size >= 100_000) {
+        stoppedEarly = true;
+        break;
+      }
+      const batch = links.slice(index, index + 8);
+      index += batch.length;
+      const fetched = (
+        await Promise.all(batch.map((url) => this.readLinkedPage(url, from)))
+      ).filter((page): page is { url: string; text: string; from: string } => Boolean(page));
+      for (const page of fetched) {
+        const room = 100_000 - size;
+        if (room <= 0) {
+          stoppedEarly = true;
+          break;
+        }
+        const text = page.text.slice(0, room);
+        pages.push({ url: page.url, text, from: page.from });
+        size += text.length;
+        if (text.length < page.text.length) stoppedEarly = true;
+      }
+    }
+    if (index < links.length) stoppedEarly = true;
+    return { pages, stoppedEarly };
   }
 
   private async readLinkedPage(
@@ -1577,13 +1622,17 @@ export class ResumeHarnessService {
   private withCrawlWarning(
     resolution: { warning?: string; linksTruncated?: boolean },
     prior: string | undefined,
+    stoppedEarly: boolean,
   ): string | undefined {
-    const crawl = resolution.linksTruncated
-      ? 'Read the link you named and 100 pages it links to on the same site.'
-      : undefined;
+    const notes = [
+      resolution.linksTruncated
+        ? `Read the link you named and ${FETCHED_LINK_CAP} pages it links to on the same site.`
+        : undefined,
+      stoppedEarly ? 'Stopped reading linked pages once the saved text reached its limit.' : undefined,
+    ].filter((note): note is string => Boolean(note));
+    const crawl = notes.join(' ');
     const base = resolution.warning || prior;
-    if (base && crawl) return `${base} ${crawl}`;
-    return base || crawl;
+    return [base, crawl].filter(Boolean).join(' ') || undefined;
   }
 
   private instructionUrls(instruction: string): string[] {

@@ -206,6 +206,25 @@ describe('ResumeBuilderService (storage migration)', () => {
       expect(result).toBe('A sharp summary.');
     });
 
+    it('does not return a resume when the share link is not public', async () => {
+      const shareLinkModel = {
+        findOne: jest.fn(() => ({
+          exec: async () => ({
+            slug: 'secret',
+            isActive: true,
+            isPublic: false,
+            views: 0,
+            save: jest.fn(),
+          }),
+        })),
+      };
+      const hidden = Object.create(ResumeBuilderService.prototype) as ResumeBuilderService;
+      (hidden as any).shareLinkModel = shareLinkModel;
+
+      await expect(hidden.getSharedResume('secret')).rejects.toThrow(/not found|expired/i);
+      expect(shareLinkModel.findOne).toHaveBeenCalledWith({ slug: 'secret', isActive: true });
+    });
+
     it('throws when the provider fails (no soft fallback for this flow)', async () => {
       setupResume();
       mockProvider.chat.mockRejectedValue(new Error('provider down'));

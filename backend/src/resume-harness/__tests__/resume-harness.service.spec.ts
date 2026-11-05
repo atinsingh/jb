@@ -682,6 +682,44 @@ describe('ResumeHarnessService', () => {
     expect(writtenPage()).not.toContain('x'.repeat(8001));
   });
 
+  it('keeps the named page last when it has links but no readable text', async () => {
+    jobDescriptions.resolve.mockImplementation(async (url: string) => {
+      if (url.endsWith('/named')) {
+        return { links: ['https://jobs.example.com/about'] };
+      }
+      if (url.endsWith('/about')) return { description: 'About body.' };
+      throw new Error(`unexpected fetch ${url}`);
+    });
+    const session = await start('codex');
+
+    await service.runTurn('u1', session.id, {
+      instruction: 'Read https://jobs.example.com/named',
+    });
+
+    const page = writtenPage();
+    expect(page.indexOf('About body.')).toBeLessThan(page.indexOf('no readable text'));
+    expect(page).toContain('https://jobs.example.com/named (latest — wins on conflict)');
+  });
+
+  it('stops reading linked pages once the saved text reaches its limit', async () => {
+    const urls = Array.from({ length: 20 }, (_, index) => `https://jobs.example.com/item-${index}`);
+    jobDescriptions.resolve.mockImplementation(async (url: string) => {
+      if (url.endsWith('/named')) return { description: 'Named body.', links: urls };
+      return { description: 'y'.repeat(8000) };
+    });
+    const session = await start('codex');
+
+    const result = await service.runTurn('u1', session.id, {
+      instruction: 'Read https://jobs.example.com/named',
+    });
+
+    const called = jobDescriptions.resolve.mock.calls.map((call: any[]) => call[0]);
+    expect(called).not.toContain('https://jobs.example.com/item-16');
+    expect(writtenPage()).toContain('Named body.');
+    expect(writtenPage()).toMatch(/saved text reached its limit/i);
+    expect(result.fetchedPageWarning).toMatch(/saved text reached its limit/i);
+  });
+
   it('warns when the named page links to more pages than are read', async () => {
     jobDescriptions.resolve.mockImplementation(async (url: string) => {
       if (url.endsWith('/named')) {

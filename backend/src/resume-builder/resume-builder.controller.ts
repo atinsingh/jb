@@ -32,6 +32,7 @@ import { CreateResumeDto, UpdateResumeSectionDto, RegenerateSectionDto } from '.
 import { GenerateResumeDto, GenerateSectionDto } from './dto/generate-resume.dto';
 import { UpdateResumeDto, CreateShareLinkDto } from './dto/resume-operations.dto';
 import { ImportResumeDto, UpdateResumeDocumentDto } from './dto/resume-details.dto';
+import { Throttle } from '@nestjs/throttler';
 import { Public } from '../common/decorators/public.decorator';
 import { StorageService } from '../storage';
 
@@ -328,6 +329,7 @@ export class ResumeBuilderController {
 
   @Public()
   @Post('shared/:slug/view')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOperation({ summary: 'View a shared resume' })
   async viewShared(
     @Param('slug') slug: string,
