@@ -6,7 +6,7 @@ import { Job, JobDocument } from '../../schemas/job.schema';
 import { JobGeoService } from '../../geography/job-geo.service';
 import { resolveCountry } from '../../geography/geo.constants';
 import { plainJobText } from '../plain-job-text';
-import { isPostedToday, listedInCanada, MAX_OPEN_MARKET_PER_COMPANY } from '../fresh-canada-listing';
+import { isPostedToday, listedInCanada } from '../fresh-canada-listing';
 
 type WorkdaySite = { host: string; tenant: string; site: string };
 
@@ -83,7 +83,6 @@ export class WorkdayMonitorService {
     const limit = 20;
     let fetched = 0;
     let upserts = 0;
-    let kept = 0;
     const newExternalIds: string[] = [];
     const base = `https://${site.host}/wday/cxs/${site.tenant}/${site.site}/jobs`;
 
@@ -95,12 +94,13 @@ export class WorkdayMonitorService {
       );
       const postings = Array.isArray(data?.jobPostings) ? data.jobPostings : [];
       if (postings.length === 0) break;
+      let todayOnPage = 0;
 
       for (const job of postings) {
-        if (kept >= MAX_OPEN_MARKET_PER_COMPANY) break;
         let location = this.place(job);
         const postedRaw = job.postedOn || job.startDate;
         if (!isPostedToday(postedRaw) || !listedInCanada({ country: resolveCountry(location) }, location)) continue;
+        todayOnPage += 1;
         const postedAt = typeof postedRaw === 'string' && /^posted today$/i.test(postedRaw.trim())
           ? new Date()
           : new Date(postedRaw);
@@ -147,14 +147,14 @@ export class WorkdayMonitorService {
           { upsert: true, new: true },
         );
         upserts++;
-        kept += 1;
         if (!existed) newExternalIds.push(externalId);
       }
 
       fetched += postings.length;
       offset += postings.length;
 
-      if (kept >= MAX_OPEN_MARKET_PER_COMPANY || postings.length < limit) break;
+      // Boards return newest first; a page with nothing from today means the rest are older.
+      if (postings.length < limit || todayOnPage === 0) break;
     }
 
     return { fetched, upserts, newExternalIds };

@@ -1,4 +1,4 @@
-import { isPostedToday, listedInCanada, publicListingFilter, torontoDayRange } from './fresh-canada-listing';
+import { isPostedToday, listedInCanada, publicListingFilter, torontoDayRange, variedByCompany } from './fresh-canada-listing';
 
 describe('fresh Canada listings', () => {
   const now = new Date('2026-11-03T17:00:00.000Z');
@@ -29,5 +29,18 @@ describe('fresh Canada listings', () => {
     });
     expect(start.toISOString()).toBe('2026-11-03T05:00:00.000Z');
     expect(end.toISOString()).toBe('2026-11-04T05:00:00.000Z');
+  });
+
+  it('mixes companies so one employer does not fill the first screen', () => {
+    const rows = [
+      ...Array.from({ length: 8 }, (_, i) => ({ id: `td-${i}`, companyName: 'TD' })),
+      { id: 'bmo', companyName: 'BMO' },
+      { id: 'shop', companyName: 'Shopify' },
+    ];
+    const ordered = variedByCompany(rows, (row) => row.companyName, '2026-11-05');
+    expect(ordered).toHaveLength(10);
+    expect(new Set(ordered.map((row) => row.id)).size).toBe(10);
+    expect(new Set(ordered.slice(0, 3).map((row) => row.companyName)).size).toBe(3);
+    expect(variedByCompany(rows, (row) => row.companyName, '2026-11-05')).toEqual(ordered);
   });
 });

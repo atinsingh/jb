@@ -6,7 +6,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Job, JobDocument } from '../schemas/job.schema';
 import { plainJobText } from '../monitors/plain-job-text';
-import { publicListingFilter } from '../monitors/fresh-canada-listing';
+import { calendarDay, publicListingFilter, variedByCompany } from '../monitors/fresh-canada-listing';
 
 /**
  * Public job listing for the marketing /jobs page.
@@ -61,16 +61,15 @@ export class PublicJobsController {
         .select(
           'title companyName companyLogo location city country isRemote jobType salary salaryDisclosed experience externalUrl originalApplyUrl createdAt preferredSkills',
         )
-        .sort({ postedAt: -1, createdAt: -1 })
-        .skip((current - 1) * perPage)
-        .limit(perPage)
         .lean()
         .exec(),
       this.jobModel.countDocuments(filter),
     ]);
+    const ordered = variedByCompany(rows, (j: any) => j.companyName || '', calendarDay(new Date()));
+    const pageRows = ordered.slice((current - 1) * perPage, current * perPage);
 
     const now = Date.now();
-    const jobs = rows.map((j: any) => ({
+    const jobs = pageRows.map((j: any) => ({
       id: String(j._id),
       title: j.title,
       company: j.companyName,

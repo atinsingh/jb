@@ -5,7 +5,7 @@ import { Model } from 'mongoose';
 import { Job, JobDocument } from '../../schemas/job.schema';
 import { JobGeoService } from '../../geography/job-geo.service';
 import { extractSkills } from '../../matching/skill-taxonomy';
-import { isPostedToday, listedInCanada, MAX_OPEN_MARKET_PER_COMPANY } from '../fresh-canada-listing';
+import { isPostedToday, listedInCanada } from '../fresh-canada-listing';
 
 // shortcut: boards that publish on Lever, set LEVER_BOARDS for a different set
 const DEFAULT_LEVER_BOARDS = ['wattpad', 'spotify'];
@@ -48,7 +48,6 @@ export class LeverMonitorService {
           const workplaceHint = (job?.workplaceType || '') as string; // Lever exposes workplaceType
           const g = this.geo.normalize({ location, description, title, workplaceType: workplaceHint });
           if (!listedInCanada(g, location)) continue;
-          if (kept >= MAX_OPEN_MARKET_PER_COMPANY) break;
           kept += 1;
           const doc = {
             title,

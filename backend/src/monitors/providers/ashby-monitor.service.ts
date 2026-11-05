@@ -5,7 +5,7 @@ import { Model } from 'mongoose';
 import { Job, JobDocument } from '../../schemas/job.schema';
 import { JobGeoService } from '../../geography/job-geo.service';
 import { plainJobText } from '../plain-job-text';
-import { isPostedToday, listedInCanada, MAX_OPEN_MARKET_PER_COMPANY } from '../fresh-canada-listing';
+import { isPostedToday, listedInCanada } from '../fresh-canada-listing';
 
 // shortcut: Canadian companies on Ashby's public board, set ASHBY_BOARDS to replace
 const DEFAULT_ASHBY_BOARDS = ['wealthsimple', 'jobber', '1password', 'koho', 'lightspeedhq', 'clearco'];
@@ -44,7 +44,6 @@ export class AshbyMonitorService {
         for (const job of ranked) {
           const location = [job.location, job.address?.postalAddress?.addressCountry].filter(Boolean).join(', ');
           if (!listedInCanada(null, location)) continue;
-          if (kept >= MAX_OPEN_MARKET_PER_COMPANY) break;
           kept += 1;
           const externalId = `ashby:${job.id}`;
           const existed = await this.jobModel.exists({ externalId });

@@ -61,4 +61,37 @@ describe('WorkdayMonitorService', () => {
       }),
     );
   });
+
+  it('keeps every role posted today and stops once a page has none', async () => {
+    process.env.WORKDAY_SITES = 'td.wd3.myworkdayjobs.com/td/TD_Bank_Careers';
+    process.env.WORKDAY_FETCH_DETAILS = 'false';
+    const today = Array.from({ length: 20 }, (_, i) => ({
+      title: `Role ${i}`,
+      externalPath: `/job/Toronto/Role_${i}`,
+      locationsText: 'Toronto, Ontario',
+      postedOn: 'Posted Today',
+      bulletFields: [`R_${i}`],
+    }));
+    (axios.post as jest.Mock)
+      .mockResolvedValueOnce({ data: { jobPostings: today } })
+      .mockResolvedValueOnce({
+        data: {
+          jobPostings: [{
+            title: 'Old',
+            externalPath: '/job/Toronto/Old',
+            locationsText: 'Toronto',
+            postedOn: 'Posted Yesterday',
+            bulletFields: ['OLD'],
+          }],
+        },
+      });
+    const jobs = {
+      exists: jest.fn().mockResolvedValue(null),
+      findOneAndUpdate: jest.fn().mockResolvedValue({}),
+    };
+    await new WorkdayMonitorService(jobs as any, { deriveLogo: jest.fn().mockReturnValue('') } as any).run();
+    expect(jobs.findOneAndUpdate).toHaveBeenCalledTimes(20);
+    expect(axios.post).toHaveBeenCalledTimes(2);
+    delete process.env.WORKDAY_FETCH_DETAILS;
+  });
 });

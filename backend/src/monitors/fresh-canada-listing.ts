@@ -3,9 +3,6 @@ export const OPEN_MARKET_SOURCES = ['Greenhouse', 'Lever', 'Workday', 'Ashby'] a
 
 export const CANADA_TIME_ZONE = 'America/Toronto';
 
-// shortcut: five roles per company per day, raise when the Canada market needs more
-export const MAX_OPEN_MARKET_PER_COMPANY = 5;
-
 export function calendarDay(value: Date, timeZone = CANADA_TIME_ZONE): string {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone,
@@ -45,6 +42,63 @@ export function torontoDayRange(now = new Date()): { start: Date; end: Date } {
     : 0;
   const start = new Date(utcMidnight.getTime() - offset);
   return { start, end: new Date(start.getTime() + 24 * 60 * 60 * 1000) };
+}
+
+function hashSeed(seed: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function mulberry32(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function shuffleInPlace<T>(items: T[], rand: () => number) {
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    const swap = items[i];
+    items[i] = items[j];
+    items[j] = swap;
+  }
+}
+
+/**
+ * Deal roles across companies so a page is not one employer's block.
+ * The seed keeps page 2 stable for the rest of that Toronto day.
+ */
+export function variedByCompany<T>(rows: T[], companyOf: (row: T) => string, seed = ''): T[] {
+  const groups = new Map<string, T[]>();
+  for (const row of rows) {
+    const key = (companyOf(row) || '').trim().toLowerCase() || 'unknown';
+    const list = groups.get(key);
+    if (list) list.push(row);
+    else groups.set(key, [row]);
+  }
+  const keys = [...groups.keys()];
+  const rand = mulberry32(hashSeed(seed));
+  shuffleInPlace(keys, rand);
+  for (const key of keys) shuffleInPlace(groups.get(key)!, rand);
+  const out: T[] = [];
+  let pending = rows.length;
+  while (pending > 0) {
+    for (const key of keys) {
+      const list = groups.get(key)!;
+      if (!list.length) continue;
+      out.push(list.pop()!);
+      pending -= 1;
+    }
+  }
+  return out;
 }
 
 /** Active employer jobs, plus open-market jobs posted today in Canada. */
