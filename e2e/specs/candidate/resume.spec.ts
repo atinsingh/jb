@@ -165,7 +165,10 @@ const sse = (session: unknown): string =>
   ].join("");
 
 /** One stubbed backend, shared by the whole file. */
-async function stubHarnessApi(page: Page) {
+async function stubHarnessApi(
+  page: Page,
+  options?: { fetchedPageWarning?: string },
+) {
   let turns = 0;
   let exists = false;
   let ats: any = null;
@@ -267,6 +270,7 @@ async function stubHarnessApi(page: Page) {
           ? "Extracted Platform Engineer role requiring Kubernetes and Terraform."
           : ""),
       jobContextWarning: undefined,
+      fetchedPageWarning: options?.fetchedPageWarning,
       templateKey: body.templateKey || "classic-serif",
       vibe: body.vibe || state.vibe,
       canRevert: false,
@@ -1081,6 +1085,21 @@ test.describe("Compare Resume manual workflow", () => {
     await page.getByRole("button", { name: "Refresh comparison" }).click();
     await expect.poll(() => comparisons).toBe(2);
     expect(comparisonRequests[1]?.forceRefresh).toBeUndefined();
+  });
+});
+
+test.describe("fetched page warning", () => {
+  test("shows the warning above the instruction box", async ({ page }) => {
+    await stubHarnessApi(page, {
+      fetchedPageWarning: "Only the first link in that message was read.",
+    });
+    await page.goto("/app/resume?mode=generate", {
+      waitUntil: "domcontentloaded",
+    });
+    await page.getByTestId("start-session").click();
+    await expect(page.getByTestId("fetched-page-warning")).toHaveText(
+      "Only the first link in that message was read.",
+    );
   });
 });
 

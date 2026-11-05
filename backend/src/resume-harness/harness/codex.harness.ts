@@ -250,6 +250,10 @@ export class CodexHarness implements HarnessAdapter {
       '[model_providers.litellm.http_headers]',
       `"${LITELLM_TAG_HEADER}" = "${(requestTags?.length ? requestTags : [harnessTag(this.id)]).join(',')}"`,
       '',
+      // Confirmed in Codex 0.154.0: `--search` turns this on. Leave it off.
+      '[features]',
+      'web_search_request = false',
+      '',
     ].join('\n');
   }
 }

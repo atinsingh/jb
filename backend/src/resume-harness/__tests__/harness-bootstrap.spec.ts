@@ -320,6 +320,28 @@ describe('harness bootstrap', () => {
     }
   });
 
+  it('denies the web tools each CLI already ships', () => {
+    const claude = registry.get('claude-code').bootstrap(bootstrapInput());
+    expect(claude.command).toEqual(
+      expect.arrayContaining(['--disallowedTools', 'WebSearch,WebFetch']),
+    );
+
+    const codex = registry.get('codex').bootstrap(bootstrapInput());
+    expect(codex.command).not.toContain('--search');
+    expect(
+      codex.files.find((file) => file.path === '.codex/config.toml')?.contents,
+    ).toContain('web_search_request = false');
+
+    const opencode = registry.get('opencode').bootstrap(bootstrapInput());
+    const config = JSON.parse(
+      opencode.files.find((file) => file.path === 'opencode.json')!.contents!,
+    );
+    expect(config.permission).toMatchObject({
+      webfetch: 'deny',
+      websearch: 'deny',
+    });
+  });
+
   it('keeps OpenCode in one auto-approved, plugin-free session across turns', () => {
     const boot = registry.get('opencode').bootstrap(bootstrapInput());
     expect(boot.command).toEqual(

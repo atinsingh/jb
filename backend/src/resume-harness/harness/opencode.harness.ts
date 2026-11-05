@@ -188,6 +188,11 @@ export class OpenCodeHarness implements HarnessAdapter {
           },
         },
         model: `litellm/${alias.alias}`,
+        // Confirmed in opencode-ai 1.18.30. `--auto` approves anything not denied.
+        permission: {
+          webfetch: 'deny',
+          websearch: 'deny',
+        },
         autoupdate: false,
       },
       null,

@@ -466,6 +466,320 @@ describe('ResumeHarnessService', () => {
     );
   });
 
+  const writtenPage = () =>
+    sandbox.writeFiles.mock.calls
+      .flatMap((call: any[]) => call[1] || [])
+      .filter((file: { path?: string }) => file?.path === 'FETCHED_PAGE.md')
+      .at(-1)?.contents as string;
+
+  it('fetches a page named in a later turn and leaves the saved job alone', async () => {
+    jobDescriptions.resolve.mockResolvedValueOnce({
+      description: 'Role brief from the named page.',
+      finalUrl: 'https://jobs.example.com/new-role',
+    });
+    const session = await start('codex', {
+      jobDescription: 'Pasted role requirements',
+    });
+
+    const result = await service.runTurn('u1', session.id, {
+      instruction: 'Tailor the summary using https://jobs.example.com/new-role.',
+    });
+
+    expect(jobDescriptions.resolve).toHaveBeenCalledTimes(1);
+    expect(jobDescriptions.resolve).toHaveBeenCalledWith(
+      'https://jobs.example.com/new-role',
+    );
+    expect(store[0].jobDescription).toBe('Pasted role requirements');
+    expect(writtenPage()).toContain('https://jobs.example.com/new-role');
+    expect(writtenPage()).toContain('Role brief from the named page.');
+    expect(JSON.stringify(sandbox.exec.mock.calls[0])).toContain('FETCHED_PAGE.md');
+    expect(result.fetchedPageWarning).toBeUndefined();
+  });
+
+  it('keeps an earlier page when a later turn names a different URL', async () => {
+    jobDescriptions.resolve
+      .mockResolvedValueOnce({ description: 'First page body.' })
+      .mockResolvedValueOnce({ description: 'Second page body.' });
+    const session = await start('codex');
+
+    await service.runTurn('u1', session.id, {
+      instruction: 'Read https://jobs.example.com/first',
+    });
+    await service.runTurn('u1', session.id, {
+      instruction: 'Also read https://jobs.example.com/second',
+    });
+
+    const page = writtenPage();
+    expect(page).toContain('https://jobs.example.com/first');
+    expect(page).toContain('First page body.');
+    expect(page).toContain('https://jobs.example.com/second (latest — wins on conflict)');
+    expect(page).toContain('Second page body.');
+  });
+
+  it('replaces a stored page with a fresh extract and drops the old body', async () => {
+    jobDescriptions.resolve
+      .mockResolvedValueOnce({ description: 'OLD BODY' })
+      .mockResolvedValueOnce({ description: 'NEW BODY' });
+    const session = await start('codex');
+
+    await service.runTurn('u1', session.id, {
+      instruction: 'Read https://jobs.example.com/new-role',
+    });
+    await service.runTurn('u1', session.id, {
+      instruction: 'Read https://jobs.example.com/new-role again',
+    });
+
+    expect(jobDescriptions.resolve).toHaveBeenCalledTimes(2);
+    expect(writtenPage()).toContain('NEW BODY');
+    expect(writtenPage()).not.toContain('OLD BODY');
+  });
+
+  it('drops a stored page when the user retracts that URL', async () => {
+    jobDescriptions.resolve.mockResolvedValueOnce({
+      description: 'Page that should disappear.',
+    });
+    const session = await start('codex');
+    await service.runTurn('u1', session.id, {
+      instruction: 'Read https://jobs.example.com/new-role',
+    });
+    jobDescriptions.resolve.mockClear();
+
+    await service.runTurn('u1', session.id, {
+      instruction: 'Ignore https://jobs.example.com/new-role',
+    });
+
+    expect(jobDescriptions.resolve).not.toHaveBeenCalled();
+    expect(writtenPage()).not.toContain('jobs.example.com/new-role');
+    expect(writtenPage()).toMatch(/No page has been fetched/i);
+  });
+
+  it('drops the oldest page when a 102nd URL arrives', async () => {
+    const paths = Array.from({ length: 102 }, (_, index) => String(index + 1).padStart(3, '0'));
+    for (const path of paths) {
+      jobDescriptions.resolve.mockResolvedValueOnce({ description: `BODY-${path}` });
+    }
+    const session = await start('codex');
+    for (const path of paths) {
+      await service.runTurn('u1', session.id, {
+        instruction: `Read https://jobs.example.com/${path}`,
+      });
+    }
+
+    const page = writtenPage();
+    expect(page).not.toContain('BODY-001');
+    expect(page).not.toContain('jobs.example.com/001');
+    expect(page).toContain('BODY-002');
+    expect(page).toContain('BODY-102');
+    expect(page).toContain('https://jobs.example.com/102 (latest — wins on conflict)');
+  });
+
+  it('reads same-host links once and does not follow links on those pages', async () => {
+    jobDescriptions.resolve.mockImplementation(async (url: string) => {
+      if (url.endsWith('/named')) {
+        return {
+          description: 'Named body.',
+          links: [
+            'https://jobs.example.com/about',
+            'https://jobs.example.com/team',
+          ],
+        };
+      }
+      if (url.endsWith('/about')) {
+        return {
+          description: 'About body.',
+          links: ['https://jobs.example.com/should-not-follow'],
+        };
+      }
+      if (url.endsWith('/team')) return { description: 'Team body.' };
+      throw new Error(`unexpected fetch ${url}`);
+    });
+    const session = await start('codex');
+
+    await service.runTurn('u1', session.id, {
+      instruction: 'Read https://jobs.example.com/named',
+    });
+
+    const called = jobDescriptions.resolve.mock.calls.map((call: any[]) => call[0]);
+    expect(called).toEqual([
+      'https://jobs.example.com/named',
+      'https://jobs.example.com/about',
+      'https://jobs.example.com/team',
+    ]);
+    const page = writtenPage();
+    expect(page).toContain('About body.');
+    expect(page).toContain('Team body.');
+    expect(page).toContain('https://jobs.example.com/named (latest — wins on conflict)');
+    expect(page.indexOf('About body.')).toBeLessThan(page.indexOf('Named body.'));
+  });
+
+  it('keeps the named page when a linked page cannot be read', async () => {
+    jobDescriptions.resolve.mockImplementation(async (url: string) => {
+      if (url.endsWith('/named')) {
+        return {
+          description: 'Named body.',
+          links: ['https://jobs.example.com/missing', 'https://jobs.example.com/about'],
+        };
+      }
+      if (url.endsWith('/missing')) return { warning: 'We could not read that page.' };
+      if (url.endsWith('/about')) return { description: 'About body.' };
+      throw new Error(`unexpected fetch ${url}`);
+    });
+    const session = await start('codex');
+
+    await service.runTurn('u1', session.id, {
+      instruction: 'Read https://jobs.example.com/named',
+    });
+
+    const page = writtenPage();
+    expect(page).toContain('Named body.');
+    expect(page).toContain('About body.');
+    expect(page).not.toContain('jobs.example.com/missing');
+  });
+
+  it('drops linked pages when the user retracts the named URL', async () => {
+    jobDescriptions.resolve.mockImplementation(async (url: string) => {
+      if (url.endsWith('/named')) {
+        return {
+          description: 'Named body.',
+          links: ['https://jobs.example.com/about'],
+        };
+      }
+      if (url.endsWith('/about')) return { description: 'About body.' };
+      throw new Error(`unexpected fetch ${url}`);
+    });
+    const session = await start('codex');
+    await service.runTurn('u1', session.id, {
+      instruction: 'Read https://jobs.example.com/named',
+    });
+    jobDescriptions.resolve.mockReset();
+
+    await service.runTurn('u1', session.id, {
+      instruction: 'Ignore https://jobs.example.com/named',
+    });
+
+    expect(jobDescriptions.resolve).not.toHaveBeenCalled();
+    expect(writtenPage()).not.toContain('Named body.');
+    expect(writtenPage()).not.toContain('About body.');
+    expect(writtenPage()).toMatch(/No page has been fetched/i);
+  });
+
+  it('stores only the first 8000 characters of a linked page', async () => {
+    const long = 'x'.repeat(9000);
+    jobDescriptions.resolve.mockImplementation(async (url: string) => {
+      if (url.endsWith('/named')) {
+        return { description: 'Named body.', links: ['https://jobs.example.com/about'] };
+      }
+      if (url.endsWith('/about')) return { description: long };
+      throw new Error(`unexpected fetch ${url}`);
+    });
+    const session = await start('codex');
+
+    await service.runTurn('u1', session.id, {
+      instruction: 'Read https://jobs.example.com/named',
+    });
+
+    expect(writtenPage()).toContain('x'.repeat(8000));
+    expect(writtenPage()).not.toContain('x'.repeat(8001));
+  });
+
+  it('warns when the named page links to more pages than are read', async () => {
+    jobDescriptions.resolve.mockImplementation(async (url: string) => {
+      if (url.endsWith('/named')) {
+        return {
+          description: 'Named body.',
+          links: [
+            'https://jobs.example.com/one',
+            'https://jobs.example.com/two',
+            'https://jobs.example.com/three',
+            'https://jobs.example.com/four',
+          ],
+          linksTruncated: true,
+        };
+      }
+      return { description: `Body ${url}` };
+    });
+    const session = await start('codex');
+
+    const result = await service.runTurn('u1', session.id, {
+      instruction: 'Read https://jobs.example.com/named and https://jobs.example.com/other',
+    });
+
+    expect(result.fetchedPageWarning).toBe(
+      'Only the first link in that message was read. Read the link you named and 100 pages it links to on the same site.',
+    );
+    expect(jobDescriptions.resolve).not.toHaveBeenCalledWith('https://jobs.example.com/other');
+  });
+
+  it('keeps the previous page body when a refresh cannot be read', async () => {
+    jobDescriptions.resolve
+      .mockResolvedValueOnce({ description: 'GOOD BODY' })
+      .mockResolvedValueOnce({
+        warning: 'We could not read that page.',
+      });
+    const session = await start('codex');
+    await service.runTurn('u1', session.id, {
+      instruction: 'Read https://jobs.example.com/new-role',
+    });
+
+    const result = await service.runTurn('u1', session.id, {
+      instruction: 'Read https://jobs.example.com/new-role again',
+    });
+
+    expect(result.fetchedPageWarning).toBe('We could not read that page.');
+    expect(writtenPage()).toContain('GOOD BODY');
+    expect(sandbox.exec).toHaveBeenCalled();
+  });
+
+  it('rewrites the stored pages when a turn names no URL', async () => {
+    jobDescriptions.resolve.mockResolvedValueOnce({ description: 'KEPT BODY' });
+    const session = await start('codex');
+    await service.runTurn('u1', session.id, {
+      instruction: 'Read https://jobs.example.com/kept',
+    });
+    jobDescriptions.resolve.mockClear();
+    sandbox.writeFiles.mockClear();
+
+    const result = await service.runTurn('u1', session.id, {
+      instruction: 'Shorten the summary.',
+    });
+
+    expect(jobDescriptions.resolve).not.toHaveBeenCalled();
+    expect(writtenPage()).toContain('KEPT BODY');
+    expect(result.fetchedPageWarning).toBeUndefined();
+  });
+
+  it('reads only the first new URL in one message', async () => {
+    jobDescriptions.resolve.mockResolvedValueOnce({ description: 'First only.' });
+    const session = await start('codex');
+
+    const result = await service.runTurn('u1', session.id, {
+      instruction:
+        'Read https://jobs.example.com/one and https://jobs.example.com/two',
+    });
+
+    expect(jobDescriptions.resolve).toHaveBeenCalledTimes(1);
+    expect(jobDescriptions.resolve).toHaveBeenCalledWith(
+      'https://jobs.example.com/one',
+    );
+    expect(writtenPage()).toContain('jobs.example.com/one');
+    expect(writtenPage()).not.toContain('jobs.example.com/two');
+    expect(result.fetchedPageWarning).toMatch(/first link/i);
+  });
+
+  it('does not fetch the job URL already saved on the session', async () => {
+    const session = await start('codex', {
+      jobUrl: 'https://jobs.example.com/platform-engineer',
+    });
+    jobDescriptions.resolve.mockClear();
+
+    await service.runTurn('u1', session.id, {
+      instruction:
+        'Use https://jobs.example.com/platform-engineer for the summary.',
+    });
+
+    expect(jobDescriptions.resolve).not.toHaveBeenCalled();
+  });
+
   it('provisions exactly one sandbox per session and binds it to the session', async () => {
     const a = await start();
     const b = await start('codex');
@@ -1004,7 +1318,8 @@ describe('ResumeHarnessService', () => {
       .filter((file: { path: string }) => file.path === 'SESSION_FACTS.md');
     expect(facts.at(-1).contents).toContain('Jane Doe');
     expect(facts.at(-1).contents).toContain('Alicia Chen');
-    expect(facts.at(-1).contents).toContain('Turn 2 (latest — wins on conflict)');
+    expect(facts.at(-1).contents).toContain('Turn 1 (history)');
+    expect(facts.at(-1).contents).toContain('Turn 2 (latest — source)');
 
     const update = JSON.stringify(sandbox.exec.mock.calls[0]);
     const repair = JSON.stringify(sandbox.exec.mock.calls[1]);

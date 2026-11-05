@@ -71,6 +71,9 @@ export class ClaudeCodeHarness implements HarnessAdapter {
         // The sandbox is the isolation boundary, so the harness is free to edit
         // inside it without a human approving each write.
         '--dangerously-skip-permissions',
+        // Confirmed on claude 2.1.267 in the sandbox image: one comma-separated list.
+        '--disallowedTools',
+        'WebSearch,WebFetch',
         '--output-format',
         'stream-json',
         '--include-partial-messages',

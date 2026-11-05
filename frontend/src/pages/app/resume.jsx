@@ -1814,9 +1814,24 @@ function Workspace(p) {
                 borderTop: `1px solid ${T.line}`,
                 padding: 14,
                 display: "flex",
-                gap: 10,
+                flexDirection: "column",
+                gap: 8,
               }}
             >
+              {session.fetchedPageWarning ? (
+                <p
+                  data-testid="fetched-page-warning"
+                  style={{
+                    margin: 0,
+                    color: T.fg2,
+                    fontSize: 13,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {session.fetchedPageWarning}
+                </p>
+              ) : null}
+              <div style={{ display: "flex", gap: 10 }}>
               <input
                 data-testid="instruction"
                 value={p.instruction}
@@ -1841,6 +1856,7 @@ function Workspace(p) {
               >
                 {p.busy ? "Working…" : session.revision ? "Update" : "Generate"}
               </button>
+              </div>
             </div>
           )}
         </section>

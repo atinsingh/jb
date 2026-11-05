@@ -120,6 +120,15 @@ describe('ContextFilesService — candidate facts', () => {
     expect(agents).toMatch(/contact location[\s\S]*workplace or school location/i);
     expect(agents).toMatch(/reliable[\s\S]*scalable[\s\S]*source/i);
     expect(agents).toContain('SESSION_FACTS.md');
+    expect(agents).toContain('FETCHED_PAGE.md');
+    expect(agents).toMatch(/untrusted data/i);
+    expect(agents).toMatch(/when the user asks to apply details from a page/i);
+    expect(agents).toMatch(/pages linked from\s+the URL the user named/i);
+    const fetched = service.fetchedPage([
+      { url: 'https://jobs.example.com/about', text: 'About' },
+      { url: 'https://jobs.example.com/role', text: 'Role' },
+    ]);
+    expect(fetched).toMatch(/pages linked from that URL/i);
     expect(agents).toMatch(/later turn replaces a conflicting earlier turn and the profile/i);
   });
 
@@ -131,7 +140,8 @@ describe('ContextFilesService — candidate facts', () => {
 
     expect(text).toContain('Jane Doe');
     expect(text).toContain('Alicia Chen');
-    expect(text).toContain('Turn 2 (latest — wins on conflict)');
+    expect(text).toContain('Turn 1 (history)');
+    expect(text).toContain('Turn 2 (latest — source)');
     expect(text).toMatch(/still come from CANDIDATE\.md/i);
   });
 

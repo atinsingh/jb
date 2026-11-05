@@ -45,14 +45,22 @@ async function signInAndSaveState(
     // survives markup changes that a structural selector would not.
     await page.locator('form').getByRole('button', { name: /^log in$/i }).click();
 
-    // Sign-in is done when Supabase has persisted its session COOKIE. It used
-    // to be a localStorage token; moving it to cookies is what lets
-    // src/middleware.js gate protected routes server-side.
-    await page.waitForFunction(
-      () => document.cookie.split(/;s*/).some((c) => /^sb-.*-auth-token/.test(c)),
-      null,
-      { timeout: 30_000 },
-    );
+    // Sign-in is done when Supabase has persisted its session COOKIE. The
+    // cookie is HttpOnly, so document.cookie never sees it. context.cookies()
+    // does, which is also what the middleware reads.
+    const deadline = Date.now() + 30_000;
+    let signedIn = false;
+    while (Date.now() < deadline) {
+      const cookies = await context.cookies();
+      signedIn = cookies.some((cookie) =>
+        /^sb-.+-auth-token(?:\.\d+)?$/.test(cookie.name),
+      );
+      if (signedIn) break;
+      await page.waitForTimeout(250);
+    }
+    if (!signedIn) {
+      throw new Error('Timed out waiting for the Supabase auth cookie.');
+    }
 
     await context.storageState({ path: storagePath });
   } catch (err) {

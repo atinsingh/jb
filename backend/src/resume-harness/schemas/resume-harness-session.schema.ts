@@ -165,6 +165,23 @@ export class ResumeHarnessSession {
   @Prop({ maxlength: 1000 })
   jobContextWarning?: string;
 
+  /** Pages named in chat, oldest first. The last entry wins on conflict. */
+  @Prop({
+    type: [
+      {
+        url: { type: String, required: true, maxlength: 2000 },
+        text: { type: String, required: true },
+        from: { type: String, maxlength: 2000 },
+      },
+    ],
+    default: [],
+  })
+  fetchedPages?: { url: string; text: string; from?: string }[];
+
+  /** Warning for the latest page-read attempt. Cleared when a turn names no URL. */
+  @Prop({ maxlength: 1000 })
+  fetchedPageWarning?: string;
+
   /**
    * The template this résumé is written to, by `ResumeTemplate.key`.
    *
