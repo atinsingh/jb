@@ -55,16 +55,42 @@ export class PublicJobsController {
     }
     if (remote === 'true') filter.isRemote = true;
 
-    const [rows, total] = await Promise.all([
-      this.jobModel
-        .find(filter)
-        .select(
-          'title companyName companyLogo location city country isRemote jobType salary salaryDisclosed experience externalUrl originalApplyUrl createdAt preferredSkills',
-        )
-        .lean()
-        .exec(),
+    const [groups, total] = await Promise.all([
+      this.jobModel.aggregate([
+        { $match: filter },
+        { $sort: { postedAt: -1, createdAt: -1 } },
+        {
+          $group: {
+            _id: { $toLower: { $ifNull: ['$companyName', ''] } },
+            jobs: {
+              $push: {
+                _id: '$_id',
+                title: '$title',
+                companyName: '$companyName',
+                companyLogo: '$companyLogo',
+                location: '$location',
+                city: '$city',
+                country: '$country',
+                isRemote: '$isRemote',
+                jobType: '$jobType',
+                salary: '$salary',
+                salaryDisclosed: '$salaryDisclosed',
+                experience: '$experience',
+                externalUrl: '$externalUrl',
+                originalApplyUrl: '$originalApplyUrl',
+                createdAt: '$createdAt',
+                preferredSkills: '$preferredSkills',
+              },
+            },
+          },
+        },
+        // shortcut: 12 roles from each of 30 companies, raise if the public board needs a deeper mix
+        { $project: { jobs: { $slice: ['$jobs', 12] } } },
+        { $limit: 30 },
+      ]).exec(),
       this.jobModel.countDocuments(filter),
     ]);
+    const rows = groups.flatMap((group: { jobs: any[] }) => group.jobs || []);
     const ordered = variedByCompany(rows, (j: any) => j.companyName || '', calendarDay(new Date()));
     const pageRows = ordered.slice((current - 1) * perPage, current * perPage);
 
@@ -85,7 +111,7 @@ export class PublicJobsController {
       isNew: j.createdAt ? now - new Date(j.createdAt).getTime() < 7 * 864e5 : false,
     }));
 
-    return { jobs, total, page: current, perPage, pages: Math.ceil(total / perPage) };
+    return { jobs, total, page: current, perPage, pages: Math.ceil(ordered.length / perPage) };
   }
 
   @Get(':id')

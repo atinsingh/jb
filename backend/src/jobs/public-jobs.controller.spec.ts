@@ -12,20 +12,27 @@ describe('PublicJobsController listing mix', () => {
       { _id: 'bmo', title: 'Advisor', companyName: 'BMO', createdAt: new Date('2026-11-05T12:00:00.000Z') },
       { _id: 'shop', title: 'Engineer', companyName: 'Shopify', createdAt: new Date('2026-11-05T12:00:00.000Z') },
     ];
-    const query: any = {};
-    query.select = () => query;
-    query.sort = () => query;
-    query.skip = () => query;
-    query.limit = () => query;
-    query.lean = () => query;
-    query.exec = () => Promise.resolve(rows);
+    let pipeline: any[] = [];
     const jobModel = {
-      find: () => query,
+      aggregate: (stages: any[]) => {
+        pipeline = stages;
+        return {
+          exec: () => Promise.resolve([
+            { jobs: rows.filter((row) => row.companyName === 'TD') },
+            { jobs: rows.filter((row) => row.companyName === 'BMO') },
+            { jobs: rows.filter((row) => row.companyName === 'Shopify') },
+          ]),
+        };
+      },
       countDocuments: () => Promise.resolve(rows.length),
     };
     const res = await new PublicJobsController(jobModel as any).list(undefined, undefined, undefined, '1', '10');
+    const serialized = JSON.stringify(pipeline);
+    expect(serialized).toContain('"$slice"');
+    expect(serialized).toContain('"$limit"');
     expect(res.jobs).toHaveLength(10);
     expect(new Set(res.jobs.slice(0, 3).map((job) => job.company)).size).toBe(3);
     expect(res.total).toBe(10);
+    expect(res.pages).toBe(1);
   });
 });
