@@ -255,10 +255,47 @@ describe('ResumeComparisonService', () => {
       templateKey: 'classic',
       targetRole: 'Backend résumé',
       jobDescription: 'Backend engineer',
-      candidateAddendum: expect.stringContaining('Acme'),
+      candidateFacts: expect.stringContaining('Acme'),
     }));
+    expect(harness.startSession.mock.calls[0][1].candidateAddendum).toBeUndefined();
+    expect(harness.startSession.mock.calls[0][1].candidateFacts).not.toContain('profile above');
     expect(prepared.instruction).toContain('Name the billing system.');
     expect(prepared.session.id).toBe('session-1');
+  });
+
+  it('uses the original file when the saved résumé has no biographical details', async () => {
+    resumeModel.findOne.mockReturnValue({ exec: () => Promise.resolve({
+      ...resume,
+      fullName: '',
+      email: '',
+      summary: '',
+      skills: [],
+      experience: [],
+      source: {
+        storageKey: `resumes/compare/${userId}/original.pdf`,
+        originalFilename: 'resume.pdf',
+        jobDescription: 'Backend engineer',
+      },
+    }) });
+    reviews.findOne.mockReturnValue({ sort: () => ({ exec: async () => ({
+      result: { annotations: [{ message: 'Vague', fix: 'Name the billing system.', quote: 'Built APIs.' }] },
+    }) }) });
+    parser.heuristicParse.mockReturnValueOnce({
+      fullName: 'Alex Chen',
+      email: 'alex@example.com',
+      experience: [{ title: 'Engineer', company: 'Example Co', location: 'Toronto', achievements: ['Shipped billing.'] }],
+    });
+    aliases.resolveAutomaticForUser.mockResolvedValue({ model: 'nova', effort: 'low' });
+    harness.startSession.mockResolvedValue({ id: 'session-2' });
+
+    await service.prepareCorrection('resume-1', userId, 'classic');
+
+    const facts = harness.startSession.mock.calls[0][1].candidateFacts as string;
+    expect(facts).toContain('Alex Chen');
+    expect(facts).toContain('alex@example.com');
+    expect(facts).toContain('Example Co');
+    expect(facts).toContain('Toronto');
+    expect(facts).not.toContain('Jordan Reyes');
   });
 
   it('does not start a corrected résumé before a comparison exists', async () => {

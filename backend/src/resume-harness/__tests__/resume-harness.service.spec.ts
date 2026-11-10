@@ -389,6 +389,25 @@ describe('ResumeHarnessService', () => {
     );
   });
 
+  it('writes a compared résumé in place of the account profile', async () => {
+    const session = await start('claude-code', {
+      candidateFacts: [
+        '# Candidate facts',
+        '',
+        '- Name: Alex Chen',
+        '',
+        '## Experience',
+        '',
+        '### Engineer — Example Co (Toronto)',
+      ].join('\n'),
+    });
+
+    const saved = store.find((row) => row._id === session.id);
+    expect(saved.candidateName).toBe('Alex Chen');
+    expect(saved.candidateMarkdown).toContain('Example Co');
+    expect(saved.candidateMarkdown).not.toContain('Stripe');
+  });
+
   it('persists Luna selection and routes its sandbox through Codex', async () => {
     modelAlias.resolveSelectionForUser.mockResolvedValueOnce(LUNA_ALIAS);
     const session = await service.startSession('u1', {

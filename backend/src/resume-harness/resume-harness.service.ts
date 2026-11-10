@@ -78,6 +78,12 @@ export interface StartSessionInput {
    * public start DTO, so a browser cannot supply biographical text.
    */
   candidateAddendum?: string;
+  /**
+   * Server-built candidate file that replaces the account profile. Used when
+   * the session is for a compared résumé that may belong to someone else.
+   * Not accepted from the public start DTO.
+   */
+  candidateFacts?: string;
 }
 
 export interface RunTurnInput {
@@ -315,8 +321,9 @@ export class ResumeHarnessService {
     // Built before the session document because the session records the name,
     // which later turns check the finished résumé actually contains.
     const context = await this.candidateContext.build(userId);
-    let candidateMarkdown = this.withTarget(context.markdown, resolvedInput);
-    if (input.candidateAddendum?.trim()) {
+    const replacement = input.candidateFacts?.trim();
+    let candidateMarkdown = this.withTarget(replacement || context.markdown, resolvedInput);
+    if (!replacement && input.candidateAddendum?.trim()) {
       candidateMarkdown = `${candidateMarkdown.trim()}\n\n${input.candidateAddendum.trim()}\n`;
     }
 
@@ -342,7 +349,9 @@ export class ResumeHarnessService {
       jobDescription,
       jobUrl,
       jobContextWarning,
-      candidateName: context.summary?.name,
+      candidateName: replacement
+        ? this.nameFromFacts(replacement)
+        : context.summary?.name,
       candidateMarkdown,
       templateKey: look.template?.key,
       vibe: look.vibe,
@@ -1904,6 +1913,10 @@ export class ResumeHarnessService {
       '',
       'Then run the build command from AGENTS.md and make sure it exits 0.',
     ].join('\n');
+  }
+
+  private nameFromFacts(markdown: string): string | undefined {
+    return markdown.match(/^- Name: (.+)$/m)?.[1]?.trim() || undefined;
   }
 
   /**

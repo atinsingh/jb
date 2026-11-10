@@ -6,7 +6,7 @@ type FactResume = {
   linkedin?: string;
   summary?: string;
   skills?: string[];
-  experience?: Array<{ title?: string; company?: string; startDate?: string; endDate?: string; description?: string; achievements?: string[] }>;
+  experience?: Array<{ title?: string; company?: string; location?: string; startDate?: string; endDate?: string; description?: string; achievements?: string[] }>;
   education?: Array<{ degree?: string; institution?: string; startDate?: string; endDate?: string }>;
   projects?: Array<{ name?: string; description?: string }>;
   achievements?: string[];
@@ -17,10 +17,11 @@ type Fix = { quote?: string; message?: string; fix?: string };
 
 export function importedResumeFacts(resume: FactResume): string {
   const lines = [
-    '## Uploaded résumé',
+    '# Candidate facts',
     '',
-    'These facts are from the résumé the candidate uploaded. They are candidate facts.',
-    'Do not invent employers, dates, titles, degrees, or metrics beyond this section and the profile above.',
+    'These facts are from the résumé used for this comparison.',
+    'They are the only biographical source for this résumé.',
+    'Do not use the signed-in account, and do not invent employers, dates, titles, degrees, or metrics that are not written here.',
     '',
   ];
   const contact = [
@@ -37,7 +38,8 @@ export function importedResumeFacts(resume: FactResume): string {
     lines.push('## Experience', '');
     for (const item of experience) {
       const when = [item.startDate, item.endDate].filter(Boolean).join(' – ');
-      lines.push(`### ${[item.title, item.company].filter(Boolean).join(' — ')}${when ? ` (${when})` : ''}`);
+      const where = [when, item.location].filter(Boolean).join(' · ');
+      lines.push(`### ${[item.title, item.company].filter(Boolean).join(' — ')}${where ? ` (${where})` : ''}`);
       if (item.description?.trim()) lines.push(item.description.trim());
       for (const achievement of item.achievements || []) if (achievement.trim()) lines.push(`- ${achievement.trim()}`);
       lines.push('');
@@ -68,7 +70,7 @@ export function importedResumeFacts(resume: FactResume): string {
 
 export function correctionInstruction(annotations: Fix[]): string {
   const lines = [
-    'Write the résumé in the selected template using only the profile and the uploaded résumé facts.',
+    'Write the résumé in the selected template using only the facts in the candidate file.',
     'Apply a review fix only when those facts support it. Do not invent metrics, employers, titles, or skills to satisfy a fix.',
     'If a fix asks for evidence that is not in the facts, leave that claim out.',
   ];

@@ -70,12 +70,46 @@ export class ResumeComparisonService {
       ...(resume.name?.trim() ? { targetRole: resume.name.trim() } : {}),
       ...(jobDescription ? { jobDescription } : {}),
       ...(!jobDescription && jobUrl ? { jobUrl } : {}),
-      candidateAddendum: importedResumeFacts(resume),
+      candidateFacts: await this.correctionFacts(resume, resumeId, userId),
     });
     return {
       session,
       instruction: correctionInstruction(review.result.annotations || []),
     };
+  }
+
+  /** Saved résumé fields, with blanks filled from the original file. */
+  private async correctionFacts(resume: Resume, resumeId: string, userId: string): Promise<string> {
+    const facts = {
+      fullName: resume.fullName,
+      email: resume.email,
+      phone: resume.phone,
+      location: resume.location,
+      linkedin: resume.linkedin,
+      summary: resume.summary,
+      skills: resume.skills,
+      experience: resume.experience,
+      education: resume.education,
+      projects: resume.projects,
+      achievements: resume.achievements,
+      certifications: resume.certifications,
+    };
+    if (resume.source?.storageKey) {
+      try {
+        const { text } = await this.comparisonText(resume, resumeId, userId);
+        const extracted = this.parser.heuristicParse(text) as Record<string, any>;
+        for (const field of ['fullName', 'email', 'phone', 'location', 'linkedin', 'summary', 'skills', 'experience', 'education', 'achievements', 'certifications', 'projects'] as const) {
+          const value = field === 'fullName' ? extracted.fullName || extracted.name : extracted[field];
+          const current = facts[field];
+          const empty = current == null || current === '' || (Array.isArray(current) && current.length === 0);
+          const usable = (typeof value === 'string' && value.trim()) || (Array.isArray(value) && value.length > 0);
+          if (empty && usable) (facts as Record<string, unknown>)[field] = value;
+        }
+      } catch {
+        // The saved résumé remains the source when the original file cannot be read.
+      }
+    }
+    return importedResumeFacts(facts);
   }
 
   async attachSource(resumeId: string, userId: string, file: Express.Multer.File) {

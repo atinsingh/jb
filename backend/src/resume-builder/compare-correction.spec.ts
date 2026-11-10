@@ -13,6 +13,7 @@ describe('compare correction', () => {
     expect(facts).toContain('Acme');
     expect(facts).toContain('Summary: Built payment APIs.');
     expect(facts).toContain('## Skills');
+    expect(facts).not.toContain('profile above');
   });
 
   it('asks for the reviewed fixes without permission to invent supporting facts', () => {
@@ -25,5 +26,6 @@ describe('compare correction', () => {
     expect(instruction).toContain('Shipped billing.');
     expect(instruction).toContain('Do not invent');
     expect(instruction).not.toContain('Skip me');
+    expect(instruction).not.toContain('profile');
   });
 });
