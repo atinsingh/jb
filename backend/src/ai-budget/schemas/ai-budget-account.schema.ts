@@ -31,6 +31,11 @@ export class AiBudgetAccount {
   @Prop({ required: true, min: 0 })
   appliedLimitUsd: number;
 
+  // Last alias list written to the LiteLLM key. A new catalogue entry must
+  // refresh the key even when the plan and budget are unchanged.
+  @Prop({ type: [String], default: [] })
+  appliedModels: string[];
+
   // One-time grants apply only to the period in which they were awarded.
   @Prop({ min: 0, default: 0 })
   bonusCredits?: number;

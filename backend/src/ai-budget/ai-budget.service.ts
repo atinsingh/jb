@@ -337,6 +337,7 @@ export class AiBudgetService {
             encryptedKey: this.codec.encrypt(generated.key),
             appliedTier: tier,
             appliedLimitUsd: baseBudgetUsd,
+            appliedModels: models,
             budgetDuration: tierPolicy.budgetDuration,
           });
         } catch (error) {
@@ -393,10 +394,15 @@ export class AiBudgetService {
           )
           .exec();
       }
+      const appliedModels = account.appliedModels || [];
+      const modelsChanged =
+        appliedModels.length !== models.length ||
+        appliedModels.some((alias, index) => alias !== models[index]);
       const changed =
         account.appliedTier !== tier ||
         account.appliedLimitUsd !== maxBudgetUsd ||
-        account.budgetDuration !== tierPolicy.budgetDuration;
+        account.budgetDuration !== tierPolicy.budgetDuration ||
+        modelsChanged;
       if (changed) {
         await this.client.update(apiKey, {
           models,
@@ -405,6 +411,7 @@ export class AiBudgetService {
         const applied = {
           appliedTier: tier,
           appliedLimitUsd: maxBudgetUsd,
+          appliedModels: models,
           budgetDuration: tierPolicy.budgetDuration,
         };
         await this.accountModel

@@ -149,8 +149,8 @@ class AtsTransportTest(unittest.TestCase):
         self.assertEqual(router.model_list[0]["litellm_params"]["extra_headers"]["x-litellm-tags"], "ownerType=candidate,logicalRunId=run-1")
 
     def test_resume_parse_gets_full_json_output_budget(self):
-        # Unregistered aliases fall back to 4096 output tokens, which truncates
-        # long resumes into invalid JSON and burns the 240s ATS exec timeout.
+        # Unregistered aliases fall back to 4096 output tokens. Medium thinking
+        # shares that budget, so the résumé JSON never finishes.
         budget = {}
 
         def parser_hook(parser, llm):
@@ -162,9 +162,9 @@ class AtsTransportTest(unittest.TestCase):
                 return {}
             parser.parse_resume_to_json = parse
 
-        run_shim({"alias": "anthropic/claude-sonnet-4-6/low", "latex": "r", "jobDescription": "j"},
+        run_shim({"alias": "anthropic/claude-haiku-5-5/medium", "latex": "r", "jobDescription": "j"},
                  module_hook=parser_hook)
-        self.assertEqual(budget["resume"], 8192)
+        self.assertEqual(budget["resume"], 16384)
 
     def test_parallel_slot_429_retries_quickly_other_429_keeps_retry_after(self):
         # The per-key slot frees just after a sequential call returns; waiting

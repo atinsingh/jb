@@ -162,6 +162,25 @@ describe('AiBudgetService', () => {
   });
 
 
+  it('refreshes an existing key when the offered alias catalogue grows', async () => {
+    accountStore.account = {
+      ...existingAccount(),
+      appliedModels: aliases.map((item) => item.alias),
+    };
+    const offered = [...aliases, { alias: 'anthropic/claude-haiku-5-5/medium' }];
+    modelAliases.listForTier.mockResolvedValue(offered);
+
+    await service.ensureCandidateAccess('candidate-1');
+
+    expect(client.update).toHaveBeenCalledWith('sk-existing', {
+      models: offered.map((item) => item.alias),
+      maxBudgetUsd: 0.5,
+    });
+    expect(accountStore.account?.appliedModels).toEqual(
+      offered.map((item) => item.alias),
+    );
+  });
+
   it('updates the existing key when the candidate tier changes', async () => {
     accountStore.account = existingAccount();
     tier = 'PRO';

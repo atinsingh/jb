@@ -56,10 +56,9 @@ async def analyze(payload: dict) -> dict:
         params["extra_headers"] = headers
 
     # Our proxy aliases have no max_output_tokens in LiteLLM's registry, so
-    # Resume-Matcher falls back to 4096 and long résumé JSON truncates into
-    # retries that outlast the sandbox exec timeout. Restore the parser's own
-    # default budget (Resume-Matcher's DEFAULT_JSON_MAX_TOKENS).
-    resume_parser.get_safe_max_tokens = lambda _model, requested=8192, config=None: requested
+    # Resume-Matcher falls back to 4096. Medium thinking shares that budget and
+    # the résumé JSON never finishes. Keep at least 16384 for thinking plus JSON.
+    resume_parser.get_safe_max_tokens = lambda _model, requested=8192, config=None: max(requested, 16384)
 
     # The per-key slot frees just after a sequential call returns, so a
     # max_parallel_requests 429 is a race: retry in seconds, not the proxy's minute.
