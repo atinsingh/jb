@@ -97,7 +97,20 @@ const ALIASES = [
   // session on them cannot produce a résumé. Re-seeding deactivates any
   // leftover rows below.
 
-  // --- Anthropic (Claude Code harness; LiteLLM → Bedrock IAM) ---
+  // --- Anthropic (Claude Code harness) ---
+  // Haiku 5.5 medium is the picker default (lowest rank) and the no-picker
+  // compare alias via DEFAULT_AUTOMATIC_MODEL_ALIAS. LiteLLM calls the
+  // Anthropic API for this row. Haiku 4.5 and Sonnet stay on Bedrock IAM.
+  {
+    alias: 'anthropic/claude-haiku-5-5/medium',
+    provider: 'anthropic',
+    model: 'claude-haiku-5-5',
+    effort: 'medium',
+    label: 'Haiku 5.5 · balanced',
+    tiers: ['FREE', 'PRO'],
+    defaultForTiers: [],
+    rank: 10,
+  },
   {
     alias: 'anthropic/claude-haiku-4-5/low',
     provider: 'anthropic',

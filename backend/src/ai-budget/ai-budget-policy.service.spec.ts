@@ -160,6 +160,7 @@ describe('AI budget policy', () => {
     const allowance = service.tier('FREE').maxBudgetCredits;
     expect(allowance).toBe(100);
     const aliases = [
+      'anthropic/claude-haiku-5-5/medium',
       'anthropic/claude-haiku-4-5/low',
       'anthropic/claude-sonnet-4-6/low',
       'anthropic/claude-sonnet-4-6/high',

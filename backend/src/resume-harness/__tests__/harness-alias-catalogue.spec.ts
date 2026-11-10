@@ -65,18 +65,18 @@ describe('harness alias catalogue', () => {
     }
   });
 
-  it('offers only verified Haiku and Sonnet 4.6 routes through Bedrock IAM', () => {
-    const claudeBlocks = [
+  it('offers Haiku 4.5 and Sonnet 4.6 through Bedrock IAM', () => {
+    const bedrockBlocks = [
       ...CONFIG.matchAll(
-        /- model_name:\s*(anthropic\/claude-[^\s]+)\r?\n([\s\S]*?)(?=\r?\n  - model_name:|\r?\nlitellm_settings:)/g,
+        /- model_name:\s*(anthropic\/claude-(?:haiku-4-5|sonnet-4-6)\/[^\s]+)\r?\n([\s\S]*?)(?=\r?\n  - model_name:|\r?\nlitellm_settings:)/g,
       ),
     ];
-    expect(claudeBlocks.map((match) => match[1])).toEqual([
+    expect(bedrockBlocks.map((match) => match[1])).toEqual([
       'anthropic/claude-haiku-4-5/low',
       'anthropic/claude-sonnet-4-6/low',
       'anthropic/claude-sonnet-4-6/high',
     ]);
-    for (const [, , body] of claudeBlocks) {
+    for (const [, , body] of bedrockBlocks) {
       expect(body).toMatch(/model:\s*bedrock\/us\.anthropic\.claude-/);
       expect(body).toMatch(/aws_access_key_id:\s*os\.environ\/AWS_ACCESS_KEY_ID/);
       expect(body).toMatch(
@@ -94,10 +94,34 @@ describe('harness alias catalogue', () => {
       true,
     );
     expect(seededAliases.filter((alias) => alias.startsWith('anthropic/claude-'))).toEqual([
+      'anthropic/claude-haiku-5-5/medium',
       'anthropic/claude-haiku-4-5/low',
       'anthropic/claude-sonnet-4-6/low',
       'anthropic/claude-sonnet-4-6/high',
     ]);
+  });
+
+  it('serves Haiku 5.5 medium from the Anthropic API key, not Bedrock', () => {
+    const blocks = [
+      ...CONFIG.matchAll(
+        /- model_name:\s*(anthropic\/claude-haiku-5-5\/medium)\r?\n([\s\S]*?)(?=\r?\n  - model_name:|\r?\nlitellm_settings:)/g,
+      ),
+    ];
+    expect(blocks).toHaveLength(1);
+    const body = blocks[0][2];
+    expect(body).toMatch(/model:\s*anthropic\/claude-haiku-5-5\s*$/m);
+    expect(body).toMatch(/api_key:\s*os\.environ\/ANTHROPIC_API_KEY/);
+    expect(body).toMatch(/reasoning_effort:\s*medium/);
+    expect(body).not.toMatch(/thinking:/);
+    expect(body).not.toMatch(/aws_access_key_id/);
+    expect(body).not.toMatch(/aws_secret_access_key/);
+    const haiku = SEED.match(
+      /alias:\s*'anthropic\/claude-haiku-5-5\/medium'([\s\S]*?)\r?\n  \},/,
+    );
+    expect(haiku?.[1]).toMatch(/model:\s*'claude-haiku-5-5'/);
+    expect(haiku?.[1]).toMatch(/effort:\s*'medium'/);
+    expect(haiku?.[1]).toMatch(/defaultForTiers:\s*\[\]/);
+    expect(haiku?.[1]).toMatch(/rank:\s*10/);
   });
 
   it('clears stale Sonnet tier defaults when the catalogue is re-seeded', () => {
@@ -148,10 +172,19 @@ describe('harness alias catalogue', () => {
     }
   });
 
-  it('does not keep vendor API-key routes on the proxy', () => {
-    expect(CONFIG).not.toMatch(
-      /api_key:\s*os\.environ\/(ANTHROPIC_API_KEY|OPENAI_API_KEY)/,
+  it('keeps vendor API keys off every proxy row except Haiku 5.5 medium', () => {
+    const blocks = [
+      ...CONFIG.matchAll(
+        /- model_name:\s*(\S+)\r?\n([\s\S]*?)(?=\r?\n  - model_name:|\r?\nlitellm_settings:)/g,
+      ),
+    ];
+    const keyed = blocks.filter(([, , body]) =>
+      /api_key:\s*os\.environ\/ANTHROPIC_API_KEY/.test(body),
     );
+    expect(keyed.map((match) => match[1])).toEqual([
+      'anthropic/claude-haiku-5-5/medium',
+    ]);
+    expect(CONFIG).not.toMatch(/os\.environ\/OPENAI_API_KEY/);
     expect(configAliases.join('\n')).not.toMatch(/gpt-5\.1-codex/);
     expect(seededAliases.join('\n')).not.toMatch(/gpt-5\.1-codex/);
   });

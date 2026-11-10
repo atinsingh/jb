@@ -10,8 +10,9 @@
 #    identical prices. Per-harness reporting comes from the `harness` request
 #    tag instead (see `tag_filters` below and LITELLM_TAG_HEADER in the backend).
 #
-# 2. Credentials on this proxy are Bedrock IAM only. Anthropic Console and
-#    OpenAI Platform keys are not configured here. Claude Pro/Max and ChatGPT
+# 2. Credentials are Bedrock IAM, except Haiku 5.5 medium, which calls the
+#    Anthropic API with ANTHROPIC_API_KEY. Do not put that key on any other
+#    row, and do not add an OpenAI Platform key. Claude Pro/Max and ChatGPT
 #    Plus/Pro logins are Consumer Terms products and must never appear either.
 #
 # Adding an alias is an entry here plus a row in `harness_model_aliases`
@@ -22,8 +23,20 @@
 
 model_list:
   # ----------------------------------------------------------- anthropic ---
-  # Haiku and Sonnet 4.6 are the verified Claude routes. Alias names stay
-  # anthropic/… so Claude Code is the harness; the wire call uses Bedrock IAM.
+  # Haiku 5.5 medium is the generation and compare default. The alias stays
+  # anthropic/… so Claude Code is the harness. This row calls the Anthropic
+  # API. Haiku 4.5 and Sonnet 4.6 stay on Bedrock IAM below.
+  - model_name: anthropic/claude-haiku-5-5/medium
+    # Published floor. Medium can bill above it. Measured spend is authoritative.
+    model_info:
+      { input_cost_per_token: 0.0000001, output_cost_per_token: 0.0000005 }
+    litellm_params:
+      model: anthropic/claude-haiku-5-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+      reasoning_effort: medium
+
+  # Haiku 4.5 and Sonnet 4.6 stay anthropic/… so Claude Code is the harness.
+  # Their wire call uses Bedrock IAM, not ANTHROPIC_API_KEY.
   - model_name: anthropic/claude-haiku-4-5/low
     # USD/token. Final spend uses actual input, output, and reasoning usage.
     model_info:
@@ -107,7 +120,7 @@ model_list:
   # If a future LiteLLM lets the Converse handler tolerate bearer auth, this can
   # go back to AWS_BEARER_TOKEN_BEDROCK and drop the IAM pair entirely.
   #
-  # The Claude aliases above use these IAM credentials.
+  # Haiku 4.5 and Sonnet above use these IAM credentials. Haiku 5.5 does not.
 
   # Amazon Nova — the cheap end of Bedrock.
   #

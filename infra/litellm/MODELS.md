@@ -12,12 +12,14 @@ Region probed: `us-east-1`. Latest Claude probe: 2026-09-16.
 |---|---|---|
 | Usable now | Qwen3 Coder Next | Available through LiteLLM with existing Bedrock IAM credentials and no Qwen key. Passed streaming tools plus the production OpenCode adapter's three-pass edit/compile/grounding probe. |
 | Offered; file write verified | Claude Haiku 4.5, Sonnet 4.6 | Claude Code sandbox turns wrote requested files through LiteLLM with Bedrock IAM on 2026-09-16. Sonnet low and high both passed. Full résumé and PDF quality are not yet verified. |
+| Offered; Anthropic API default | Claude Haiku 5.5 medium | Picker and no-picker compare default. LiteLLM calls the Anthropic API with `ANTHROPIC_API_KEY` at effort medium. A file-write probe on this account is still outstanding. |
 | Usable for smoke checks | Nova Micro, Nova Lite, Nova Pro, Nova 2 Lite | Available through LiteLLM with the existing Bedrock IAM credential. Use for transport and browser smoke verification only; they are not approved résumé writers. |
 | Not usable without additional steps | DeepSeek V3.2; MiniMax M2.5; Kimi K2.5; Devstral 2; Bedrock Sonnet 4.5 and Opus 4.5/4.6 | See the exact missing quality, configuration, credential, or account step below. Do not use these for ticket sign-off until that step passes. |
 | Not usable | Bedrock Llama; DeepSeek R1; Nova Premier; legacy Bedrock Claude; unavailable Sonnet/Opus 5 routes | The model or account route cannot satisfy the harness protocol. Do not add them to the proxy or picker. |
 
 Qwen is the current no-vendor-key résumé model with a three-pass quality probe.
-Haiku and Sonnet 4.6 are the Claude aliases offered through Bedrock IAM. GPT-5.6 Luna remains
+Haiku 5.5 medium is the default Claude alias and uses the Anthropic API key.
+Haiku 4.5 and Sonnet 4.6 stay on Bedrock IAM. GPT-5.6 Luna remains
 on the proxy but needs account enablement before it can be offered.
 
 ---
@@ -67,15 +69,22 @@ candidate-document quality.
 | Moonshot AI | `moonshotai.kimi-k2.5` | Add the LiteLLM alias and seed row, recreate LiteLLM, then run the multi-turn résumé and PDF-quality flow. |
 | Mistral AI | `mistral.devstral-2-123b` | Add the LiteLLM alias and seed row, recreate LiteLLM, then run the multi-turn résumé and PDF-quality flow. |
 
+### Anthropic Claude — Haiku 5.5 medium on the Anthropic API
+
+`anthropic/claude-haiku-5-5/medium` is the generation picker default and the
+no-picker compare alias. LiteLLM calls `anthropic/claude-haiku-5-5` with
+`ANTHROPIC_API_KEY` and `reasoning_effort: medium`. Adaptive thinking stays
+on. This row has no Bedrock credentials. Do not put the key in this file.
+
 ### Anthropic Claude — Haiku 4.5 and Sonnet 4.6 on Bedrock IAM
 
 Alias names stay `anthropic/…` so Claude Code is the harness. LiteLLM calls
 Bedrock with the same IAM pair as Nova/Qwen. Do not put `ANTHROPIC_API_KEY`
 on these rows.
 
-- `anthropic/claude-haiku-4-5/low` → `us.anthropic.claude-haiku-4-5-20251001-v1:0` (FREE, PRO, and ELITE default)
-- `anthropic/claude-sonnet-4-6/low` → `us.anthropic.claude-sonnet-4-6` (FREE, PRO, and ELITE)
-- `anthropic/claude-sonnet-4-6/high` → `us.anthropic.claude-sonnet-4-6` (FREE, PRO, and ELITE)
+- `anthropic/claude-haiku-4-5/low` → `us.anthropic.claude-haiku-4-5-20251001-v1:0` (FREE, PRO)
+- `anthropic/claude-sonnet-4-6/low` → `us.anthropic.claude-sonnet-4-6` (FREE, PRO)
+- `anthropic/claude-sonnet-4-6/high` → `us.anthropic.claude-sonnet-4-6` (FREE, PRO)
 
 ### OpenAI Platform
 

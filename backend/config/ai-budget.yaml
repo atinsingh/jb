@@ -53,6 +53,13 @@ services:
 # authoritative; ranges are deliberately not exact charge promises.
 estimates:
   - {
+      alias: anthropic/claude-haiku-5-5/medium,
+      service: resume_agent_turn,
+      kind: range,
+      minUsd: 0.005,
+      maxUsd: 0.1,
+    }
+  - {
       alias: anthropic/claude-haiku-4-5/low,
       service: resume_agent_turn,
       kind: range,
