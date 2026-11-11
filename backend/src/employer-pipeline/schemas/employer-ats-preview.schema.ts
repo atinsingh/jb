@@ -28,3 +28,16 @@ export class EmployerAtsPreview {
 
 export const EmployerAtsPreviewSchema = SchemaFactory.createForClass(EmployerAtsPreview);
 EmployerAtsPreviewSchema.index({ ownerId: 1, jobId: 1, createdAt: -1 });
+
+// Older deploys created a unique ownerId+jobId index. A second upload for the same job is a new session.
+export function staleUniquePreviewIndex(
+  indexes: { name?: string; unique?: boolean; key?: Record<string, unknown> }[],
+): string | null {
+  const stale = indexes.find((index) =>
+    index.unique === true
+    && index.key?.ownerId === 1
+    && index.key?.jobId === 1
+    && index.key.createdAt == null,
+  );
+  return stale?.name || null;
+}

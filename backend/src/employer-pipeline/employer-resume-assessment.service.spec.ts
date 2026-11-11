@@ -633,4 +633,19 @@ describe('EmployerResumeAssessmentService', () => {
     expect(gateway.assess).not.toHaveBeenCalled();
     expect(applicantModel.updateOne).not.toHaveBeenCalled();
   });
+
+  it('drops the stale unique preview index so a second upload for the same job can be saved', async () => {
+    const dropIndex = jest.fn();
+    (previewModel as any).collection = {
+      indexes: async () => [
+        { name: '_id_', key: { _id: 1 } },
+        { name: 'ownerId_1_jobId_1', unique: true, key: { ownerId: 1, jobId: 1 } },
+        { name: 'ownerId_1_jobId_1_createdAt_-1', key: { ownerId: 1, jobId: 1, createdAt: -1 } },
+      ],
+      dropIndex,
+    };
+    await service.onModuleInit();
+    expect(dropIndex).toHaveBeenCalledTimes(1);
+    expect(dropIndex).toHaveBeenCalledWith('ownerId_1_jobId_1');
+  });
 });

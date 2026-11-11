@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { createHash, randomUUID } from 'crypto';
 import { Model, Types } from 'mongoose';
@@ -27,10 +27,11 @@ import { StorageService } from '../storage/storage.service';
 import {
   EmployerAtsPreview,
   EmployerAtsPreviewDocument,
+  staleUniquePreviewIndex,
 } from './schemas/employer-ats-preview.schema';
 
 @Injectable()
-export class EmployerResumeAssessmentService {
+export class EmployerResumeAssessmentService implements OnModuleInit {
   constructor(
     @InjectModel(EmployerApplicant.name)
     private readonly applicantModel: Model<EmployerApplicantDocument>,
@@ -46,6 +47,18 @@ export class EmployerResumeAssessmentService {
     private readonly atsRuntime?: EmployerAtsRuntimeService,
     private readonly storageService?: StorageService,
   ) {}
+
+  async onModuleInit(): Promise<void> {
+    let indexes: Parameters<typeof staleUniquePreviewIndex>[0] = [];
+    try {
+      indexes = await this.previewModel.collection.indexes();
+    } catch (error) {
+      if ((error as { code?: number }).code === 26) return;
+      throw error;
+    }
+    const stale = staleUniquePreviewIndex(indexes);
+    if (stale) await this.previewModel.collection.dropIndex(stale);
+  }
 
   async budgetStatus(ownerId: string) {
     return this.atsRuntime?.budgetStatus(ownerId) || {
