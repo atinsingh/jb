@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "arial",
+        "createdAt": "2026-10-28T17:31:16.056Z",
+        "reason": "Existing SMTP HTML already uses Arial because mail clients do not load product fonts. This is transactional mail, not the app UI."
+      }
+    ]
+  }
+}

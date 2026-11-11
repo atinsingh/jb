@@ -60,7 +60,7 @@ function main(){
   values.RESUME_SANDBOX_IMAGE=sandboxImage;
   secret('jobocate-agent-platform',['AGENT_PLATFORM_API_KEY','RESUME_SANDBOX_IMAGE']);
   if(!gatewayOnly){
-    secret('jobocate-litellm',['AWS_ACCESS_KEY_ID','AWS_SECRET_ACCESS_KEY','AWS_REGION','LITELLM_MASTER_KEY','LITELLM_DATABASE_URL']);
+    secret('jobocate-litellm',['AWS_ACCESS_KEY_ID','AWS_SECRET_ACCESS_KEY','AWS_REGION','LITELLM_MASTER_KEY','LITELLM_DATABASE_URL','ANTHROPIC_API_KEY']);
     const config=fs.readFileSync(path.join(root,'infra/litellm/config.yaml'),'utf8');
     apply({apiVersion:'v1',kind:'ConfigMap',metadata:{name:'jobocate-litellm-config',namespace},data:{'config.yaml':config}});
   }

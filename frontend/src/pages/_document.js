@@ -28,7 +28,8 @@ export default function Document() {
     <Html lang="en" data-jb-theme="dark" suppressHydrationWarning>
       <Head>
         <meta charSet="utf-8" />
-        <link rel="icon" href="/favicon.ico" />
+        <link rel="icon" href="/favicon.ico" sizes="32x32" />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <meta name="theme-color" content="#0d2418" />
 
         {/* No font <link>s and no font preconnects here on purpose. Fonts are
