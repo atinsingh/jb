@@ -63,6 +63,7 @@ export default function JobApplications() {
   const [reviewLoading, setReviewLoading] = useState(false);
   const [previewBusy, setPreviewBusy] = useState(false);
   const [assessmentBusy, setAssessmentBusy] = useState(false);
+  const [submittedResume, setSubmittedResume] = useState(null);
   const previewAbort = useRef(null);
   const previewInput = useRef(null);
   const { status: sandboxStatus, error: sandboxError } = useEmployerAtsSandboxRelease(() => {
@@ -150,6 +151,30 @@ export default function JobApplications() {
     };
   }, [selectedId]);
 
+  useEffect(() => {
+    if (!selectedId) {
+      setSubmittedResume(null);
+      return undefined;
+    }
+    let cancelled = false;
+    employerPipelineApi.submittedResume(selectedId)
+      .then((resume) => { if (!cancelled) setSubmittedResume(resume); })
+      .catch(() => { if (!cancelled) setSubmittedResume(null); });
+    return () => { cancelled = true; };
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (!selectedId || assessment?.status !== 'RUNNING' || assessmentBusy) return undefined;
+    const timer = setInterval(() => {
+      employerPipelineApi.get(selectedId)
+        .then((applicant) => {
+          if (applicant?.resumeAssessment) setAssessment(applicant.resumeAssessment);
+        })
+        .catch(() => {});
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [selectedId, assessment?.status, assessmentBusy]);
+
   const filteredApplications = applications.filter((app) => {
     const name = (app.candidateName || '').toLowerCase();
     const email = (app.candidateEmail || '').toLowerCase();
@@ -178,7 +203,7 @@ export default function JobApplications() {
   const runResumeAssessment = async () => {
     if (!selectedId || assessmentBusy || sandboxStatus !== 'ready') return;
     setAssessmentBusy(true);
-    setAssessment((current) => ({ ...(current || {}), status: 'RUNNING' }));
+    setAssessment((current) => ({ ...(current || {}), status: 'RUNNING', startedAt: new Date().toISOString() }));
     setActionError(null);
     try {
       const result = await employerPipelineApi.assessResume(selectedId);
@@ -435,6 +460,35 @@ export default function JobApplications() {
                           ) : null}
                         </dl>
 
+                        {submittedResume?.fileName && (
+                          <div className="resume-file">
+                            <h3>{submittedResume.fileName}</h3>
+                            {submittedResume.downloadUrl && (
+                              <button type="button" className="ghost" onClick={async () => {
+                                try {
+                                  const blob = await employerPipelineApi.downloadSubmittedResume(selectedApplication._id);
+                                  const url = URL.createObjectURL(blob);
+                                  const link = document.createElement('a');
+                                  link.href = url;
+                                  link.download = submittedResume.fileName || 'resume.pdf';
+                                  link.click();
+                                  URL.revokeObjectURL(url);
+                                } catch (err) {
+                                  setActionError(err);
+                                }
+                              }}>
+                                Download résumé
+                              </button>
+                            )}
+                            {submittedResume.text && (
+                              <details className="resume-text">
+                                <summary>View submitted résumé</summary>
+                                <pre>{submittedResume.text}</pre>
+                              </details>
+                            )}
+                          </div>
+                        )}
+
                         {selectedApplication.skills?.length > 0 && (
                           <div className="skills">
                             {selectedApplication.skills.map((skill) => (
@@ -548,6 +602,8 @@ export default function JobApplications() {
         dd { margin: 0; font-size: 13.5px; }
         dd a { color: var(--jb-v3-accent); text-decoration: none; }
         .skills { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 22px 8px; }
+        .resume-file { margin: 22px 22px 0; }
+        .resume-file h3 { margin: 0 0 10px; font-size: 16px; font-weight: 600; }
         .skills span { font-family: var(--jb-v3-font-mono); font-size: 10px; letter-spacing: .06em; color: var(--jb-v3-fg-2); border: 1px solid var(--jb-v3-line); padding: 4px 8px; }
         .detail :global(.resume-assessment) { margin: 0 22px; }
         .actions { display: flex; justify-content: flex-end; gap: 8px; padding: 18px 22px 22px; }

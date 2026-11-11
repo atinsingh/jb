@@ -7,7 +7,6 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { API_URL } from "@/config/api";
 import { useAuth } from "@/context/AuthContext";
-import { getSubscription } from "@/services/billingApi";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import AppTopNav from "@/components/app/AppTopNav";
@@ -155,20 +154,10 @@ export default function AppResume() {
   const [targetRole, setTargetRole] = useState("");
   const [jobDescription, setJobDescription] = useState("");
   const [jobUrl, setJobUrl] = useState("");
-  const [listingPaid, setListingPaid] = useState(false);
-  const paidListing = user?.role === "ROLE_CANDIDATE" && (user?.currentPlanType === "PRO" || listingPaid);
+  const [companyUrl, setCompanyUrl] = useState("");
 
   useEffect(() => {
-    if (user?.role !== "ROLE_CANDIDATE") return undefined;
-    let live = true;
-    getSubscription()
-      .then((data) => { if (live && data?.currentPlan === "PRO") setListingPaid(true); })
-      .catch(() => {});
-    return () => { live = false; };
-  }, [user?.role]);
-
-  useEffect(() => {
-    if (!router.isReady || typeof router.query.jobId !== "string" || !paidListing) return undefined;
+    if (!router.isReady || typeof router.query.jobId !== "string") return undefined;
     let live = true;
     fetch(`${API_URL}/api/public/jobs/${router.query.jobId}`)
       .then((res) => (res.ok ? res.json() : null))
@@ -181,8 +170,7 @@ export default function AppResume() {
     return () => {
       live = false;
     };
-  }, [router.isReady, router.query.jobId, paidListing]);
-  const [companyUrl, setCompanyUrl] = useState("");
+  }, [router.isReady, router.query.jobId]);
 
   const [session, setSession] = useState(null);
   const lifecycleEnded = useRef(new Set());
@@ -442,7 +430,7 @@ export default function AppResume() {
           ? { jobDescription: composedPastedJobDescription() }
           : {}),
         ...(jobUrl.trim() ? { jobUrl: jobUrl.trim() } : {}),
-        ...(typeof router.query.jobId === "string" && paidListing
+        ...(typeof router.query.jobId === "string"
           ? { publicJobId: router.query.jobId }
           : {}),
         ...(sourceSessionId ? { carryFromSessionId: sourceSessionId } : {}),

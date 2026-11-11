@@ -105,7 +105,21 @@ export const getJobRecommendations = async (limit = 10) => {
 };
 
 // Application Agent API
-export const applyToJob = async (jobId) => apiCall(`/api/applications/apply/${jobId}`, { method: 'POST' });
+export const applyToJob = async (jobId, file) => {
+  const token = await getAccessToken();
+  const body = new FormData();
+  if (file) body.append('resume', file);
+  const response = await fetch(`${API_URL}/api/applications/apply/${jobId}`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body,
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Request failed' }));
+    throw new Error(error.message || 'Request failed');
+  }
+  return response.json();
+};
 
 export const queueApplication = async (jobId) => {
   return apiCall(`/api/applications/queue/${jobId}`, {

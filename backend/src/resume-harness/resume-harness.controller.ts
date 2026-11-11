@@ -96,7 +96,7 @@ export class ResumeHarnessController {
     return this.service.startSession(this.userId(req), input);
   }
 
-  /** Paid callers only. Reads the cached listing; does not fetch or start the agent itself. */
+  /** Reads the cached listing; does not fetch or start the agent itself. */
   private async inputForListing(req: any, dto: StartSessionDto) {
     const tier = await this.modelAlias.tierFor(this.userId(req));
     const job = await this.jobs

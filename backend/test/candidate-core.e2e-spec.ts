@@ -1,4 +1,5 @@
 import { INestApplication } from '@nestjs/common';
+import { join } from 'path';
 import {
   api,
   auth,
@@ -7,6 +8,8 @@ import {
   resetDatabase,
   TestUser,
 } from './utils/e2e-app';
+
+const RESUME = join(__dirname, '../../e2e/fixtures/ats-preview.pdf');
 
 /**
  * The screens a paying candidate touches on day one: preferences, profile,
@@ -156,6 +159,7 @@ describe('Candidate core surface (e2e)', () => {
       await api(app)
         .post(`/api/applications/apply/${searchJob._id}`)
         .set(auth(candidate.token))
+        .attach('resume', RESUME)
         .expect(201);
 
       const res = await api(app)

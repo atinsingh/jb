@@ -20,6 +20,7 @@ export interface PersistedResumeAssessment {
   reason?: string;
   runId: string;
   pairKey?: string;
+  startedAt?: Date;
   applicationId?: string;
   submittedResume?: {
     artifactId: string;

@@ -165,6 +165,20 @@ describe('copilot tools', () => {
       expect(mocks.applyRunner.submitOne).not.toHaveBeenCalled();
     });
 
+    it('a missing PDF is an error, not an already-applied skip', async () => {
+      const { deps, mocks } = makeDeps();
+      mocks.applicationAgent.canApplyMore.mockResolvedValue({ canApply: true, remaining: 5 });
+      mocks.applications.createApplication.mockRejectedValue(
+        new BadRequestException('Upload a PDF résumé to apply.'),
+      );
+      const t = tool(buildCopilotTools(deps), 'apply');
+
+      const res = await t.handler(CTX, { jobId: 'job-1', matchScore: 90 });
+
+      expect(res).toEqual({ error: 'Upload a PDF résumé to apply.' });
+      expect(mocks.applyRunner.submitOne).not.toHaveBeenCalled();
+    });
+
     it("passes through submitOne 'needs_human' status", async () => {
       const { deps, mocks } = makeDeps();
       mocks.applicationAgent.canApplyMore.mockResolvedValue({ canApply: true, remaining: 3 });

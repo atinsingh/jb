@@ -9,7 +9,6 @@ import { appRoute } from '@/components/app/appRoutes';
 import { API_URL } from '@/config/api';
 import { useAuth } from '@/context/AuthContext';
 import { applyToJob, getMyApplications } from '@/services/api';
-import { getSubscription } from '@/services/billingApi';
 
 /**
  * Job detail.
@@ -60,27 +59,17 @@ export default function JobDetail() {
   const [job, setJob] = useState(null);
   const [state, setState] = useState('loading'); // loading | ready | missing | error
   const { user, loading: authLoading } = useAuth();
-  const [listedPaid, setListedPaid] = useState(false);
   const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState(false);
   const [checkingApplications, setCheckingApplications] = useState(false);
   const [applyError, setApplyError] = useState(null);
-
-  useEffect(() => {
-    if (user?.role !== 'ROLE_CANDIDATE') return undefined;
-    let live = true;
-    getSubscription()
-      .then((data) => { if (live && data?.currentPlan === 'PRO') setListedPaid(true); })
-      .catch(() => {});
-    return () => { live = false; };
-  }, [user?.role]);
-
-  const paid = user?.role === 'ROLE_CANDIDATE' && (user?.currentPlanType === 'PRO' || listedPaid);
+  const [resumeFile, setResumeFile] = useState(null);
   const resumeForJob = `/app/resume?mode=generate&jobId=${id}`;
 
   useEffect(() => {
     setApplied(false);
     setApplyError(null);
+    setResumeFile(null);
     if (!job?.acceptsDirectApplications || !user) return undefined;
     let live = true;
     setCheckingApplications(true);
@@ -94,10 +83,10 @@ export default function JobDetail() {
   }, [id, job?.acceptsDirectApplications, user]);
 
   const apply = async () => {
-    if (applying || applied) return;
+    if (applying || applied || !resumeFile) return;
     setApplying(true);
     setApplyError(null);
-    try { await applyToJob(id); setApplied(true); }
+    try { await applyToJob(id, resumeFile); setApplied(true); }
     catch (error) { setApplyError(error.message); }
     finally { setApplying(false); }
   };
@@ -253,10 +242,20 @@ export default function JobDetail() {
                     )}
                     {job.acceptsDirectApplications ? <>
                       {user ? <>
-                        <p className="jd__p">Your primary resume and profile details will be shared with the employer.</p>
-                        <button type="button" className="jd__btn jd__btn--green" onClick={apply} disabled={authLoading || checkingApplications || applying || applied}>
+                        <p className="jd__p">The employer receives this PDF.</p>
+                        <label className="jd__file">
+                          Résumé PDF
+                          <input
+                            aria-label="Résumé PDF"
+                            type="file"
+                            accept="application/pdf,.pdf"
+                            onChange={(event) => setResumeFile(event.target.files?.[0] || null)}
+                          />
+                        </label>
+                        <button type="button" className="jd__btn jd__btn--green" onClick={apply} disabled={authLoading || checkingApplications || applying || applied || !resumeFile}>
                           {applied ? 'Applied' : applying ? 'Submitting…' : 'Apply on Jobocate'}
                         </button>
+                        <Link href={resumeForJob} className="jd__btn jd__btn--green">Generate résumé</Link>
                       </> : <Link href={`/app/login?redirect=${encodeURIComponent(`/jobs/${id}`)}`} className="jd__btn jd__btn--green">Sign in to apply</Link>}
                       {applied && <p role="status" className="jd__p">Application submitted. The employer can now review it.</p>}
                       {applyError && <p role="alert" className="jd__p">{applyError}</p>}
@@ -268,7 +267,7 @@ export default function JobDetail() {
                         </span>
                       )}
                       <Link href={user ? resumeForJob : appRoute('App Sign Up.dc.html')} className="jd__btn jd__btn--green">
-                        {paid ? 'Generate résumé' : 'See your match & apply →'}
+                        {user ? 'Generate résumé' : 'See your match & apply →'}
                       </Link>
                     </>}
                     {job.applyUrl && (
@@ -280,11 +279,6 @@ export default function JobDetail() {
                       >
                         Or apply on {titleCase(job.company)}’s site ↗
                       </a>
-                    )}
-                    {paid && job.acceptsDirectApplications && (
-                      <Link href={resumeForJob} className="jd__btn jd__btn--green">
-                        Generate résumé
-                      </Link>
                     )}
                   </div>
 
@@ -393,6 +387,8 @@ export default function JobDetail() {
           }
           .jd__matchnum { filter: blur(4px); color: var(--jb-d-accent); font-weight: 600; }
           .jd__direct { font-size: 12.5px; color: var(--jb-d-ink-55); text-align: center; text-decoration: none; }
+          .jd__file { font-size: 13px; color: var(--jb-d-ink-70); }
+          .jd__file input { display: block; margin-top: 6px; max-width: 100%; }
           .jd__direct:hover { color: var(--jb-d-accent); text-decoration: underline; }
 
           .jd__glance {

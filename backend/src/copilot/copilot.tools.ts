@@ -180,7 +180,7 @@ export function buildCopilotTools(deps: CopilotToolDeps): AgentTool[] {
             true,
           );
         } catch (err) {
-          if (err instanceof BadRequestException) {
+          if (err instanceof BadRequestException && /already/i.test(err.message)) {
             return { skipped: 'already applied', jobId: String(args.jobId) };
           }
           throw err;

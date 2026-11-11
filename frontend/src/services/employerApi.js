@@ -84,6 +84,15 @@ export const employerPipelineApi = {
   // GET /api/employer/applicants?jobId&stage
   list: (filters = {}) => apiCall(`/api/employer/applicants${qs(filters)}`),
   get: (id) => apiCall(`/api/employer/applicants/${id}`),
+  submittedResume: (id) => apiCall(`/api/employer/applicants/${id}/resume`),
+  downloadSubmittedResume: async (id) => {
+    const token = await getAccessToken();
+    const response = await fetch(`${API_URL}/api/employer/applicants/${id}/resume/file`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error('Résumé download failed');
+    return response.blob();
+  },
   create: (dto) =>
     apiCall('/api/employer/applicants', {
       method: 'POST',

@@ -23,6 +23,7 @@ import {
 } from './employer-resume-assessment.types';
 import { EmployerAtsRuntimeService } from './employer-ats-runtime.service';
 import { ResumeParserService } from '../resume/resume-parser.service';
+import { StorageService } from '../storage/storage.service';
 import {
   EmployerAtsPreview,
   EmployerAtsPreviewDocument,
@@ -43,6 +44,7 @@ export class EmployerResumeAssessmentService {
     @InjectModel(EmployerAtsPreview.name)
     private readonly previewModel: Model<EmployerAtsPreviewDocument>,
     private readonly atsRuntime?: EmployerAtsRuntimeService,
+    private readonly storageService?: StorageService,
   ) {}
 
   async budgetStatus(ownerId: string) {
@@ -334,10 +336,7 @@ export class EmployerResumeAssessmentService {
 
     const descriptionHash = this.sha256(jobDescription);
     const pairKey = this.sha256(`${submittedResume.hash}:${descriptionHash}`);
-    if (
-      applicant.resumeAssessment?.status === 'RUNNING' &&
-      applicant.resumeAssessment?.pairKey === pairKey
-    ) {
+    if (this.freshRun(applicant.resumeAssessment, pairKey)) {
       return applicant.resumeAssessment;
     }
     const applicationId = String(applicant.applicationId);
@@ -358,6 +357,7 @@ export class EmployerResumeAssessmentService {
       ...base,
       ...snapshot,
       pairKey,
+      startedAt: new Date(),
       status: 'RUNNING',
       ats: { status: 'RUNNING', harness: 'ats' },
       aiContent: { status: 'RUNNING' },
@@ -386,6 +386,14 @@ export class EmployerResumeAssessmentService {
           $or: [
             { 'resumeAssessment.status': { $ne: 'RUNNING' } },
             { 'resumeAssessment.pairKey': { $ne: pairKey } },
+            {
+              'resumeAssessment.status': 'RUNNING',
+              'resumeAssessment.pairKey': pairKey,
+              $or: [
+                { 'resumeAssessment.startedAt': { $exists: false } },
+                { 'resumeAssessment.startedAt': { $lt: new Date(Date.now() - 10 * 60 * 1000) } },
+              ],
+            },
           ],
         },
         startUpdate,
@@ -421,6 +429,20 @@ export class EmployerResumeAssessmentService {
         reason: 'EMPLOYER_ATS_EXECUTION_FAILED',
         harness: 'ats',
       };
+    }
+    if (ats.reason === 'EMPLOYER_ATS_RUN_IN_PROGRESS' || ats.status === 'RUNNING') {
+      const blocked: PersistedResumeAssessment = {
+        ...running,
+        reason: 'EMPLOYER_ATS_RUN_IN_PROGRESS',
+        ats: { status: 'NOT_RUN', reason: 'EMPLOYER_ATS_RUN_IN_PROGRESS', harness: 'ats' },
+        aiContent: { status: 'NOT_RUN', reason: 'EMPLOYER_ATS_RUN_IN_PROGRESS' },
+      };
+      delete blocked.startedAt;
+      await this.applicantModel.updateOne(
+        { _id: applicantId, ownerId, 'resumeAssessment.runId': runId },
+        { $set: { resumeAssessment: blocked } },
+      ).exec();
+      return blocked;
     }
 
     let aiContent: PersistedResumeAssessment['aiContent'];
@@ -514,6 +536,62 @@ export class EmployerResumeAssessmentService {
       .exec();
     (applicant as any).resumeAssessment = staleAssessment;
     return applicant;
+  }
+
+  async submittedResume(ownerIdValue: string, applicantIdValue: string) {
+    const artifact = await this.submittedArtifact(ownerIdValue, applicantIdValue);
+    return {
+      fileName: artifact.fileName || 'resume.pdf',
+      text: this.artifactText(artifact.content),
+      ...(artifact.fileUrl
+        ? { downloadUrl: `/api/employer/applicants/${applicantIdValue}/resume/file` }
+        : {}),
+    };
+  }
+
+  async submittedResumeFile(ownerIdValue: string, applicantIdValue: string) {
+    const artifact = await this.submittedArtifact(ownerIdValue, applicantIdValue);
+    if (!artifact.fileUrl || !this.storageService) {
+      throw new NotFoundException('Submitted résumé not found');
+    }
+    const buffer = await this.storageService.getBuffer(artifact.fileUrl);
+    const fileName = String(artifact.fileName || 'resume.pdf').replace(/[^\w.\- ]+/g, '') || 'resume.pdf';
+    return {
+      buffer,
+      fileName,
+      contentType: fileName.toLowerCase().endsWith('.docx')
+        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        : 'application/pdf',
+    };
+  }
+
+  private async submittedArtifact(ownerIdValue: string, applicantIdValue: string) {
+    const ownerId = this.asObjectId(ownerIdValue);
+    const applicant: any = await this.applicantModel
+      .findOne({ _id: this.asObjectId(applicantIdValue), ownerId })
+      .lean()
+      .exec();
+    if (!applicant) throw new NotFoundException('Applicant not found');
+    const submitted = applicant.submittedResume;
+    if (!submitted?.artifactId || !applicant.applicationId) {
+      throw new NotFoundException('Submitted résumé not found');
+    }
+    const artifact: any = await this.artifactModel
+      .findOne({
+        _id: this.asObjectId(submitted.artifactId),
+        applicationId: this.asObjectId(applicant.applicationId),
+        type: ArtifactType.RESUME_VERSION,
+      })
+      .lean()
+      .exec();
+    if (!artifact) throw new NotFoundException('Submitted résumé not found');
+    return artifact;
+  }
+
+  private freshRun(assessment: any, pairKey: string): boolean {
+    if (assessment?.status !== 'RUNNING' || assessment.pairKey !== pairKey) return false;
+    const started = assessment.startedAt ? new Date(assessment.startedAt).getTime() : 0;
+    return started > 0 && Date.now() - started < 10 * 60 * 1000;
   }
 
   private async persistTerminalInputState(

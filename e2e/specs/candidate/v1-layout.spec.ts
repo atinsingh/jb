@@ -50,8 +50,7 @@ test('signed-in candidate opens Jobs from the nav, and a paid candidate can gene
   await page.getByRole('link', { name: /Engineer/ }).click();
   await expect(page).toHaveURL(/\/jobs\/job-142$/);
   await expect(nav.getByRole('link', { name: 'Jobs', exact: true })).toHaveAttribute('aria-current', 'page');
-  await expect(page.getByRole('link', { name: 'Generate résumé' })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: /See your match/ })).toHaveAttribute('href', '/app/resume?mode=generate&jobId=job-142');
+  await expect(page.getByRole('link', { name: 'Generate résumé' })).toHaveAttribute('href', '/app/resume?mode=generate&jobId=job-142');
   await page.unroute('**/api/auth/me');
   await page.route('**/api/auth/me', r => r.fulfill({ json: { user: { id: 'paid-layout', role: 'ROLE_CANDIDATE', currentPlanType: 'PRO' } } }));
   await page.reload();

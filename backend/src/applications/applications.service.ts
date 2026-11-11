@@ -17,6 +17,7 @@ import {
 import { StorageService } from '../storage/storage.service';
 import { createHash } from 'crypto';
 import { EmployerResumeAssessmentService } from '../employer-pipeline/employer-resume-assessment.service';
+import { ResumeParserService } from '../resume/resume-parser.service';
 
 @Injectable()
 export class ApplicationsService {
@@ -37,6 +38,7 @@ export class ApplicationsService {
     private readonly notificationsService: NotificationsService,
     private readonly autopilotRulesService: AutopilotRulesService,
     private readonly resumeAssessmentService: EmployerResumeAssessmentService,
+    private readonly resumeParser: ResumeParserService,
   ) { }
 
   async createApplication(
@@ -45,6 +47,7 @@ export class ApplicationsService {
     coverLetter?: string,
     matchScore?: number,
     autoApplied: boolean = false,
+    file?: Express.Multer.File,
   ): Promise<ApplicationDocument> {
     // Check if application already exists
     const existing = await this.applicationModel.findOne({
@@ -59,6 +62,10 @@ export class ApplicationsService {
     const job = await this.jobModel.findById(jobId).lean();
     if (!job || !job.isActive) throw new NotFoundException('Job not found');
     const direct = job.importMethod === 'employer_direct';
+    const uploaded = direct && file ? await this.readUploadedResume(file) : undefined;
+    if (direct && !uploaded) {
+      throw new BadRequestException('Upload a PDF résumé to apply.');
+    }
     const submittedAt = direct ? new Date() : undefined;
 
     const application = new this.applicationModel({
@@ -73,7 +80,12 @@ export class ApplicationsService {
     });
 
     const saved = await application.save();
-    await this.snapshotSubmittedResume(saved, candidateId);
+    try {
+      await this.snapshotSubmittedResume(saved, candidateId, uploaded);
+    } catch (err) {
+      await this.applicationModel.findByIdAndDelete(saved._id);
+      throw err;
+    }
     await this.applicationEventsService.recordEvent({
       applicationId: saved._id as any,
       userId: saved.candidateId,
@@ -311,8 +323,10 @@ export class ApplicationsService {
         applicant.updatedAt &&
         applicant.createdAt.getTime() === applicant.updatedAt.getTime();
 
+      if (ownerId && this.shouldQueueResumeReview(applicant, application)) {
+        this.queueResumeAssessment(ownerId, String(applicant._id));
+      }
       if (isNewlyCreated) {
-        if (ownerId) this.queueResumeAssessment(ownerId, String(applicant._id));
         try {
           await this.autopilotRulesService.evaluateApplicant(ownerId, applicant);
         } catch {
@@ -341,11 +355,27 @@ export class ApplicationsService {
     }
   }
 
+  private shouldQueueResumeReview(applicant: any, application: ApplicationDocument): boolean {
+    const hash = application.artifacts?.resumeHash;
+    if (!hash) return false;
+    const review = applicant?.resumeAssessment;
+    if (review?.submittedResume?.hash !== hash) return true;
+    if (review.status === 'COMPLETE' || review.status === 'PARTIAL') return false;
+    if (review.status !== 'RUNNING') return true;
+    const started = review.startedAt ? new Date(review.startedAt).getTime() : 0;
+    return !started || Date.now() - started >= 10 * 60 * 1000;
+  }
+
   private queueResumeAssessment(ownerId: string, applicantId: string): void {
     const previous = this.resumeReviews.get(ownerId) || Promise.resolve();
     const review = previous.then(async () => {
       try {
-        await this.resumeAssessmentService.assess(ownerId, applicantId);
+        const result: any = await this.resumeAssessmentService.assess(ownerId, applicantId);
+        if (result?.reason === 'EMPLOYER_ATS_RUN_IN_PROGRESS') {
+          // shortcut: one 15s retry, upgrade if sandbox waits are routinely longer
+          await new Promise((resolve) => setTimeout(resolve, 15_000));
+          await this.resumeAssessmentService.assess(ownerId, applicantId);
+        }
       } catch (error) {
         this.logger.warn(`Submitted resume assessment failed for ${applicantId}: ${error instanceof Error ? error.message : error}`);
       }
@@ -425,10 +455,65 @@ export class ApplicationsService {
    * resume source for submission and employer assessment, so later edits to a
    * candidate's primary resume cannot change what was actually submitted.
    */
+  private async readUploadedResume(file: Express.Multer.File) {
+    try {
+      this.resumeParser.validateFile(file);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : 'Invalid résumé file');
+    }
+    if (file.originalname && !file.originalname.toLowerCase().endsWith('.pdf')) {
+      throw new BadRequestException('Upload a PDF résumé to apply.');
+    }
+    let text = '';
+    try {
+      text = String((await this.resumeParser.extractText(file)) || '').trim();
+    } catch {
+      throw new BadRequestException('Failed to extract text from résumé');
+    }
+    if (!text) throw new BadRequestException('Could not extract text from that résumé');
+    return { buffer: file.buffer, fileName: file.originalname || 'resume.pdf', text };
+  }
+
   private async snapshotSubmittedResume(
     application: ApplicationDocument,
     candidateId: string,
+    uploaded?: { buffer: Buffer; fileName: string; text: string },
   ): Promise<void> {
+    if (uploaded) {
+      const key = `resumes/applications/${application._id}.pdf`;
+      try {
+        await this.storageService.put(key, uploaded.buffer, { contentType: 'application/pdf' });
+      } catch (err) {
+        this.logger.warn(
+          `snapshotSubmittedResume: could not store the uploaded PDF for ${String(application._id)}: ${err instanceof Error ? err.message : err}`,
+        );
+        throw new BadRequestException('Could not store that résumé. Try again.');
+      }
+      const sha256 = createHash('sha256').update(uploaded.buffer).digest('hex');
+      const artifact = new this.applicationArtifactModel({
+        applicationId: application._id,
+        userId: new Types.ObjectId(candidateId),
+        type: ArtifactType.RESUME_VERSION,
+        content: uploaded.text,
+        version: 1,
+        fileName: uploaded.fileName,
+        fileUrl: key,
+        isActive: true,
+        metadata: { sha256 },
+      });
+      const savedArtifact = await artifact.save();
+      application.artifacts = {
+        ...(application.artifacts || {}),
+        resumeVersionId: savedArtifact._id as Types.ObjectId,
+        resumeVersion: 1,
+        resumeHash: sha256,
+      };
+      await this.applicationModel.updateOne(
+        { _id: application._id },
+        { $set: { artifacts: application.artifacts } },
+      );
+      return;
+    }
     try {
       const resume: any = await this.resumeModel
         .findOne({ userId: new Types.ObjectId(candidateId) })

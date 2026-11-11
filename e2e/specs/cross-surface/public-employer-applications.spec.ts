@@ -1,5 +1,6 @@
 import { test, expect, storage } from '../../fixtures/test';
 import { api, uniqueId } from '../../support/api';
+import path from 'path';
 
 test.use({ storageState: storage.candidate });
 
@@ -40,7 +41,8 @@ test('a website application reaches the job applicant list and opening it does n
       await expect(visitor.getByRole('link', { name: 'Generate résumé' })).toHaveCount(0);
     } finally { await anonymous.close(); }
     await page.goto(`/jobs/${jobId}`);
-    await expect(page.getByRole('link', { name: 'Generate résumé' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Generate résumé' })).toHaveAttribute('href', `/app/resume?mode=generate&jobId=${jobId}`);
+    await page.getByLabel('Résumé PDF').setInputFiles(path.join(__dirname, '../../fixtures/ats-preview.pdf'));
     await page.getByRole('button', { name: 'Apply on Jobocate', exact: true }).click();
     await expect(page.getByRole('status')).toContainText('Application submitted');
     const applications = await api.get<any>('/api/applications/my-applications', candidateUser.token);
@@ -51,8 +53,9 @@ test('a website application reaches the job applicant list and opening it does n
     await expect(page.getByRole('button', { name: 'Applied', exact: true })).toBeDisabled();
     await expect.poll(async () => {
       const applicants = await api.get<any[]>(`/api/employer/applicants?jobId=${created.job._id}`, employerUser.token);
-      return applicants.find(item => item.applicationId === applicationId)?.resumeAssessment?.status;
-    }).toBe('NO_RESUME');
+      const applicant = applicants.find(item => item.applicationId === applicationId);
+      return Boolean(applicant?.submittedResume?.hash) && applicant?.resumeAssessment?.status !== 'NO_RESUME';
+    }).toBe(true);
     const employerJobs = await api.get<any>('/api/employer/jobs', employerUser.token);
     expect(employerJobs.jobs.find(item => item._id === created.job._id).applicantCount).toBe(1);
     const context = await browser.newContext({ storageState: storage.employer });
@@ -65,9 +68,9 @@ test('a website application reaches the job applicant list and opening it does n
       await employer.route('**/api/employer/applicants/resume-assessment/preview?*', route => route.fulfill({ json: { saved: false } }));
       await employer.goto(new URL(`/employer/jobs/${created.job._id}/applications`, page.url()).href);
       await expect(employer.getByRole('region', { name: 'Applicants', exact: true })).toContainText(candidateUser.name);
-      await expect(employer.getByText('No submitted resume is attached to this applicant.', { exact: true })).toBeVisible();
+      await expect(employer.getByRole('region', { name: 'Applicant detail' })).toContainText('ats-preview.pdf');
       await employer.reload();
-      await expect(employer.getByText('No submitted resume is attached to this applicant.', { exact: true })).toBeVisible();
+      await expect(employer.getByRole('region', { name: 'Applicant detail' })).toContainText('ats-preview.pdf');
       expect(reviewCalls).toBe(0);
     } finally { await context.close(); }
   } finally {

@@ -16,6 +16,13 @@ const assessmentStateCopy = {
   DETECTOR_FAILED: 'The local content-pattern check failed during execution. Retry the assessment.',
 };
 
+const RUN_WINDOW_MS = 10 * 60 * 1000;
+
+function freshRun(assessment) {
+  if (assessment?.status !== 'RUNNING' || !assessment.startedAt) return false;
+  return Date.now() - new Date(assessment.startedAt).getTime() < RUN_WINDOW_MS;
+}
+
 const signalLabel = (key) =>
   String(key)
     .replace(/([a-z])([A-Z])/g, '$1 $2')
@@ -59,10 +66,11 @@ export default function ResumeAssessmentPanel({
   if (loading) return <div className={styles.muted}>Loading resume assessment…</div>;
 
   const status = assessment?.status || 'NOT_RUN';
+  const runningNow = freshRun(assessment);
+  const sandboxBusy = assessment?.reason === 'EMPLOYER_ATS_RUN_IN_PROGRESS';
   const inputState = ['NOT_RUN', 'RUNNING', 'STALE', 'NO_RESUME', 'NO_JOB_DESCRIPTION'].includes(status);
   const ats = assessment?.ats;
   const aiContent = assessment?.aiContent;
-  const canRun = status !== 'RUNNING';
 
   return (
     <div className={styles.panel}>
@@ -70,22 +78,29 @@ export default function ResumeAssessmentPanel({
         <div>
           <div className={styles.title}>{title}</div>
           {status === 'PARTIAL' && <div className={styles.warn}>Partial assessment — the available result is shown below.</div>}
-          {inputState && (
+          {runningNow && <div role="status" className={styles.muted}>{assessmentStateCopy.RUNNING}</div>}
+          {sandboxBusy && (
+            <div role="status" className={styles.muted}>ATS match did not start because another employer assessment is already running.</div>
+          )}
+          {status === 'RUNNING' && !runningNow && !sandboxBusy && (
+            <div className={styles.warn}>The previous assessment did not finish. Run it again.</div>
+          )}
+          {inputState && status !== 'RUNNING' && (
             <div className={status === 'STALE' ? styles.warn : styles.muted}>
               {assessmentStateCopy[status]}
             </div>
           )}
           <AtsBudgetStatus budget={budget} />
         </div>
-        {canRun && onRun && (
+        {onRun && (
           <button
             type="button"
             onClick={onRun}
-            disabled={busy}
+            disabled={busy || runningNow}
             className={`${auth.btn} ${auth.btnPrimary}`}
             style={{ width: 'auto', flex: 'none' }}
           >
-            {busy ? 'Assessing…' : runLabel}
+            {runningNow ? 'Assessment already running' : busy ? 'Assessing…' : runLabel}
           </button>
         )}
       </div>

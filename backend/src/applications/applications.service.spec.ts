@@ -17,6 +17,7 @@ import { AutopilotRulesService } from '../ai-recruiter/autopilot-rules.service';
 import { StorageService } from '../storage/storage.service';
 import { EmployerResumeAssessmentService } from '../employer-pipeline/employer-resume-assessment.service';
 import { ResumeAiContentHeuristicService } from '../employer-pipeline/resume-ai-content-heuristic.service';
+import { ResumeParserService } from '../resume/resume-parser.service';
 
 const CAND = new Types.ObjectId().toHexString();
 const OWNER = new Types.ObjectId().toHexString();
@@ -34,6 +35,7 @@ describe('ApplicationsService', () => {
 
   const applicationModel: any = jest.fn();
   applicationModel.findOne = jest.fn();
+  applicationModel.findByIdAndDelete = jest.fn().mockResolvedValue({});
   applicationModel.updateOne = jest.fn().mockReturnValue({
     exec: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
   });
@@ -42,7 +44,8 @@ describe('ApplicationsService', () => {
   const userModel = { findById: jest.fn() };
   const resumeModel = { find: jest.fn(), findOne: jest.fn() };
   const artifactModel: any = jest.fn();
-  const storageService = { getBuffer: jest.fn() };
+  const storageService = { getBuffer: jest.fn(), put: jest.fn() };
+  const resumeParser = { validateFile: jest.fn(), extractText: jest.fn() };
   const applicationEventsService = { recordEvent: jest.fn().mockResolvedValue({}) };
   const employerPipelineService = {
     upsertApplicant: jest.fn().mockResolvedValue({ _id: 'app-1' }),
@@ -69,6 +72,7 @@ describe('ApplicationsService', () => {
         { provide: NotificationsService, useValue: notificationsService },
         { provide: AutopilotRulesService, useValue: autopilotRulesService },
         { provide: EmployerResumeAssessmentService, useValue: resumeAssessmentService },
+        { provide: ResumeParserService, useValue: resumeParser },
       ],
     }).compile();
 
@@ -244,7 +248,93 @@ describe('ApplicationsService', () => {
         newlyCreatedApplicant,
       );
       await new Promise(resolve => setImmediate(resolve));
-      expect(resumeAssessmentService.assess).toHaveBeenCalledWith(OWNER, 'app-new');
+      expect(resumeAssessmentService.assess).not.toHaveBeenCalled();
+    });
+
+    it('reviews a newly attached résumé even when the applicant timestamps differ', async () => {
+      jobModel.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(employerJob) });
+      const applicant = {
+        _id: 'app-late',
+        createdAt: new Date('2026-08-01T00:00:00.000Z'),
+        updatedAt: new Date('2026-08-11T00:00:00.000Z'),
+      };
+      employerPipelineService.upsertApplicant.mockResolvedValueOnce(applicant);
+
+      await service.bridgeApplicationToPipeline({
+        _id: 'a-late',
+        candidateId: CAND,
+        jobId: JOBID,
+        artifacts: {
+          resumeVersionId: new Types.ObjectId(),
+          resumeVersion: 1,
+          resumeHash: 'hash-1',
+        },
+      } as any);
+      await new Promise(resolve => setImmediate(resolve));
+
+      expect(resumeAssessmentService.assess).toHaveBeenCalledTimes(1);
+      expect(resumeAssessmentService.assess).toHaveBeenCalledWith(OWNER, 'app-late');
+      expect(autopilotRulesService.evaluateApplicant).not.toHaveBeenCalled();
+    });
+
+    it('retries a review once when the employer sandbox is already busy', async () => {
+      jest.useFakeTimers();
+      try {
+      jobModel.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(employerJob) });
+      employerPipelineService.upsertApplicant.mockResolvedValueOnce({
+        _id: 'app-busy',
+        createdAt: new Date('2026-08-01T00:00:00.000Z'),
+        updatedAt: new Date('2026-08-11T00:00:00.000Z'),
+      });
+      resumeAssessmentService.assess
+        .mockResolvedValueOnce({ status: 'RUNNING', reason: 'EMPLOYER_ATS_RUN_IN_PROGRESS' })
+        .mockResolvedValueOnce({ status: 'COMPLETE' });
+
+      const pending = service.bridgeApplicationToPipeline({
+        _id: 'a-busy',
+        candidateId: CAND,
+        jobId: JOBID,
+        artifacts: {
+          resumeVersionId: new Types.ObjectId(),
+          resumeVersion: 1,
+          resumeHash: 'hash-busy',
+        },
+      } as any);
+      await pending;
+      await jest.advanceTimersByTimeAsync(0);
+      expect(resumeAssessmentService.assess).toHaveBeenCalledTimes(1);
+      await jest.advanceTimersByTimeAsync(15_000);
+      expect(resumeAssessmentService.assess).toHaveBeenCalledTimes(2);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('does not start a second review for the same résumé hash', async () => {
+      jobModel.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(employerJob) });
+      employerPipelineService.upsertApplicant.mockResolvedValueOnce({
+        _id: 'app-same',
+        createdAt: new Date('2026-08-01T00:00:00.000Z'),
+        updatedAt: new Date('2026-08-11T00:00:00.000Z'),
+        resumeAssessment: {
+          status: 'COMPLETE',
+          submittedResume: { hash: 'hash-1' },
+        },
+      });
+
+      await service.bridgeApplicationToPipeline({
+        _id: 'a-same',
+        candidateId: CAND,
+        jobId: JOBID,
+        artifacts: {
+          resumeVersionId: new Types.ObjectId(),
+          resumeVersion: 1,
+          resumeHash: 'hash-1',
+        },
+      } as any);
+      await new Promise(resolve => setImmediate(resolve));
+
+      expect(resumeAssessmentService.assess).not.toHaveBeenCalled();
     });
 
     it('does not re-evaluate an applicant that already existed (re-apply / update path)', async () => {
@@ -273,8 +363,21 @@ describe('ApplicationsService', () => {
       jobModel.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(employerJob) });
       applicationModel.findOne.mockResolvedValue(null);
       applicationModel.mockImplementation((doc: any) => ({ ...doc, save: async () => doc }));
+      resumeParser.validateFile.mockImplementation(() => undefined);
+      resumeParser.extractText.mockResolvedValue('Ada Lovelace builds APIs');
+      storageService.put.mockResolvedValue({ key: 'resumes/applications/x.pdf', url: '' });
+      artifactModel.mockImplementation((doc: any) => ({
+        ...doc,
+        save: jest.fn().mockResolvedValue({ _id: new Types.ObjectId() }),
+      }));
       jest.spyOn(service, 'bridgeApplicationToPipeline').mockResolvedValue(undefined);
-      const result = await service.createApplication(CAND, JOBID);
+      const file = {
+        originalname: 'ada.pdf',
+        mimetype: 'application/pdf',
+        size: 12,
+        buffer: Buffer.from('%PDF-ada'),
+      } as Express.Multer.File;
+      const result = await service.createApplication(CAND, JOBID, undefined, undefined, false, file);
       expect(result).toMatchObject({ status: 'submitted', submittedAt: expect.any(Date) });
       expect(applicationEventsService.recordEvent).toHaveBeenCalledWith(expect.objectContaining({ type: 'submitted' }));
     });
@@ -367,6 +470,75 @@ describe('ApplicationsService', () => {
           artifacts: expect.objectContaining({ resumeVersionId: artifactId }),
         }),
       );
+    });
+
+    it('refuses a direct employer application that has no PDF', async () => {
+      jobModel.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(employerJob) });
+      applicationModel.findOne.mockResolvedValue(null);
+      await expect(
+        service.createApplication(CAND, JOBID),
+      ).rejects.toThrow('Upload a PDF résumé to apply.');
+      expect(applicationModel).not.toHaveBeenCalled();
+    });
+
+    it('snapshots an uploaded PDF as the submitted résumé', async () => {
+      jobModel.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(employerJob) });
+      applicationModel.findOne.mockResolvedValue(null);
+      const saved: any = { _id: new Types.ObjectId(), candidateId: CAND, jobId: JOBID };
+      applicationModel.mockImplementation((doc: any) => ({ ...doc, save: async () => saved }));
+      const file = {
+        originalname: 'ada.pdf',
+        mimetype: 'application/pdf',
+        size: 12,
+        buffer: Buffer.from('%PDF-ada'),
+      } as Express.Multer.File;
+      resumeParser.validateFile.mockImplementation(() => undefined);
+      resumeParser.extractText.mockResolvedValue('Ada Lovelace builds APIs');
+      storageService.put.mockResolvedValue({ key: 'resumes/applications/x.pdf', url: '' });
+      const artifactId = new Types.ObjectId();
+      artifactModel.mockImplementation((doc: any) => ({
+        ...doc,
+        save: jest.fn().mockResolvedValue({ _id: artifactId }),
+      }));
+      jest.spyOn(service, 'bridgeApplicationToPipeline').mockResolvedValue(undefined);
+
+      await service.createApplication(CAND, JOBID, undefined, undefined, false, file);
+
+      expect(storageService.put).toHaveBeenCalledWith(
+        `resumes/applications/${saved._id}.pdf`,
+        file.buffer,
+        { contentType: 'application/pdf' },
+      );
+      expect(artifactModel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fileName: 'ada.pdf',
+          content: 'Ada Lovelace builds APIs',
+          fileUrl: `resumes/applications/${saved._id}.pdf`,
+          type: ArtifactType.RESUME_VERSION,
+        }),
+      );
+      expect(resumeModel.findOne).not.toHaveBeenCalled();
+    });
+
+    it('deletes the application when the uploaded PDF cannot be stored', async () => {
+      jobModel.findById.mockReturnValue({ lean: jest.fn().mockResolvedValue(employerJob) });
+      applicationModel.findOne.mockResolvedValue(null);
+      const saved: any = { _id: new Types.ObjectId(), candidateId: CAND, jobId: JOBID };
+      applicationModel.mockImplementation((doc: any) => ({ ...doc, save: async () => saved }));
+      resumeParser.validateFile.mockImplementation(() => undefined);
+      resumeParser.extractText.mockResolvedValue('Ada Lovelace builds APIs');
+      storageService.put.mockRejectedValue(new Error('disk full'));
+      const file = {
+        originalname: 'ada.pdf',
+        mimetype: 'application/pdf',
+        size: 12,
+        buffer: Buffer.from('%PDF-ada'),
+      } as Express.Multer.File;
+
+      await expect(
+        service.createApplication(CAND, JOBID, undefined, undefined, false, file),
+      ).rejects.toThrow('Could not store that résumé');
+      expect(applicationModel.findByIdAndDelete).toHaveBeenCalledWith(saved._id);
     });
   });
 

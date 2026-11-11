@@ -11,6 +11,7 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  StreamableFile,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -153,6 +154,22 @@ export class EmployerPipelineController {
     return file
       ? this.resumeAssessmentService.previewFromUpload(ownerId, jobId, file)
       : this.resumeAssessmentService.rerunSavedPreview(ownerId, jobId, sessionId);
+  }
+
+  @Get(':id/resume/file')
+  @ApiOperation({ summary: 'Download the résumé the candidate submitted' })
+  async submittedResumeFile(@Param('id') id: string, @Request() req) {
+    const file = await this.resumeAssessmentService.submittedResumeFile(req.user._id.toString(), id);
+    return new StreamableFile(file.buffer, {
+      type: file.contentType,
+      disposition: `attachment; filename="${file.fileName}"`,
+    });
+  }
+
+  @Get(':id/resume')
+  @ApiOperation({ summary: 'Read the résumé the candidate submitted' })
+  async submittedResume(@Param('id') id: string, @Request() req) {
+    return this.resumeAssessmentService.submittedResume(req.user._id.toString(), id);
   }
 
   @Get(':id')

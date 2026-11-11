@@ -18,6 +18,7 @@ import { JobMatch, JobMatchSchema } from '../schemas/job-match.schema';
 import { MatchingModule } from '../matching/matching.module';
 import { LoggerModule } from '../common/logger/logger.module';
 import { UsersModule } from '../users/users.module';
+import { ResumeModule } from '../resume/resume.module';
 import { ApplyRunnerModule } from '../apply-runner/apply-runner.module';
 import { EmployerPipelineModule } from '../employer-pipeline/employer-pipeline.module';
 import { AiRecruiterModule } from '../ai-recruiter/ai-recruiter.module';
@@ -39,6 +40,7 @@ import { AutoApplyProcessor } from './auto-apply.processor';
     forwardRef(() => MatchingModule),
     forwardRef(() => ApplyRunnerModule),
     UsersModule,
+    ResumeModule,
     LoggerModule,
     EmployerPipelineModule,
     AiRecruiterModule,

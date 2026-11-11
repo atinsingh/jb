@@ -270,7 +270,7 @@ describe('EmployerResumeAssessmentService', () => {
     applicantModel.findOne.mockReturnValue(
       query({
         ...linkedApplicant(),
-        resumeAssessment: { ...first, status: 'RUNNING' },
+        resumeAssessment: { ...first, status: 'RUNNING', startedAt: new Date() },
       }),
     );
     artifactModel.findOne.mockReturnValue(
@@ -298,6 +298,136 @@ describe('EmployerResumeAssessmentService', () => {
     expect(duplicate).toEqual(expect.objectContaining({ status: 'RUNNING' }));
     expect(gateway.assess).not.toHaveBeenCalled();
     expect(applicantModel.updateOne).not.toHaveBeenCalled();
+  });
+
+  it('starts again when a RUNNING review is older than 10 minutes', async () => {
+    const first = await service.assess(String(OWNER), String(APPLICANT));
+    jest.clearAllMocks();
+    gateway.assess.mockResolvedValue({ status: 'COMPLETE', semanticMatch: 70, harness: 'ats' });
+    applicantModel.findOne.mockReturnValue(
+      query({
+        ...linkedApplicant(),
+        resumeAssessment: {
+          ...first,
+          status: 'RUNNING',
+          startedAt: new Date(Date.now() - 11 * 60 * 1000),
+        },
+      }),
+    );
+    applicantModel.updateOne.mockReturnValue(query({ acknowledged: true, modifiedCount: 1 }));
+    artifactModel.findOne.mockReturnValue(
+      query({
+        _id: ARTIFACT,
+        applicationId: APPLICATION,
+        version: 7,
+        metadata: { sha256: 'resume-hash-v7' },
+        content: JSON.stringify({ summary: 'Reliable backend engineer.' }),
+      }),
+    );
+    employerJobModel.findOne.mockReturnValue(
+      query({
+        _id: JOB,
+        ownerId: OWNER,
+        description: 'Build reliable backend services.',
+        responsibilities: ['Own APIs'],
+        requirements: ['TypeScript'],
+        skills: ['MongoDB'],
+      }),
+    );
+
+    await service.assess(String(OWNER), String(APPLICANT));
+
+    expect(gateway.assess).toHaveBeenCalledTimes(1);
+    const filter = applicantModel.updateOne.mock.calls[0][0];
+    expect(JSON.stringify(filter)).toContain('startedAt');
+  });
+
+  it('starts again when a RUNNING review has no start time', async () => {
+    const first = await service.assess(String(OWNER), String(APPLICANT));
+    jest.clearAllMocks();
+    gateway.assess.mockResolvedValue({ status: 'COMPLETE', semanticMatch: 70, harness: 'ats' });
+    applicantModel.findOne.mockReturnValue(
+      query({
+        ...linkedApplicant(),
+        resumeAssessment: { ...first, status: 'RUNNING', startedAt: undefined },
+      }),
+    );
+    applicantModel.updateOne.mockReturnValue(query({ acknowledged: true, modifiedCount: 1 }));
+    artifactModel.findOne.mockReturnValue(
+      query({
+        _id: ARTIFACT,
+        applicationId: APPLICATION,
+        version: 7,
+        metadata: { sha256: 'resume-hash-v7' },
+        content: '{}',
+      }),
+    );
+    employerJobModel.findOne.mockReturnValue(
+      query({ _id: JOB, ownerId: OWNER, description: 'Build reliable backend services.' }),
+    );
+
+    await service.assess(String(OWNER), String(APPLICANT));
+
+    expect(gateway.assess).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps an in-progress sandbox as RUNNING instead of a finished partial review', async () => {
+    gateway.assess.mockResolvedValue({
+      status: 'NOT_RUN',
+      reason: 'EMPLOYER_ATS_RUN_IN_PROGRESS',
+      harness: 'ats',
+    });
+    const analyze = jest.spyOn(heuristic, 'analyze');
+
+    const result = await service.assess(String(OWNER), String(APPLICANT));
+
+    expect(result.status).toBe('RUNNING');
+    expect(result.reason).toBe('EMPLOYER_ATS_RUN_IN_PROGRESS');
+    expect(result.startedAt).toBeUndefined();
+    expect(analyze).not.toHaveBeenCalled();
+    const statuses = applicantModel.updateOne.mock.calls.map(
+      (call) => call[1].$set.resumeAssessment.status,
+    );
+    expect(statuses).toEqual(['RUNNING', 'RUNNING']);
+    analyze.mockRestore();
+  });
+
+  it('returns the submitted résumé text and download path to the owner', async () => {
+    artifactModel.findOne.mockReturnValue(
+      query({
+        _id: ARTIFACT,
+        applicationId: APPLICATION,
+        type: 'resume_version',
+        version: 7,
+        fileName: 'ada.pdf',
+        fileUrl: 'resumes/applications/ada.pdf',
+        metadata: { sha256: 'resume-hash-v7' },
+        content: 'Ada builds APIs',
+      }),
+    );
+    const storage = { getBuffer: jest.fn().mockResolvedValue(Buffer.from('%PDF')) };
+    const withStorage = new EmployerResumeAssessmentService(
+      applicantModel as any,
+      artifactModel as any,
+      employerJobModel as any,
+      heuristic,
+      gateway as any,
+      parser as any,
+      previewModel as any,
+      undefined,
+      storage as any,
+    );
+
+    const view = await withStorage.submittedResume(String(OWNER), String(APPLICANT));
+    const file = await withStorage.submittedResumeFile(String(OWNER), String(APPLICANT));
+
+    expect(view).toEqual({
+      fileName: 'ada.pdf',
+      text: 'Ada builds APIs',
+      downloadUrl: `/api/employer/applicants/${APPLICANT}/resume/file`,
+    });
+    expect(file.buffer.toString()).toBe('%PDF');
+    expect(file.fileName).toBe('ada.pdf');
   });
 
   it('loses the atomic start race without dispatching a duplicate assessment', async () => {

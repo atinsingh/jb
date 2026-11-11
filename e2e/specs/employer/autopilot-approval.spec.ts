@@ -1,5 +1,8 @@
 import { test, expect } from '../../fixtures/test';
 import { api, createUser, uniqueId, type TestUser } from '../../support/api';
+import { readFileSync } from 'fs';
+import path from 'path';
+import { URLS } from '../../playwright.config';
 
 /**
  * The end-to-end proof for this whole feature set: an employer posts a job,
@@ -97,9 +100,18 @@ test.describe.skip('Autopilot UI muted by JOB-131: proposal -> approval -> real 
   });
 
   test('candidate applies, and Autopilot proposes a reject (low-signal applicant)', async () => {
-    // The real endpoint is POST /applications/apply/:jobId (a route param, no
-    // body) — see ApplicationsController.applyToJob.
-    await api.post(`/api/applications/apply/${jobId}`, undefined, candidate.token);
+    const body = new FormData();
+    body.append(
+      'resume',
+      new Blob([new Uint8Array(readFileSync(path.join(__dirname, '../../fixtures/ats-preview.pdf')))], { type: 'application/pdf' }),
+      'ats-preview.pdf',
+    );
+    const applied = await fetch(`${URLS.backend}/api/applications/apply/${jobId}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${candidate.token}` },
+      body,
+    });
+    if (!applied.ok) throw new Error(await applied.text());
 
     let proposals: any[] = [];
     await expect

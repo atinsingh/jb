@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { listingResumeInput } from './listing-resume';
 
 const dto = {
@@ -10,10 +10,15 @@ const dto = {
 } as any;
 
 describe('listingResumeInput', () => {
-  it('refuses a free caller before any résumé session exists', () => {
-    expect(() =>
-      listingResumeInput('FREE', { title: 'Engineer', description: 'Build APIs' }, dto),
-    ).toThrow(ForbiddenException);
+  it('uses the stored listing for a free caller and ignores the client description and url', () => {
+    expect(
+      listingResumeInput('FREE', { title: 'Engineer', description: '<p>Build APIs</p>' }, dto),
+    ).toEqual({
+      model: 'm',
+      effort: 'low',
+      targetRole: 'Engineer',
+      jobDescription: 'Build APIs',
+    });
   });
 
   it('uses the stored listing and ignores the client description and url', () => {

@@ -1,4 +1,5 @@
 import { INestApplication } from '@nestjs/common';
+import { join } from 'path';
 import {
   api,
   auth,
@@ -7,6 +8,8 @@ import {
   resetDatabase,
   TestUser,
 } from './utils/e2e-app';
+
+const RESUME = join(__dirname, '../../e2e/fixtures/ats-preview.pdf');
 
 /**
  * The go-live spine, end to end across both surfaces:
@@ -113,6 +116,7 @@ describe('Employer -> candidate -> employer hiring journey (e2e)', () => {
     const res = await api(app)
       .post(`/api/applications/apply/${searchJobId}`)
       .set(auth(candidate.token))
+      .attach('resume', RESUME)
       .expect(201);
 
     applicationId = res.body.application?._id ?? res.body.application?.id;

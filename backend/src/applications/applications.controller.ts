@@ -12,6 +12,8 @@ import {
   UnauthorizedException,
   BadRequestException,
   Logger,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -21,13 +23,29 @@ import {
   ApiParam,
   ApiQuery,
   ApiBody,
+  ApiConsumes,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import { extname } from 'path';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ApplicationsService } from './applications.service';
 import { ApplicationAgentService } from './application-agent.service';
 import { ApplicationEventsService } from './application-events.service';
 
 import { ApplyRunnerService } from '../apply-runner/apply-runner.service';
+
+const applyResumeFilter = (
+  _req: any,
+  file: Express.Multer.File,
+  cb: (error: Error | null, acceptFile: boolean) => void,
+) => {
+  if (extname(file.originalname).toLowerCase() === '.pdf') {
+    cb(null, true);
+    return;
+  }
+  cb(new BadRequestException('Upload a PDF résumé to apply.'), false);
+};
 
 @ApiTags('applications')
 @Controller('applications')
@@ -63,13 +81,25 @@ export class ApplicationsController {
   }
 
   @Post('apply/:jobId')
+  @UseInterceptors(
+    FileInterceptor('resume', {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: applyResumeFilter,
+    }),
+  )
+  @ApiConsumes('multipart/form-data')
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Apply to a job' })
+  @ApiOperation({ summary: 'Apply to a job with a PDF résumé' })
   @ApiParam({ name: 'jobId', description: 'Job ID to apply for' })
   @ApiResponse({ status: 200, description: 'Application created successfully' })
   @ApiResponse({ status: 400, description: 'Already applied to this job' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async applyToJob(@Param('jobId') jobId: string, @Request() req) {
+  async applyToJob(
+    @Param('jobId') jobId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req,
+  ) {
     this.logger.log(`📝 Applying to job ${jobId} for user ${req.user?.email || 'unknown'}`);
     const userId = req.user._id.toString();
 
@@ -87,6 +117,10 @@ export class ApplicationsController {
     const application = await this.applicationsService.createApplication(
       userId,
       jobId,
+      undefined,
+      undefined,
+      false,
+      file,
     );
 
     this.logger.log(`✅ Application created: ${application._id}`);
