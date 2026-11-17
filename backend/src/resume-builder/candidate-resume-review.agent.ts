@@ -194,7 +194,6 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
           sessionId,
           runId,
         },
-        replaced.length > 0,
         async (access, tags) => {
           await this.stopIfReplaced(sessionId);
           const boot = adapter.bootstrap({
@@ -358,11 +357,9 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
   private withReviewLease<T>(
     userId: string,
     attribution: { harness: string; alias: string; model: string; effort: string; sessionId: string; runId: string },
-    replaced: boolean,
     run: Parameters<AiBudgetService['withCandidateLease']>[3],
   ): Promise<T> {
     const start = () => this.budget.withCandidateLease(userId, 'candidate_ats_review', attribution, run) as Promise<T>;
-    if (!replaced) return start();
     const claim = async (attempt: number): Promise<T> => {
       try {
         return await start();

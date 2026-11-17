@@ -8,6 +8,17 @@ import {
 import { Request, Response } from 'express';
 import { AppLoggerService } from '../logger/logger.service';
 
+function stripeClientError(exception: unknown): exception is Error & { statusCode: number } {
+  if (!(exception instanceof Error)) return false;
+  const statusCode = (exception as { statusCode?: unknown }).statusCode;
+  const type = (exception as { type?: unknown }).type;
+  return typeof statusCode === 'number'
+    && statusCode >= 400
+    && statusCode < 500
+    && typeof type === 'string'
+    && type.startsWith('Stripe');
+}
+
 interface ErrorResponse {
   statusCode: number;
   message: string | string[];
@@ -58,6 +69,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
       // CastError. That's bad input, not a server fault — report 400, not 500.
       status = HttpStatus.BAD_REQUEST;
       message = `Invalid identifier: ${(exception as any).value}`;
+      error = 'Bad Request';
+    } else if (stripeClientError(exception)) {
+      status = exception.statusCode;
+      message = exception.message;
       error = 'Bad Request';
     } else if (exception instanceof Error) {
       status = HttpStatus.INTERNAL_SERVER_ERROR;

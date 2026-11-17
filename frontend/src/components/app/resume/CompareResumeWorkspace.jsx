@@ -403,6 +403,7 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
   const [elapsed, setElapsed] = useState(0);
   const [showActivity, setShowActivity] = useState(false);
   const [bites, setBites] = useState(null);
+  const bitesRef = useRef(null);
   const compareRequest = useRef(0);
 
   const followReview = useCallback(async (id, result, request) => {
@@ -533,13 +534,19 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
 
   useEffect(() => {
     if (!comparing || !resumeId) {
+      bitesRef.current = null;
       setBites(null);
       return undefined;
     }
     let cancelled = false;
     getCompareBites(resumeId)
-      .then((body) => { if (!cancelled) setBites(Array.isArray(body?.bites) ? body.bites : []); })
-      .catch(() => { if (!cancelled) setBites([]); });
+      .then((body) => {
+        if (cancelled) return;
+        const next = Array.isArray(body?.bites) ? body.bites : [];
+        bitesRef.current = next;
+        setBites(next);
+      })
+      .catch(() => { if (!cancelled) { bitesRef.current = []; setBites([]); } });
     return () => { cancelled = true; };
   }, [comparing, resumeId]);
 
@@ -553,13 +560,13 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
     const tick = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
     const reveal = setInterval(() => {
       const waited = Date.now() - started;
-      if (waited >= 4000 || (waited >= 2000 && bites)) setShowActivity(true);
+      if (waited >= 4000 || (waited >= 2000 && bitesRef.current)) setShowActivity(true);
     }, 200);
     return () => {
       clearInterval(tick);
       clearInterval(reveal);
     };
-  }, [comparing, bites]);
+  }, [comparing]);
 
   useEffect(() => {
     if (!resumeId) return;

@@ -357,9 +357,10 @@ export class ResumeComparisonService {
           timer = setTimeout(() => reject(new Error('timeout')), 4000);
         }),
       ]).finally(() => clearTimeout(timer));
-      return { bites: groundedBites(response.content, source) };
+      const grounded = groundedBites(response.content, source);
+      return { bites: grounded.length ? grounded : localBites(resume) };
     } catch {
-      return { bites: [] };
+      return { bites: localBites(resume) };
     }
   }
 
@@ -417,7 +418,8 @@ function biteSource(resume: Resume): string {
   push(resume.summary);
   (resume.skills || []).forEach(push);
   (resume.experience || []).forEach((job) => {
-    push([job.title, job.company].filter(Boolean).join(' at '));
+    const role = [job.title, job.company].filter(Boolean).join(' at ');
+    if (!isHeaderLine(role)) push(role);
     push(job.description);
     (job.achievements || []).forEach(push);
   });
@@ -425,8 +427,39 @@ function biteSource(resume: Resume): string {
   return lines.join('\n');
 }
 
-function biteWords(text: string) {
-  return (text.toLowerCase().replace(/[^a-z0-9+#\s-]/g, ' ').match(/[a-z0-9][a-z0-9+#-]*/g) || []).filter((word) => word.length >= 4);
+const BITE_STOP = new Set<string>(['at', 'as', 'an', 'or', 'of', 'to', 'in', 'on', 'for', 'and', 'the', 'with', 'from', 'your']);
+
+function isHeaderLine(text: string) {
+  return /location:|client:|duration:|responsibilities:/i.test(text);
+}
+
+function localBites(resume: Resume) {
+  const facts: Array<{ label: string; detail: string }> = [];
+  const add = (label: string, detail: string) => {
+    const name = label.replace(/\s+/g, ' ').trim();
+    const more = detail.replace(/\s+/g, ' ').trim();
+    if (!name || !more || isHeaderLine(name) || facts.some((fact) => fact.label === name)) return;
+    facts.push({ label: name, detail: more });
+  };
+  (resume.experience || []).forEach((job) => {
+    (job.achievements || []).forEach((item) => {
+      const text = String(item || '').replace(/\s+/g, ' ').trim();
+      if (text.length >= 20) add(text, text);
+    });
+    const role = [job.title, job.company].filter(Boolean).join(' at ');
+    const detail = String(job.description || '').replace(/\s+/g, ' ').trim();
+    if (role && detail) add(role, detail);
+  });
+  (resume.skills || []).forEach((skill) => {
+    const name = String(skill || '').replace(/\s+/g, ' ').trim();
+    if (name) add(name, name);
+  });
+  return facts.slice(0, 8);
+}
+
+function biteWords(text: string): string[] {
+  return text.toLowerCase().replace(/[^a-z0-9+#\s-]/g, ' ').split(/\s+/)
+    .filter((word) => word.length >= 2 && !BITE_STOP.has(word));
 }
 
 function groundedBites(raw: string, source: string) {
@@ -440,11 +473,11 @@ function groundedBites(raw: string, source: string) {
   } catch {
     return [];
   }
-  const clip = (value: string, max: number) => (value.length > max ? `${value.slice(0, max - 1)}…` : value);
+  const clean = (value?: string) => String(value || '').replace(/\s+/g, ' ').trim();
   return (parsed?.bites || []).flatMap((bite) => {
-    const label = clip(String(bite?.label || '').replace(/\s+/g, ' ').trim(), 48);
-    const detail = clip(String(bite?.detail || '').replace(/\s+/g, ' ').trim(), 160);
-    if (!label || !detail) return [];
+    const label = clean(bite?.label);
+    const detail = clean(bite?.detail);
+    if (!label || !detail || isHeaderLine(label) || isHeaderLine(detail)) return [];
     const blob = `${label} ${detail}`;
     const numbers = blob.match(/\d+/g) || [];
     if (numbers.some((number) => !sourceNumbers.has(number))) return [];

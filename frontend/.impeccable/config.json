@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/components/app/resume/CompareResumeWorkspace.jsx"
+        ],
+        "createdAt": "2026-11-12T19:43:16.981Z",
+        "reason": "Existing review-severity markers (suggestion cards and missing-section callout) already shipped in Compare Resume. This task does not restyle them."
+      }
+    ]
+  }
+}

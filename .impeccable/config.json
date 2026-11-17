@@ -8,6 +8,15 @@
         "value": "arial",
         "createdAt": "2026-10-28T17:31:16.056Z",
         "reason": "Existing SMTP HTML already uses Arial because mail clients do not load product fonts. This is transactional mail, not the app UI."
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "frontend/src/components/app/resume/CompareResumeWorkspace.jsx"
+        ],
+        "createdAt": "2026-11-12T19:39:19.846Z",
+        "reason": "Existing review-severity markers (suggestion cards and missing-section callout) already shipped in Compare Resume. This task does not restyle them."
       }
     ]
   }

@@ -349,22 +349,67 @@ describe('ResumeComparisonService', () => {
   });
 
   it('rewrites wait bites with the default model and drops lines that are not in the résumé', async () => {
+    resume.skills = ['TypeScript', 'SQL'];
     chat.mockResolvedValue({
       content: JSON.stringify({
         bites: [
           { label: 'TypeScript APIs', detail: 'Built APIs at Acme as an Engineer.' },
+          { label: 'SQL', detail: 'SQL at Acme.' },
           { label: 'Raised revenue 400%', detail: 'Invented a new market.' },
         ],
       }),
     });
 
-    const result = await service.waitBites('resume-1', userId);
+    try {
+      const result = await service.waitBites('resume-1', userId);
 
-    expect(llm.getProviderForFeature).toHaveBeenCalledWith('rewriteBullets', userId);
-    expect(chat.mock.calls[0][0].model).toBeUndefined();
-    expect(result.bites).toEqual([
-      { label: 'TypeScript APIs', detail: 'Built APIs at Acme as an Engineer.' },
-    ]);
+      expect(llm.getProviderForFeature).toHaveBeenCalledWith('rewriteBullets', userId);
+      expect(chat.mock.calls[0][0].model).toBeUndefined();
+      expect(result.bites).toEqual([
+        { label: 'TypeScript APIs', detail: 'Built APIs at Acme as an Engineer.' },
+        { label: 'SQL', detail: 'SQL at Acme.' },
+      ]);
+    } finally {
+      resume.skills = ['TypeScript'];
+    }
+  });
+
+  it('uses résumé bullets when the model only echoes the job header', async () => {
+    const experience = resume.experience;
+    resume.summary = '';
+    resume.skills = [];
+    resume.experience = [{
+      title: 'Backend Developer Location: Toronto',
+      company: 'ON Client: XXXXX XXX Duration: Responsibilities:',
+      startDate: '2022-01',
+      achievements: [
+        'Developed backend services using Java 17 and Spring Boot for enterprise applications that stayed in production for years.',
+        'Designed database solutions using PostgreSQL and Oracle.',
+      ],
+    }];
+    chat.mockResolvedValue({
+      content: JSON.stringify({
+        bites: [{
+          label: 'Backend Developer Location: Toronto at ON',
+          detail: 'Client: XXXXX XXX Duration: Responsibilities:',
+        }],
+      }),
+    });
+
+    try {
+      const result = await service.waitBites('resume-1', userId);
+      const text = result.bites.map((bite) => `${bite.label} ${bite.detail}`).join(' ');
+      expect(text).not.toMatch(/Location:|Client:|Duration:|Responsibilities:/);
+      const java = result.bites.find((bite) => bite.detail.includes('Java 17'));
+      expect(java?.label).toBe('Developed backend services using Java 17 and Spring Boot for enterprise applications that stayed in production for years.');
+      expect(java?.detail).toBe(java?.label);
+      expect(java?.label).not.toContain('…');
+      expect(text).toContain('PostgreSQL');
+    } finally {
+      resume.summary = 'Results-driven engineer with a proven track record.';
+      resume.skills = ['TypeScript'];
+      resume.experience = experience;
+    }
   });
 
   it('does not expose another user\'s imported resume', async () => {

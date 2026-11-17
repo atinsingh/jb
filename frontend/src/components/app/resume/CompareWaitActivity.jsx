@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const COLS = 16;
 const ROWS = 11;
@@ -24,8 +24,11 @@ const PAUSE_MS = 3200;
 
 function clip(value) {
   const text = String(value || '').replace(/\s+/g, ' ').trim();
-  if (text.length < 2) return '';
-  return text.length > 90 ? `${text.slice(0, 87)}…` : text;
+  return text.length < 2 ? '' : text;
+}
+
+function isHeaderLine(text) {
+  return /location:|client:|duration:|responsibilities:/i.test(text);
 }
 
 function factsFrom(resume) {
@@ -44,20 +47,23 @@ function factsFrom(resume) {
   const seen = new Set();
   const add = (label, detail) => {
     const name = clip(label);
-    if (!name || seen.has(name.toLowerCase())) return;
+    if (!name || isHeaderLine(name) || seen.has(name.toLowerCase())) return;
     seen.add(name.toLowerCase());
     const more = clip(detail);
-    facts.push({ label: name, detail: more && more.toLowerCase() !== name.toLowerCase() ? more : 'Listed on your résumé.' });
+    facts.push({ label: name, detail: more || name });
   };
+  (resume?.experience || []).forEach((job) => {
+    (job?.achievements || []).forEach((item) => {
+      const text = clip(item);
+      if (text.length >= 20) add(text, text);
+    });
+    const role = [job?.title, job?.company].filter(Boolean).join(' at ');
+    add(role, clip(job?.description) || summary);
+  });
   (resume?.skills || []).forEach((skill) => {
     const name = clip(skill);
     const hit = notes.find((note) => name && note.toLowerCase().includes(name.toLowerCase()));
     add(name, hit || summary);
-  });
-  (resume?.experience || []).forEach((job) => {
-    const role = [job?.title, job?.company].filter(Boolean).join(' at ');
-    const more = [job?.description, ...(job?.achievements || [])].map(clip).filter(Boolean).join(' ');
-    add(role, more || summary);
   });
   (resume?.achievements || []).forEach((item) => add(item, summary));
   if (summary) add(summary, notes[0] || '');
@@ -154,13 +160,15 @@ function releaseHold(current) {
   return true;
 }
 
+function openingFacts(resume, bites) {
+  const refined = (Array.isArray(bites) ? bites : []).filter((bite) => bite?.label && bite?.detail && !isHeaderLine(bite.label) && !isHeaderLine(bite.detail));
+  if (refined.length) return refined;
+  const lines = factsFrom(resume);
+  return lines.length ? lines : [{ label: 'A specific line beats a vague one', detail: 'A number you can explain beats a number you rounded up.' }];
+}
+
 export default function CompareWaitActivity({ resume, bites }) {
-  const facts = useMemo(() => {
-    const refined = (Array.isArray(bites) ? bites : []).filter((bite) => bite?.label && bite?.detail);
-    if (refined.length) return refined;
-    const lines = factsFrom(resume);
-    return lines.length ? lines : [{ label: 'A specific line beats a vague one', detail: 'A number you can explain beats a number you rounded up.' }];
-  }, [resume, bites]);
+  const facts = useRef(openingFacts(resume, bites)).current;
   const canvasRef = useRef(null);
   const stateRef = useRef(null);
   const [factIndex, setFactIndex] = useState(0);
@@ -277,7 +285,7 @@ export default function CompareWaitActivity({ resume, bites }) {
         @media (prefers-reduced-motion: reduce) { .snake-detail { animation: none; } }
       `}</style>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'end' }}>
-        <p data-testid="snake-fact" style={{ margin: 0, maxWidth: '22ch', fontFamily: 'var(--jb-v3-font-display), system-ui, sans-serif', fontSize: 'clamp(1.7rem, 3vw, 2.5rem)', lineHeight: 1.12, letterSpacing: '-0.03em', fontWeight: 600 }}>{fact.label}</p>
+        <p data-testid="snake-fact" style={{ margin: 0, maxWidth: '68ch', fontFamily: 'var(--jb-v3-font-display), system-ui, sans-serif', fontSize: 'clamp(1.15rem, 2vw, 1.45rem)', lineHeight: 1.35, letterSpacing: '-0.02em', fontWeight: 600 }}>{fact.label}</p>
         <div style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--jb-v3-fg-2)', fontSize: 14 }}>Length {length}</div>
       </div>
       <p style={{ margin: 0, color: 'var(--jb-v3-fg-2)', fontSize: 15 }}>Steer into that line. Arrow keys, or the buttons.</p>
@@ -286,7 +294,7 @@ export default function CompareWaitActivity({ resume, bites }) {
         {reading && (
           <div className="snake-detail" data-testid="snake-detail" role="status">
             <p className="snake-detail-label">{reading.label}</p>
-            <p className="snake-detail-body">{reading.detail}</p>
+            {reading.detail !== reading.label && <p className="snake-detail-body">{reading.detail}</p>}
             <button type="button" onClick={resumePlay}>Keep playing</button>
           </div>
         )}

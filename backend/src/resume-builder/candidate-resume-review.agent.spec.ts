@@ -302,6 +302,25 @@ describe('LiteLlmCandidateResumeReviewAgent session runtime', () => {
     }
   });
 
+  it('waits out a short overlapping model call instead of failing the written review', async () => {
+    let busy = true;
+    budget.withCandidateLease.mockImplementation(async (_u, _s, _a, run) => {
+      if (busy) {
+        busy = false;
+        throw Object.assign(new Error('Another operation is already running for this account. Nothing was started.'), { code: 'AI_BUDGET_OPERATION_IN_PROGRESS' });
+      }
+      return run({ apiKey: 'candidate-key' }, ['usageContext=candidate_ats_review']);
+    });
+
+    const result = await agent.review({
+      userId: 'user-1', resumeId: 'resume-1', resumeText: 'Built payment services for clients',
+      jobDescription: 'Backend engineer',
+    });
+
+    expect(result.sessionId).toBe('compare-session-1');
+    expect(session.status).not.toBe('failed');
+  });
+
   it('starts a review for a changed job instead of failing while the previous comparison is still running', async () => {
     let busy = true;
     budget.withCandidateLease.mockImplementation(async (_u, _s, _a, run) => {
