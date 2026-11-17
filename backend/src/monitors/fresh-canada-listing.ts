@@ -21,7 +21,7 @@ export function listedInCanada(
   return /\b(canada|ontario|quebec|québec|british columbia|alberta|manitoba|saskatchewan|nova scotia|new brunswick|newfoundland|prince edward island|toronto|vancouver|montr[eé]al|ottawa|calgary|edmonton|winnipeg|halifax)\b/i.test(location || '');
 }
 
-/** Inclusive of today. shortcut: 30×24h back from today's Toronto midnight, not 30 local midnights across DST — upgrade if a role on the boundary day must follow the calendar. */
+/** Inclusive of today, counted in Toronto calendar days. */
 export const OPEN_MARKET_RETENTION_DAYS = 30;
 
 function relativeAgeDays(text: string): number | null {
@@ -33,8 +33,11 @@ function relativeAgeDays(text: string): number | null {
 }
 
 export function openMarketPostedSince(now = new Date()): Date {
-  const { start } = torontoDayRange(now);
-  return new Date(start.getTime() - (OPEN_MARKET_RETENTION_DAYS - 1) * 864e5);
+  const [year, month, day] = calendarDay(now).split('-').map(Number);
+  const earlier = new Date(Date.UTC(year, month - 1, day));
+  earlier.setUTCDate(earlier.getUTCDate() - (OPEN_MARKET_RETENTION_DAYS - 1));
+  const stamp = earlier.toISOString().slice(0, 10);
+  return torontoDayRange(new Date(`${stamp}T12:00:00.000Z`)).start;
 }
 
 /** True when the source date is inside the 30-day browse window. */

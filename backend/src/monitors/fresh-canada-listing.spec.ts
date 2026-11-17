@@ -7,6 +7,8 @@ describe('fresh Canada listings', () => {
     expect(postedWithinMonth('2026-11-03T08:15:00-05:00', now)).toBe(true);
     expect(postedWithinMonth('2026-11-02T22:00:00-05:00', now)).toBe(true);
     expect(postedWithinMonth('2026-10-05T08:00:00-04:00', now)).toBe(true);
+    expect(postedWithinMonth('2026-10-05T00:30:00-04:00', now)).toBe(true);
+    expect(postedWithinMonth('2026-10-04T23:30:00-04:00', now)).toBe(false);
     expect(postedWithinMonth('2026-10-04T12:00:00-04:00', now)).toBe(false);
     expect(postedWithinMonth('Posted Today', now)).toBe(true);
     expect(postedWithinMonth('Posted Yesterday', now)).toBe(true);
@@ -30,7 +32,7 @@ describe('fresh Canada listings', () => {
         {
           source: { $in: ['Greenhouse', 'Lever', 'Workday', 'Ashby'] },
           country: 'CA',
-          postedAt: { $gte: new Date('2026-10-05T05:00:00.000Z'), $lt: end },
+          postedAt: { $gte: new Date('2026-10-05T04:00:00.000Z'), $lt: end },
         },
       ],
     });

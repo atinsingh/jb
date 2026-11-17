@@ -405,26 +405,30 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
   const [bites, setBites] = useState(null);
   const bitesRef = useRef(null);
   const compareRequest = useRef(0);
+  const mounted = useRef(true);
+
+  useEffect(() => () => { mounted.current = false; }, []);
 
   const followReview = useCallback(async (id, result, request) => {
-    if (!result || request !== compareRequest.current) return;
+    const live = () => mounted.current && request === compareRequest.current;
+    if (!result || !live()) return;
     if (Object.keys(result.details || {}).length) {
       setResume((current) => withoutDuplicatedExperienceText({ ...current, ...result.details }));
     }
     setAssessment(result);
     if (!result.pending || !result.review?.sessionId) return;
     for (;;) {
-      if (request !== compareRequest.current) return;
+      if (!live()) return;
       let status;
       try {
         status = await getCompareReview(id, result.review.sessionId);
       } catch (cause) {
-        if (request !== compareRequest.current) return;
+        if (!live()) return;
         setMessage(cause?.message || 'Comparison is temporarily unavailable.');
         setAssessment((current) => (current ? { ...current, pending: false } : current));
         return;
       }
-      if (request !== compareRequest.current) return;
+      if (!live()) return;
       if (status?.status === 'completed') {
         setAssessment((current) => ({ ...(current || result), pending: false, annotations: status.annotations || [] }));
         return;
@@ -435,6 +439,7 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
         return;
       }
       await new Promise((resolve) => setTimeout(resolve, 2000));
+      if (!live()) return;
     }
   }, []);
 

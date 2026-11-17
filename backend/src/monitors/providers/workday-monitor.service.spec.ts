@@ -95,4 +95,51 @@ describe('WorkdayMonitorService', () => {
     expect(axios.post).toHaveBeenCalledTimes(3);
     delete process.env.WORKDAY_FETCH_DETAILS;
   });
+
+  it('does not refetch the detail page for a role already stored', async () => {
+    process.env.WORKDAY_SITES = 'td.wd3.myworkdayjobs.com/td/TD_Bank_Careers';
+    delete process.env.WORKDAY_FETCH_DETAILS;
+    (axios.post as jest.Mock).mockResolvedValue({
+      data: {
+        jobPostings: [{
+          title: 'Advisor',
+          externalPath: '/job/Toronto/Advisor_R_1',
+          locationsText: 'Toronto, Ontario',
+          postedOn: 'Posted Today',
+          bulletFields: ['R_1'],
+        }],
+      },
+    });
+    const jobs = {
+      exists: jest.fn().mockResolvedValue({ _id: 'stored' }),
+      findOneAndUpdate: jest.fn().mockResolvedValue({}),
+    };
+    await new WorkdayMonitorService(jobs as any, { deriveLogo: jest.fn().mockReturnValue('') } as any).run();
+    expect(axios.get).not.toHaveBeenCalled();
+    expect(jobs.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it('stops paging a site once its time budget is spent', async () => {
+    process.env.WORKDAY_SITES = 'td.wd3.myworkdayjobs.com/td/TD_Bank_Careers';
+    process.env.WORKDAY_FETCH_DETAILS = 'false';
+    process.env.WORKDAY_SITE_BUDGET_MS = '0';
+    const page = Array.from({ length: 20 }, (_, i) => ({
+      title: `Role ${i}`,
+      externalPath: `/job/Toronto/Role_${i}`,
+      locationsText: 'Toronto, Ontario',
+      postedOn: 'Posted Today',
+      bulletFields: [`R_${i}`],
+    }));
+    (axios.post as jest.Mock)
+      .mockResolvedValueOnce({ data: { jobPostings: page } })
+      .mockResolvedValueOnce({ data: { jobPostings: page } });
+    const jobs = {
+      exists: jest.fn().mockResolvedValue(null),
+      findOneAndUpdate: jest.fn().mockResolvedValue({}),
+    };
+    await new WorkdayMonitorService(jobs as any, { deriveLogo: jest.fn().mockReturnValue('') } as any).run();
+    expect(axios.post).toHaveBeenCalledTimes(1);
+    delete process.env.WORKDAY_FETCH_DETAILS;
+    delete process.env.WORKDAY_SITE_BUDGET_MS;
+  });
 });

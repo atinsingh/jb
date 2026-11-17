@@ -46,6 +46,9 @@ export class WorkdayMonitorService {
     const sites = this.resolveSites(sitesInput, process.env.WORKDAY_SITES);
     const fetchDetails = (process.env.WORKDAY_FETCH_DETAILS || 'true') === 'true';
     const detailTimeout = parseInt(process.env.WORKDAY_DETAIL_TIMEOUT_MS || '4000', 10);
+    const rawBudget = process.env.WORKDAY_SITE_BUDGET_MS;
+    const parsedBudget = rawBudget === undefined || rawBudget === '' ? NaN : Number(rawBudget);
+    const siteBudgetMs = Number.isFinite(parsedBudget) ? parsedBudget : 90_000;
 
     let fetched = 0;
     let upserts = 0;
@@ -55,7 +58,7 @@ export class WorkdayMonitorService {
     for (const site of sites) {
       const key = `${site.tenant}/${site.site}`;
       try {
-        const count = await this.fetchSite(site, { fetchDetails, detailTimeout });
+        const count = await this.fetchSite(site, { fetchDetails, detailTimeout, siteBudgetMs });
         fetched += count.fetched;
         upserts += count.upserts;
         newExternalIds.push(...count.newExternalIds);
@@ -77,7 +80,7 @@ export class WorkdayMonitorService {
 
   private async fetchSite(
     site: WorkdaySite,
-    options: { fetchDetails: boolean; detailTimeout: number },
+    options: { fetchDetails: boolean; detailTimeout: number; siteBudgetMs: number },
   ) {
     let offset = 0;
     const limit = 20;
@@ -85,6 +88,7 @@ export class WorkdayMonitorService {
     let upserts = 0;
     const newExternalIds: string[] = [];
     const base = `https://${site.host}/wday/cxs/${site.tenant}/${site.site}/jobs`;
+    const started = Date.now();
 
     while (true) {
       const { data } = await axios.post(
@@ -105,6 +109,8 @@ export class WorkdayMonitorService {
         const reqId = job.bulletFields?.[0] || job.externalPath;
         const externalId = `workday:${site.tenant}:${reqId}`;
         const existed = await this.jobModel.exists({ externalId });
+        // A stored row keeps its first detail page. Later runs must not download it again.
+        if (existed) continue;
         let description = job.title || '';
         let jobType = job?.timeType || 'Full-time';
         const externalUrl = job.externalPath
@@ -152,7 +158,9 @@ export class WorkdayMonitorService {
       offset += postings.length;
 
       // Boards return newest first; a page with nothing inside the month means the rest are older.
-      if (postings.length < limit || todayOnPage === 0) break;
+      // The budget stops one site from holding the cron until the next slot. The next run
+      // walks stored rows without detail fetches, so it continues further into the month.
+      if (postings.length < limit || todayOnPage === 0 || Date.now() - started >= options.siteBudgetMs) break;
     }
 
     return { fetched, upserts, newExternalIds };
