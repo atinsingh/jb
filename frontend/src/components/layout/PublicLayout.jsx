@@ -115,32 +115,6 @@ export default function PublicLayout({ children, variant = 'candidate', surface 
           --jb-warn-tint: rgba(255, 181, 46, 0.14);
         }
 
-        /* The footer keeps its dark ground in BOTH themes, so its ink must stay
-           on the dark scale. Without this it inherits light mode's near-black
-           ink and renders dark-on-dark. */
-        html[data-jb-theme='light'] .jb-dark .jbfoot {
-          --jb-d-ink: #f2ecdb;
-          --jb-d-ink-85: rgba(242, 236, 219, 0.85);
-          --jb-d-ink-70: rgba(242, 236, 219, 0.7);
-          --jb-d-ink-65: rgba(242, 236, 219, 0.65);
-          --jb-d-ink-55: rgba(242, 236, 219, 0.55);
-          --jb-d-ink-45: rgba(242, 236, 219, 0.45);
-          --jb-d-accent: #8fd6a3;
-          --jb-d-line: rgba(242, 236, 219, 0.12);
-          --jb-d-line-card: rgba(242, 236, 219, 0.15);
-          --jb-d-focus: #8fd6a3;
-          --jb-ink: var(--jb-d-ink);
-          --jb-ink-body: var(--jb-d-ink-70);
-          --jb-ink-muted: var(--jb-d-ink-65);
-          --jb-ink-subtle: var(--jb-d-ink-55);
-          --jb-on-dark: var(--jb-d-ink);
-          --jb-on-dark-muted: var(--jb-d-ink-55);
-          --jb-accent: var(--jb-d-accent);
-          --jb-accent-text: var(--jb-d-accent);
-          --jb-border: var(--jb-d-line-card);
-          --jb-border-soft: var(--jb-d-line);
-        }
-
         .jb-dark h1,
         .jb-dark h2,
         .jb-dark h3 {
