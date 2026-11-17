@@ -6,7 +6,7 @@ import { Job, JobDocument } from '../../schemas/job.schema';
 import { JobGeoService } from '../../geography/job-geo.service';
 import { resolveCountry } from '../../geography/geo.constants';
 import { plainJobText } from '../plain-job-text';
-import { isPostedToday, listedInCanada } from '../fresh-canada-listing';
+import { listedInCanada, marketPostedAt, postedWithinMonth } from '../fresh-canada-listing';
 
 type WorkdaySite = { host: string; tenant: string; site: string };
 
@@ -99,11 +99,9 @@ export class WorkdayMonitorService {
       for (const job of postings) {
         let location = this.place(job);
         const postedRaw = job.postedOn || job.startDate;
-        if (!isPostedToday(postedRaw) || !listedInCanada({ country: resolveCountry(location) }, location)) continue;
+        if (!postedWithinMonth(postedRaw) || !listedInCanada({ country: resolveCountry(location) }, location)) continue;
         todayOnPage += 1;
-        const postedAt = typeof postedRaw === 'string' && /^posted today$/i.test(postedRaw.trim())
-          ? new Date()
-          : new Date(postedRaw);
+        const postedAt = marketPostedAt(postedRaw);
         const reqId = job.bulletFields?.[0] || job.externalPath;
         const externalId = `workday:${site.tenant}:${reqId}`;
         const existed = await this.jobModel.exists({ externalId });
@@ -153,7 +151,7 @@ export class WorkdayMonitorService {
       fetched += postings.length;
       offset += postings.length;
 
-      // Boards return newest first; a page with nothing from today means the rest are older.
+      // Boards return newest first; a page with nothing inside the month means the rest are older.
       if (postings.length < limit || todayOnPage === 0) break;
     }
 

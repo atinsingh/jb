@@ -5,7 +5,7 @@ import { Model } from 'mongoose';
 import { Job, JobDocument } from '../../schemas/job.schema';
 import { JobGeoService } from '../../geography/job-geo.service';
 import { extractSkills } from '../../matching/skill-taxonomy';
-import { isPostedToday, listedInCanada } from '../fresh-canada-listing';
+import { listedInCanada, postedWithinMonth } from '../fresh-canada-listing';
 
 // shortcut: boards that publish on Lever, set LEVER_BOARDS for a different set
 const DEFAULT_LEVER_BOARDS = ['wattpad', 'spotify'];
@@ -32,7 +32,7 @@ export class LeverMonitorService {
         const jobs = Array.isArray(data) ? data : [];
         fetched += jobs.length;
         const ranked = jobs
-          .filter((job) => isPostedToday(job.createdAt))
+          .filter((job) => postedWithinMonth(job.createdAt))
           .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         let kept = 0;
 

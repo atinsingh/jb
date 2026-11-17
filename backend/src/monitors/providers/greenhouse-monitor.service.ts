@@ -6,7 +6,7 @@ import { Job, JobDocument } from '../../schemas/job.schema';
 import { JobGeoService } from '../../geography/job-geo.service';
 import { extractSkills } from '../../matching/skill-taxonomy';
 import { plainJobText } from '../plain-job-text';
-import { isPostedToday, listedInCanada } from '../fresh-canada-listing';
+import { listedInCanada, postedWithinMonth } from '../fresh-canada-listing';
 
 // shortcut: six public boards, set GREENHOUSE_BOARDS for a different market
 const DEFAULT_GREENHOUSE_BOARDS = ['hootsuite', 'unbounce', 'ritual', 'later', 'stripe', 'gitlab'];
@@ -39,7 +39,7 @@ export class GreenhouseMonitorService {
         const jobs = Array.isArray(data.jobs) ? data.jobs : [];
         fetched += jobs.length;
         const ranked = jobs
-          .filter((job) => isPostedToday(job.first_published))
+          .filter((job) => postedWithinMonth(job.first_published))
           .sort((a, b) => new Date(b.first_published).getTime() - new Date(a.first_published).getTime());
         let kept = 0;
 

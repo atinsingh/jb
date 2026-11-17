@@ -1,21 +1,28 @@
-import { isPostedToday, listedInCanada, publicListingFilter, torontoDayRange, variedByCompany } from './fresh-canada-listing';
+import { listedInCanada, marketPostedAt, postedWithinMonth, publicListingFilter, torontoDayRange, variedByCompany } from './fresh-canada-listing';
 
 describe('fresh Canada listings', () => {
   const now = new Date('2026-11-03T17:00:00.000Z');
 
-  it('keeps a role posted today in Toronto and drops yesterday or a missing date', () => {
-    expect(isPostedToday('2026-11-03T08:15:00-05:00', now)).toBe(true);
-    expect(isPostedToday('2026-11-02T22:00:00-05:00', now)).toBe(false);
-    expect(isPostedToday('Posted Today', now)).toBe(true);
-    expect(isPostedToday(null, now)).toBe(false);
+  it('keeps Canada roles from the last month, including a day the cron found nothing new', () => {
+    expect(postedWithinMonth('2026-11-03T08:15:00-05:00', now)).toBe(true);
+    expect(postedWithinMonth('2026-11-02T22:00:00-05:00', now)).toBe(true);
+    expect(postedWithinMonth('2026-10-05T08:00:00-04:00', now)).toBe(true);
+    expect(postedWithinMonth('2026-10-04T12:00:00-04:00', now)).toBe(false);
+    expect(postedWithinMonth('Posted Today', now)).toBe(true);
+    expect(postedWithinMonth('Posted Yesterday', now)).toBe(true);
+    expect(postedWithinMonth('Posted 8 Days Ago', now)).toBe(true);
+    expect(postedWithinMonth(marketPostedAt('Posted 8 Days Ago', now), now)).toBe(true);
+    expect(postedWithinMonth('Posted 30 Days Ago', now)).toBe(false);
+    expect(postedWithinMonth('Posted 30+ Days Ago', now)).toBe(false);
+    expect(postedWithinMonth(null, now)).toBe(false);
     expect(listedInCanada({ country: 'US', eligibleCountries: ['CA'] }, 'Remote, Canada; Remote, United States')).toBe(true);
     expect(listedInCanada({ country: 'US', eligibleCountries: ['US'] }, 'San Francisco')).toBe(false);
     expect(listedInCanada(null, 'Dieppe New Brunswick')).toBe(true);
     expect(listedInCanada(null, 'Ghent')).toBe(false);
   });
 
-  it('limits the public list to employer jobs plus today Canada market jobs', () => {
-    const { start, end } = torontoDayRange(now);
+  it('limits the public list to employer jobs plus Canada market jobs from the last 30 days', () => {
+    const { end } = torontoDayRange(now);
     expect(publicListingFilter(now)).toEqual({
       isActive: true,
       $or: [
@@ -23,11 +30,10 @@ describe('fresh Canada listings', () => {
         {
           source: { $in: ['Greenhouse', 'Lever', 'Workday', 'Ashby'] },
           country: 'CA',
-          postedAt: { $gte: start, $lt: end },
+          postedAt: { $gte: new Date('2026-10-05T05:00:00.000Z'), $lt: end },
         },
       ],
     });
-    expect(start.toISOString()).toBe('2026-11-03T05:00:00.000Z');
     expect(end.toISOString()).toBe('2026-11-04T05:00:00.000Z');
   });
 

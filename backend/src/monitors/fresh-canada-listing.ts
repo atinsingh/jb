@@ -21,12 +21,42 @@ export function listedInCanada(
   return /\b(canada|ontario|quebec|québec|british columbia|alberta|manitoba|saskatchewan|nova scotia|new brunswick|newfoundland|prince edward island|toronto|vancouver|montr[eé]al|ottawa|calgary|edmonton|winnipeg|halifax)\b/i.test(location || '');
 }
 
-export function isPostedToday(value: unknown, now = new Date()): boolean {
+/** Inclusive of today. shortcut: 30×24h back from today's Toronto midnight, not 30 local midnights across DST — upgrade if a role on the boundary day must follow the calendar. */
+export const OPEN_MARKET_RETENTION_DAYS = 30;
+
+function relativeAgeDays(text: string): number | null {
+  if (/^posted today$/i.test(text)) return 0;
+  if (/^posted yesterday$/i.test(text)) return 1;
+  if (/^posted \d+\+ days ago$/i.test(text)) return OPEN_MARKET_RETENTION_DAYS;
+  const days = /^posted (\d+) days ago$/i.exec(text);
+  return days ? Number(days[1]) : null;
+}
+
+export function openMarketPostedSince(now = new Date()): Date {
+  const { start } = torontoDayRange(now);
+  return new Date(start.getTime() - (OPEN_MARKET_RETENTION_DAYS - 1) * 864e5);
+}
+
+/** True when the source date is inside the 30-day browse window. */
+export function postedWithinMonth(value: unknown, now = new Date()): boolean {
   if (value == null || value === '') return false;
-  if (typeof value === 'string' && /^posted today$/i.test(value.trim())) return true;
+  if (typeof value === 'string') {
+    const age = relativeAgeDays(value.trim());
+    if (age != null) return age < OPEN_MARKET_RETENTION_DAYS;
+  }
   const posted = new Date(value as string | number);
   if (Number.isNaN(posted.getTime())) return false;
-  return calendarDay(posted) === calendarDay(now);
+  const { end } = torontoDayRange(now);
+  return posted >= openMarketPostedSince(now) && posted < end;
+}
+
+/** Stored postedAt. Workday's relative labels count back from now. */
+export function marketPostedAt(value: unknown, now = new Date()): Date {
+  if (typeof value === 'string') {
+    const age = relativeAgeDays(value.trim());
+    if (age != null && age < OPEN_MARKET_RETENTION_DAYS) return new Date(now.getTime() - age * 864e5);
+  }
+  return new Date(value as string | number);
 }
 
 export function torontoDayRange(now = new Date()): { start: Date; end: Date } {
@@ -101,9 +131,9 @@ export function variedByCompany<T>(rows: T[], companyOf: (row: T) => string, see
   return out;
 }
 
-/** Active employer jobs, plus open-market jobs posted today in Canada. */
+/** Active employer jobs, plus Canada open-market jobs still inside the 30-day window. */
 export function publicListingFilter(now = new Date()): Record<string, unknown> {
-  const { start, end } = torontoDayRange(now);
+  const { end } = torontoDayRange(now);
   return {
     isActive: true,
     $or: [
@@ -111,7 +141,7 @@ export function publicListingFilter(now = new Date()): Record<string, unknown> {
       {
         source: { $in: [...OPEN_MARKET_SOURCES] },
         country: 'CA',
-        postedAt: { $gte: start, $lt: end },
+        postedAt: { $gte: openMarketPostedSince(now), $lt: end },
       },
     ],
   };

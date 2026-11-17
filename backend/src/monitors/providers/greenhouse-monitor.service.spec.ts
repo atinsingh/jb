@@ -62,7 +62,7 @@ describe('GreenhouseMonitorService', () => {
             absolute_url: 'https://acme.example/jobs/2',
             content: '<p>Old</p>',
             location: { name: 'Toronto, Canada' },
-            first_published: new Date(Date.now() - 2 * 864e5).toISOString(),
+            first_published: new Date(Date.now() - 40 * 864e5).toISOString(),
           },
           {
             id: 3,
@@ -104,6 +104,37 @@ describe('GreenhouseMonitorService', () => {
     expect(jobs.findOneAndUpdate.mock.calls[0][1].$set).toEqual(
       expect.objectContaining({ description: 'Build APIs', isExternal: true, country: 'CA', postedAt: new Date(posted) }),
     );
+  });
+
+  it('stores a Canada role from the last month and still skips one older than that', async () => {
+    process.env.GREENHOUSE_BOARDS = 'acme';
+    (axios.get as jest.Mock).mockResolvedValue({
+      data: {
+        jobs: [
+          {
+            id: 10,
+            title: 'Recent',
+            absolute_url: 'https://acme.example/jobs/10',
+            content: '<p>Recent</p>',
+            location: { name: 'Toronto, Canada' },
+            first_published: new Date(Date.now() - 10 * 864e5).toISOString(),
+          },
+          {
+            id: 40,
+            title: 'Stale',
+            absolute_url: 'https://acme.example/jobs/40',
+            content: '<p>Stale</p>',
+            location: { name: 'Toronto, Canada' },
+            first_published: new Date(Date.now() - 40 * 864e5).toISOString(),
+          },
+        ],
+      },
+    });
+    const { jobs, geo, monitor } = service();
+    geo.normalize.mockReturnValue({ country: 'CA', eligibleCountries: [] });
+    await monitor.run();
+    expect(jobs.findOneAndUpdate).toHaveBeenCalledTimes(1);
+    expect(jobs.findOneAndUpdate.mock.calls[0][0]).toEqual({ externalId: 'greenhouse:10' });
   });
 
   it('stores every Canada role posted today instead of stopping at five', async () => {

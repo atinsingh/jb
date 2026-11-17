@@ -62,25 +62,26 @@ describe('WorkdayMonitorService', () => {
     );
   });
 
-  it('keeps every role posted today and stops once a page has none', async () => {
+  it('keeps roles from the last month and stops once a page is older', async () => {
     process.env.WORKDAY_SITES = 'td.wd3.myworkdayjobs.com/td/TD_Bank_Careers';
     process.env.WORKDAY_FETCH_DETAILS = 'false';
-    const today = Array.from({ length: 20 }, (_, i) => ({
-      title: `Role ${i}`,
-      externalPath: `/job/Toronto/Role_${i}`,
+    const page = (label: string, n = 20) => Array.from({ length: n }, (_, i) => ({
+      title: `${label} ${i}`,
+      externalPath: `/job/Toronto/${label}_${i}`,
       locationsText: 'Toronto, Ontario',
-      postedOn: 'Posted Today',
-      bulletFields: [`R_${i}`],
+      postedOn: label,
+      bulletFields: [`${label}_${i}`],
     }));
     (axios.post as jest.Mock)
-      .mockResolvedValueOnce({ data: { jobPostings: today } })
+      .mockResolvedValueOnce({ data: { jobPostings: page('Posted Today') } })
+      .mockResolvedValueOnce({ data: { jobPostings: page('Posted 8 Days Ago') } })
       .mockResolvedValueOnce({
         data: {
           jobPostings: [{
             title: 'Old',
             externalPath: '/job/Toronto/Old',
             locationsText: 'Toronto',
-            postedOn: 'Posted Yesterday',
+            postedOn: 'Posted 30+ Days Ago',
             bulletFields: ['OLD'],
           }],
         },
@@ -90,8 +91,8 @@ describe('WorkdayMonitorService', () => {
       findOneAndUpdate: jest.fn().mockResolvedValue({}),
     };
     await new WorkdayMonitorService(jobs as any, { deriveLogo: jest.fn().mockReturnValue('') } as any).run();
-    expect(jobs.findOneAndUpdate).toHaveBeenCalledTimes(20);
-    expect(axios.post).toHaveBeenCalledTimes(2);
+    expect(jobs.findOneAndUpdate).toHaveBeenCalledTimes(40);
+    expect(axios.post).toHaveBeenCalledTimes(3);
     delete process.env.WORKDAY_FETCH_DETAILS;
   });
 });
