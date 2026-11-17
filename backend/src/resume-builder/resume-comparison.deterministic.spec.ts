@@ -23,7 +23,7 @@ describe('deterministic candidate comparison', () => {
       annotations: [{ id: 'detail', section: 'experience', severity: 'warning',
         quote: 'Built TypeScript APIs.', message: 'The API work lacks an outcome.', fix: 'What did these APIs help users accomplish?' }],
     };
-    const agent = { review: jest.fn().mockResolvedValue(review) };
+    const agent = { beginReview: jest.fn().mockResolvedValue({ pending: true, sessionId: review.sessionId }) };
     const service = new (ResumeComparisonService as any)(
       { findOne: () => ({ exec: async () => resume }), updateOne }, content, {}, {},
       {}, ats, match, agent,
@@ -46,14 +46,15 @@ describe('deterministic candidate comparison', () => {
     expect(first.review).toMatchObject({ source: 'agent-session', sessionId: 'review-1' });
     expect(first.ats.explanation).toContain(`${first.ats.score}%`);
     expect(first.match.explanation).toContain(`${first.match.coverage}%`);
-    expect(first.annotations).toEqual(expect.arrayContaining([
-      expect.objectContaining({ quote: 'Built TypeScript APIs.', message: review.annotations[0].message, color: 'amber' }),
+    expect(first.pending).toBe(true);
+    expect(first.annotations).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ quote: 'Built TypeScript APIs.' }),
     ]));
-    expect(agent.review).toHaveBeenNthCalledWith(1, expect.objectContaining({
+    expect(agent.beginReview).toHaveBeenNthCalledWith(1, expect.objectContaining({
       userId: '507f1f77bcf86cd799439011', resumeId: 'resume-1', resumeText: expect.stringContaining('Built TypeScript APIs.'),
       jobDescription: input.jobDescription,
     }), { forceRefresh: false });
-    expect(agent.review).toHaveBeenNthCalledWith(2, expect.anything(), { forceRefresh: true });
+    expect(agent.beginReview).toHaveBeenNthCalledWith(2, expect.anything(), { forceRefresh: true });
     expect(updateOne).toHaveBeenCalledTimes(3);
     expect(updateOne).toHaveBeenNthCalledWith(1,
       { _id: 'resume-1', userId: expect.anything() },
@@ -75,13 +76,14 @@ describe('deterministic candidate comparison', () => {
       creationMethod: 'imported', source: { storageKey: 'resumes/compare/507f1f77bcf86cd799439011/source.pdf', originalFilename: 'source.pdf' },
       save: jest.fn(),
     };
-    const agent = { review: jest.fn().mockResolvedValue({
+    const cached = {
       source: 'agent-session', sessionId: 'cached-review',
       ats: { score: 36, explanation: 'ATS semantic score is 35.6/100 — a weak match.' },
       match: { coverage: 36, explanation: 'Job match is 35.6%.' },
       annotations: [{ id: 'detail', section: 'experience', severity: 'warning',
         quote: 'Built TypeScript APIs.', message: 'Explain the customer outcome.', fix: 'What did these APIs help customers accomplish?' }],
-    }) };
+    };
+    const agent = { beginReview: jest.fn().mockResolvedValue({ pending: false, result: cached }) };
     const service = new (ResumeComparisonService as any)(
       { findOne: () => ({ exec: async () => resume }), updateOne: jest.fn() },
       new ResumeAiContentHeuristicService(), {},

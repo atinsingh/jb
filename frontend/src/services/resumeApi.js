@@ -68,6 +68,12 @@ export const compareResume = async (id, payload = {}, headers = {}) =>
     body: JSON.stringify(payload),
   });
 
+export const getCompareReview = (id, sessionId) =>
+  apiCall(`/api/resume-builder/${id}/compare/review/${sessionId}`);
+
+export const getCompareBites = (id) =>
+  apiCall(`/api/resume-builder/${id}/compare/bites`);
+
 export const prepareCompareCorrection = async (id, payload = {}) =>
   apiCall(`/api/resume-builder/${id}/correct`, {
     method: 'POST',

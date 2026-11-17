@@ -18,4 +18,16 @@ describe('ResumeComparisonController', () => {
       jobDescription: 'TypeScript and AWS',
     });
   });
+
+  it('passes the authenticated user and session to the review read', async () => {
+    const service = { compare: jest.fn(), reviewComments: jest.fn().mockResolvedValue({ status: 'active' }) };
+    const controller = new ResumeComparisonController(service as unknown as ResumeComparisonService);
+
+    await expect(controller.review(
+      'resume-1',
+      'session-1',
+      { user: { _id: { toString: () => 'user-1' } } },
+    )).resolves.toEqual({ status: 'active' });
+    expect(service.reviewComments).toHaveBeenCalledWith('resume-1', 'user-1', 'session-1');
+  });
 });

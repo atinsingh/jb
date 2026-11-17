@@ -18,6 +18,10 @@ export class CandidateAtsReviewSession {
   @Prop({ required: true })
   resumeTextHash: string;
 
+  /** The job text this review is scoring. The compare read uses it to rebuild local findings. */
+  @Prop()
+  jobText?: string;
+
   @Prop({ required: true })
   harness: string;
 

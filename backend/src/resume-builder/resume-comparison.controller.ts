@@ -55,6 +55,17 @@ export class ResumeComparisonController {
     return this.comparison.prepareCorrection(id, req.user._id.toString(), body?.templateKey);
   }
 
+  @Get(':id/compare/bites')
+  @ApiOperation({ summary: 'Rewrite résumé lines into short wait-game bites with the default model' })
+  bites(@Param('id') id: string, @Request() req: any) {
+    return this.comparison.waitBites(id, req.user._id.toString());
+  }
+
+  @Get(':id/compare/review/:sessionId')
+  review(@Param('id') id: string, @Param('sessionId') sessionId: string, @Request() req: any) {
+    return this.comparison.reviewComments(id, req.user._id.toString(), sessionId);
+  }
+
   @Post(':id/compare')
   @ApiOperation({ summary: 'Compare an imported resume with deterministic document, job-match and content checks' })
   compare(

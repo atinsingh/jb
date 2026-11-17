@@ -41,8 +41,13 @@ export interface CandidateResumeReviewResult {
   annotations: ResumeComparisonAnnotation[];
 }
 
+export type BeginCandidateResumeReview =
+  | { pending: false; result: CandidateResumeReviewResult }
+  | { pending: true; sessionId: string };
+
 export abstract class CandidateResumeReviewAgent {
   abstract review(input: CandidateResumeReviewInput, options?: { forceRefresh?: boolean }): Promise<CandidateResumeReviewResult>;
+  abstract beginReview(input: CandidateResumeReviewInput, options?: { forceRefresh?: boolean }): Promise<BeginCandidateResumeReview>;
 }
 
 type DetailedReview = {
@@ -77,7 +82,51 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
     super();
   }
 
-  async review(input: CandidateResumeReviewInput, options: { forceRefresh?: boolean } = {}): Promise<CandidateResumeReviewResult> {
+  private async reusableReview(input: CandidateResumeReviewInput, forceRefresh: boolean) {
+    if (forceRefresh) return null;
+    const jobDescriptionHash = createHash('sha256').update(input.jobDescription).digest('hex');
+    const resumeTextHash = createHash('sha256').update(input.resumeText).digest('hex');
+    const completed = await this.sessionModel.findOne({
+      userId: input.userId,
+      resumeId: input.resumeId,
+      status: 'completed',
+      jobDescriptionHash,
+      resumeTextHash,
+    }).sort({ createdAt: -1 }).lean().exec();
+    if (completed?.result) return { kind: 'cached' as const, result: completed.result as CandidateResumeReviewResult };
+    const inflight = await this.sessionModel.find({
+      userId: input.userId,
+      resumeId: input.resumeId,
+      status: { $in: ['provisioning', 'active'] },
+    }).exec();
+    const same = inflight.find((row) => row.jobDescriptionHash === jobDescriptionHash && row.resumeTextHash === resumeTextHash);
+    return same ? { kind: 'inflight' as const, sessionId: String(same._id) } : null;
+  }
+
+  async beginReview(
+    input: CandidateResumeReviewInput,
+    options: { forceRefresh?: boolean } = {},
+  ): Promise<BeginCandidateResumeReview> {
+    const reusable = await this.reusableReview(input, options.forceRefresh === true);
+    if (reusable?.kind === 'cached') return { pending: false, result: reusable.result };
+    if (reusable?.kind === 'inflight') return { pending: true, sessionId: reusable.sessionId };
+    return await new Promise((resolve, reject) => {
+      let settled = false;
+      void this.review(input, {
+        ...options,
+        ready: (sessionId) => {
+          settled = true;
+          resolve({ pending: true, sessionId });
+        },
+      }).then((result) => {
+        if (!settled) resolve({ pending: false, result });
+      }).catch((error) => {
+        if (!settled) reject(error);
+      });
+    });
+  }
+
+  async review(input: CandidateResumeReviewInput, options: { forceRefresh?: boolean; ready?: (sessionId: string) => void } = {}): Promise<CandidateResumeReviewResult> {
     const maxReviewTurns = this.maxReviewTurns();
     const jobDescriptionHash = createHash('sha256').update(input.jobDescription).digest('hex');
     const resumeTextHash = createHash('sha256').update(input.resumeText).digest('hex');
@@ -86,6 +135,8 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
         userId: input.userId,
         resumeId: input.resumeId,
         status: 'completed',
+        jobDescriptionHash,
+        resumeTextHash,
       }).sort({ createdAt: -1 }).lean().exec();
       if (completed?.result) return completed.result as CandidateResumeReviewResult;
     }
@@ -116,6 +167,7 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
       resumeId: input.resumeId,
       jobDescriptionHash,
       resumeTextHash,
+      jobText: input.jobDescription,
       harness: adapter.id,
       alias: alias.alias,
       provider: alias.provider,
@@ -126,6 +178,7 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
       groundedAnnotations: 0,
     });
     const sessionId = String(session._id);
+    options.ready?.(sessionId);
     const runId = randomUUID();
     let sandboxId: string | undefined;
     const reviewTurns = { count: 0, max: maxReviewTurns };

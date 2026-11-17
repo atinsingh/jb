@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { ServiceUnavailableException } from '@nestjs/common';
 import { LiteLlmCandidateResumeReviewAgent } from './candidate-resume-review.agent';
 
@@ -215,7 +216,7 @@ describe('LiteLlmCandidateResumeReviewAgent session runtime', () => {
     })).rejects.toThrow(/contradicts the original résumé/i);
   });
 
-  it('reopens the latest completed review when the extracted text no longer matches', async () => {
+  it('does not reuse a completed review when the résumé or job text changed', async () => {
     const prior = {
       result: {
         source: 'agent-session', sessionId: 'saved-review', harness: 'claude-code',
@@ -223,7 +224,14 @@ describe('LiteLlmCandidateResumeReviewAgent session runtime', () => {
         match: { coverage: 60, matched: [], missing: [], keywordCount: 0 }, annotations: [],
       },
     };
-    sessionModel.findOne.mockReturnValue({ sort: () => ({ lean: () => ({ exec: async () => prior }) }) });
+    sessionModel.findOne.mockImplementation((query) => ({
+      sort: () => ({ lean: () => ({ exec: async () => (query.jobDescriptionHash && query.resumeTextHash ? null : prior) }) }),
+    }));
+    sandbox.exec.mockResolvedValue({
+      exitCode: 0, stderr: '', stdout: reviewJson([
+        { id: 'one', section: 'experience', severity: 'warning', message: 'Too vague', fix: 'Name the outcome', quote: 'A later extraction' },
+      ]),
+    });
 
     const result = await agent.review({
       userId: 'user-1', resumeId: 'resume-1',
@@ -231,11 +239,8 @@ describe('LiteLlmCandidateResumeReviewAgent session runtime', () => {
       jobDescription: 'A different posting',
     });
 
-    expect(result.sessionId).toBe('saved-review');
-    expect(sessionModel.create).not.toHaveBeenCalled();
-    expect(sessionModel.findOne).toHaveBeenCalledWith({
-      userId: 'user-1', resumeId: 'resume-1', status: 'completed',
-    });
+    expect(sandbox.provision).toHaveBeenCalled();
+    expect(result.sessionId).toBe('compare-session-1');
   });
 
   it('reuses a completed identical review on reopen without consuming another credit', async () => {
@@ -255,6 +260,46 @@ describe('LiteLlmCandidateResumeReviewAgent session runtime', () => {
     expect(sessionModel.create).not.toHaveBeenCalled();
     expect(quota.consumeCredit).not.toHaveBeenCalled();
     expect(sandbox.provision).not.toHaveBeenCalled();
+  });
+
+  it('returns an in-flight same-pair session without starting another sandbox', async () => {
+    const resumeText = 'Built payment services for clients';
+    const jobDescription = 'Backend engineer';
+    const running = {
+      _id: 'running-session',
+      status: 'active',
+      jobDescriptionHash: createHash('sha256').update(jobDescription).digest('hex'),
+      resumeTextHash: createHash('sha256').update(resumeText).digest('hex'),
+    };
+    sessionModel.find.mockReturnValue({ exec: async () => [running] });
+
+    const started = await agent.beginReview({
+      userId: 'user-1', resumeId: 'resume-1', resumeText, jobDescription,
+    });
+
+    expect(started).toEqual({ pending: true, sessionId: 'running-session' });
+    expect(sandbox.provision).not.toHaveBeenCalled();
+    expect(sessionModel.create).not.toHaveBeenCalled();
+  });
+
+  it('returns a new session id before the sandbox review finishes', async () => {
+    let releaseExec: (value: { exitCode: number; stdout: string; stderr: string }) => void = () => undefined;
+    sandbox.exec.mockReturnValue(new Promise((resolve) => { releaseExec = resolve; }));
+    try {
+      const started = await agent.beginReview({
+        userId: 'user-1', resumeId: 'resume-1',
+        resumeText: 'Built payment services for clients',
+        jobDescription: 'Backend engineer',
+      });
+      expect(started).toEqual({ pending: true, sessionId: 'compare-session-1' });
+    } finally {
+      releaseExec({
+        exitCode: 0, stderr: '', stdout: reviewJson([
+          { id: 'one', section: 'experience', severity: 'warning', message: 'Too vague', fix: 'Name the outcome', quote: 'Built payment services for clients' },
+        ]),
+      });
+      await new Promise((resolve) => setImmediate(resolve));
+    }
   });
 
   it('starts a review for a changed job instead of failing while the previous comparison is still running', async () => {

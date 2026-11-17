@@ -50,13 +50,18 @@ describe('ResumeComparisonService', () => {
     getBuffer: jest.fn().mockResolvedValue(Buffer.from('%PDF-preview')),
   };
   const parser = { extractText: jest.fn(), heuristicParse: jest.fn() };
-  const agent = { review: jest.fn().mockResolvedValue({
-    source: 'agent-session', sessionId: 'review-1', harness: 'opencode', modelAlias: 'automatic',
-    ats: { explanation: 'Review of the original document.' }, match: { explanation: 'Review against the job.' }, annotations: [],
-  }) };
+  const agent = {
+    review: jest.fn().mockResolvedValue({
+      source: 'agent-session', sessionId: 'review-1', harness: 'opencode', modelAlias: 'automatic',
+      ats: { explanation: 'Review of the original document.' }, match: { explanation: 'Review against the job.' }, annotations: [],
+    }),
+    beginReview: jest.fn().mockResolvedValue({ pending: true, sessionId: 'review-1' }),
+  };
   const harness = { startSession: jest.fn() };
   const aliases = { resolveAutomaticForUser: jest.fn() };
   const reviews = { findOne: jest.fn() };
+  const chat = jest.fn();
+  const llm = { getProviderForFeature: jest.fn(() => ({ chat })) };
 
   let service: ResumeComparisonService;
 
@@ -77,6 +82,7 @@ describe('ResumeComparisonService', () => {
       harness,
       aliases,
       reviews,
+      llm,
     );
 
   });
@@ -190,10 +196,47 @@ describe('ResumeComparisonService', () => {
     expect(result.match.coverage).toBe(50);
     expect(result.aiContent.composite).toBe(78);
     expect(result.review.source).toBe('agent-session');
+    expect(result.pending).toBe(true);
+    expect(result.review.sessionId).toBe('review-1');
     expect(result.annotations).toEqual(expect.arrayContaining([
       expect.objectContaining({ section: 'skills', message: expect.stringContaining('AWS') }),
       expect.objectContaining({ quote: 'Results-driven', fix: expect.any(String) }),
     ]));
+    expect(result.annotations).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ quote: 'Built APIs.' }),
+    ]));
+    expect(agent.beginReview).toHaveBeenCalled();
+    expect(agent.review).not.toHaveBeenCalled();
+  });
+
+  it('merges grounded review comments when the owner session completes', async () => {
+    reviews.findOne.mockReturnValue({ exec: async () => ({
+      status: 'completed',
+      jobText: 'TypeScript and AWS required.',
+      result: { annotations: [{
+        id: 'agent-1', section: 'experience', severity: 'warning',
+        message: 'Name the billing system.', fix: 'Say which system you built.', quote: 'Built APIs.',
+      }] },
+    }) });
+
+    const comments = await service.reviewComments('resume-1', userId, 'review-1');
+
+    expect(comments.status).toBe('completed');
+    expect(comments.annotations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ quote: 'Built APIs.', message: 'Name the billing system.' }),
+      expect.objectContaining({ section: 'skills', message: expect.stringContaining('AWS') }),
+    ]));
+  });
+
+  it('does not turn a failed review into a comment list', async () => {
+    reviews.findOne.mockReturnValue({ exec: async () => ({
+      status: 'failed', failureReason: 'INSUFFICIENT_GROUNDED_COMMENTS',
+    }) });
+
+    const comments = await service.reviewComments('resume-1', userId, 'review-1');
+
+    expect(comments).toEqual({ status: 'failed', failureReason: 'INSUFFICIENT_GROUNDED_COMMENTS' });
+    expect(comments.annotations).toBeUndefined();
   });
 
   it('reviews the complete source PDF when structured import lost the professional sections', async () => {
@@ -303,6 +346,25 @@ describe('ResumeComparisonService', () => {
 
     await expect(service.prepareCorrection('resume-1', userId, 'classic')).rejects.toBeInstanceOf(BadRequestException);
     expect(harness.startSession).not.toHaveBeenCalled();
+  });
+
+  it('rewrites wait bites with the default model and drops lines that are not in the résumé', async () => {
+    chat.mockResolvedValue({
+      content: JSON.stringify({
+        bites: [
+          { label: 'TypeScript APIs', detail: 'Built APIs at Acme as an Engineer.' },
+          { label: 'Raised revenue 400%', detail: 'Invented a new market.' },
+        ],
+      }),
+    });
+
+    const result = await service.waitBites('resume-1', userId);
+
+    expect(llm.getProviderForFeature).toHaveBeenCalledWith('rewriteBullets', userId);
+    expect(chat.mock.calls[0][0].model).toBeUndefined();
+    expect(result.bites).toEqual([
+      { label: 'TypeScript APIs', detail: 'Built APIs at Acme as an Engineer.' },
+    ]);
   });
 
   it('does not expose another user\'s imported resume', async () => {

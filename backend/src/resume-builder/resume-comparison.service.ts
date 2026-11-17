@@ -12,6 +12,7 @@ import { StorageService } from '../storage';
 import { randomUUID } from 'crypto';
 import { extname } from 'path';
 import { CandidateResumeReviewAgent } from './candidate-resume-review.agent';
+import { LLMFeature, LLMRoutingService } from '../llm/llm-routing.service';
 import { CandidateAtsReviewSession, CandidateAtsReviewSessionDocument } from './schemas/candidate-ats-review-session.schema';
 import { ResumeHarnessService } from '../resume-harness/resume-harness.service';
 import { ModelAliasService } from '../resume-harness/model-alias.service';
@@ -43,6 +44,7 @@ export class ResumeComparisonService {
     private readonly aliases: ModelAliasService,
     @InjectModel(CandidateAtsReviewSession.name)
     private readonly reviews: Model<CandidateAtsReviewSessionDocument>,
+    private readonly llm: LLMRoutingService,
   ) {}
 
   async prepareCorrection(resumeId: string, userId: string, templateKey?: string) {
@@ -210,36 +212,11 @@ export class ResumeComparisonService {
     // Score the original upload, never partially parsed or subsequently edited fields.
     const ats = this.ats.check(originalFile ? { text } : { structured });
     const match = this.matcher.match(originalFile ? text : structured, targetText);
-    const review = await this.agentReview.review({
+    const started = await this.agentReview.beginReview({
       userId, resumeId, resumeText: text, originalFile, jobDescription: targetText, missingSections,
     }, { forceRefresh: input.forceRefresh === true });
-    const annotations: ResumeComparisonAnnotation[] = ats.findings.map((finding) => ({
-      id: finding.code,
-      section: finding.code.includes('EXPERIENCE') ? 'experience'
-        : finding.code.includes('EDUCATION') ? 'education'
-        : finding.code.includes('SKILL') ? 'skills'
-        : finding.code.includes('EMAIL') || finding.code.includes('PHONE') ? 'personal' : 'summary',
-      severity: finding.severity,
-      color: finding.severity === 'critical' ? 'red' : finding.severity === 'warning' ? 'amber' : 'blue',
-      message: finding.message,
-      fix: finding.fix,
-    }));
-    if (match.missing.length) annotations.push({
-      id: 'missing-job-skills', section: 'skills', severity: 'warning', color: 'amber',
-      message: `Job requirements not found in this resume: ${match.missing.join(', ')}.`,
-      fix: 'Add relevant examples only for skills you have used.',
-    });
-    for (const phrase of AI_CONTENT_HEURISTIC_CONFIG.stockPhrases) {
-      const start = text.toLowerCase().indexOf(phrase);
-      if (start < 0) continue;
-      annotations.push({
-        id: `stock-${phrase.replace(/\s+/g, '-')}`, section: 'summary', severity: 'info', color: 'blue',
-        quote: text.slice(start, start + phrase.length),
-        message: 'This phrase is generic.',
-        fix: 'Replace it with a specific example of your work and its outcome.',
-      });
-    }
-    annotations.push(...this.groundedAnnotations(review.annotations, text));
+    const annotations = this.localAnnotations(text, ats, match);
+    if ('result' in started) annotations.push(...this.groundedAnnotations(started.result.annotations, text));
     const sectionNotice = missingSections.length
       ? `Missing sections: ${missingSections.map((section) => section[0].toUpperCase() + section.slice(1)).join(', ')}.`
       : '';
@@ -266,10 +243,68 @@ export class ResumeComparisonService {
           : '0%: no recognized job skills found in the job description to compare.',
       },
       aiContent,
-      review: { source: review.source, sessionId: review.sessionId, harness: review.harness, modelAlias: review.modelAlias },
+      pending: started.pending,
+      review: 'result' in started
+        ? { source: started.result.source, sessionId: started.result.sessionId, harness: started.result.harness, modelAlias: started.result.modelAlias }
+        : { source: 'agent-session' as const, sessionId: started.sessionId },
       annotations,
       details,
     };
+  }
+
+  async reviewComments(resumeId: string, userId: string, sessionId: string) {
+    const session = await this.reviews.findOne({
+      _id: sessionId,
+      resumeId,
+      userId: new Types.ObjectId(userId),
+    }).exec();
+    if (!session) throw new NotFoundException('Review not found');
+    if (session.status === 'failed') return { status: 'failed' as const, failureReason: session.failureReason };
+    if (session.status !== 'completed' || !session.result) return { status: session.status };
+    const resume = await this.resumeModel.findOne({ _id: resumeId, userId: new Types.ObjectId(userId) }).exec();
+    if (!resume) throw new NotFoundException('Resume not found');
+    const structured = resume.toObject ? resume.toObject() : resume;
+    const jobText = session.jobText || structured.source?.jobDescription || '';
+    const { text, originalFile } = await this.comparisonText(structured as Resume, resumeId, userId);
+    const ats = this.ats.check(originalFile ? { text } : { structured });
+    const match = jobText ? this.matcher.match(originalFile ? text : structured, jobText) : { missing: [] as string[] };
+    return {
+      status: 'completed' as const,
+      annotations: [
+        ...this.localAnnotations(text, ats, match),
+        ...this.groundedAnnotations(session.result.annotations, text),
+      ],
+    };
+  }
+
+  private localAnnotations(text: string, ats: { findings: Array<{ code: string; severity: AtsSeverity; message: string; fix: string }> }, match: { missing: string[] }) {
+    const annotations: ResumeComparisonAnnotation[] = ats.findings.map((finding) => ({
+      id: finding.code,
+      section: finding.code.includes('EXPERIENCE') ? 'experience'
+        : finding.code.includes('EDUCATION') ? 'education'
+        : finding.code.includes('SKILL') ? 'skills'
+        : finding.code.includes('EMAIL') || finding.code.includes('PHONE') ? 'personal' : 'summary',
+      severity: finding.severity,
+      color: finding.severity === 'critical' ? 'red' : finding.severity === 'warning' ? 'amber' : 'blue',
+      message: finding.message,
+      fix: finding.fix,
+    }));
+    if (match.missing.length) annotations.push({
+      id: 'missing-job-skills', section: 'skills', severity: 'warning', color: 'amber',
+      message: `Job requirements not found in this resume: ${match.missing.join(', ')}.`,
+      fix: 'Add relevant examples only for skills you have used.',
+    });
+    for (const phrase of AI_CONTENT_HEURISTIC_CONFIG.stockPhrases) {
+      const start = text.toLowerCase().indexOf(phrase);
+      if (start < 0) continue;
+      annotations.push({
+        id: `stock-${phrase.replace(/\s+/g, '-')}`, section: 'summary', severity: 'info', color: 'blue',
+        quote: text.slice(start, start + phrase.length),
+        message: 'This phrase is generic.',
+        fix: 'Replace it with a specific example of your work and its outcome.',
+      });
+    }
+    return annotations;
   }
 
   private groundedAnnotations(items: ResumeComparisonAnnotation[], text: string) {
@@ -293,6 +328,39 @@ export class ResumeComparisonService {
       achievements: ['achievements', 'other initiatives and achievements', 'accomplishments', 'awards', 'honors', 'honours'],
     };
     return Object.entries(aliases).filter(([, names]) => !names.some((name) => headings.has(name))).map(([section]) => section);
+  }
+
+  async waitBites(resumeId: string, userId: string) {
+    const resume = await this.resumeModel
+      .findOne({ _id: resumeId, userId: new Types.ObjectId(userId) })
+      .exec();
+    if (!resume) throw new NotFoundException('Resume not found');
+    const source = biteSource(resume);
+    if (!source) return { bites: [] };
+    try {
+      // Owner routing already forces DEFAULT_AUTOMATIC_MODEL_ALIAS (Haiku). Do not pass a model.
+      const provider = this.llm.getProviderForFeature(LLMFeature.REWRITE_BULLETS, userId);
+      let timer: ReturnType<typeof setTimeout>;
+      const response = await Promise.race([
+        provider.chat({
+          messages: [
+            {
+              role: 'system',
+              content: 'Rewrite the résumé lines into short game bites. Return JSON {"bites":[{"label":"","detail":""}]}. Each label is under 8 words. Each detail is one sentence. Use only words, employers, tools, and numbers that appear in the lines. Do not add achievements.',
+            },
+            { role: 'user', content: source },
+          ],
+          temperature: 0.2,
+          maxTokens: 400,
+        }),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('timeout')), 4000);
+        }),
+      ]).finally(() => clearTimeout(timer));
+      return { bites: groundedBites(response.content, source) };
+    } catch {
+      return { bites: [] };
+    }
   }
 
   private resumeText(resume: Resume): string {
@@ -338,4 +406,50 @@ export class ResumeComparisonService {
     return { text, originalFile: { filename: source.filename, bytes: source.buffer } };
   }
 
+}
+
+function biteSource(resume: Resume): string {
+  const lines: string[] = [];
+  const push = (value?: string) => {
+    const text = String(value || '').replace(/\s+/g, ' ').trim();
+    if (text) lines.push(text);
+  };
+  push(resume.summary);
+  (resume.skills || []).forEach(push);
+  (resume.experience || []).forEach((job) => {
+    push([job.title, job.company].filter(Boolean).join(' at '));
+    push(job.description);
+    (job.achievements || []).forEach(push);
+  });
+  ((resume as { achievements?: string[] }).achievements || []).forEach(push);
+  return lines.join('\n');
+}
+
+function biteWords(text: string) {
+  return (text.toLowerCase().replace(/[^a-z0-9+#\s-]/g, ' ').match(/[a-z0-9][a-z0-9+#-]*/g) || []).filter((word) => word.length >= 4);
+}
+
+function groundedBites(raw: string, source: string) {
+  const sourceWords = new Set(biteWords(source));
+  const sourceNumbers = new Set(source.match(/\d+/g) || []);
+  let parsed: { bites?: Array<{ label?: string; detail?: string }> };
+  try {
+    const start = raw.indexOf('{');
+    const end = raw.lastIndexOf('}');
+    parsed = JSON.parse(start >= 0 ? raw.slice(start, end + 1) : raw);
+  } catch {
+    return [];
+  }
+  const clip = (value: string, max: number) => (value.length > max ? `${value.slice(0, max - 1)}…` : value);
+  return (parsed?.bites || []).flatMap((bite) => {
+    const label = clip(String(bite?.label || '').replace(/\s+/g, ' ').trim(), 48);
+    const detail = clip(String(bite?.detail || '').replace(/\s+/g, ' ').trim(), 160);
+    if (!label || !detail) return [];
+    const blob = `${label} ${detail}`;
+    const numbers = blob.match(/\d+/g) || [];
+    if (numbers.some((number) => !sourceNumbers.has(number))) return [];
+    const significant = biteWords(blob);
+    if (!significant.length || significant.some((word) => !sourceWords.has(word))) return [];
+    return [{ label, detail }];
+  }).slice(0, 8);
 }

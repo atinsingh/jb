@@ -7,12 +7,15 @@ import {
   importResume,
   prepareCompareCorrection,
   uploadCompareSource,
+  getCompareReview,
+  getCompareBites,
   getCompareSource,
   updateResume,
 } from '@/services/resumeApi';
 import { compareCorrectionKey, getResumeTemplates } from '@/services/resumeHarnessApi';
 import { uploadResume } from '@/services/api';
 import CompareDocumentPreview, { placeComment } from './CompareDocumentPreview';
+import CompareWaitActivity from './CompareWaitActivity';
 
 const colors = {
   red: { border: '#D9485F', bg: 'color-mix(in srgb, #D9485F 8%, transparent)', label: 'Fix first' },
@@ -397,7 +400,42 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
   const [templates, setTemplates] = useState([]);
   const [templateKey, setTemplateKey] = useState('');
   const [correcting, setCorrecting] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const [showActivity, setShowActivity] = useState(false);
+  const [bites, setBites] = useState(null);
   const compareRequest = useRef(0);
+
+  const followReview = useCallback(async (id, result, request) => {
+    if (!result || request !== compareRequest.current) return;
+    if (Object.keys(result.details || {}).length) {
+      setResume((current) => withoutDuplicatedExperienceText({ ...current, ...result.details }));
+    }
+    setAssessment(result);
+    if (!result.pending || !result.review?.sessionId) return;
+    for (;;) {
+      if (request !== compareRequest.current) return;
+      let status;
+      try {
+        status = await getCompareReview(id, result.review.sessionId);
+      } catch (cause) {
+        if (request !== compareRequest.current) return;
+        setMessage(cause?.message || 'Comparison is temporarily unavailable.');
+        setAssessment((current) => (current ? { ...current, pending: false } : current));
+        return;
+      }
+      if (request !== compareRequest.current) return;
+      if (status?.status === 'completed') {
+        setAssessment((current) => ({ ...(current || result), pending: false, annotations: status.annotations || [] }));
+        return;
+      }
+      if (status?.status === 'failed') {
+        setMessage('The written review did not finish. The scores above are from the document check.');
+        setAssessment((current) => (current ? { ...current, pending: false } : current));
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  }, []);
 
   useEffect(() => {
     if (!assessment || templates.length) return undefined;
@@ -435,6 +473,7 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
     const request = ++compareRequest.current;
     setBusy(true);
     setComparing(true);
+    setAssessment(null);
     setMessage('');
     try {
       const context = { jobDescription: jd.trim(), jobUrl: url.trim() };
@@ -443,10 +482,8 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
         if (request !== compareRequest.current) return;
         setResume(withoutDuplicatedExperienceText(updated));
       }
-      const result = await compareResume(id, { ...context, forceRefresh: true });
-      if (request !== compareRequest.current) return;
-      if (Object.keys(result.details || {}).length) setResume((current) => withoutDuplicatedExperienceText({ ...current, ...result.details }));
-      setAssessment(result);
+      const result = await compareResume(id, context);
+      await followReview(id, result, request);
     } catch (cause) {
       if (request !== compareRequest.current) return;
       setMessage(cause?.message || 'Comparison is temporarily unavailable.');
@@ -457,7 +494,7 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
         setBusy(false);
       }
     }
-  }, [resumeId, jobDescription, jobUrl, resume, onComparisonSettled]);
+  }, [resumeId, jobDescription, jobUrl, resume, onComparisonSettled, followReview]);
 
   useEffect(() => {
     if (!resumeId) return;
@@ -479,10 +516,9 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
         }
         return compareResume(resumeId, {});
       })
-      .then((result) => {
+      .then(async (result) => {
         if (cancelled || request !== compareRequest.current || !result) return;
-        if (Object.keys(result.details || {}).length) setResume((current) => withoutDuplicatedExperienceText({ ...current, ...result.details }));
-        setAssessment(result);
+        await followReview(resumeId, result, request);
       })
       .catch((cause) => !cancelled && request === compareRequest.current && setMessage(cause?.message || 'Could not open this resume.'))
       .finally(() => {
@@ -493,7 +529,37 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
         }
       });
     return () => { cancelled = true; };
-  }, [resumeId, onComparisonSettled]);
+  }, [resumeId, onComparisonSettled, followReview]);
+
+  useEffect(() => {
+    if (!comparing || !resumeId) {
+      setBites(null);
+      return undefined;
+    }
+    let cancelled = false;
+    getCompareBites(resumeId)
+      .then((body) => { if (!cancelled) setBites(Array.isArray(body?.bites) ? body.bites : []); })
+      .catch(() => { if (!cancelled) setBites([]); });
+    return () => { cancelled = true; };
+  }, [comparing, resumeId]);
+
+  useEffect(() => {
+    if (!comparing) {
+      setElapsed(0);
+      setShowActivity(false);
+      return undefined;
+    }
+    const started = Date.now();
+    const tick = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
+    const reveal = setInterval(() => {
+      const waited = Date.now() - started;
+      if (waited >= 4000 || (waited >= 2000 && bites)) setShowActivity(true);
+    }, 200);
+    return () => {
+      clearInterval(tick);
+      clearInterval(reveal);
+    };
+  }, [comparing, bites]);
 
   useEffect(() => {
     if (!resumeId) return;
@@ -608,8 +674,8 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
       {message && <div role="alert" style={{ marginBottom: 14, color: message.startsWith('Resume details saved.') ? 'var(--jb-v3-fg-2)' : 'var(--jb-v3-danger)' }}>{message}</div>}
       {comparing && (
         <div role="status" aria-live="polite" data-testid="comparison-pending" style={{ marginBottom: 14, padding: '13px 15px', border: '1px solid var(--jb-v3-accent-line)', background: 'var(--jb-v3-panel)' }}>
-          <div style={{ fontSize: 13, fontWeight: 700 }}>Checking db for the comparison…</div>
-          <div style={{ fontSize: 11.5, color: 'var(--jb-v3-fg-3)', marginTop: 4 }}>Reading your saved resume and checking it against the role.</div>
+          <div style={{ fontSize: 13, fontWeight: 700 }}>Review still running. Stay on this page.</div>
+          <div data-testid="comparison-elapsed" style={{ fontSize: 11.5, color: 'var(--jb-v3-fg-3)', marginTop: 4 }}>{elapsed}s</div>
 
           <div className="compare-loading-track" aria-hidden="true" />
         </div>
@@ -623,7 +689,9 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
       <div className="compare-resume-layout" aria-busy={comparing}>
         <div style={{ display: 'grid', gap: 12, minWidth: 0 }}>
           <>
-          {sourceBlob ? (
+          {showActivity && comparing ? (
+            <CompareWaitActivity resume={resume} bites={bites} />
+          ) : sourceBlob ? (
             <CompareDocumentPreview blob={sourceBlob} filename={resume.source?.originalFilename || 'resume.pdf'} annotations={comparing ? emptyAnnotations : annotations} resume={resume} />
           ) : sourceError ? (
             <div role="status" style={{ padding: 12, border: '1px solid var(--jb-v3-line)' }}>
@@ -708,7 +776,7 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
 
         <aside className="compare-resume-aside" style={{ position: 'sticky', top: 18, border: '1px solid var(--jb-v3-line)', borderRadius: 10, padding: 16, background: 'var(--jb-v3-panel)' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: 15 }}>Comparison</h3>
-          {comparing ? <ComparisonLoading scores /> : <>
+          {comparing && !assessment ? <ComparisonLoading scores /> : <>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9, marginBottom: 14 }}>
             <Score label="ATS Match Percentage" value={assessment?.ats?.score} suffix="%" testId="compare-ats-score" cardTestId="compare-ats-card" caption="Document compatibility" />
             <Score label="Job Match" value={assessment?.match?.coverage} suffix="%" testId="compare-match-score" cardTestId="compare-match-card" caption="Required skills covered" />

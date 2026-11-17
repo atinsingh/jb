@@ -582,6 +582,9 @@ test.describe("Compare Resume manual workflow", () => {
       experience: [], certifications: [], achievements: [],
       source: { originalFilename: "resume.pdf", fileExtension: ".pdf", jobDescription: "TypeScript engineer" },
     };
+    await page.route("**/api/matching/recommendations**", (route: Route) =>
+      route.fulfill({ json: { recommendations: [], total: 0 } }),
+    );
     await page.route("**/api/resume-builder/pending-compare/compare/source", (route: Route) =>
       route.fulfill({ body: source, contentType: "application/pdf" }),
     );
@@ -597,11 +600,10 @@ test.describe("Compare Resume manual workflow", () => {
 
     await page.goto("/app/resume?mode=compare&id=pending-compare", { waitUntil: "domcontentloaded" });
     await expect(page.getByTestId("comparison-pending")).toBeVisible();
-    await expect(page.getByTestId("comparison-fields-loading")).toBeVisible();
-    await expect(page.getByLabel("Summary")).toHaveCount(0);
+    await expect(page.getByLabel("Summary")).toBeHidden();
     await expect(page.getByTestId("comparison-score-loading")).toBeVisible();
     await expect(page.getByRole("button", { name: "Save resume details" })).toHaveCount(0);
-    await expect(page.getByTestId("comparison-pending")).toContainText("Checking db for the comparison");
+    await expect(page.getByTestId("comparison-pending")).toContainText("Review still running");
     await expect(page.getByLabel("Job description")).toBeDisabled();
     expect(await page.getByTestId("compare-ats-score").count()).toBe(0);
 
@@ -625,6 +627,76 @@ test.describe("Compare Resume manual workflow", () => {
     await expect(page.getByTestId("compare-ats-score")).toHaveCount(0);
     expect(await preview.count()).toBe(1);
     releaseComparison();
+    await expect(page.getByTestId("comparison-pending")).toHaveCount(0);
+  });
+
+  test("shows the scores while the written review is still running and does not repeat the wait", async ({ page }) => {
+    await stubHarnessApi(page);
+    const { PDFDocument } = require("../../../backend/node_modules/pdf-lib");
+    const pdf = await PDFDocument.create();
+    pdf.addPage([600, 800]).drawText("Jordan Reyes", { x: 50, y: 700, size: 12 });
+    const source = Buffer.from(await pdf.save());
+    let releaseReview = () => undefined;
+    let reviewGate = new Promise<void>((resolve) => { releaseReview = resolve; });
+    let posts = 0;
+    const imported = {
+      id: "wait-compare", name: "Imported profile", creationMethod: "imported",
+      fullName: "Jordan Reyes", summary: "Backend engineer", skills: ["TypeScript"],
+      experience: [{ title: "Engineer", company: "Northwind", description: "Shipped the billing export in TypeScript.", achievements: [] }],
+      certifications: [], achievements: [],
+      source: { originalFilename: "resume.pdf", fileExtension: ".pdf", jobDescription: "TypeScript engineer" },
+    };
+    await page.route("**/api/matching/recommendations**", (route: Route) => route.fulfill({
+      json: { recommendations: [{ jobId: { _id: "job-1", title: "Backend engineer", companyName: "Northwind", location: "Remote" }, matchScore: 81 }], total: 1 },
+    }));
+    await page.route("**/api/matching/interest/**", (route: Route) => route.fulfill({ json: { match: { isInterested: true } } }));
+    await page.route("**/api/resume-builder/wait-compare/compare/source", (route: Route) =>
+      route.fulfill({ body: source, contentType: "application/pdf" }),
+    );
+    await page.route("**/api/resume-builder/wait-compare/compare", async (route: Route) => {
+      posts += 1;
+      await route.fulfill({ json: {
+        resumeId: imported.id,
+        pending: true,
+        review: { sessionId: `sess-${posts}` },
+        ats: { score: 72, findings: [], missingSections: [] },
+        match: { coverage: 61 },
+        aiContent: { composite: 47, signals: {} },
+        annotations: [],
+      } });
+    });
+    await page.route("**/api/resume-builder/wait-compare/compare/review/**", async (route: Route) => {
+      await reviewGate;
+      await route.fulfill({ json: { status: "completed", annotations: [] } });
+    });
+    await page.route("**/api/resume-builder/wait-compare/compare/bites", (route: Route) => route.fulfill({
+      json: { bites: [
+        { label: "TypeScript billing export", detail: "Shipped the billing export in TypeScript." },
+        { label: "Engineer at Northwind", detail: "Shipped the billing export in TypeScript." },
+      ] },
+    }));
+    await page.route("**/api/resume-builder/wait-compare", (route: Route) => route.fulfill({ json: imported }));
+
+    await page.goto("/app/resume?mode=compare&id=wait-compare", { waitUntil: "domcontentloaded" });
+    await expect(page.getByTestId("compare-ats-score")).toHaveText("72%");
+    await expect(page.getByTestId("comparison-pending")).toContainText("Review still running");
+    await expect(page.getByTestId("snake-fact")).toHaveText("TypeScript billing export", { timeout: 8000 });
+    const url = page.url();
+    await expect(page.getByTestId("snake-detail")).toContainText("Shipped the billing export in TypeScript.", { timeout: 8000 });
+    await expect(page.getByTestId("compare-snake")).toHaveAttribute("data-paused", "true");
+    await page.keyboard.press("ArrowUp");
+    await expect(page).toHaveURL(url);
+    await expect(page.getByTestId("snake-detail")).toHaveCount(0, { timeout: 8000 });
+    await expect(page.getByTestId("snake-fact")).toHaveText("Engineer at Northwind");
+    await expect(page.getByTestId("snake-kept")).toContainText("TypeScript billing export");
+
+    releaseReview();
+    await expect(page.getByTestId("comparison-pending")).toHaveCount(0);
+    await expect(page.getByTestId("compare-snake")).toHaveCount(0);
+    reviewGate = new Promise<void>((resolve) => { releaseReview = resolve; });
+    await page.getByRole("button", { name: "Refresh comparison" }).click();
+    await expect(page.getByTestId("snake-fact")).toHaveText("TypeScript billing export", { timeout: 8000 });
+    releaseReview();
     await expect(page.getByTestId("comparison-pending")).toHaveCount(0);
   });
 
