@@ -233,6 +233,9 @@ async function stubHarnessApi(
   await page.route("**/api/resume-harness/options", (route: Route) =>
     route.fulfill({ json: OPTIONS }),
   );
+  await page.route("**/api/resume-builder/*/compare/bites", (route: Route) =>
+    route.fulfill({ json: { bites: [] } }),
+  );
 
   await page.route("**/api/resume-harness/budget", (route: Route) =>
     route.fulfill({
@@ -628,6 +631,52 @@ test.describe("Compare Resume manual workflow", () => {
     expect(await preview.count()).toBe(1);
     releaseComparison();
     await expect(page.getByTestId("comparison-pending")).toHaveCount(0);
+  });
+
+  test("applies résumé details from the finished review when the heading is not Summary", async ({ page }) => {
+    await stubHarnessApi(page);
+    const { PDFDocument } = require("../../../backend/node_modules/pdf-lib");
+    const pdf = await PDFDocument.create();
+    pdf.addPage([600, 800]).drawText("Alex Chen", { x: 50, y: 700, size: 12 });
+    const source = Buffer.from(await pdf.save());
+    const imported = {
+      id: "equiv-compare", name: "Imported profile", creationMethod: "imported",
+      fullName: "Alex Chen", summary: "", skills: [], experience: [],
+      certifications: [], achievements: [],
+      source: { originalFilename: "resume.pdf", fileExtension: ".pdf", jobDescription: "Backend engineer" },
+    };
+    await page.route("**/api/matching/recommendations**", (route: Route) =>
+      route.fulfill({ json: { recommendations: [], total: 0 } }),
+    );
+    await page.route("**/api/resume-builder/equiv-compare/compare/source", (route: Route) =>
+      route.fulfill({ body: source, contentType: "application/pdf" }),
+    );
+    await page.route("**/api/resume-builder/equiv-compare/compare/bites", (route: Route) =>
+      route.fulfill({ json: { bites: [] } }),
+    );
+    await page.route("**/api/resume-builder/equiv-compare/compare", (route: Route) =>
+      route.fulfill({ json: {
+        resumeId: imported.id, pending: true, review: { sessionId: "review-equiv" },
+        ats: { score: 70, findings: [], missingSections: ["summary"] },
+        match: { coverage: 40 }, aiContent: { composite: 20, signals: {} },
+        annotations: [], details: {},
+      } }),
+    );
+    await page.route("**/api/resume-builder/equiv-compare/compare/review/**", (route: Route) =>
+      route.fulfill({ json: {
+        status: "completed",
+        annotations: [],
+        details: { summary: "Designed distributed systems for billing." },
+        missingSections: ["skills"],
+      } }),
+    );
+    await page.route("**/api/resume-builder/equiv-compare", (route: Route) => route.fulfill({ json: imported }));
+
+    await page.goto("/app/resume?mode=compare&id=equiv-compare", { waitUntil: "domcontentloaded" });
+    await expect(page.getByTestId("comparison-missing-sections")).toContainText("Skills");
+    await expect(page.getByTestId("comparison-missing-sections")).not.toContainText("Summary");
+    await page.getByText("Edit resume details", { exact: true }).click();
+    await expect(page.getByLabel("Summary")).toHaveValue("Designed distributed systems for billing.");
   });
 
   test("shows the scores while the written review is still running and does not repeat the wait", async ({ page }) => {

@@ -11,6 +11,7 @@ import { ModelAliasService } from '../resume-harness/model-alias.service';
 import { SANDBOX_WORKDIR, SandboxService } from '../resume-harness/sandbox/sandbox.service';
 import { hideWorkspaceFiles, WORKSPACE_VOICE_RULE } from '../resume-harness/workspace-voice';
 import type { ResumeComparisonAnnotation } from './resume-comparison.service';
+import { absentAfterExtraction, ExtractedResume, groundResumeExtraction, mergeExtractedResumes } from './resume-extraction';
 import {
   CandidateAtsReviewSession,
   CandidateAtsReviewSessionDocument,
@@ -39,6 +40,8 @@ export interface CandidateResumeReviewResult {
     keywordCount: number;
   };
   annotations: ResumeComparisonAnnotation[];
+  extracted?: ExtractedResume;
+  absentSections?: string[];
 }
 
 export type BeginCandidateResumeReview =
@@ -56,6 +59,8 @@ type DetailedReview = {
   matched: string[];
   missing: string[];
   annotations: ResumeComparisonAnnotation[];
+  extracted?: unknown;
+  absentSections: string[];
 };
 
 
@@ -246,14 +251,34 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
           const firstGrounded = this.grounded(first.review.annotations, input.resumeText);
           let detailed = first.review;
           let annotations = firstGrounded;
-          while (annotations.length < desired && reviewTurns.count < reviewTurns.max) {
+          let extracted = groundResumeExtraction(first.review.extracted, input.resumeText);
+          let absentSections = first.review.absentSections;
+          const expectsExtraction = Boolean(input.originalFile) && input.resumeText.split(/\r?\n/).filter((line) => line.trim()).length >= 3;
+          let requestedExtractionRepair = false;
+
+          while (
+            reviewTurns.count < reviewTurns.max
+            && (annotations.length < desired || (expectsExtraction && !Object.keys(extracted).length && !requestedExtractionRepair))
+          ) {
+            const needsAnnotations = annotations.length < desired;
+            if (!needsAnnotations) requestedExtractionRepair = true;
+            const repairPrompt = needsAnnotations
+              ? `REPAIR REQUIRED: only ${annotations.length} annotations had exact source quotes and factual fixes. Return the full JSON contract again with at least ${desired} distinct, character-for-character quotes from different résumé lines, plus extracted and absentSections. Do not paraphrase quotes or invent metrics in fixes. Ask for missing facts without supplying fictional examples.`
+              : `REPAIR REQUIRED: extracted was missing or empty. Return the full JSON contract again with extracted populated verbatim from the original résumé (including canonical sections and customSections for any other headings) and absentSections. Keep your exact grounded annotations.`;
             const repaired = await this.requestReview(
               adapter,
               boot,
               sandboxId,
-              `REPAIR REQUIRED: only ${annotations.length} annotations had exact source quotes and factual fixes. Return the full JSON contract again with at least ${desired} distinct, character-for-character quotes from different résumé lines. Do not paraphrase quotes or invent metrics in fixes. Ask for missing facts without supplying fictional examples.`,
+              repairPrompt,
               reviewTurns,
             );
+            extracted = mergeExtractedResumes(
+              extracted,
+              groundResumeExtraction(repaired.review.extracted, input.resumeText),
+            );
+            if (repaired.review.absentSections.length) {
+              absentSections = repaired.review.absentSections;
+            }
             detailed = repaired.review;
             session.reviewAttempts = reviewTurns.count;
             annotations = this.mergeGrounded(
@@ -268,7 +293,10 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
             );
           }
 
-          const result = this.result(sessionId, adapter, alias, ats, detailed, annotations);
+          const result = this.result(
+            sessionId, adapter, alias, ats, detailed, annotations,
+            extracted, absentAfterExtraction(absentSections, extracted),
+          );
           session.status = 'completed';
           session.result = result;
           session.groundedAnnotations = annotations.length;
@@ -308,6 +336,8 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
     ats: ResumeMatcherResult,
     detailed: DetailedReview,
     annotations: ResumeComparisonAnnotation[],
+    extracted: ExtractedResume,
+    absentSections: string[],
   ): CandidateResumeReviewResult {
     const missing = detailed.missing.length ? detailed.missing : ats.keywordGaps;
     const keywordCount = new Set([...detailed.matched, ...missing].map((item) => item.toLowerCase())).size;
@@ -334,6 +364,8 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
         message: hideWorkspaceFiles(annotation.message),
         fix: hideWorkspaceFiles(annotation.fix),
       })),
+      ...(Object.keys(extracted).length ? { extracted } : {}),
+      ...(absentSections.length ? { absentSections } : {}),
     };
   }
 
@@ -381,8 +413,11 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
       sourcePath
         ? `Inspect ${sourcePath} directly in this workspace, then read RESUME.txt, JOB.txt, and ATS_RESULT.json. For PDF, use Python pdfminer.high_level.extract_text; for DOCX, use python-docx. The original file is authoritative; RESUME.txt is an extraction aid for exact quotes and highlights.`
         : 'Read RESUME.txt, JOB.txt, and ATS_RESULT.json before answering.',
-      'Return JSON only with: atsExplanation, matchExplanation, matched, missing, annotations.',
-      'Read MISSING_SECTIONS.json. Explicitly address absent sections in the ATS explanation; do not fabricate them or quote text that does not exist.',
+      'Return JSON only with: atsExplanation, matchExplanation, matched, missing, annotations, extracted, absentSections.',
+      'extracted schema: { fullName, email, phone, location, linkedin, github, website, headline, summary, skills: string[], experience: [{ title, company, location, startDate, endDate, current, description, achievements: string[] }], education: [{ degree, institution, location, startDate, endDate, gpa, description }], achievements: string[], certifications: [{ name, issuer, date }], projects: [{ name, description, technologies: string[], url, startDate, endDate }], languages: [{ language, proficiency }], customSections: [{ heading, items: string[] }] }. Copy consecutive source text only. Do not paraphrase, improve, or add employers, dates, metrics, or skills.',
+      'Equate headings by meaning. Engineering Description, professional profile, objective, and about are summary. Work history, career history, and employment are experience. Technical stack and core competencies are skills. Academic background is education. Preserve any additional non-standard sections (such as Publications, Open Source, Volunteer, Speaking, Patents, Leadership, or Coursework) verbatim in customSections using their original heading.',
+      'MISSING_SECTIONS.json lists canonical sections already known to have no content. It is empty when the original file must be read. Do not treat an unfamiliar heading as a missing summary.',
+      'absentSections lists canonical sections that have no equivalent heading and no body. Omit a section whose text is in extracted.',
       'Each annotation needs id, section, severity, message, fix, and an exact consecutive quote copied from RESUME.txt.',
       'Every suggested rewrite must use only facts already present in RESUME.txt. Never invent metrics, dates, customers, achievements, qualifications, tools or technologies, even as examples. Do not add a missing job keyword as a candidate skill. Ask the candidate to add evidence only if it is true; otherwise suggest learning it separately. Do not infer a current employer or school location from contact details.',
       'Do not provide sample replacement bullets, fictional examples, or fill-in-the-blank placeholders such as X%, X team, or [result]. Instead, ask a concise specific question for the missing factual detail or suggest a factual formatting improvement.',
@@ -407,7 +442,7 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
   }
 
   private reviewPrompt(): string {
-    return `Perform the Compare Resume assessment now. Inspect ORIGINAL_RESUME.pdf or ORIGINAL_RESUME.docx when present, then read RESUME.txt, JOB.txt, and ATS_RESULT.json. Return only the JSON contract from AGENTS.md. Every annotation quote must be copied exactly from RESUME.txt. ${WORKSPACE_VOICE_RULE}`;
+    return `Perform the Compare Resume assessment now. Inspect ORIGINAL_RESUME.pdf or ORIGINAL_RESUME.docx when present, then read RESUME.txt, JOB.txt, and ATS_RESULT.json. Return only the JSON contract from AGENTS.md, including extracted and absentSections. Equate headings such as Engineering Description to summary and copy that text verbatim. Every annotation quote must be copied exactly from RESUME.txt. ${WORKSPACE_VOICE_RULE}`;
   }
 
   private async requestReview(
@@ -427,7 +462,7 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
           adapter,
           boot,
           sandboxId,
-          `The prior response was not valid complete JSON for the required review contract. Inspect the original résumé file when present, then read RESUME.txt, JOB.txt and ATS_RESULT.json again. Return one complete compact JSON object only, with atsExplanation, matchExplanation, matched, missing, and annotations. Use short messages and fixes, exact résumé quotes, no markdown or prose outside JSON. ${WORKSPACE_VOICE_RULE}`,
+          `The prior response was not valid complete JSON for the required review contract. Inspect the original résumé file when present, then read RESUME.txt, JOB.txt and ATS_RESULT.json again. Return one complete compact JSON object only, with atsExplanation, matchExplanation, matched, missing, annotations, extracted, and absentSections. Equate headings such as Engineering Description to summary and copy that text verbatim. Use short messages and fixes, exact résumé quotes, no markdown or prose outside JSON. ${WORKSPACE_VOICE_RULE}`,
           turns,
         );
       }
@@ -517,6 +552,8 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
         fix: this.text(item.fix),
         quote: this.text(item.quote),
       })),
+      extracted: value.extracted && typeof value.extracted === 'object' ? value.extracted : undefined,
+      absentSections: this.strings(value.absentSections),
     };
   }
 

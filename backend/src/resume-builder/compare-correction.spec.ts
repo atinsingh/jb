@@ -16,6 +16,29 @@ describe('compare correction', () => {
     expect(facts).not.toContain('profile above');
   });
 
+  it('includes headline, links, languages, project tech, education details, and dynamic customSections in facts', () => {
+    const facts = importedResumeFacts({
+      fullName: 'Alex Chen',
+      headline: 'Staff Systems Engineer',
+      github: 'https://github.com/alexchen',
+      website: 'https://alexchen.dev',
+      education: [{ degree: 'BSc CS', institution: 'UofT', location: 'Toronto', startDate: '2018', endDate: '2022', gpa: '3.9' }],
+      projects: [{ name: 'LedgerKit', description: 'Billing CLI', technologies: ['TypeScript', 'PostgreSQL'], url: 'https://github.com/alexchen/ledgerkit' }],
+      languages: [{ language: 'English', proficiency: 'Native' }],
+      customSections: [{ heading: 'Publications', items: ['Scaling Billing Queues, 2024'] }],
+    } as any);
+
+    expect(facts).toContain('- Headline: Staff Systems Engineer');
+    expect(facts).toContain('- GitHub: https://github.com/alexchen');
+    expect(facts).toContain('- Website: https://alexchen.dev');
+    expect(facts).toContain('GPA 3.9');
+    expect(facts).toContain('TypeScript, PostgreSQL');
+    expect(facts).toContain('## Languages');
+    expect(facts).toContain('English (Native)');
+    expect(facts).toContain('## Publications');
+    expect(facts).toContain('Scaling Billing Queues, 2024');
+  });
+
   it('asks for the reviewed fixes without permission to invent supporting facts', () => {
     const instruction = correctionInstruction([
       { quote: 'Shipped billing.', message: 'Vague', fix: 'Name the billing system.' },

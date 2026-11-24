@@ -278,6 +278,7 @@ export default function CompareDocumentPreview({ blob, filename, annotations, re
   const containerRef = useRef(null);
   const tooltipRef = useRef(null);
   const originalResume = useRef(resume);
+  originalResume.current = resume;
   const [tooltip, setTooltip] = useState(null);
   const [error, setError] = useState('');
   const [renderVersion, setRenderVersion] = useState(0);
@@ -355,7 +356,7 @@ export default function CompareDocumentPreview({ blob, filename, annotations, re
     });
     setTooltip(null);
     annotate(container, annotations, originalResume.current, showTooltip, hideTooltip);
-  }, [annotations, renderVersion]);
+  }, [annotations, renderVersion, resume]);
 
   useEffect(() => {
     if (!tooltip) return undefined;

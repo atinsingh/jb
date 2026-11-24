@@ -209,7 +209,7 @@ export class ResumeBuilderService {
 
   // Section fields the importer is allowed to persist onto a resume.
   private static readonly IMPORT_SECTION_KEYS = [
-    'fullName', 'email', 'phone', 'location', 'website', 'linkedin', 'github',
+    'fullName', 'email', 'phone', 'location', 'website', 'linkedin', 'github', 'headline',
     'summary', 'profileSummary', 'skills', 'experience', 'education',
     'achievements', 'certifications', 'projects', 'languages', 'customSections',
   ];
@@ -301,7 +301,14 @@ export class ResumeBuilderService {
     // Prevent direct version manipulation via generic update
     delete updates.version;
 
+    const editingContent = ResumeBuilderService.IMPORT_SECTION_KEYS.some(
+      (key) => Object.prototype.hasOwnProperty.call(updates, key),
+    );
     Object.assign(resume, this.sanitizeResumeHtml(updates as any));
+    if (editingContent && !updates.source && resume.source) {
+      resume.source = { ...resume.source, parseStatus: 'user_edited' };
+      resume.markModified?.('source');
+    }
     // Rescore before saving so the ring reflects what was just written.
     this.applyAtsScore(resume);
     return resume.save();

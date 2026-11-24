@@ -105,6 +105,145 @@ describe('LiteLlmCandidateResumeReviewAgent session runtime', () => {
     expect(sandbox.destroy).toHaveBeenCalled();
   });
 
+  it('keeps a verbatim summary from an equivalent heading and drops invented extraction', async () => {
+    const resumeText = [
+      'Alex Chen',
+      'Engineering Description',
+      'Designed distributed systems for Example Co.',
+      'Engineer',
+      'Example Co',
+    ].join('\n');
+    sandbox.exec.mockResolvedValueOnce({
+      exitCode: 0,
+      stdout: JSON.stringify({
+        atsExplanation: 'The introduction is present under another heading.',
+        matchExplanation: 'Example Co is named.',
+        matched: ['TypeScript'],
+        missing: ['AWS'],
+        annotations: [{
+          id: 'one', section: 'summary', severity: 'warning',
+          message: 'Name the system.', fix: 'Ask which billing system.',
+          quote: 'Designed distributed systems for Example Co.',
+        }],
+        extracted: {
+          summary: 'Designed distributed systems for Example Co. Led a team of 40.',
+          experience: [{ title: 'Engineer', company: 'Example Co', achievements: ['Invented a 40% speedup.'] }],
+        },
+        absentSections: ['summary', 'skills'],
+      }),
+    });
+
+    const result = await agent.review({
+      userId: 'user-1', resumeId: 'resume-1', resumeText, jobDescription: 'Backend engineer',
+    });
+
+    expect(result.extracted?.summary).toBe('Designed distributed systems for Example Co.');
+    expect(result.extracted?.experience).toEqual([
+      expect.objectContaining({ title: 'Engineer', company: 'Example Co' }),
+    ]);
+    expect(JSON.stringify(result.extracted)).not.toMatch(/40%/);
+    expect(result.absentSections).toEqual(['skills']);
+    const rules = adapter.bootstrap.mock.calls[0][0].contextFiles.find((file: any) => file.path === 'AGENTS.md').contents;
+    expect(rules).toMatch(/Engineering Description/);
+    expect(rules).toMatch(/customSections/);
+  });
+
+  it('keeps turn-1 extracted sections when a repair turn returns an empty extracted object', async () => {
+    const resumeText = [
+      'Alex Chen',
+      'Built payment services for clients',
+      'Reduced deployment time with automation',
+      'Documented production support workflows',
+    ].join('\n');
+    sandbox.exec
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stderr: '',
+        stdout: JSON.stringify({
+          atsExplanation: 'Readable.',
+          matchExplanation: 'Partial.',
+          matched: ['TypeScript'],
+          missing: ['AWS'],
+          annotations: [{ id: '1', section: 'experience', severity: 'warning', message: 'Vague', fix: 'Clarify', quote: 'Built payment services for clients' }],
+          extracted: {
+            fullName: 'Alex Chen',
+            experience: [{ title: 'Built payment services for clients' }],
+          },
+          absentSections: ['education'],
+        }),
+      })
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stderr: '',
+        stdout: JSON.stringify({
+          atsExplanation: 'Readable.',
+          matchExplanation: 'Partial.',
+          matched: ['TypeScript'],
+          missing: ['AWS'],
+          annotations: [
+            { id: '1', section: 'experience', severity: 'warning', message: 'Vague', fix: 'Clarify', quote: 'Built payment services for clients' },
+            { id: '2', section: 'experience', severity: 'warning', message: 'Thin', fix: 'Clarify', quote: 'Reduced deployment time with automation' },
+            { id: '3', section: 'experience', severity: 'warning', message: 'Thin', fix: 'Clarify', quote: 'Documented production support workflows' },
+          ],
+          extracted: {},
+          absentSections: [],
+        }),
+      });
+
+    const result = await agent.review({
+      userId: 'user-1', resumeId: 'resume-1', resumeText, jobDescription: 'Backend engineer',
+    });
+
+    expect(result.extracted?.fullName).toBe('Alex Chen');
+    expect(result.absentSections).toEqual(['education']);
+  });
+
+  it('requests extraction in a repair turn when an original file review omits extracted', async () => {
+    const resumeText = [
+      'Alex Chen',
+      'Engineering Description',
+      'Built payment services for clients',
+    ].join('\n');
+    sandbox.exec
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stderr: '',
+        stdout: reviewJson([
+          { id: '1', section: 'experience', severity: 'warning', message: 'Vague', fix: 'Clarify', quote: 'Built payment services for clients' },
+        ]),
+      })
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stderr: '',
+        stdout: JSON.stringify({
+          atsExplanation: 'Readable.',
+          matchExplanation: 'Partial.',
+          matched: ['TypeScript'],
+          missing: ['AWS'],
+          annotations: [
+            { id: '1', section: 'experience', severity: 'warning', message: 'Vague', fix: 'Clarify', quote: 'Built payment services for clients' },
+          ],
+          extracted: {
+            fullName: 'Alex Chen',
+            summary: 'Built payment services for clients',
+          },
+          absentSections: ['skills'],
+        }),
+      });
+
+    const result = await agent.review({
+      userId: 'user-1',
+      resumeId: 'resume-1',
+      resumeText,
+      jobDescription: 'Backend engineer',
+      originalFile: { filename: 'source.pdf', bytes: Buffer.from('%PDF-1.4') },
+    });
+
+    expect(sandbox.exec).toHaveBeenCalledTimes(2);
+    expect(result.extracted?.summary).toBe('Built payment services for clients');
+    expect(result.absentSections).toEqual(['skills']);
+  });
+
   it('places an original binary PDF in the temporary agent workspace', async () => {
     const bytes = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x00, 0xff]);
     await agent.review({

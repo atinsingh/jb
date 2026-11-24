@@ -142,22 +142,25 @@ describe('ResumeComparisonService', () => {
     expect(owned.source).toEqual(expect.objectContaining({ storageKey: expect.any(String) }));
   });
 
-  it('fills missing saved details from the original file and reports absent core sections', async () => {
+  it('does not fill an original résumé from the heading heuristic', async () => {
     const saved = { ...resume, fullName: '', summary: '', experience: [], skills: [], education: [], achievements: [],
       source: { storageKey: `resumes/compare/${userId}/original.pdf`, originalFilename: 'resume.pdf', jobDescription: 'Backend engineer' },
       save: jest.fn().mockResolvedValue(undefined) };
     resumeModel.findOne.mockReturnValue({ exec: () => Promise.resolve(saved) });
-    parser.heuristicParse.mockReturnValueOnce({ fullName: 'John Doe', summary: 'Developer with Kubernetes experience.', experience: [{ title: 'Software Engineer', company: 'Example Co', achievements: ['Deployed 8 containerised services.'] }], skills: [], education: [] });
+    parser.extractText.mockResolvedValue('Alex Chen\nEngineering Description\nDesigned distributed systems for billing.');
 
     const result = await service.compare('resume-1', userId, {});
 
-    expect(saved.save).toHaveBeenCalledTimes(1);
-    expect(saved.summary).toContain('Kubernetes experience');
-    expect(saved.fullName).toBe('John Doe');
-    expect(saved.experience).toEqual(expect.arrayContaining([expect.objectContaining({ company: 'Example Co' })]));
-    expect(result.details).toEqual(expect.objectContaining({ summary: saved.summary, experience: saved.experience }));
-    expect(result.ats.missingSections).toEqual(['skills', 'education', 'achievements']);
-    expect(result.ats.explanation).toContain('Missing sections: Skills, Education, Achievements.');
+    expect(parser.heuristicParse).not.toHaveBeenCalled();
+    expect(saved.save).not.toHaveBeenCalled();
+    expect(saved.summary).toBe('');
+    expect(result.details).toEqual({});
+    expect(result.ats.missingSections).toEqual([]);
+    expect(result.ats.explanation).not.toContain('Missing sections');
+    expect(agent.beginReview).toHaveBeenCalledWith(
+      expect.objectContaining({ missingSections: [] }),
+      { forceRefresh: false },
+    );
   });
 
   it('retains a legacy DOC source with its safe server-side content type', async () => {
@@ -207,6 +210,264 @@ describe('ResumeComparisonService', () => {
     ]));
     expect(agent.beginReview).toHaveBeenCalled();
     expect(agent.review).not.toHaveBeenCalled();
+  });
+
+  it('saves agent-extracted text from an equivalent heading and drops text that is not in the file', async () => {
+    const saved = {
+      ...resume,
+      summary: '',
+      experience: [{ title: '', company: '' }],
+      skills: [''],
+      source: {
+        storageKey: `resumes/compare/${userId}/original.pdf`,
+        originalFilename: 'resume.pdf',
+        jobDescription: 'Backend engineer',
+      },
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+    resumeModel.findOne.mockReturnValue({ exec: () => Promise.resolve(saved) });
+    parser.extractText.mockResolvedValue([
+      'Alex Chen',
+      'Engineering Description',
+      'Designed distributed systems for billing.',
+      'Engineer',
+      'Example Co',
+    ].join('\n'));
+    reviews.findOne.mockReturnValue({ exec: async () => ({
+      status: 'completed',
+      jobText: 'Backend engineer',
+      result: {
+        annotations: [{
+          id: 'agent-1', section: 'summary', severity: 'warning',
+          message: 'Name the system.', fix: 'Ask which system.', quote: 'Designed distributed systems for billing.',
+        }],
+        extracted: {
+          summary: 'Designed distributed systems for billing. Led a team of 40.',
+          experience: [{ title: 'Engineer', company: 'Example Co', achievements: ['Invented a 40% speedup.'] }],
+        },
+        absentSections: ['summary', 'skills', 'education'],
+      },
+    }) });
+
+    const comments = await service.reviewComments('resume-1', userId, 'review-1');
+
+    expect(saved.summary).toBe('Designed distributed systems for billing.');
+    expect(saved.experience).toEqual([expect.objectContaining({ title: 'Engineer', company: 'Example Co' })]);
+    expect(JSON.stringify(saved.experience)).not.toContain('40%');
+    expect(saved.save).toHaveBeenCalledTimes(1);
+    expect(comments.details).toEqual(expect.objectContaining({ summary: saved.summary }));
+    expect(comments.missingSections).toEqual(['skills', 'education']);
+  });
+
+  it('replaces unedited heuristic fields with agent extraction while preserving user-edited fields', async () => {
+    const heuristicDoc = {
+      ...resume,
+      summary: 'Wrong partial heuristic summary',
+      skills: ['BrokenSkill'],
+      experience: [{ title: 'Mangled Location: Toronto', company: 'Client: X', achievements: [] }],
+      source: {
+        storageKey: `resumes/compare/${userId}/original.pdf`,
+        originalFilename: 'resume.pdf',
+        jobDescription: 'Backend engineer',
+        parseStatus: 'partial',
+      },
+      save: jest.fn().mockResolvedValue(undefined),
+      markModified: jest.fn(),
+    };
+    resumeModel.findOne.mockReturnValue({ exec: () => Promise.resolve(heuristicDoc) });
+    parser.extractText.mockResolvedValue([
+      'Alex Chen',
+      'Engineering Description',
+      'Designed distributed systems for billing.',
+      'Technical Stack',
+      'TypeScript, PostgreSQL',
+      'Work History',
+      'Staff Engineer | Example Co',
+      'Shipped payment APIs.',
+      'Publications',
+      'Scaling Billing Queues, 2024',
+    ].join('\n'));
+    reviews.findOne.mockReturnValue({ exec: async () => ({
+      status: 'completed',
+      jobText: 'Backend engineer',
+      result: {
+        annotations: [],
+        extracted: {
+          summary: 'Designed distributed systems for billing.',
+          skills: ['TypeScript', 'PostgreSQL'],
+          experience: [{ title: 'Staff Engineer', company: 'Example Co', achievements: ['Shipped payment APIs.'] }],
+          customSections: [{ heading: 'Publications', items: ['Scaling Billing Queues, 2024'] }],
+        },
+        absentSections: ['education'],
+      },
+    }) });
+
+    const comments = await service.reviewComments('resume-1', userId, 'review-1');
+
+    expect(heuristicDoc.summary).toBe('Designed distributed systems for billing.');
+    expect(heuristicDoc.skills).toEqual(['TypeScript', 'PostgreSQL']);
+    expect(heuristicDoc.experience).toEqual([
+      expect.objectContaining({ title: 'Staff Engineer', company: 'Example Co' }),
+    ]);
+    expect((heuristicDoc as any).customSections).toEqual([
+      { heading: 'Publications', items: ['Scaling Billing Queues, 2024'] },
+    ]);
+    expect(heuristicDoc.source.parseStatus).toBe('parsed');
+    expect(comments.details).toEqual(expect.objectContaining({
+      summary: 'Designed distributed systems for billing.',
+      skills: ['TypeScript', 'PostgreSQL'],
+      customSections: [{ heading: 'Publications', items: ['Scaling Billing Queues, 2024'] }],
+    }));
+
+    // Once user-edited, a later review must not overwrite manual edits.
+    const editedDoc = {
+      ...resume,
+      summary: 'My manually edited summary',
+      skills: ['CustomSkill'],
+      source: {
+        storageKey: `resumes/compare/${userId}/original.pdf`,
+        originalFilename: 'resume.pdf',
+        jobDescription: 'Backend engineer',
+        parseStatus: 'user_edited',
+      },
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+    resumeModel.findOne.mockReturnValue({ exec: () => Promise.resolve(editedDoc) });
+
+    const afterEdit = await service.reviewComments('resume-1', userId, 'review-1');
+
+    expect(editedDoc.summary).toBe('My manually edited summary');
+    expect(editedDoc.skills).toEqual(['CustomSkill']);
+    expect(editedDoc.save).not.toHaveBeenCalled();
+    expect(afterEdit.details).toEqual({});
+  });
+
+  it('applies cached review details and missing sections directly in compare()', async () => {
+    const saved = {
+      ...resume,
+      summary: '',
+      skills: [],
+      experience: [],
+      source: {
+        storageKey: `resumes/compare/${userId}/original.pdf`,
+        originalFilename: 'resume.pdf',
+        jobDescription: 'Backend engineer',
+        parseStatus: 'pending',
+      },
+      save: jest.fn().mockResolvedValue(undefined),
+      markModified: jest.fn(),
+    };
+    resumeModel.findOne.mockReturnValue({ exec: () => Promise.resolve(saved) });
+    parser.extractText.mockResolvedValue('Alex Chen\nEngineering Description\nDesigned distributed systems for billing.');
+    agent.beginReview.mockResolvedValueOnce({
+      pending: false,
+      result: {
+        source: 'agent-session',
+        sessionId: 'cached-1',
+        harness: 'opencode',
+        modelAlias: 'automatic',
+        annotations: [],
+        extracted: { summary: 'Designed distributed systems for billing.' },
+        absentSections: ['summary', 'skills'],
+      },
+    });
+
+    const result = await service.compare('resume-1', userId, {});
+
+    expect(result.pending).toBe(false);
+    expect(result.details).toEqual({ summary: 'Designed distributed systems for billing.' });
+    expect(result.ats.missingSections).toEqual(['skills']);
+    expect(saved.summary).toBe('Designed distributed systems for billing.');
+    expect(saved.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('prefers agent extraction over stale heuristic fields when preparing correction facts', async () => {
+    resumeModel.findOne.mockReturnValue({ exec: () => Promise.resolve({
+      ...resume,
+      summary: 'Mangled heuristic summary',
+      skills: ['BrokenSkill'],
+      experience: [{ title: 'Broken', company: 'Heuristic Co', achievements: [] }],
+      source: {
+        storageKey: `resumes/compare/${userId}/original.pdf`,
+        originalFilename: 'resume.pdf',
+        jobDescription: 'Backend engineer',
+        parseStatus: 'partial',
+      },
+    }) });
+    parser.extractText.mockResolvedValue([
+      'Alex Chen',
+      'Engineering Description',
+      'Designed distributed systems for billing.',
+      'Staff Engineer',
+      'Example Co',
+      'Shipped payment APIs.',
+      'Publications',
+      'Scaling Billing Queues, 2024',
+    ].join('\n'));
+    reviews.findOne.mockReturnValue({ sort: () => ({ exec: async () => ({
+      jobText: 'Backend engineer',
+      result: {
+        annotations: [],
+        extracted: {
+          summary: 'Designed distributed systems for billing.',
+          experience: [{ title: 'Staff Engineer', company: 'Example Co', achievements: ['Shipped payment APIs.'] }],
+          customSections: [{ heading: 'Publications', items: ['Scaling Billing Queues, 2024'] }],
+        },
+      },
+    }) }) });
+    aliases.resolveAutomaticForUser.mockResolvedValue({ model: 'nova', effort: 'low' });
+    harness.startSession.mockResolvedValue({ id: 'session-3' });
+
+    await service.prepareCorrection('resume-1', userId, 'classic');
+
+    const facts = harness.startSession.mock.calls[0][1].candidateFacts as string;
+    expect(facts).toContain('Designed distributed systems for billing.');
+    expect(facts).toContain('Staff Engineer');
+    expect(facts).toContain('Example Co');
+    expect(facts).toContain('## Publications');
+    expect(facts).toContain('Scaling Billing Queues, 2024');
+    expect(facts).not.toContain('Mangled heuristic summary');
+    expect(facts).not.toContain('Heuristic Co');
+  });
+
+  it('fills an empty experience list when a mongoose parent link points back at the list', async () => {
+    const job: Record<string, unknown> = { title: '', company: '', achievements: [] };
+    const experience: unknown[] = [job];
+    job.parent = experience;
+    const saved = {
+      ...resume,
+      summary: '',
+      skills: [],
+      experience,
+      source: {
+        storageKey: `resumes/compare/${userId}/original.pdf`,
+        originalFilename: 'resume.pdf',
+        jobDescription: 'Backend engineer',
+      },
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+    resumeModel.findOne.mockReturnValue({ exec: () => Promise.resolve(saved) });
+    parser.extractText.mockResolvedValue([
+      'Alex Chen',
+      'Engineer at Example Co',
+      'Designed billing services for the platform.',
+    ].join('\n'));
+    reviews.findOne.mockReturnValue({ exec: async () => ({
+      status: 'completed',
+      jobText: 'Backend engineer',
+      result: {
+        annotations: [],
+        extracted: {
+          experience: [{ title: 'Engineer', company: 'Example Co', achievements: [] }],
+        },
+        absentSections: [],
+      },
+    }) });
+
+    const comments = await service.reviewComments('resume-1', userId, 'review-1');
+
+    expect(comments.status).toBe('completed');
+    expect(saved.experience).toEqual([expect.objectContaining({ title: 'Engineer', company: 'Example Co' })]);
   });
 
   it('merges grounded review comments when the owner session completes', async () => {
@@ -285,6 +546,7 @@ describe('ResumeComparisonService', () => {
       source: { jobDescription: 'Backend engineer' },
     }) });
     reviews.findOne.mockReturnValue({ sort: () => ({ exec: async () => ({
+      jobText: 'Backend engineer',
       result: { annotations: [{ message: 'Vague', fix: 'Name the billing system.', quote: 'Built APIs.' }] },
     }) }) });
     aliases.resolveAutomaticForUser.mockResolvedValue({ model: 'nova', effort: 'low' });
@@ -320,25 +582,67 @@ describe('ResumeComparisonService', () => {
         jobDescription: 'Backend engineer',
       },
     }) });
+    parser.extractText.mockResolvedValue('Alex Chen\nalex@example.com\nEngineer\nExample Co\nToronto\nShipped billing.');
     reviews.findOne.mockReturnValue({ sort: () => ({ exec: async () => ({
-      result: { annotations: [{ message: 'Vague', fix: 'Name the billing system.', quote: 'Built APIs.' }] },
+      jobText: 'Backend engineer',
+      result: {
+        annotations: [{ message: 'Vague', fix: 'Name the billing system.', quote: 'Built APIs.' }],
+        extracted: {
+          fullName: 'Alex Chen',
+          email: 'alex@example.com',
+          summary: 'Raised revenue 400% with a new market.',
+          experience: [{ title: 'Engineer', company: 'Example Co', location: 'Toronto', achievements: ['Shipped billing.'] }],
+        },
+      },
     }) }) });
-    parser.heuristicParse.mockReturnValueOnce({
-      fullName: 'Alex Chen',
-      email: 'alex@example.com',
-      experience: [{ title: 'Engineer', company: 'Example Co', location: 'Toronto', achievements: ['Shipped billing.'] }],
-    });
     aliases.resolveAutomaticForUser.mockResolvedValue({ model: 'nova', effort: 'low' });
     harness.startSession.mockResolvedValue({ id: 'session-2' });
 
     await service.prepareCorrection('resume-1', userId, 'classic');
 
     const facts = harness.startSession.mock.calls[0][1].candidateFacts as string;
+    expect(parser.heuristicParse).not.toHaveBeenCalled();
     expect(facts).toContain('Alex Chen');
     expect(facts).toContain('alex@example.com');
     expect(facts).toContain('Example Co');
     expect(facts).toContain('Toronto');
+    expect(facts).toContain('Shipped billing.');
+    expect(facts).not.toContain('400%');
     expect(facts).not.toContain('Jordan Reyes');
+  });
+
+  it('does not generate from a review of a different job', async () => {
+    resumeModel.findOne.mockReturnValue({ exec: () => Promise.resolve({
+      ...resume,
+      source: { jobDescription: 'New role' },
+    }) });
+    reviews.findOne.mockReturnValue({ sort: () => ({ exec: async () => ({
+      jobText: 'Backend engineer',
+      result: { annotations: [{ fix: 'Name the billing system.' }], extracted: { summary: 'Old summary.' } },
+    }) }) });
+
+    await expect(service.prepareCorrection('resume-1', userId, 'classic')).rejects.toBeInstanceOf(BadRequestException);
+    expect(harness.startSession).not.toHaveBeenCalled();
+  });
+
+  it('does not start a corrected résumé when the original file cannot be read', async () => {
+    resumeModel.findOne.mockReturnValue({ exec: () => Promise.resolve({
+      ...resume,
+      summary: '',
+      source: {
+        storageKey: `resumes/compare/${userId}/original.pdf`,
+        originalFilename: 'resume.pdf',
+        jobDescription: 'Backend engineer',
+      },
+    }) });
+    parser.extractText.mockRejectedValueOnce(new Error('PDF extraction failed'));
+    reviews.findOne.mockReturnValue({ sort: () => ({ exec: async () => ({
+      jobText: 'Backend engineer',
+      result: { extracted: { summary: 'Designed distributed systems for billing.' }, annotations: [] },
+    }) }) });
+
+    await expect(service.prepareCorrection('resume-1', userId, 'classic')).rejects.toBeInstanceOf(BadRequestException);
+    expect(harness.startSession).not.toHaveBeenCalled();
   });
 
   it('does not start a corrected résumé before a comparison exists', async () => {

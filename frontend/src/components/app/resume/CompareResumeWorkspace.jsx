@@ -89,18 +89,19 @@ function CompareUpload({ onOpen }) {
     try {
       const result = await uploadResume(file, { fastCompare: true });
       const parsed = result?.parsedData || result?.parsed || result || {};
+      const heuristic = parsed._source === 'heuristic';
       const created = await importResume({
         name: file.name.replace(/\.[^.]+$/, '') || 'Imported Resume',
         importMode: 'keep_format',
         template: 'modern',
-        ...parsedResume(parsed),
+        ...(heuristic ? {} : parsedResume(parsed)),
         source: {
           originalFilename: file.name,
           fileExtension: (file.name.match(/\.[^.]+$/) || [''])[0].toLowerCase(),
           mimeType: file.type || '',
           fileSize: file.size,
-          parseStatus: parsed._source === 'heuristic' ? 'partial' : 'parsed',
-          parseConfidence: parsed._source === 'heuristic' ? 0.6 : 0.9,
+          parseStatus: heuristic ? 'pending' : 'parsed',
+          parseConfidence: heuristic ? 0 : 0.9,
           jobDescription: jobDescription.trim(),
           jobUrl: jobUrl.trim(),
         },
@@ -377,12 +378,29 @@ function validateDetails(resume) {
     return `Job title and company are required for work experience ${invalidExperience + 1}.`;
   }
   const invalidCertification = (resume.certifications || []).findIndex((item) =>
-    !String(item.name || '').trim() || !String(item.issuer || '').trim(),
+    !String(item.name || '').trim(),
   );
   if (invalidCertification >= 0) {
-    return `Certification name and issuer are required for certification ${invalidCertification + 1}.`;
+    return `Certification name is required for certification ${invalidCertification + 1}.`;
   }
   return '';
+}
+
+function normalizeCustomSections(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return raw.map((section) => ({
+      heading: String(section?.heading || section?.title || ''),
+      items: Array.isArray(section?.items) ? section.items.map((item) => String(item || '')) : [],
+    }));
+  }
+  if (typeof raw === 'object') {
+    return Object.entries(raw).map(([heading, value]) => ({
+      heading: String(heading || ''),
+      items: Array.isArray(value) ? value.map((item) => String(item || '')) : value ? [String(value)] : [],
+    }));
+  }
+  return [];
 }
 
 export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonSettled, onCorrected }) {
@@ -407,7 +425,11 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
   const compareRequest = useRef(0);
   const mounted = useRef(true);
 
-  useEffect(() => () => { mounted.current = false; }, []);
+  useEffect(() => {
+    // Strict mode runs this cleanup once before the real mount.
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   const followReview = useCallback(async (id, result, request) => {
     const live = () => mounted.current && request === compareRequest.current;
@@ -430,7 +452,21 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
       }
       if (!live()) return;
       if (status?.status === 'completed') {
-        setAssessment((current) => ({ ...(current || result), pending: false, annotations: status.annotations || [] }));
+        if (status.details && Object.keys(status.details).length) {
+          setResume((current) => withoutDuplicatedExperienceText({ ...(current || {}), ...status.details }));
+        }
+        setAssessment((current) => {
+          const base = current || result;
+          const missingSections = Array.isArray(status.missingSections)
+            ? status.missingSections
+            : base.ats?.missingSections;
+          return {
+            ...base,
+            pending: false,
+            annotations: status.annotations || [],
+            ats: { ...base.ats, missingSections },
+          };
+        });
         return;
       }
       if (status?.status === 'failed') {
@@ -617,6 +653,27 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
   const addCertification = () => update({
     certifications: [...(resume.certifications || []), { name: '', issuer: '', date: '' }],
   });
+  const patchProject = (index, patch) => update({
+    projects: (resume.projects || []).map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item),
+  });
+  const addProject = () => update({
+    projects: [...(resume.projects || []), { name: '', description: '', technologies: [], url: '' }],
+  });
+  const patchLanguage = (index, patch) => update({
+    languages: (resume.languages || []).map((item, itemIndex) => itemIndex === index
+      ? { ...(typeof item === 'string' ? { language: item, proficiency: '' } : item), ...patch }
+      : item),
+  });
+  const addLanguage = () => update({
+    languages: [...(resume.languages || []), { language: '', proficiency: '' }],
+  });
+  const customSections = useMemo(() => normalizeCustomSections(resume?.customSections), [resume?.customSections]);
+  const patchCustomSection = (index, patch) => update({
+    customSections: customSections.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item),
+  });
+  const addCustomSection = () => update({
+    customSections: [...customSections, { heading: '', items: [] }],
+  });
   const summaryCounts = useMemo(() => ({
     red: annotations.filter((item) => item.color === 'red').length,
     amber: annotations.filter((item) => item.color === 'amber').length,
@@ -644,6 +701,24 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
         certifications: (resume.certifications || []).map(({ name, issuer, date, expiryDate, credentialId, credentialUrl }) => ({
           name, issuer, date, expiryDate, credentialId, credentialUrl,
         })),
+        ...(resume.headline ? { headline: resume.headline } : {}),
+        ...(resume.github ? { github: resume.github } : {}),
+        ...(resume.website ? { website: resume.website } : {}),
+        ...(Array.isArray(resume.projects) && resume.projects.length ? {
+          projects: resume.projects.map(({ name, description, technologies, url, startDate, endDate }) => ({
+            name, description, technologies, url, startDate, endDate,
+          })),
+        } : {}),
+        ...(Array.isArray(resume.languages) && resume.languages.length ? {
+          languages: resume.languages.map((entry) => (typeof entry === 'string'
+            ? { language: entry, proficiency: '' }
+            : { language: entry.language || '', proficiency: entry.proficiency || '' })),
+        } : {}),
+        ...(customSections.length ? {
+          customSections: customSections
+            .map((section) => ({ heading: section.heading.trim(), items: (section.items || []).map((item) => item.trim()).filter(Boolean) }))
+            .filter((section) => section.heading && section.items.length),
+        } : {}),
       };
       setResume(withoutDuplicatedExperienceText(await updateResume(resumeId, payload)));
       setMessage('Resume details saved. The review still reflects the uploaded file; Compare again to refresh the results.');
@@ -780,6 +855,43 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
               <button type="button" onClick={addEducation} style={{ ...button, color: 'var(--jb-v3-accent)', background: 'transparent', border: '1px dashed var(--jb-v3-accent-line)' }}>+ Add education</button>
             </div>
           </Section>
+          <Section section="projects" title="Projects" annotations={annotations}>
+            <div style={{ display: 'grid', gap: 10 }}>
+              {(resume.projects || []).map((project, index) => (
+                <div key={index} style={{ border: '1px solid var(--jb-v3-line)', padding: 12, display: 'grid', gap: 8 }}>
+                  <input aria-label={`Project name ${index + 1}`} value={project.name || ''} onChange={(event) => patchProject(index, { name: event.target.value })} placeholder="Project name" style={input} />
+                  <textarea aria-label={`Project description ${index + 1}`} rows={2} value={project.description || ''} onChange={(event) => patchProject(index, { description: event.target.value })} placeholder="Project description" style={input} />
+                </div>
+              ))}
+              <button type="button" onClick={addProject} style={{ ...button, color: 'var(--jb-v3-accent)', background: 'transparent', border: '1px dashed var(--jb-v3-accent-line)' }}>+ Add project</button>
+            </div>
+          </Section>
+          <Section section="languages" title="Languages" annotations={annotations}>
+            <div style={{ display: 'grid', gap: 9 }}>
+              {(resume.languages || []).map((entry, index) => {
+                const item = typeof entry === 'string' ? { language: entry, proficiency: '' } : entry;
+                return (
+                  <div key={index} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <input aria-label={`Language ${index + 1}`} value={item.language || ''} onChange={(event) => patchLanguage(index, { language: event.target.value })} placeholder="Language" style={input} />
+                    <input aria-label={`Proficiency ${index + 1}`} value={item.proficiency || ''} onChange={(event) => patchLanguage(index, { proficiency: event.target.value })} placeholder="Proficiency" style={input} />
+                  </div>
+                );
+              })}
+              <button type="button" onClick={addLanguage} style={{ ...button, color: 'var(--jb-v3-accent)', background: 'transparent', border: '1px dashed var(--jb-v3-accent-line)' }}>+ Add language</button>
+            </div>
+          </Section>
+          <section style={{ border: '1px solid var(--jb-v3-line)', background: 'var(--jb-v3-panel)', borderRadius: 10, padding: 16 }}>
+            <h3 style={{ fontSize: 15, margin: '0 0 12px' }}>Additional sections</h3>
+            <div style={{ display: 'grid', gap: 10 }}>
+              {customSections.map((section, index) => (
+                <div key={index} style={{ border: '1px solid var(--jb-v3-line)', padding: 12, display: 'grid', gap: 8 }}>
+                  <input aria-label={`Section heading ${index + 1}`} value={section.heading || ''} onChange={(event) => patchCustomSection(index, { heading: event.target.value })} placeholder="Section heading (e.g. Publications, Open Source)" style={input} />
+                  <textarea aria-label={`Section items ${index + 1}`} rows={3} value={(section.items || []).join('\n')} onChange={(event) => patchCustomSection(index, { items: lines(event.target.value) })} placeholder="One item per line" style={input} />
+                </div>
+              ))}
+              <button type="button" onClick={addCustomSection} style={{ ...button, color: 'var(--jb-v3-accent)', background: 'transparent', border: '1px dashed var(--jb-v3-accent-line)' }}>+ Add section</button>
+            </div>
+          </section>
             <button type="button" onClick={save} disabled={busy} style={button}>{busy ? 'Saving…' : 'Save resume details'}</button>
             </div>
           </details>
