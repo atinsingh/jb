@@ -8,7 +8,7 @@ test('renders the live two-tier catalogue and sends the selected checkout cycle'
   );
   await page.route('**/api/billing/plans', (route) => route.fulfill({ json: { plans: [
     { _id: 'free-id', type: 'FREE', name: 'Free', priceMonthly: 0, priceYearly: 0, features: ['Monthly AI allowance'] },
-    { _id: 'paid-id', type: 'PRO', name: 'Paid', priceMonthly: 10, priceYearly: 100, features: ['Higher monthly AI allowance'] },
+    { _id: 'paid-id', type: 'PRO', name: 'Pro', priceMonthly: 10, priceYearly: 100, features: ['Higher monthly AI allowance'] },
   ] } }));
   await page.route('**/api/billing/subscription', (route) =>
     route.fulfill({ json: { subscription: null } }),
@@ -28,8 +28,11 @@ test('renders the live two-tier catalogue and sends the selected checkout cycle'
   await page.goto('/app/billing');
   await expect(page.locator('[data-testid^="billing-plan-"]')).toHaveCount(2);
   await expect(page.getByText('Premium')).toHaveCount(0);
-  await expect(page.getByTestId('billing-budget')).toContainText('$0.50 of $0.50 remaining');
   await expect(page.getByTestId('billing-plan-PRO')).toContainText('$10');
+  // The membership is called Pro everywhere a candidate sees it.
+  await expect(page.getByTestId('billing-plan-PRO')).toContainText('Pro');
+  await expect(page.locator('body')).not.toContainText(/\bPaid\b/);
+  await expect(page.getByTestId('billing-budget')).toContainText('$0.50 of $0.50 remaining');
 
   await page.getByRole('switch', { name: 'Billing cycle' }).click();
   await expect(page.getByTestId('billing-plan-PRO')).toContainText('$100/year');

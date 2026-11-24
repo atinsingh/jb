@@ -1,3 +1,6 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import { parse as parseYaml } from 'yaml';
 import { reconcileCandidatePlans } from '../candidate-plan-catalog';
 
 describe('candidate plan catalogue reconciliation', () => {
@@ -65,7 +68,7 @@ describe('candidate plan catalogue reconciliation', () => {
     ]);
     expect(plans.get('FREE')).toMatchObject({ name: 'Free', priceMonthly: 0, priceYearly: 0 });
     expect(plans.get('PRO')).toMatchObject({
-      name: 'Paid',
+      name: 'Pro',
       priceMonthly: 10,
       priceYearly: 100,
       stripePriceIdMonthly: stripe.monthly.priceId,
@@ -77,5 +80,28 @@ describe('candidate plan catalogue reconciliation', () => {
     expect([...entitlements.values()].some(item => item.featureKey === 'ai_credits_per_month')).toBe(false);
     expect(new Set(entitlements.keys()).size).toBe(entitlements.size);
     expect(planModel.findOneAndUpdate).toHaveBeenCalledTimes(4);
+  });
+
+  it('advertises the real monthly credit allowance from ai-budget.yaml on each tier', async () => {
+    const policy = parseYaml(readFileSync(join(__dirname, '..', '..', '..', 'config', 'ai-budget.yaml'), 'utf8'));
+    const saved = new Map<string, any>();
+    const planModel = {
+      findOneAndUpdate: jest.fn(async (filter, update) => {
+        const next = { _id: `${filter.type.toLowerCase()}-id`, ...update.$set };
+        saved.set(filter.type, next);
+        return next;
+      }),
+      updateMany: jest.fn(),
+    };
+    const entitlementModel = { updateOne: jest.fn(), deleteMany: jest.fn() };
+
+    await reconcileCandidatePlans(planModel as any, entitlementModel as any, stripe);
+
+    for (const tier of ['FREE', 'PRO']) {
+      const credits = policy.tiers[tier].maxBudgetCredits;
+      expect(saved.get(tier).features).toContain(`${credits} credits a month`);
+      // "Higher allowance" with no number was the vague copy this replaces.
+      expect(saved.get(tier).features.join(' ')).not.toMatch(/higher monthly allowance/i);
+    }
   });
 });

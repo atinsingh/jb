@@ -25,13 +25,20 @@ import { getPlans } from '@/services/billingApi';
  */
 
 const FAQS = [
-  ['What uses credits?', 'Resume generation and rewriting use your plan allowance. Resume comparison uses local checks and does not use generation credits.'],
-  ['Can I manage my plan?', 'You can manage your subscription and billing from your account’s billing page.'],
-  ['What happens when I use my allowance?', 'New generation requests pause until your allowance resets or you upgrade. Your saved resumes remain available, and you can keep comparing documents.'],
+  ['What uses credits?', 'Creating and rewriting a resume, and the written review in a comparison, use your monthly credit allowance. Each plan above lists its allowance.'],
+  ['What happens when I run out?', 'Actions that run the model pause until your allowance resets next month or you upgrade. Your saved resumes stay available.'],
+  ['Can I cancel anytime?', 'Yes. Manage or cancel your plan from your account’s billing page.'],
   ['Can I edit my resume?', 'Yes. Refine the wording, keep your versions together, and review the details before downloading your PDF.'],
 ];
 
 const SIGNUP = '/app/signup';
+
+const formatAmount = (amount, currency) =>
+  new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: String(currency || 'usd').toUpperCase(),
+    minimumFractionDigits: amount % 1 ? 2 : 0,
+  }).format(amount || 0);
 
 export default function Pricing() {
   const [annual, setAnnual] = useState(false);
@@ -52,14 +59,10 @@ export default function Pricing() {
     };
   }, []);
 
-  const formatPrice = (tier) => {
-    const amount = annual ? tier.priceYearly : tier.priceMonthly;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: String(tier.currency || 'usd').toUpperCase(),
-      minimumFractionDigits: amount % 1 ? 2 : 0,
-    }).format(amount || 0);
-  };
+  const formatPrice = (tier) => formatAmount(annual ? tier.priceYearly : tier.priceMonthly, tier.currency);
+  // Rounded to cents so float noise (9.99 * 12) never reaches the page as "$19.98000001".
+  const yearlySaving = (tier) => Math.round((tier.priceMonthly * 12 - tier.priceYearly) * 100) / 100;
+  const currencyCode = tiers.length ? String(tiers[0].currency || 'usd').toUpperCase() : null;
 
   return (
     <>
@@ -72,7 +75,7 @@ export default function Pricing() {
       <PublicLayout surface="v3">
         <div className={`jb ${styles.page}`}>
           <div className={styles.headRow}>
-            <h1>Pricing</h1>
+            <h1>Start free. Upgrade when it counts.</h1>
 
             <button type="button" className={styles.cycle} onClick={() => setAnnual((v) => !v)} aria-pressed={annual} aria-label={annual ? 'Switch to monthly billing' : 'Switch to annual billing'}>
               <span className={`${styles.cycleLabel} ${annual ? '' : styles.cycleLabelOn}`}>Monthly</span>
@@ -83,36 +86,61 @@ export default function Pricing() {
             </button>
           </div>
 
+          <p className={styles.subhead}>Every plan starts with a free ATS score. No card required.</p>
+          {currencyCode ? <p className={styles.currencyNote}>{`Prices in ${currencyCode}.`}</p> : null}
+
           {error ? <p role="alert">Unable to load pricing from Stripe. Please try again.</p> : null}
-          {!error && tiers.length === 0 ? <p>Loading pricing…</p> : null}
           <div className={`${styles.strip} ${styles.pricingGrid}`}>
-            {tiers.map((tier) => (
-              <div key={tier.type} data-testid="candidate-pricing-tier" data-tier={tier.type} className={`${styles.tier} ${tier.type === 'PRO' ? styles.tierFeatured : ''}`}>
-                <div className={styles.tierHead}>
-                  <h2 className={styles.tierName}>{tier.name}</h2>
-                  {tier.type === 'PRO' ? <span className={styles.tierTag}>Paid</span> : null}
+            {!error && tiers.length === 0 ? (
+              <>
+                <span className={styles.srOnly} role="status">Fetching plans</span>
+                {[0, 1].map((i) => (
+                  <div key={i} data-testid="candidate-pricing-skeleton" className={`${styles.tier} ${styles.tierSkeleton}`} aria-hidden="true">
+                    <span className={styles.skelLine} style={{ width: '40%' }} />
+                    <span className={styles.skelLine} style={{ width: '55%', height: 28 }} />
+                    <span className={styles.skelLine} style={{ width: '70%' }} />
+                    <span className={styles.skelLine} />
+                    <span className={styles.skelLine} style={{ width: '85%' }} />
+                  </div>
+                ))}
+              </>
+            ) : null}
+            {tiers.map((tier) => {
+              const saving = yearlySaving(tier);
+              return (
+                <div key={tier.type} data-testid="candidate-pricing-tier" data-tier={tier.type} className={`${styles.tier} ${tier.type === 'PRO' ? styles.tierFeatured : ''}`}>
+                  <div className={styles.tierHead}>
+                    <h2 className={styles.tierName}>{tier.name}</h2>
+                  </div>
+                  <p className={styles.tierSub}>{tier.type === 'FREE' ? 'For checking where you stand.' : 'For an active job search.'}</p>
+
+                  <p className={styles.tierPrice}>
+                    <span className={styles.tierPriceValue}>{formatPrice(tier)}</span>
+                    <span className={styles.tierPriceUnit}>{tier.type === 'FREE' ? 'forever' : annual ? '/year' : '/month'}</span>
+                  </p>
+                  {saving > 0 ? (
+                    <p className={styles.tierSaving}>
+                      {annual
+                        ? `save ${formatAmount(saving, tier.currency)} vs monthly`
+                        : `or ${formatAmount(tier.priceYearly, tier.currency)}/year — save ${formatAmount(saving, tier.currency)}`}
+                    </p>
+                  ) : null}
+
+                  <ul className={styles.tierFeatures}>
+                    {tier.features.map((f) => (
+                      <li key={f} className={styles.tierFeature}>
+                        <span className={styles.tierTick} aria-hidden="true" />
+                        <span>{f.replace(/\bAI[- ]?/g, '')}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <Link href={SIGNUP} data-testid={`candidate-pricing-tier-${tier.type}`} className={`${styles.tierCta} ${tier.type === 'PRO' ? styles.tierCtaPrimary : ''}`}>
+                    {tier.type === 'FREE' ? 'Start free' : `Choose ${tier.name}`}
+                  </Link>
                 </div>
-                <p className={styles.tierSub}>{tier.type === 'FREE' ? 'Explore resume tools at your own pace.' : 'More room to create and refine your resume.'}</p>
-
-                <p className={styles.tierPrice}>
-                  <span className={styles.tierPriceValue}>{formatPrice(tier)}</span>
-                  <span className={styles.tierPriceUnit}>{tier.type === 'FREE' ? 'forever' : annual ? '/year' : '/month'}</span>
-                </p>
-
-                <ul className={styles.tierFeatures}>
-                  {tier.features.map((f) => (
-                    <li key={f} className={styles.tierFeature}>
-                      <span className={styles.tierTick} aria-hidden="true" />
-                      <span>{f.replace(/\bAI[- ]?/g, '')}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <Link href={SIGNUP} data-testid={`candidate-pricing-tier-${tier.type}`} className={`${styles.tierCta} ${tier.type === 'PRO' ? styles.tierCtaPrimary : ''}`}>
-                  {tier.type === 'FREE' ? 'Start free' : `Choose ${tier.name}`}
-                </Link>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <h2 className={styles.monoLabel}>Questions</h2>

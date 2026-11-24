@@ -34,6 +34,41 @@ export const isProtectedRoute = (pathname) =>
 
 /** Where an unauthenticated visitor is sent, carrying the route they wanted. */
 export const LOGIN_ROUTE = '/app/login';
+export const SIGNUP_ROUTE = '/app/signup';
 
-export const loginRedirectFor = (pathname) =>
-  `${LOGIN_ROUTE}?redirect=${encodeURIComponent(pathname)}`;
+/**
+ * A ?redirect= value we are willing to follow, or null.
+ *
+ * Same-origin paths only. `startsWith('/')` alone is not enough: `//evil.com`
+ * and `/\evil.com` are protocol-relative and browsers leave the site for them.
+ */
+export const safeRedirect = (value) =>
+  typeof value === 'string' &&
+  value.startsWith('/') &&
+  !value.startsWith('//') &&
+  !value.startsWith('/\\')
+    ? value
+    : null;
+
+/** `path` includes the query string, so a `?mode=` choice survives sign-in. */
+export const loginRedirectFor = (path) =>
+  `${LOGIN_ROUTE}?redirect=${encodeURIComponent(path)}`;
+
+export const signupRedirectFor = (path) =>
+  `${SIGNUP_ROUTE}?redirect=${encodeURIComponent(path)}`;
+
+/** Where the homepage's two résumé choices lead once the visitor has an account. */
+export const RESUME_INTENT_PATH = {
+  compare: '/app/resume?mode=compare',
+  generate: '/app/resume?mode=generate',
+};
+
+/** 'compare' | 'generate' | null for a redirect target into /app/resume. */
+export const resumeIntentOf = (redirect) => {
+  const path = safeRedirect(redirect);
+  if (!path) return null;
+  const url = new URL(path, 'http://x');
+  if (url.pathname !== '/app/resume') return null;
+  const mode = url.searchParams.get('mode');
+  return mode === 'compare' || mode === 'generate' ? mode : null;
+};

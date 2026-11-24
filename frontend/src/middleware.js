@@ -41,7 +41,7 @@ export async function middleware(request) {
   const { response, user } = await updateSession(request);
 
   if (!user && isProtectedRoute(pathname)) {
-    const target = loginRedirectFor(pathname);
+    const target = loginRedirectFor(pathname + request.nextUrl.search);
     const url = request.nextUrl.clone();
     url.pathname = target.slice(0, target.indexOf('?'));
     url.search = target.slice(target.indexOf('?'));

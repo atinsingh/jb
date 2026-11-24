@@ -122,7 +122,7 @@ export default function AppBilling() {
         >
           <div>
             <div data-testid="candidate-current-plan" style={{ ...mono(11, '0'), marginBottom: 12 }}>
-              Current plan: {currentPlan === 'PRO' ? 'Paid' : 'Free'}
+              Current plan: {currentPlan === 'PRO' ? 'Pro' : 'Free'}
               {currentPlan === 'PRO' && subscription?.billingCycle ? ` · ${subscription.billingCycle}` : ''}
             </div>
             <div style={{ ...mono(), marginBottom: 10 }}>Invoices paid</div>
@@ -148,7 +148,7 @@ export default function AppBilling() {
           </div>
         </div>
 
-        <p style={{ color: 'var(--jb-v3-fg-2)', fontSize: 13 }}>One Paid membership covers candidate and employer workspaces.</p>
+        <p style={{ color: 'var(--jb-v3-fg-2)', fontSize: 13 }}>One Pro membership covers candidate and employer workspaces.</p>
         <p style={{ color: 'var(--jb-v3-fg-3)', fontSize: 12 }}>Candidate and employer credits are counted separately.</p>
 
         {budget && (
@@ -183,7 +183,7 @@ export default function AppBilling() {
                   }}
                 >
                   <span style={{ fontSize: 15, fontWeight: 600 }}>{p.name}</span>
-                  {p.type === 'PRO' && <span style={mono(9.5, '0.12em', 'var(--jb-v3-accent)')}>Paid</span>}
+                  {p.type === 'PRO' && <span style={mono(9.5, '0.12em', 'var(--jb-v3-accent)')}>Pro</span>}
                 </div>
                 <div
                   style={{
@@ -247,7 +247,7 @@ export default function AppBilling() {
                     opacity: p.type === 'FREE' || current ? 0.55 : 1,
                   }}
                 >
-                  {current ? 'Current' : p.type === 'FREE' ? 'Free' : hasSubscription ? 'Manage subscription' : 'Choose Paid'}
+                  {current ? 'Current' : p.type === 'FREE' ? 'Free' : hasSubscription ? 'Manage subscription' : 'Choose Pro'}
                 </MonoButton>
               </div>
             );

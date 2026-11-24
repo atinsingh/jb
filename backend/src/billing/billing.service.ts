@@ -263,7 +263,7 @@ export class BillingService {
     }
     if (plan.type !== 'PRO') {
       throw new BadRequestException(
-        'Only the configured Paid plan can be purchased',
+        'Only the configured Pro plan can be purchased',
       );
     }
 

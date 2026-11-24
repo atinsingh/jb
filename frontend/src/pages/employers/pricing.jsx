@@ -90,8 +90,21 @@ export default function EmployerPricing() {
           </div>
 
           {error ? <p role="alert">Unable to load employer pricing from Stripe. Please try again.</p> : null}
-          {!error && tiers.length === 0 ? <p>Loading pricing…</p> : null}
           <div className={`${styles.strip} ${tiers.length === 4 ? styles.strip4 : ''}`}>
+            {!error && tiers.length === 0 ? (
+              <>
+                <span className={styles.srOnly} role="status">Fetching plans</span>
+                {[0, 1, 2].map((i) => (
+                  <div key={i} data-testid="employer-pricing-skeleton" className={`${styles.tier} ${styles.tierSkeleton}`} aria-hidden="true">
+                    <span className={styles.skelLine} style={{ width: '40%' }} />
+                    <span className={styles.skelLine} style={{ width: '55%', height: 28 }} />
+                    <span className={styles.skelLine} style={{ width: '70%' }} />
+                    <span className={styles.skelLine} />
+                    <span className={styles.skelLine} style={{ width: '85%' }} />
+                  </div>
+                ))}
+              </>
+            ) : null}
             {tiers.map((t) => (
               <div key={t.key} data-testid="employer-pricing-tier" data-tier={t.key} className={`${styles.tier} ${t.popular ? styles.tierFeatured : ''}`}>
                 <div className={styles.tierHead}>

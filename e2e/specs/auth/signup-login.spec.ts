@@ -153,3 +153,60 @@ test.describe('signing up and in', () => {
     expect(url).toContain('redirect=');
   });
 });
+
+/**
+ * The homepage asks "Compare or Create?". A visitor who answered must not be
+ * asked again after the account wall: the choice rides along as ?redirect= from
+ * the middleware through login <-> signup and back into /app/resume.
+ */
+test.describe('the Compare/Create choice survives the account wall', () => {
+  const COMPARE = '/app/resume?mode=compare';
+
+  test('a signed-out visitor sent to login keeps the query and lands in that mode', async ({ page, candidateUser }) => {
+    await page.goto(COMPARE, { waitUntil: 'domcontentloaded' });
+    await expect(page).toHaveURL(/\/app\/login\?/);
+    expect(new URL(page.url()).searchParams.get('redirect')).toBe(COMPARE);
+
+    // The way to a new account carries the same intent (the href settles once the router is ready).
+    await expect(page.getByRole('link', { name: /create an account/i }))
+      .toHaveAttribute('href', `/app/signup?redirect=${encodeURIComponent(COMPARE)}`);
+
+    await page.fill('input[name="email"]', candidateUser.email);
+    await page.fill('input[name="password"]', candidateUser.password);
+    await page.locator('form').getByRole('button', { name: /^log in$/i }).click();
+    await expect(page).toHaveURL(/\/app\/resume\?mode=compare$/, { timeout: 30_000 });
+  });
+
+  test('a new visitor from the homepage CTA signs up and lands in Compare', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.getByRole('link', { name: 'Score my resume — free' }).first().click();
+    await expect(page).toHaveURL(/\/app\/signup\?/);
+    expect(new URL(page.url()).searchParams.get('redirect')).toBe(COMPARE);
+
+    // A résumé intent is a candidate intent: no role picker, and the page says what the account is for.
+    await expect(page.getByRole('heading', { name: /score your resume/i })).toBeVisible();
+    await expect(page.locator('input[name="name"]')).toBeVisible();
+    await expect(page.getByRole('link', { name: /^sign in$/i }).first())
+      .toHaveAttribute('href', `/app/login?redirect=${encodeURIComponent(COMPARE)}`);
+
+    await page.fill('input[name="name"]', 'E2E Intent Candidate');
+    await page.fill('input[name="email"]', uniqueEmail('signup-intent').replace('@example.com', '@jobocate.com'));
+    await page.fill('input[name="password"]', TEST_PASSWORD);
+    await page.locator('form').getByRole('button', { name: /create account/i }).click();
+
+    await expect.poll(async () =>
+      await hasSession(page) || await page.getByRole('heading', { name: 'Check your inbox.' }).isVisible(),
+    ).toBe(true);
+    if (!await hasSession(page)) return;
+    await expect(page).toHaveURL(/\/app\/resume\?mode=compare$/, { timeout: 30_000 });
+  });
+
+  test('sign-in ignores an off-site redirect', async ({ page, candidateUser }) => {
+    await page.goto('/app/login?redirect=%2F%2Fexample.com%2Fsteal', { waitUntil: 'domcontentloaded' });
+    await page.fill('input[name="email"]', candidateUser.email);
+    await page.fill('input[name="password"]', candidateUser.password);
+    await page.locator('form').getByRole('button', { name: /^log in$/i }).click();
+    await expect(page).toHaveURL(/\/app\/dashboard/, { timeout: 30_000 });
+    expect(new URL(page.url()).host).not.toBe('example.com');
+  });
+});

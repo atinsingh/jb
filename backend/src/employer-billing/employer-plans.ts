@@ -37,7 +37,7 @@ export const EMPLOYER_PLANS: EmployerPlan[] = [
   },
   {
     key: 'paid',
-    name: 'Paid',
+    name: 'Pro',
     tagline: 'More room for your hiring team',
     popular: true,
     selfServe: true,

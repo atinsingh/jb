@@ -318,7 +318,7 @@ export default function EmployerQuota() {
                   </div>
                   <div style={{ background: '#15140F', border: '1px solid #4263EB', borderRadius: 14, padding: 16 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 12 }}>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: '#FBF8F1' }}>{scale?.name || 'Paid'}</span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: '#FBF8F1' }}>{scale?.name || 'Pro'}</span>
                       <span
                         style={{
                           fontFamily: 'var(--jb-font-mono)',

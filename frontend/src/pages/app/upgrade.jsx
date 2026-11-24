@@ -13,12 +13,12 @@ import { createCheckout, getPlans } from '@/services/billingApi';
 // ---------------------------------------------------------------------------
 const PLAN_DATA = [
   { key: 'free', name: 'Free', tagline: 'Essential search tools with a $1.00 monthly credit allowance.', monthly: 0, annual: 0, popular: false },
-  { key: 'paid', name: 'Paid', tagline: 'More capacity with a $4 monthly credit allowance.', monthly: 10, annual: 100, popular: true },
+  { key: 'paid', name: 'Pro', tagline: 'More capacity with a $4 monthly credit allowance.', monthly: 10, annual: 100, popular: true },
 ];
 
 const DELTA_DATA = {
   paid: {
-    label: 'What Paid unlocks',
+    label: 'What Pro unlocks',
     items: [
       { title: '$4 credit allowance / mo', desc: 'Measured model spend shared across candidate services.' },
       { title: 'Cover letters', desc: 'Tailored, editable drafts for every role.' },
@@ -141,7 +141,7 @@ export default function AppUpgrade() {
   const delta = DELTA_DATA[plan] || DELTA_DATA.free;
 
   const successSubs = {
-    paid: 'Your Paid plan is active. The $4 credit allowance renews monthly.',
+    paid: 'Your Pro plan is active. The $4 credit allowance renews monthly.',
     free: 'You’re on the Free plan. Upgrade anytime to put your search on autopilot.',
   };
 
@@ -170,7 +170,7 @@ export default function AppUpgrade() {
         window.location.assign('/app/cancel');
         return;
       }
-      if (!sel.id) throw new Error('Paid plan is not available yet. Please refresh and try again.');
+      if (!sel.id) throw new Error('Pro plan is not available yet. Please refresh and try again.');
       const checkout = await createCheckout(sel.id, annual ? 'yearly' : 'monthly');
       if (!checkout?.url) throw new Error('Stripe checkout did not return a URL.');
       window.location.assign(checkout.url);

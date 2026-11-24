@@ -5,7 +5,7 @@ version: 1
 audiences:
   candidate:
     - key: paid
-      name: Paid
+      name: Pro
       products:
         monthly:
           env: STRIPE_CANDIDATE_PAID_MONTHLY_PRODUCT_ID
@@ -14,7 +14,7 @@ audiences:
 
   employer:
     - key: paid
-      name: Paid
+      name: Pro
       products:
         monthly:
           env: STRIPE_CANDIDATE_PAID_MONTHLY_PRODUCT_ID

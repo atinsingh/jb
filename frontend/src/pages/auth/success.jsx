@@ -6,6 +6,7 @@ import { useRouter } from 'next/router';
 
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import { safeRedirect } from '@/lib/auth/routes';
 
 /**
  * The OAuth landing page.
@@ -112,8 +113,8 @@ export default function AuthSuccess() {
       // protected route, otherwise land on the role's home surface. Only
       // same-origin paths are accepted - an absolute URL here would be an open
       // redirect.
-      const requested = router.query.redirect;
-      if (typeof requested === 'string' && requested.startsWith('/')) {
+      const requested = safeRedirect(router.query.redirect);
+      if (requested) {
         router.replace(requested);
         return;
       }

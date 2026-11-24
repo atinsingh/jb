@@ -8,6 +8,7 @@ import { FaGoogle, FaLinkedinIn } from 'react-icons/fa6';
 
 import Logo from '@/components/brand/Logo';
 import { useAuth } from '@/context/AuthContext';
+import { loginRedirectFor, resumeIntentOf, safeRedirect } from '@/lib/auth/routes';
 import styles from '@/components/auth/v3/AuthV3.module.css';
 
 /**
@@ -48,10 +49,29 @@ function passwordScore(value) {
 
 const SCORE_LABEL = ['Too short', 'Weak', 'Fair', 'Good', 'Strong'];
 
+/** Form heading for a visitor who came for a résumé. */
+const INTENT_HEADING = {
+  compare: 'Create a free account to score your resume.',
+  generate: 'Create a free account to build your resume.',
+};
+
+/**
+ * Where a new or returning account lands. A résumé redirect is a candidate
+ * destination, so an employer is sent to their own dashboard instead.
+ */
+function destinationFor(role, redirect) {
+  if (role === 'ROLE_EMPLOYER') {
+    return redirect && !redirect.startsWith('/app/') ? redirect : '/employer/dashboard';
+  }
+  return redirect || '/app/dashboard';
+}
+
 export default function AppSignup() {
   const router = useRouter();
   const { user, loading, signup, loginWithProvider } = useAuth();
 
+  const redirect = safeRedirect(router.query.redirect);
+  const intent = resumeIntentOf(redirect);
   const asEmployer = router.query.as === 'employer';
   const [stage, setStage] = useState('role');
   const [role, setRole] = useState('ROLE_CANDIDATE');
@@ -71,13 +91,19 @@ export default function AppSignup() {
     }
   }, [asEmployer]);
 
+  // A résumé choice is a candidate intent, so it skips the picker too.
+  useEffect(() => {
+    if (intent && !asEmployer) {
+      setRole('ROLE_CANDIDATE');
+      setStage('form');
+    }
+  }, [intent, asEmployer]);
+
   useEffect(() => {
     if (!loading && user) {
-      router.replace(
-        user.role === 'ROLE_EMPLOYER' ? '/employer/dashboard' : '/app/dashboard',
-      );
+      router.replace(destinationFor(user.role, redirect));
     }
-  }, [loading, user, router]);
+  }, [loading, user, router, redirect]);
 
   const score = passwordScore(password);
 
@@ -88,7 +114,7 @@ export default function AppSignup() {
     setError('');
     setSubmitting(true);
     try {
-      const result = await signup({ name, email, password, role });
+      const result = await signup({ name, email, password, role, redirect });
 
       // With email confirmation off this returns a session and we route on.
       // If it is ever switched on, say so instead of silently doing nothing.
@@ -98,9 +124,7 @@ export default function AppSignup() {
         return;
       }
 
-      router.replace(
-        role === 'ROLE_EMPLOYER' ? '/employer/dashboard' : '/app/dashboard',
-      );
+      router.replace(destinationFor(role, redirect));
     } catch (err) {
       setError(err?.message || 'Could not create that account. Please try again.');
       setSubmitting(false);
@@ -110,7 +134,7 @@ export default function AppSignup() {
   const handleOAuth = async (provider) => {
     setError('');
     try {
-      await loginWithProvider(provider, { role });
+      await loginWithProvider(provider, { role, redirectTo: redirect || undefined });
     } catch (err) {
       setError(err?.message || 'Could not reach that provider. Please try again.');
     }
@@ -130,7 +154,7 @@ export default function AppSignup() {
           <Link href="/" className={styles.brand} aria-label="Jobocate home">
             <Logo size={22} />
           </Link>
-          <Link href="/app/login" className={styles.barLink}>
+          <Link href={redirect ? loginRedirectFor(redirect) : '/app/login'} className={styles.barLink}>
             Sign in
           </Link>
         </header>
@@ -146,7 +170,7 @@ export default function AppSignup() {
                       We sent a confirmation link to {email}. Open it to finish setting up your
                       account.
                     </p>
-                    <Link href="/app/login" className={`${styles.btn} ${styles.btnGhost}`}>
+                    <Link href={redirect ? loginRedirectFor(redirect) : '/app/login'} className={`${styles.btn} ${styles.btnGhost}`}>
                       Back to sign in
                     </Link>
                   </>
@@ -189,7 +213,8 @@ export default function AppSignup() {
                     </button>
 
                     <p className={styles.footNote}>
-                      Already have an account? <Link href="/app/login">Sign in</Link>.
+                      Already have an account?{' '}
+                      <Link href={redirect ? loginRedirectFor(redirect) : '/app/login'}>Sign in</Link>.
                     </p>
                   </>
                 ) : (
@@ -207,7 +232,7 @@ export default function AppSignup() {
                     <h1 className={styles.h1}>
                       {role === 'ROLE_EMPLOYER'
                         ? 'Create your hiring account.'
-                        : 'Create your account.'}
+                        : (intent && INTENT_HEADING[intent]) || 'Create your account.'}
                     </h1>
                     <p className={styles.lede}>
                       Free to start. No card required.

@@ -189,7 +189,7 @@ export default function EmployerSettings() {
     } catch (err) { setPlanError(err); }
     finally { setChoosing(null); }
   };
-  const currentName = subscription && (catalog?.plans?.find((plan) => plan.key === subscription.plan)?.name || (subscription.plan === 'paid' ? 'Paid' : 'Free'));
+  const currentName = subscription && (catalog?.plans?.find((plan) => plan.key === subscription.plan)?.name || (subscription.plan === 'paid' ? 'Pro' : 'Free'));
   const hasSubscription = subscription?.stripeSubscriptionId && !['canceled', 'incomplete_expired'].includes(subscription.status);
   const periodEnd = subscription?.renewsAt && new Date(subscription.renewsAt);
   const periodEndLabel = periodEnd && !Number.isNaN(periodEnd.getTime()) && periodEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
@@ -329,13 +329,13 @@ export default function EmployerSettings() {
             <div className="planHead">
               <div>
                 <h2>Plan</h2>
-                <p>One Paid membership covers candidate and employer workspaces. Canceling it applies to both.</p>
+                <p>One Pro membership covers candidate and employer workspaces. Canceling it applies to both.</p>
               </div>
               {subscription?.stripeCustomerId && <button type="button" className={styles.button} onClick={portal} disabled={!!choosing}>Manage subscription</button>}
             </div>
             {router.query.success && <p role="status">Checkout completed. Your plan updates once payment is confirmed.</p>}
             {router.query.canceled && <p>Checkout canceled. Your plan has not changed.</p>}
-            {currentName && <p className="planStatus">Current plan: {currentName}{subscription?.status ? ` · ${subscription.status.replaceAll('_', ' ')}` : ''}{subscription?.billingCycle ? ` · ${subscription.billingCycle === 'annual' ? 'Annual' : 'Monthly'}` : ''}{periodEndLabel ? ` · ${subscription.cancelAtPeriodEnd ? 'Paid access ends' : subscription.plan === 'paid' ? 'Renews' : 'Billing period ends'} ${periodEndLabel}` : ''}</p>}
+            {currentName && <p className="planStatus">Current plan: {currentName}{subscription?.status ? ` · ${subscription.status.replaceAll('_', ' ')}` : ''}{subscription?.billingCycle ? ` · ${subscription.billingCycle === 'annual' ? 'Annual' : 'Monthly'}` : ''}{periodEndLabel ? ` · ${subscription.cancelAtPeriodEnd ? 'Pro access ends' : subscription.plan === 'paid' ? 'Renews' : 'Billing period ends'} ${periodEndLabel}` : ''}</p>}
             <InlineError error={planError} />
             {!catalog ? planError ? <button type="button" className={styles.button} onClick={loadPlan}>Retry plans</button> : <LoadingState label="Loading plans…" tone="dark" /> : (
               <>

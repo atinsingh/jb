@@ -14,11 +14,11 @@ const candidatePlans = {
     {
       _id: 'paid-id',
       type: 'PRO',
-      name: 'Paid',
+      name: 'Pro',
       priceMonthly: 10,
       priceYearly: 100,
       currency: 'usd',
-      features: ['Higher monthly AI allowance'],
+      features: ['400 credits a month'],
     },
   ],
 };
@@ -62,15 +62,32 @@ const employerPlans = {
 };
 
 test('candidate pricing renders exactly the tiers and prices returned by the catalog API', async ({ page }) => {
-  await page.route('**/api/billing/plans', (route) => route.fulfill({ json: candidatePlans }));
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  await page.route('**/api/billing/plans', async (route) => {
+    await held;
+    await route.fulfill({ json: candidatePlans });
+  });
 
   await page.goto('/pricing');
+  // While Stripe answers, the page keeps its shape instead of a bare "Loading…" line.
+  await expect(page.getByTestId('candidate-pricing-skeleton').first()).toBeVisible();
+  await expect(page.getByText(/loading pricing/i)).toHaveCount(0);
+  release();
+
+  const pro = page.locator('[data-testid="candidate-pricing-tier"][data-tier="PRO"]');
   await expect(page.getByTestId('candidate-pricing-tier')).toHaveCount(2);
-  await expect(page.locator('[data-testid="candidate-pricing-tier"][data-tier="PRO"]')).toContainText('$10');
+  await expect(pro).toContainText('Pro');
+  await expect(pro).toContainText('$10');
+  await expect(pro).not.toContainText('Paid');
+  await expect(pro).toContainText('save $20');
+  await expect(page.getByText(/prices in USD/i)).toBeVisible();
   await expect(page.getByText('Premium')).toHaveCount(0);
+  // Comparison runs a metered review, so the page must not promise it is credit-free.
+  await expect(page.locator('main')).not.toContainText(/does not use generation credits/i);
 
   await page.getByRole('button', { name: 'Switch to annual billing' }).click();
-  await expect(page.locator('[data-testid="candidate-pricing-tier"][data-tier="PRO"]')).toContainText('$100/year');
+  await expect(pro).toContainText('$100/year');
 });
 
 test('employer pricing renders the Stripe-backed tier count and yearly totals', async ({ page }) => {

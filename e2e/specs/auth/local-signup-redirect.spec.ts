@@ -10,6 +10,8 @@ test('local signup callbacks stay on localhost instead of the production Site UR
     'http://localhost:3000/auth/success',
     'http://localhost:3000/auth/success?role=ROLE_CANDIDATE',
     'http://localhost:3000/auth/success?role=ROLE_EMPLOYER',
+    // A homepage Compare/Create choice rides through email confirmation.
+    'http://localhost:3000/auth/success?redirect=%2Fapp%2Fresume%3Fmode%3Dcompare',
   ]) {
     // Admin link generation exercises the real allow list without sending mail.
     const response = await request.post(`${authUrl}/admin/generate_link`, {

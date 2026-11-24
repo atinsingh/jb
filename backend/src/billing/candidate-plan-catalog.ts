@@ -55,17 +55,19 @@ export async function reconcileCandidatePlans(
   entitlementModel: Model<PlanEntitlementDocument>,
   stripe: StripePaidPrices,
 ): Promise<void> {
+  // Credit numbers in features must match backend/config/ai-budget.yaml tiers (spec-checked).
   const catalogue = [
     {
       type: 'FREE', name: 'Free', description: 'Get started with essential job search tools',
-      priceMonthly: 0, priceYearly: 0, features: ['Basic job search', 'Monthly allowance'],
+      priceMonthly: 0, priceYearly: 0,
+      features: ['Resume score and comparison', '100 credits a month', '1 saved resume version', 'Basic job search'],
       isActive: true, sortOrder: 0, entitlements: commonFree,
     },
     {
-      type: 'PRO', name: 'Paid', description: 'More capacity for an active job search',
+      type: 'PRO', name: 'Pro', description: 'More capacity for an active job search',
       priceMonthly: stripe.monthly.amountUsd, priceYearly: stripe.yearly.amountUsd,
       stripePriceIdMonthly: stripe.monthly.priceId, stripePriceIdYearly: stripe.yearly.priceId,
-      features: ['Everything in Free', 'Higher monthly allowance', 'Priority job matching'],
+      features: ['Everything in Free', '400 credits a month', 'Cover letters', 'Priority job matching', '5 saved resume versions'],
       isActive: true, sortOrder: 1, entitlements: commonPaid,
     },
   ] as const;

@@ -18,9 +18,9 @@ import HomeV3 from '@/components/home/v3/HomeV3';
 
 const SITE_URL = 'https://jobocate.com';
 const OG_IMAGE = `${SITE_URL}/jobocate-logo.png`;
-const SEO_TITLE = 'Jobocate — A Better Resume for Your Next Role';
+const SEO_TITLE = 'Jobocate — ATS resume score and resume builder';
 const SEO_DESC =
-  "Compare your resume with a job description, get useful feedback, and create a polished resume from your real experience. Free to start.";
+  'Upload your resume, paste the job you want, and get your ATS score with a free account. See what’s missing, fix it line by line, and build a resume for that role.';
 
 // Honest structured data only: Organization + WebSite. No AggregateRating /
 // JobPosting / review markup — there is no verified rating data behind this
@@ -61,7 +61,7 @@ export default function JobocateHome() {
         <meta property="og:type" content="website" />
         <meta property="og:url" content={`${SITE_URL}/`} />
         <meta property="og:image" content={OG_IMAGE} />
-        <meta property="og:image:alt" content="Jobocate — A better resume for your next role" />
+        <meta property="og:image:alt" content="Jobocate — Your resume gets 6 seconds. Make them count." />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={SEO_TITLE} />
         <meta name="twitter:description" content={SEO_DESC} />

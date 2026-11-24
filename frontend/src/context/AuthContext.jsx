@@ -217,7 +217,7 @@ export const AuthProvider = ({ children }) => {
     return { user: localUser };
   };
 
-  const signup = async ({ name, email, password, role }) => {
+  const signup = async ({ name, email, password, role, redirect }) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -226,7 +226,9 @@ export const AuthProvider = ({ children }) => {
         // here, and only when first creating the user — user_metadata is
         // user-writable, so it can never grant anything privileged.
         data: { name, role },
-        emailRedirectTo: `${window.location.origin}/auth/success`,
+        emailRedirectTo: `${window.location.origin}/auth/success${
+          redirect ? `?redirect=${encodeURIComponent(redirect)}` : ''
+        }`,
       },
     });
     if (error) throw new Error(error.message);

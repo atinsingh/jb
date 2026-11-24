@@ -3,14 +3,27 @@ import { test, expect } from '../../fixtures/test';
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test('the homepage comparison demo plays and resume actions work on mobile', async ({ page }, testInfo) => {
+  await page.route('**/api/billing/plans', (route) => route.fulfill({ json: { plans: [
+    { _id: 'free-id', type: 'FREE', name: 'Free', priceMonthly: 0, priceYearly: 0, currency: 'usd', features: [] },
+    { _id: 'pro-id', type: 'PRO', name: 'Pro', priceMonthly: 10, priceYearly: 100, currency: 'usd', features: [] },
+  ] } }));
   await page.goto('/');
   await expect(page.getByRole('navigation', { name: 'Primary', exact: true }).getByRole('link', { name: 'Candidates', exact: true })).toHaveAttribute('href', '/#candidates');
   await expect(page.getByRole('navigation', { name: 'Primary', exact: true }).getByRole('link', { name: 'Resume', exact: true })).toHaveCount(0);
-  await expect(page.locator('#candidates')).toContainText('Know where you stand.');
-  await expect(page.getByRole('link', { name: 'Create my resume' }).first()).toHaveAttribute('href', '/app/resume?mode=generate');
-  await expect(page.getByRole('link', { name: 'Compare my resume' })).toHaveAttribute('href', '/app/resume?mode=compare');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Your resume gets 6 seconds\.\s*Make them count\./);
+  await expect(page.locator('#candidates')).toContainText('Know where you stand before you apply.');
+  // Signed out, every résumé CTA goes to signup carrying the visitor's choice.
+  for (const link of await page.getByRole('link', { name: /Score my resume — free|Compare my resume — free/ }).all()) {
+    await expect(link).toHaveAttribute('href', '/app/signup?redirect=%2Fapp%2Fresume%3Fmode%3Dcompare');
+  }
+  for (const link of await page.getByRole('link', { name: /Build a new resume|Build my resume/ }).all()) {
+    await expect(link).toHaveAttribute('href', '/app/signup?redirect=%2Fapp%2Fresume%3Fmode%3Dgenerate');
+  }
+  // The price comes from the live catalogue, and scoring needs an account.
+  await expect(page.locator('#pricing-teaser')).toContainText('$10/month');
+  await expect(page.locator('main')).not.toContainText(/no account/i);
   await expect(page.locator('main')).not.toContainText(/\bAI\b|résumé/i);
-  const video = page.locator('video');
+  const video = page.locator('#demo video');
   await expect(video).toHaveAttribute('autoplay', '');
   await expect(video).toHaveAttribute('loop', '');
   await expect(video).not.toHaveAttribute('controls', '');

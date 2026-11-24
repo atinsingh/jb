@@ -5,4 +5,9 @@ describe('single AI allowance in plan configuration', () => {
     for (const plan of EMPLOYER_PLANS) expect(plan.limits).not.toHaveProperty('aiActionsLimit');
     expect(EMPLOYER_PLANS.map(p => p.limits.aiBudgetCreditsLimit)).toEqual([100, 400]);
   });
+
+  it('names the shared paid membership Pro on the employer side too', () => {
+    // One membership covers both workspaces, so it carries one name.
+    expect(EMPLOYER_PLANS.map(p => p.name)).toEqual(['Free', 'Pro']);
+  });
 });

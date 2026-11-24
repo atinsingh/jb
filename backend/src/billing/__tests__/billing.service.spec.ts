@@ -270,7 +270,7 @@ describe('BillingService', () => {
           planId: 'legacy-id',
           billingCycle: 'monthly',
         }),
-      ).rejects.toThrow('Only the configured Paid plan can be purchased');
+      ).rejects.toThrow('Only the configured Pro plan can be purchased');
       expect(createCustomer).not.toHaveBeenCalled();
     });
 

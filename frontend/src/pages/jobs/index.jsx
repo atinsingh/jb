@@ -206,7 +206,27 @@ export default function FindJobs() {
               {error}
             </p>
           ) : loading ? (
-            <p className={styles.stateMsg}>Loading roles…</p>
+            <>
+              <span role="status" className={styles.srOnly}>
+                Fetching roles
+              </span>
+              <ul className={styles.rows}>
+                {Array.from({ length: 6 }, (_, i) => (
+                  <li key={i} data-testid="jobs-skeleton-row" aria-hidden="true">
+                    <div className={`${styles.row} ${styles.skeletonRow}`}>
+                      <span className={`${styles.skeletonBar} ${styles.skeletonLogo}`} />
+                      <span className={styles.rowMain}>
+                        <span className={`${styles.skeletonBar} ${styles.skeletonTitle}`} />
+                        <span className={`${styles.skeletonBar} ${styles.skeletonSub}`} />
+                      </span>
+                      <span className={`${styles.skeletonBar} ${styles.skeletonMeta}`} />
+                      <span className={`${styles.skeletonBar} ${styles.skeletonMeta}`} />
+                      <span className={`${styles.skeletonBar} ${styles.skeletonMeta}`} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </>
           ) : data.jobs.length === 0 ? (
             <p className={styles.stateMsg}>
               No roles match that search. Try a broader keyword or clear the filters.

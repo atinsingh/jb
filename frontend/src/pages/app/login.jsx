@@ -7,9 +7,22 @@ import { useRouter } from 'next/router';
 import { FaGoogle, FaLinkedinIn } from 'react-icons/fa6';
 
 import { appRoute } from '@/components/app/appRoutes';
+import { resumeIntentOf, safeRedirect, signupRedirectFor } from '@/lib/auth/routes';
 import Logo from '@/components/brand/Logo';
 import { useAuth } from '@/context/AuthContext';
 import styles from '@/components/auth/v3/AuthV3.module.css';
+
+/** Copy for a visitor who arrived through the homepage's Compare/Create choice. */
+const INTENT_COPY = {
+  compare: {
+    heading: 'Log in to score your resume.',
+    lede: 'Your ATS score, the skills you’re missing and the lines to fix are one step away.',
+  },
+  generate: {
+    heading: 'Log in to build your resume.',
+    lede: 'Pick a template and turn your experience into a resume for the role.',
+  },
+};
 
 /**
  * Sign in, Candidate v3.
@@ -25,6 +38,9 @@ import styles from '@/components/auth/v3/AuthV3.module.css';
 export default function AppLogin() {
   const router = useRouter();
   const { user, loading, login, loginWithProvider } = useAuth();
+  const redirect = safeRedirect(router.query.redirect);
+  const intent = resumeIntentOf(redirect);
+  const intentCopy = INTENT_COPY[intent];
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -42,7 +58,9 @@ export default function AppLogin() {
     ? {
         heading: 'Log in to keep hiring on autopilot.',
         lede: 'Your candidates, interviews and recruiter are where you left them.',
-        signupHref: '/app/signup?as=employer',
+        signupHref: redirect
+          ? `/app/signup?as=employer&redirect=${encodeURIComponent(redirect)}`
+          : '/app/signup?as=employer',
         asideHead: 'Your recruiting copilot kept working.',
         stats: [
           ['37', 'screened overnight'],
@@ -52,9 +70,9 @@ export default function AppLogin() {
           'Every shortlist shows the reasoning behind it, and nothing is sent without your approval.',
       }
     : {
-        heading: 'Welcome back to your workspace.',
-        lede: 'Your resumes and saved versions are where you left them.',
-        signupHref: '/app/signup',
+        heading: intentCopy?.heading ?? 'Welcome back to your workspace.',
+        lede: intentCopy?.lede ?? 'Your resumes and saved versions are where you left them.',
+        signupHref: redirect ? signupRedirectFor(redirect) : '/app/signup',
         asideHead: 'Pick up where you left off.',
         stats: [
           ['Compare', 'an existing resume'],
@@ -74,8 +92,8 @@ export default function AppLogin() {
 
   // Already signed in: do not show a login form to someone who has a session.
   useEffect(() => {
-    if (!loading && user) router.replace(landingFor(user));
-  }, [loading, user, router]);
+    if (!loading && user) router.replace(redirect || landingFor(user));
+  }, [loading, user, router, redirect]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -87,12 +105,7 @@ export default function AppLogin() {
       const result = await login(email, password, {
         role,
       });
-      const requested = router.query.redirect;
-      router.replace(
-        typeof requested === 'string' && requested.startsWith('/')
-          ? requested
-          : landingFor(result?.user),
-      );
+      router.replace(redirect || landingFor(result?.user));
     } catch (err) {
       setError(err?.message || 'Could not sign in. Check your email and password.');
       setSubmitting(false);
@@ -103,7 +116,7 @@ export default function AppLogin() {
     setError('');
     try {
       await loginWithProvider(provider, {
-        redirectTo: typeof router.query.redirect === 'string' ? router.query.redirect : undefined,
+        redirectTo: redirect || undefined,
         role,
       });
     } catch (err) {

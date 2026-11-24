@@ -54,7 +54,7 @@ export class EmployerBillingService {
 
   async upgrade(ownerId: string, dto: UpgradeDto, _email?: string) {
     const result = await this.createCheckoutSession(ownerId, dto.plan, dto.billingCycle === 'annual' ? 'annual' : 'monthly');
-    return { checkoutUrl: result.url, subscription: await this.getOrCreateSubscription(ownerId), message: 'Complete checkout to activate Paid in both workspaces' };
+    return { checkoutUrl: result.url, subscription: await this.getOrCreateSubscription(ownerId), message: 'Complete checkout to activate Pro in both workspaces' };
   }
 
   async createBillingPortalSession(ownerId: string, returnUrl?: string) {

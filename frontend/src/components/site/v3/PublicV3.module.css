@@ -298,6 +298,64 @@
   color: var(--jb-v3-accent-ink);
 }
 
+/* Subhead under the heading, the currency label, and the yearly-saving line. */
+.subhead {
+  margin: 0 0 22px;
+  font-size: 16.5px;
+  color: var(--jb-v3-fg-2);
+  max-width: 520px;
+  text-wrap: pretty;
+}
+
+.currencyNote {
+  margin: 0 0 14px;
+  font-family: var(--jb-v3-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--jb-v3-fg-3);
+}
+
+.tierSaving {
+  margin: -12px 0 22px;
+  font-family: var(--jb-v3-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--jb-v3-accent);
+}
+
+/* Loading placeholder: the shape of a tier, hairline bars, no copy. */
+.tierSkeleton {
+  min-height: 300px;
+}
+
+.skelLine {
+  display: block;
+  width: 100%;
+  height: 10px;
+  margin: 0 0 14px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--jb-v3-line) 0%, var(--jb-v3-panel) 50%, var(--jb-v3-line) 100%);
+  background-size: 200% 100%;
+  animation: skelShimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes skelShimmer {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skelLine {
+    animation: none;
+  }
+}
+
 /* --------------------------------------------------------------------- */
 /* FAQ ledger                                                              */
 /* --------------------------------------------------------------------- */
@@ -623,6 +681,40 @@
   cursor: default;
 }
 
+/* Loading skeleton: reuses .row's grid so the bars sit where the text will. */
+.skeletonRow {
+  pointer-events: none;
+}
+
+.skeletonBar {
+  display: block;
+  max-width: 100%;
+  height: 12px;
+  border-radius: 2px;
+  background-color: var(--jb-v3-line);
+  background-image: linear-gradient(90deg, transparent, var(--jb-v3-line-2), transparent);
+  background-size: 200% 100%;
+  animation: skelShimmer 1.4s ease-in-out infinite;
+}
+
+.skeletonLogo {
+  width: 34px;
+  height: 34px;
+}
+
+.skeletonTitle {
+  width: 60%;
+  height: 14px;
+}
+
+.skeletonSub {
+  width: 40%;
+}
+
+.skeletonMeta {
+  width: 80px;
+}
+
 @media (max-width: 900px) {
   .filterBar {
     grid-template-columns: 1fr;
@@ -651,6 +743,10 @@
   .row,
   .pageBtn {
     transition: none;
+  }
+
+  .skeletonBar {
+    animation: none;
   }
 
   .fieldBtn:hover {
