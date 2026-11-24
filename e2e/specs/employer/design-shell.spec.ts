@@ -10,7 +10,7 @@ test.describe('Employer v3 workspace shell', () => {
     for (const route of ['/employer/dashboard', '/employer/jobs', '/employer/settings', '/employer/jobs/post']) {
       await page.goto(route, { waitUntil: 'domcontentloaded' });
       await expect(page.getByRole('navigation', { name: 'Employer primary' }).getByRole('link'))
-        .toHaveText(['Dashboard', 'Jobs', 'Bookings', 'Messages', 'Settings']);
+        .toHaveText(['Dashboard', 'Jobs', 'Candidates', 'Bookings', 'Messages', 'Settings']);
       await expect(page.locator('#emapp')).toHaveCSS('background-color', 'rgb(11, 11, 12)');
       await expect(page.locator('#emapp')).toHaveCSS('color', 'rgb(245, 245, 244)');
       await expectNoHorizontalOverflow(page, route);
@@ -47,6 +47,8 @@ test.describe('Employer v3 workspace shell', () => {
     const jobId = '64b0000000000000000000aa';
     await page.route(`**/api/employer/jobs/${jobId}`, (route) => route.fulfill({ json: { job: { _id: jobId, title: 'Backend Engineer' } } }));
     await page.route('**/api/employer/applicants/resume-assessment/budget', (route) => route.fulfill({ json: { status: 'READY', limitCredits: 100, remainingCredits: 100 } }));
+    await page.route('**/api/employer/applicants/resume-assessment/preview?**', (route) => route.fulfill({ json: { preview: null } }));
+    await page.route(`**/api/employer/candidate-search/for-job/${jobId}`, (route) => route.fulfill({ json: { candidates: [] } }));
     await page.route('**/api/employer/applicants?**', (route) => route.fulfill({ json: [] }));
     await page.goto(`/employer/jobs/${jobId}/applications`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: 'Backend Engineer' })).toBeVisible();

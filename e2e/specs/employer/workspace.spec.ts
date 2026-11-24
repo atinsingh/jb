@@ -6,7 +6,7 @@ test.use({ storageState: storage.employer });
 test('employer navigation keeps three pages without administrative page notes', async ({ page }) => {
   await page.goto('/employer/dashboard');
   await expect(page.getByRole('navigation', { name: 'Employer primary' }).getByRole('link'))
-    .toHaveText(['Dashboard', 'Jobs', 'Bookings', 'Messages', 'Settings']);
+    .toHaveText(['Dashboard', 'Jobs', 'Candidates', 'Bookings', 'Messages', 'Settings']);
   await expect(page.getByRole('heading', { name: 'Employer dashboard' })).toBeVisible();
   await expect(page.getByText('Muted pages', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Your workspace' })).toHaveCount(0);
