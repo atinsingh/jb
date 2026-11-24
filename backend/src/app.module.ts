@@ -39,6 +39,7 @@ import { EmployerIntegrationsModule } from './employer-integrations/employer-int
 import { EmployerDeveloperModule } from './employer-developer/employer-developer.module';
 import { EmployerSecurityModule } from './employer-security/employer-security.module';
 import { EmployerTalentModule } from './employer-talent/employer-talent.module';
+import { EmployerCandidateSearchModule } from './employer-candidate-search/employer-candidate-search.module';
 import { EmployerDistributionModule } from './employer-distribution/employer-distribution.module';
 import { EmployerNotificationsModule } from './employer-notifications/employer-notifications.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -139,6 +140,7 @@ function getEnvFilePath(): string[] {
     EmployerDeveloperModule,
     EmployerSecurityModule,
     EmployerTalentModule,
+    EmployerCandidateSearchModule,
     EmployerDistributionModule,
     EmployerNotificationsModule,
     EmployerApprovalsModule,

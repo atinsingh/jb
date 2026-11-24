@@ -8,7 +8,7 @@ import EmployerSidebar from '@/components/employer/EmployerSidebar';
 import { LoadingState, ErrorState, EmptyState, InlineError } from '@/components/employer/EmployerStates';
 import ResumeAssessmentPanel from '@/components/employer/ResumeAssessmentPanel';
 import useEmployerAtsSandboxRelease from '@/components/employer/useEmployerAtsSandboxRelease';
-import { employerJobsApi, employerPipelineApi } from '@/services/employerApi';
+import { employerCandidateSearchApi, employerJobsApi, employerPipelineApi } from '@/services/employerApi';
 
 const STAGES = ['applied', 'screening', 'interview', 'offer', 'hired', 'rejected'];
 const NEXT_STAGE = {
@@ -46,6 +46,7 @@ export default function JobApplications() {
 
   const [job, setJob] = useState(null);
   const [applications, setApplications] = useState([]);
+  const [recommended, setRecommended] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
@@ -118,6 +119,15 @@ export default function JobApplications() {
   useEffect(() => {
     if (router.isReady) load();
   }, [router.isReady, load]);
+
+  useEffect(() => {
+    if (!jobId) return undefined;
+    let cancelled = false;
+    employerCandidateSearchApi.forJob(jobId)
+      .then((result) => { if (!cancelled) setRecommended(Array.isArray(result?.candidates) ? result.candidates : []); })
+      .catch(() => { if (!cancelled) setRecommended([]); });
+    return () => { cancelled = true; };
+  }, [jobId]);
 
   useEffect(() => {
     if (sandboxStatus !== 'ready') return undefined;
@@ -285,6 +295,22 @@ export default function JobApplications() {
               </div>
               <strong>{loading ? '…' : `${applications.length} total`}</strong>
             </div>
+
+            {recommended.length > 0 && (
+              <section className="preview-card" aria-label="Recommended candidates">
+                <h2>Recommended from résumés</h2>
+                <p>People in the résumé database whose own résumé targets this job. Résumés written for someone else are not recommended.</p>
+                <ul className="recommend-list">
+                  {recommended.map((candidate) => (
+                    <li key={candidate.candidateId}>
+                      <strong>{candidate.name}</strong>
+                      <span>{(candidate.matchedRoles?.length ? candidate.matchedRoles : candidate.targetRoles || []).join(', ')}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Link href="/employer/search">Search candidates</Link>
+              </section>
+            )}
 
             {loading && <LoadingState label="Loading applications…" tone="dark" />}
             {!loading && error && <ErrorState error={error} onRetry={load} tone="dark" />}
@@ -550,6 +576,8 @@ export default function JobApplications() {
         .heading p { margin: 0; color: var(--jb-v3-fg-2); font-size: 14px; max-width: 62ch; }
         .heading > strong { font-weight: 400; }
         .preview-card { border-radius: 12px; border: 1px solid var(--jb-v3-line); background: var(--jb-v3-panel); padding: 22px; margin-bottom: 18px; }
+        .recommend-list { list-style: none; margin: 12px 0; padding: 0; display: grid; gap: 8px; }
+        .recommend-list li { display: flex; justify-content: space-between; gap: 12px; }
         .preview-head { display: flex; align-items: start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
         .preview-card h2 { margin: 0 0 6px; font-size: 18px; font-weight: 600; }
         .preview-card p { margin: 0; color: var(--jb-v3-fg-2); font-size: 13.5px; max-width: 62ch; }

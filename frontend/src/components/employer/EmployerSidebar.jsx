@@ -1,7 +1,7 @@
 'use client';
 import AppTopNav from '@/components/app/AppTopNav';
 import EmployerV3SurfaceStyles from '@/components/employer/EmployerV3SurfaceStyles';
-const NAV = [['Dashboard', '/employer/dashboard'], ['Jobs', '/employer/jobs'], ['Bookings', '/employer/bookings'], ['Messages', '/employer/messages'], ['Settings', '/employer/settings']];
+const NAV = [['Dashboard', '/employer/dashboard'], ['Jobs', '/employer/jobs'], ['Candidates', '/employer/search'], ['Bookings', '/employer/bookings'], ['Messages', '/employer/messages'], ['Settings', '/employer/settings']];
 export default function EmployerSidebar() {
   return (
     <>

@@ -77,6 +77,13 @@ export const employerJobsApi = {
     }),
 };
 
+export const employerCandidateSearchApi = {
+  // GET /api/employer/candidate-search?q&role&page&limit -> { candidates, page, limit }
+  list: (filters = {}) => apiCall(`/api/employer/candidate-search${qs(filters)}`),
+  // GET /api/employer/candidate-search/for-job/:jobId -> { candidates }
+  forJob: (jobId) => apiCall(`/api/employer/candidate-search/for-job/${jobId}`),
+};
+
 /* -------------------------------------------------------------- pipeline --- */
 export const employerPipelineApi = {
   // GET /api/employer/applicants/stats?jobId -> { total, applied, ... }
