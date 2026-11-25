@@ -464,13 +464,16 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
             ...base,
             pending: false,
             annotations: status.annotations || [],
+            ...(status.match ? { match: status.match } : {}),
             ats: { ...base.ats, missingSections },
           };
         });
         return;
       }
       if (status?.status === 'failed') {
-        setMessage('The written review did not finish. The scores above are from the document check.');
+        setMessage(result.match?.coverage == null
+          ? 'The written review did not finish, so there is no job match score for this posting.'
+          : 'The written review did not finish. The job match shown is the preliminary keyword check.');
         setAssessment((current) => (current ? { ...current, pending: false } : current));
         return;
       }
@@ -903,7 +906,7 @@ export default function CompareResumeWorkspace({ resumeId, onOpen, onComparisonS
           {comparing && !assessment ? <ComparisonLoading scores /> : <>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9, marginBottom: 14 }}>
             <Score label="ATS Match Percentage" value={assessment?.ats?.score} suffix="%" testId="compare-ats-score" cardTestId="compare-ats-card" caption="Document compatibility" />
-            <Score label="Job Match" value={assessment?.match?.coverage} suffix="%" testId="compare-match-score" cardTestId="compare-match-card" caption="Required skills covered" />
+            <Score label="Job Match" value={assessment?.match?.coverage} suffix="%" testId="compare-match-score" cardTestId="compare-match-card" caption={assessment?.match?.preliminary ? 'Preliminary keyword check' + (assessment.pending ? ' — final score when the review finishes' : '') : 'Required skills covered'} />
             <Score label="Content patterns" value={assessment?.aiContent?.composite} suffix="%" testId="compare-ai-score" cardTestId="compare-ai-card" caption="Writing pattern score" wide />
           </div>
           {(assessment?.ats?.explanation || assessment?.match?.explanation) && (

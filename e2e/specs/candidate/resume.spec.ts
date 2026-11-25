@@ -679,6 +679,97 @@ test.describe("Compare Resume manual workflow", () => {
     await expect(page.getByLabel("Summary")).toHaveValue("Designed distributed systems for billing.");
   });
 
+  test("replaces the preliminary keyword job match with the agent review score when the review finishes (JOB-161)", async ({ page }) => {
+    await stubHarnessApi(page);
+    const { PDFDocument } = require("../../../backend/node_modules/pdf-lib");
+    const pdf = await PDFDocument.create();
+    pdf.addPage([600, 800]).drawText("Alex Chen", { x: 50, y: 700, size: 12 });
+    const source = Buffer.from(await pdf.save());
+    const imported = {
+      id: "score-compare", name: "Imported profile", creationMethod: "imported",
+      fullName: "Alex Chen", summary: "Backend engineer", skills: [], experience: [],
+      certifications: [], achievements: [],
+      source: { originalFilename: "resume.pdf", fileExtension: ".pdf", jobDescription: "Warehouse associate" },
+    };
+    let releaseReview = () => undefined;
+    const reviewGate = new Promise<void>((resolve) => { releaseReview = resolve; });
+    await page.route("**/api/matching/recommendations**", (route: Route) =>
+      route.fulfill({ json: { recommendations: [], total: 0 } }),
+    );
+    await page.route("**/api/resume-builder/score-compare/compare/source", (route: Route) =>
+      route.fulfill({ body: source, contentType: "application/pdf" }),
+    );
+    await page.route("**/api/resume-builder/score-compare/compare/bites", (route: Route) =>
+      route.fulfill({ json: { bites: [] } }),
+    );
+    await page.route("**/api/resume-builder/score-compare/compare", (route: Route) =>
+      route.fulfill({ json: {
+        resumeId: imported.id, pending: true, review: { sessionId: "review-score" },
+        ats: { score: 90, findings: [], missingSections: [] },
+        match: { coverage: null, keywordCount: 0, matched: [], missing: [], preliminary: true, explanation: "No recognized job skills were found in the job description to score against." },
+        aiContent: { composite: 20, signals: {} },
+        annotations: [], details: {},
+      } }),
+    );
+    await page.route("**/api/resume-builder/score-compare/compare/review/**", async (route: Route) => {
+      await reviewGate;
+      await route.fulfill({ json: {
+        status: "completed", annotations: [], details: {}, missingSections: [],
+        match: { coverage: 77, explanation: "Agent review of the job.", matched: ["Inventory"], missing: [], keywordCount: 1, preliminary: false },
+      } });
+    });
+    await page.route("**/api/resume-builder/score-compare", (route: Route) => route.fulfill({ json: imported }));
+
+    await page.goto("/app/resume?mode=compare&id=score-compare", { waitUntil: "domcontentloaded" });
+    await expect(page.getByTestId("compare-match-score")).toHaveText("—");
+    await expect(page.getByTestId("compare-match-card")).toContainText(/preliminary/i);
+    releaseReview();
+    await expect(page.getByTestId("compare-match-score")).toHaveText("77%");
+    await expect(page.getByTestId("compare-match-card")).not.toContainText(/preliminary/i);
+    await expect(page.getByTestId("comparison-score-reasons")).toContainText("Agent review of the job.");
+    await expect(page.getByTestId("comparison-score-reasons")).not.toContainText("No recognized job skills");
+  });
+
+  test("says there is no job match score when the review fails and the job names no known skills (JOB-161)", async ({ page }) => {
+    await stubHarnessApi(page);
+    const { PDFDocument } = require("../../../backend/node_modules/pdf-lib");
+    const pdf = await PDFDocument.create();
+    pdf.addPage([600, 800]).drawText("Alex Chen", { x: 50, y: 700, size: 12 });
+    const source = Buffer.from(await pdf.save());
+    const imported = {
+      id: "nomatch-compare", name: "Imported profile", creationMethod: "imported",
+      fullName: "Alex Chen", summary: "Backend engineer", skills: [], experience: [],
+      certifications: [], achievements: [],
+      source: { originalFilename: "resume.pdf", fileExtension: ".pdf", jobDescription: "Warehouse associate" },
+    };
+    await page.route("**/api/matching/recommendations**", (route: Route) =>
+      route.fulfill({ json: { recommendations: [], total: 0 } }),
+    );
+    await page.route("**/api/resume-builder/nomatch-compare/compare/source", (route: Route) =>
+      route.fulfill({ body: source, contentType: "application/pdf" }),
+    );
+    await page.route("**/api/resume-builder/nomatch-compare/compare/bites", (route: Route) =>
+      route.fulfill({ json: { bites: [] } }),
+    );
+    await page.route("**/api/resume-builder/nomatch-compare/compare", (route: Route) =>
+      route.fulfill({ json: {
+        resumeId: imported.id, pending: true, review: { sessionId: "review-nomatch" },
+        ats: { score: 90, findings: [], missingSections: [] },
+        match: { coverage: null, keywordCount: 0, matched: [], missing: [], preliminary: true, explanation: "No recognized job skills were found in the job description to score against." },
+        aiContent: { composite: 20, signals: {} },
+        annotations: [], details: {},
+      } }),
+    );
+    await page.route("**/api/resume-builder/nomatch-compare/compare/review/**", (route: Route) =>
+      route.fulfill({ json: { status: "failed", failureReason: "INSUFFICIENT_GROUNDED_COMMENTS" } }),
+    );
+    await page.route("**/api/resume-builder/nomatch-compare", (route: Route) => route.fulfill({ json: imported }));
+
+    await page.goto("/app/resume?mode=compare&id=nomatch-compare", { waitUntil: "domcontentloaded" });
+    await expect(page.locator('div[role="alert"]').filter({ hasText: "no job match score" })).toBeVisible();
+    await expect(page.getByTestId("compare-match-score")).toHaveText("—");
+  });
+
   test("shows the scores while the written review is still running and does not repeat the wait", async ({ page }) => {
     await stubHarnessApi(page);
     const { PDFDocument } = require("../../../backend/node_modules/pdf-lib");

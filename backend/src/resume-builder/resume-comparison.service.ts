@@ -11,7 +11,7 @@ import { ResumeParserService } from '../resume/resume-parser.service';
 import { StorageService } from '../storage';
 import { randomUUID } from 'crypto';
 import { extname } from 'path';
-import { CandidateResumeReviewAgent } from './candidate-resume-review.agent';
+import { CandidateResumeReviewAgent, CandidateResumeReviewResult } from './candidate-resume-review.agent';
 import { LLMFeature, LLMRoutingService } from '../llm/llm-routing.service';
 import { CandidateAtsReviewSession, CandidateAtsReviewSessionDocument } from './schemas/candidate-ats-review-session.schema';
 import { ResumeHarnessService } from '../resume-harness/resume-harness.service';
@@ -27,6 +27,29 @@ export type ResumeComparisonAnnotation = {
   message: string;
   fix: string;
   quote?: string;
+};
+
+type JobMatch = {
+  coverage: number | null;
+  explanation: string;
+  matched: string[];
+  missing: string[];
+  keywordCount: number;
+  preliminary: boolean;
+};
+
+/** Built from the displayed number: the agent's prose can quote an unrounded or different score. */
+function agentMatchExplanation(coverage: number, missing: string[]): string {
+  return `${coverage}%: job match from the written review of this posting.${missing.length ? ` Missing: ${missing.join(', ')}.` : ''}`;
+}
+
+type ReviewComments = {
+  status: string;
+  failureReason?: string;
+  annotations?: ResumeComparisonAnnotation[];
+  details?: Record<string, unknown>;
+  missingSections?: string[];
+  match?: JobMatch;
 };
 
 @Injectable()
@@ -207,8 +230,18 @@ export class ResumeComparisonService {
     const match = this.matcher.match(originalFile ? text : structured, targetText);
     const started = await this.agentReview.beginReview({
       userId, resumeId, resumeText: text, originalFile, jobDescription: targetText, missingSections,
-    }, { forceRefresh: input.forceRefresh === true });
-    const annotations = this.localAnnotations(text, ats, match);
+    }, {
+      forceRefresh: input.forceRefresh === true,
+      // The candidate may leave before the review finishes, so the history entry is corrected here, not only by reviewComments().
+      onComplete: (result) => {
+        const coverage = result.match?.coverage;
+        if (typeof coverage === 'number' && Number.isFinite(coverage)) {
+          this.recordAgentJobMatch(resumeId, userId, result.sessionId, coverage).catch(() => undefined);
+        }
+      },
+    });
+    const jobMatch = this.scoreJobMatch(match, 'result' in started ? started.result.match : undefined);
+    const annotations = this.localAnnotations(text, ats, jobMatch);
     let resolvedMissingSections: string[] = [...missingSections];
     if ('result' in started) {
       annotations.push(...this.groundedAnnotations(started.result.annotations, text));
@@ -228,9 +261,13 @@ export class ResumeComparisonService {
     await this.resumeModel.updateOne(
       { _id: resumeId, userId: new Types.ObjectId(userId) },
       { $push: { comparisonHistory: { $each: [{
-        at: new Date(), atsScore: ats.score, jobMatchScore: match.coverage, contentScore: aiContent.composite,
+        at: new Date(), atsScore: ats.score, jobMatchScore: jobMatch.coverage, contentScore: aiContent.composite,
+        sessionId: 'result' in started ? started.result.sessionId : started.sessionId,
       }], $slice: -500 } } },
     );
+    if ('result' in started && !jobMatch.preliminary && jobMatch.coverage !== null) {
+      await this.recordAgentJobMatch(resumeId, userId, started.result.sessionId, jobMatch.coverage);
+    }
 
     return {
       resumeId,
@@ -239,12 +276,7 @@ export class ResumeComparisonService {
         explanation: `${ats.score}% document compatibility, based on readable text, contact details, section headings, dates, and length. ${sectionNotice}`.trim(),
         missingSections: resolvedMissingSections,
       },
-      match: {
-        ...match,
-        explanation: match.keywordCount
-          ? `${match.coverage}%: ${match.matched.length} of ${match.keywordCount} recognized job skills found in the resume.${match.missing.length ? ` Missing: ${match.missing.join(', ')}.` : ''}`
-          : '0%: no recognized job skills found in the job description to compare.',
-      },
+      match: jobMatch,
       aiContent,
       pending: started.pending,
       review: 'result' in started
@@ -255,7 +287,7 @@ export class ResumeComparisonService {
     };
   }
 
-  async reviewComments(resumeId: string, userId: string, sessionId: string) {
+  async reviewComments(resumeId: string, userId: string, sessionId: string): Promise<ReviewComments> {
     const session = await this.reviews.findOne({
       _id: sessionId,
       resumeId,
@@ -270,19 +302,64 @@ export class ResumeComparisonService {
     const jobText = session.jobText || structured.source?.jobDescription || '';
     const { text, originalFile } = await this.comparisonText(structured as Resume, resumeId, userId);
     const ats = this.ats.check(originalFile ? { text } : { structured });
-    const match = jobText ? this.matcher.match(originalFile ? text : structured, jobText) : { missing: [] as string[] };
+    const keywordMatch = jobText
+      ? this.matcher.match(originalFile ? text : structured, jobText)
+      : { coverage: 0, matched: [] as string[], missing: [] as string[], keywordCount: 0 };
     const extracted = groundResumeExtraction(session.result.extracted, text);
     const missingSections = absentAfterExtraction(session.result.absentSections, extracted);
     const details = this.applyExtractedToDocument(resume, extracted, missingSections);
     if (Object.keys(details).length) await resume.save();
+    const jobMatch = this.scoreJobMatch(keywordMatch, session.result.match);
+    if (!jobMatch.preliminary && jobMatch.coverage !== null) {
+      await this.recordAgentJobMatch(resumeId, userId, sessionId, jobMatch.coverage);
+    }
     return {
       status: 'completed' as const,
       annotations: [
-        ...this.localAnnotations(text, ats, match),
+        ...this.localAnnotations(text, ats, jobMatch),
         ...this.groundedAnnotations(session.result.annotations, text),
       ],
       details,
       missingSections,
+      ...(jobMatch.preliminary ? {} : { match: jobMatch }),
+    };
+  }
+
+  /** Corrects every history entry for the review session, including duplicates from a reload during the review. */
+  private async recordAgentJobMatch(resumeId: string, userId: string, sessionId: string, coverage: number): Promise<void> {
+    await this.resumeModel.updateOne(
+      { _id: resumeId, userId: new Types.ObjectId(userId), 'comparisonHistory.sessionId': sessionId },
+      { $set: { 'comparisonHistory.$[entry].jobMatchScore': coverage } },
+      { arrayFilters: [{ 'entry.sessionId': sessionId }] },
+    );
+  }
+
+  /** The agent's job match once it has a finite coverage; otherwise the instant keyword match, with null coverage when the job names no known skills. */
+  private scoreJobMatch(
+    keyword: { coverage: number; matched: string[]; missing: string[]; keywordCount: number },
+    agent?: Partial<CandidateResumeReviewResult['match']>,
+  ): JobMatch {
+    const keywordExplanation = keyword.keywordCount
+      ? `${keyword.coverage}%: ${keyword.matched.length} of ${keyword.keywordCount} recognized job skills found in the resume.${keyword.missing.length ? ` Missing: ${keyword.missing.join(', ')}.` : ''}`
+      : 'No recognized job skills were found in the job description to score against.';
+    if (typeof agent?.coverage !== 'number' || !Number.isFinite(agent.coverage)) {
+      return {
+        coverage: keyword.keywordCount ? keyword.coverage : null,
+        explanation: keywordExplanation,
+        matched: keyword.matched,
+        missing: keyword.missing,
+        keywordCount: keyword.keywordCount,
+        preliminary: true,
+      };
+    }
+    const missing = agent.missing || keyword.missing;
+    return {
+      coverage: agent.coverage,
+      explanation: agentMatchExplanation(agent.coverage, missing),
+      matched: agent.matched || keyword.matched,
+      missing,
+      keywordCount: agent.keywordCount ?? keyword.keywordCount,
+      preliminary: false,
     };
   }
 

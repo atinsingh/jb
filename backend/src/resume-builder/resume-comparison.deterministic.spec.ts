@@ -53,14 +53,15 @@ describe('deterministic candidate comparison', () => {
     expect(agent.beginReview).toHaveBeenNthCalledWith(1, expect.objectContaining({
       userId: '507f1f77bcf86cd799439011', resumeId: 'resume-1', resumeText: expect.stringContaining('Built TypeScript APIs.'),
       jobDescription: input.jobDescription,
-    }), { forceRefresh: false });
-    expect(agent.beginReview).toHaveBeenNthCalledWith(2, expect.anything(), { forceRefresh: true });
+    }), expect.objectContaining({ forceRefresh: false }));
+    expect(agent.beginReview).toHaveBeenNthCalledWith(2, expect.anything(), expect.objectContaining({ forceRefresh: true }));
     expect(updateOne).toHaveBeenCalledTimes(3);
     expect(updateOne).toHaveBeenNthCalledWith(1,
       { _id: 'resume-1', userId: expect.anything() },
       { $push: { comparisonHistory: { $each: [{
         at: expect.any(Date), atsScore: first.ats.score,
         jobMatchScore: first.match.coverage, contentScore: first.aiContent.composite,
+        sessionId: 'review-1',
       }], $slice: -500 } } },
     );
   });
@@ -97,10 +98,10 @@ describe('deterministic candidate comparison', () => {
     expect(result.ats.score).toBe(100);
     expect(result.ats.explanation).toContain('100%');
     expect(result.ats.explanation).toContain('document compatibility');
-    expect(result.match.coverage).toBe(50);
-    expect(result.match.explanation).toContain('50%');
-    expect(result.match.explanation).toContain('1 of 2');
-    expect(result.match.explanation).toContain('AWS');
+    // JOB-161: a finished agent review's job match is the score of record.
+    expect(result.match.coverage).toBe(36);
+    expect(result.match.preliminary).toBe(false);
+    expect(result.match.explanation).toContain('36%');
     expect(`${result.ats.explanation} ${result.match.explanation}`).not.toContain('35.6');
     expect(result.annotations).toEqual(expect.arrayContaining([
       expect.objectContaining({ quote: 'Built TypeScript APIs.', message: 'Explain the customer outcome.' }),

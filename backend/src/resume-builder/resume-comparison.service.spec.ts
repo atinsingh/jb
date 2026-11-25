@@ -159,7 +159,7 @@ describe('ResumeComparisonService', () => {
     expect(result.ats.explanation).not.toContain('Missing sections');
     expect(agent.beginReview).toHaveBeenCalledWith(
       expect.objectContaining({ missingSections: [] }),
-      { forceRefresh: false },
+      expect.objectContaining({ forceRefresh: false }),
     );
   });
 
@@ -487,6 +487,107 @@ describe('ResumeComparisonService', () => {
       expect.objectContaining({ quote: 'Built APIs.', message: 'Name the billing system.' }),
       expect.objectContaining({ section: 'skills', message: expect.stringContaining('AWS') }),
     ]));
+  });
+
+  it('returns the agent review job match when the session completes (JOB-161)', async () => {
+    reviews.findOne.mockReturnValue({ exec: async () => ({
+      status: 'completed',
+      jobText: 'TypeScript and AWS required.',
+      result: {
+        annotations: [],
+        match: {
+          coverage: 64, explanation: 'Most required skills are evidenced.',
+          matched: ['TypeScript'], missing: ['Docker'], keywordCount: 2,
+        },
+      },
+    }) });
+
+    const comments = await service.reviewComments('resume-1', userId, 'review-1');
+
+    expect(comments.match).toEqual(expect.objectContaining({
+      coverage: 64, missing: ['Docker'], preliminary: false,
+    }));
+    expect(comments.match?.explanation).toContain('64%');
+    expect(resumeModel.updateOne).toHaveBeenCalledWith(
+      expect.anything(),
+      { $set: { 'comparisonHistory.$[entry].jobMatchScore': 64 } },
+      { arrayFilters: [{ 'entry.sessionId': 'review-1' }] },
+    );
+    const gap = comments.annotations?.find((a) => a.id === 'missing-job-skills');
+    expect(gap?.message).toContain('Docker');
+    expect(gap?.message).not.toContain('AWS');
+  });
+
+  it('records the agent job match on the history entry when the background review completes (JOB-161)', async () => {
+    let onComplete: any;
+    agent.beginReview.mockImplementationOnce(async (_input: any, options: any) => {
+      onComplete = options.onComplete;
+      return { pending: true, sessionId: 'review-1' };
+    });
+
+    const pending = await service.compare('resume-1', userId, { jobDescription: 'TypeScript and AWS required.' });
+    expect(pending.pending).toBe(true);
+
+    onComplete({ sessionId: 'review-1', match: { coverage: 81 }, annotations: [] });
+
+    expect(resumeModel.updateOne).toHaveBeenCalledWith(
+      expect.anything(),
+      { $set: { 'comparisonHistory.$[entry].jobMatchScore': 81 } },
+      { arrayFilters: [{ 'entry.sessionId': 'review-1' }] },
+    );
+  });
+
+  it('uses a cached agent review job match in compare() (JOB-161)', async () => {
+    agent.beginReview.mockResolvedValueOnce({
+      pending: false,
+      result: {
+        source: 'agent-session', sessionId: 'cached-2', harness: 'opencode', modelAlias: 'automatic',
+        annotations: [],
+        match: { coverage: 72, explanation: 'Agent match.', matched: ['TypeScript'], missing: [], keywordCount: 1 },
+      },
+    });
+
+    const result = await service.compare('resume-1', userId, { jobDescription: 'TypeScript and AWS required.' });
+
+    expect(result.match.coverage).toBe(72);
+    expect(result.match.preliminary).toBe(false);
+    expect(result.match.explanation).toContain('72%');
+    expect(result.annotations.some((a) => a.id === 'missing-job-skills')).toBe(false);
+    expect(resumeModel.updateOne).toHaveBeenCalledWith(
+      expect.anything(),
+      { $push: { comparisonHistory: { $each: [expect.objectContaining({ sessionId: 'cached-2', jobMatchScore: 72 })], $slice: -500 } } },
+    );
+  });
+
+  it('passes an agent coverage of 0 through compare() as a finished score (JOB-161)', async () => {
+    agent.beginReview.mockResolvedValueOnce({
+      pending: false,
+      result: {
+        source: 'agent-session', sessionId: 'cached-0', harness: 'opencode', modelAlias: 'automatic',
+        annotations: [],
+        match: { coverage: 0, explanation: 'No overlap.', matched: [], missing: ['TypeScript'], keywordCount: 1 },
+      },
+    });
+
+    const result = await service.compare('resume-1', userId, { jobDescription: 'TypeScript required.' });
+
+    expect(result.match).toEqual(expect.objectContaining({ coverage: 0, preliminary: false }));
+  });
+
+  it('marks the instant keyword match preliminary and never reports 0% when the job names no known skills (JOB-161)', async () => {
+    const pending = await service.compare('resume-1', userId, { jobDescription: 'TypeScript and AWS required.' });
+    expect(pending.match.preliminary).toBe(true);
+    expect(resumeModel.updateOne.mock.calls[0][1].$push.comparisonHistory.$each[0]).toEqual(
+      expect.objectContaining({ sessionId: 'review-1' }),
+    );
+
+    const unknown = await service.compare('resume-1', userId, {
+      jobDescription: 'Warehouse associate. Lift boxes, keep the floor tidy, and greet visitors.',
+    });
+    expect(unknown.match.keywordCount).toBe(0);
+    expect(unknown.match.coverage).toBeNull();
+    expect(unknown.match.explanation).not.toContain('0%');
+    expect(unknown.match.explanation).toBe('No recognized job skills were found in the job description to score against.');
   });
 
   it('does not turn a failed review into a comment list', async () => {

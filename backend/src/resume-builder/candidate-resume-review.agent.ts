@@ -50,7 +50,7 @@ export type BeginCandidateResumeReview =
 
 export abstract class CandidateResumeReviewAgent {
   abstract review(input: CandidateResumeReviewInput, options?: { forceRefresh?: boolean }): Promise<CandidateResumeReviewResult>;
-  abstract beginReview(input: CandidateResumeReviewInput, options?: { forceRefresh?: boolean }): Promise<BeginCandidateResumeReview>;
+  abstract beginReview(input: CandidateResumeReviewInput, options?: { forceRefresh?: boolean; onComplete?: (result: CandidateResumeReviewResult) => void }): Promise<BeginCandidateResumeReview>;
 }
 
 type DetailedReview = {
@@ -110,7 +110,7 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
 
   async beginReview(
     input: CandidateResumeReviewInput,
-    options: { forceRefresh?: boolean } = {},
+    options: { forceRefresh?: boolean; onComplete?: (result: CandidateResumeReviewResult) => void } = {},
   ): Promise<BeginCandidateResumeReview> {
     const reusable = await this.reusableReview(input, options.forceRefresh === true);
     if (reusable?.kind === 'cached') return { pending: false, result: reusable.result };
@@ -118,13 +118,20 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
     return await new Promise((resolve, reject) => {
       let settled = false;
       void this.review(input, {
-        ...options,
+        forceRefresh: options.forceRefresh,
         ready: (sessionId) => {
           settled = true;
           resolve({ pending: true, sessionId });
         },
       }).then((result) => {
-        if (!settled) resolve({ pending: false, result });
+        // A review that finished before ready() is returned to the caller directly.
+        if (!settled) {
+          resolve({ pending: false, result });
+          return;
+        }
+        try {
+          void Promise.resolve(options.onComplete?.(result)).catch(() => undefined);
+        } catch { /* a failing callback must not turn the finished review into an unhandled rejection */ }
       }).catch((error) => {
         if (!settled) reject(error);
       });

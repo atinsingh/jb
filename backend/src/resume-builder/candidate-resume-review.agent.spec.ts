@@ -441,6 +441,27 @@ describe('LiteLlmCandidateResumeReviewAgent session runtime', () => {
     }
   });
 
+  it('calls onComplete with the result when the background review resolves (JOB-161)', async () => {
+    let releaseExec: (value: { exitCode: number; stdout: string; stderr: string }) => void = () => undefined;
+    sandbox.exec.mockReturnValue(new Promise((resolve) => { releaseExec = resolve; }));
+    const completed = new Promise<any>((resolve) => {
+      void agent.beginReview({
+        userId: 'user-1', resumeId: 'resume-1',
+        resumeText: 'Built payment services for clients',
+        jobDescription: 'Backend engineer',
+      }, { onComplete: resolve }).then((started) => {
+        expect(started).toEqual({ pending: true, sessionId: 'compare-session-1' });
+        releaseExec({
+          exitCode: 0, stderr: '', stdout: reviewJson([
+            { id: 'one', section: 'experience', severity: 'warning', message: 'Too vague', fix: 'Name the outcome', quote: 'Built payment services for clients' },
+          ]),
+        });
+      });
+    });
+    const result = await completed;
+    expect(result).toEqual(expect.objectContaining({ sessionId: 'compare-session-1', match: expect.objectContaining({ coverage: 67 }) }));
+  });
+
   it('waits out a short overlapping model call instead of failing the written review', async () => {
     let busy = true;
     budget.withCandidateLease.mockImplementation(async (_u, _s, _a, run) => {
