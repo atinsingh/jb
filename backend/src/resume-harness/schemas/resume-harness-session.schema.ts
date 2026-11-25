@@ -246,6 +246,13 @@ export class ResumeHarnessSession {
   @Prop({ type: [ResumeHarnessMessageSchema], default: [] })
   conversation: ResumeHarnessMessage[];
 
+  /** Most recent failed starts and turns, capped at 20, so production failures can be diagnosed. */
+  @Prop({
+    type: [{ _id: false, at: Date, kind: String, message: String }],
+    default: [],
+  })
+  failures?: Array<{ at: Date; kind: string; message: string }>;
+
   @Prop()
   endedAt?: Date;
 

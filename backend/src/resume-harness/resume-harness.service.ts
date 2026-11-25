@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
   Injectable,
   Logger,
   NotFoundException,
@@ -458,6 +459,12 @@ export class ResumeHarnessService {
           }
         }
         (session as any).status = 'failed';
+        const startFailure = this.describeFailure(error);
+        this.logger.warn(`Résumé session ${session._id} start failed: ${startFailure}`);
+        (session as any).failures = [
+          ...((session as any).failures || []),
+          { at: new Date(), kind: 'start', message: startFailure },
+        ].slice(-20);
         try {
           await (session as any).save();
         } catch {
@@ -582,16 +589,21 @@ export class ResumeHarnessService {
 
     const sessionFacts = this.orderedSessionFacts(session, input.instruction);
     await this.syncFetchedPages(session, input.instruction);
-    await this.sandbox.writeFiles(session.sandboxId!, [
-      { path: 'SESSION_FACTS.md', contents: sessionFacts },
-      {
-        path: 'FETCHED_PAGE.md',
-        contents: this.contextFiles.fetchedPage(
-          session.fetchedPages || [],
-          session.fetchedPageWarning,
-        ),
-      },
-    ]);
+    try {
+      await this.sandbox.writeFiles(session.sandboxId!, [
+        { path: 'SESSION_FACTS.md', contents: sessionFacts },
+        {
+          path: 'FETCHED_PAGE.md',
+          contents: this.contextFiles.fetchedPage(
+            session.fetchedPages || [],
+            session.fetchedPageWarning,
+          ),
+        },
+      ]);
+    } catch (error) {
+      await this.recordTurnFailure(userId, sessionId, error);
+      throw error;
+    }
 
     return this.withBudgetedResult(
       userId,
@@ -625,8 +637,43 @@ export class ResumeHarnessService {
       });
     } catch (error) {
       if (completed && (error as { code?: string }).code === 'AI_USAGE_RECONCILING') return completed;
+      await this.recordTurnFailure(userId, attribution.sessionId, error);
       throw error;
     }
+  }
+
+  /** Persist the failure on the session: pod logs do not survive a deploy. */
+  private async recordTurnFailure(userId: string, sessionId: string, error: unknown): Promise<void> {
+    const message = this.describeFailure(error);
+    this.logger.warn(`Résumé session ${sessionId} turn failed: ${message}`);
+    try {
+      await this.sessionModel.updateOne(
+        { _id: sessionId, userId },
+        { $push: { failures: { $each: [{ at: new Date(), kind: 'turn', message }], $slice: -20 } } },
+      ).exec();
+    } catch {
+      // Recording must never replace the original turn error.
+    }
+  }
+
+  /** Error class, Nest error code when present, and message: no résumé text or keys. */
+  private describeFailure(error: unknown): string {
+    let text: string;
+    if (error instanceof Error) {
+      const response = error instanceof HttpException ? error.getResponse() : undefined;
+      const code = response && typeof response === 'object' ? (response as { code?: unknown }).code : undefined;
+      const name = typeof code === 'string' ? `${error.constructor.name}[${code}]` : error.constructor.name;
+      const diagnostic = (error as { diagnostic?: unknown }).diagnostic;
+      text = `${name}: ${typeof diagnostic === 'string' ? diagnostic : error.message}`;
+    } else {
+      text = String(error);
+    }
+    return text
+      .replace(/\s+/g, ' ')
+      .replace(/\bsk-[A-Za-z0-9_-]{8,}/g, 'sk-[redacted]')
+      .replace(/Bearer\s+\S+/gi, 'Bearer [redacted]')
+      .trim()
+      .slice(0, 500);
   }
 
   // ------------------------------------------------------ template and look ---
@@ -733,7 +780,12 @@ export class ResumeHarnessService {
     //    document they have not asked for yet, and would leave an empty
     //    snapshot behind for "back to previous look" to restore.
     if (!session.latex) {
-      await this.sandbox.writeFiles(session.sandboxId!, conditionFiles);
+      try {
+        await this.sandbox.writeFiles(session.sandboxId!, conditionFiles);
+      } catch (error) {
+        await this.recordTurnFailure(userId, sessionId, error);
+        throw error;
+      }
       session.templateKey = look.template.key;
       session.vibe = look.vibe;
       await (session as any).save();
@@ -1730,11 +1782,11 @@ export class ResumeHarnessService {
         `${adapter.id} exited ${result.exitCode}: ${result.stderr?.slice(0, 400)}`,
       );
       const detail = [result.stderr, parsed?.error, streamError, result.stdout].filter(Boolean).join('\n');
-      throw new ServiceUnavailableException(publicTurnFailure(detail));
+      throw turnFailure(adapter.id, detail, `exited ${result.exitCode}`);
     }
     if (parsed) {
       const failure = parsed.error || streamError;
-      if (failure) throw new ServiceUnavailableException(publicTurnFailure(failure));
+      if (failure) throw turnFailure(adapter.id, failure, 'reported a turn error');
       return parsed.response?.slice(-6000);
     }
     return (result.stdout || '').trim().slice(-6000) || undefined;
@@ -2077,6 +2129,14 @@ export class ResumeHarnessService {
       archivedAt: session.archivedAt,
     };
   }
+}
+
+/** The user sees publicTurnFailure(detail); the diagnostic carries no raw harness output. */
+function turnFailure(adapterId: string, detail: string, what: string): ServiceUnavailableException {
+  const timedOut = /timed out|timeout/i.test(detail) ? ' (timed out)' : '';
+  return Object.assign(new ServiceUnavailableException(publicTurnFailure(detail)), {
+    diagnostic: `${adapterId} ${what}${timedOut}`,
+  });
 }
 
 function publicTurnFailure(detail: string): string {

@@ -16,6 +16,7 @@ describe('LiteLlmCandidateResumeReviewAgent session runtime', () => {
   const session = {
     _id: 'compare-session-1', status: 'provisioning', sandboxId: undefined as string | undefined,
     failureReason: undefined as string | undefined,
+    failureDetail: undefined as string | undefined,
     save: jest.fn(),
   };
   const sessionModel = { create: jest.fn(), findOne: jest.fn(), find: jest.fn() };
@@ -52,6 +53,7 @@ describe('LiteLlmCandidateResumeReviewAgent session runtime', () => {
     session.status = 'provisioning';
     session.sandboxId = undefined;
     session.failureReason = undefined;
+    session.failureDetail = undefined;
     session.save.mockResolvedValue(undefined);
     sessionModel.create.mockResolvedValue(session);
     sessionModel.findOne.mockReturnValue({ sort: () => ({ lean: () => ({ exec: async () => null }) }) });
@@ -560,6 +562,37 @@ describe('LiteLlmCandidateResumeReviewAgent session runtime', () => {
     expect(adapter.turnCommand.mock.calls[1][1]).toContain('REPAIR REQUIRED');
     expect(result.annotations).toHaveLength(3);
     expect(quota.consumeCredit).not.toHaveBeenCalled();
+  });
+
+  it('saves the real execution error as failureDetail on a failed session', async () => {
+    sandbox.provision.mockRejectedValueOnce(new Error('Agent Platform unreachable: fetch failed'));
+    await expect(agent.review({
+      userId: 'user-1', resumeId: 'resume-1', resumeText: 'Built payment services for clients', jobDescription: 'Backend engineer',
+    } as any)).rejects.toThrow('Agent Platform unreachable: fetch failed');
+    expect(session.status).toBe('failed');
+    expect(session.failureDetail).toBe('Error: Agent Platform unreachable: fetch failed');
+    expect(session.failureDetail.length).toBeLessThanOrEqual(500);
+  });
+
+  it('scrubs API keys from the saved failureDetail and truncates it to 500 chars', async () => {
+    sandbox.provision.mockRejectedValueOnce(new Error(`sk-abcdefghijklmnop ${'x'.repeat(600)}`));
+    await expect(agent.review({
+      userId: 'user-1', resumeId: 'resume-1', resumeText: 'Built payment services', jobDescription: 'Backend engineer',
+    } as any)).rejects.toThrow('sk-abcdefghijklmnop');
+    expect(session.failureDetail).toHaveLength(500);
+    expect(session.failureDetail).toContain('sk-[redacted]');
+    expect(session.failureDetail).not.toContain('sk-abcdefghijklmnop');
+  });
+
+  it('records a review timeout by exit code without saving the raw harness output (JOB-161)', async () => {
+    sandbox.exec.mockResolvedValue({ exitCode: 124, stderr: 'Command timed out after 240 seconds.', stdout: 'Jane Candidate jane@example.com built payments' });
+    await expect(agent.review({
+      userId: 'user-1', resumeId: 'resume-1', resumeText: 'Built payment services for clients', jobDescription: 'Backend engineer',
+    } as any)).rejects.toThrow('ATS review session failed.');
+    expect(session.failureReason).toBe('HARNESS_EXECUTION_FAILED');
+    expect(session.failureDetail).toContain('exited 124 (timed out)');
+    expect(session.failureDetail).not.toContain('jane@example.com');
+    expect(session.failureDetail).not.toContain('Jane Candidate');
   });
 
   it('does not deduct a credit when the session returns invalid review output', async () => {

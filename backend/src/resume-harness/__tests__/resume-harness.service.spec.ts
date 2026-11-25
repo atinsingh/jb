@@ -1399,6 +1399,69 @@ describe('ResumeHarnessService', () => {
       .rejects.toThrow('The résumé could not be finished in time. Try again.');
   });
 
+  it('records a failed turn on the session and still rethrows the original error', async () => {
+    const session = await start('claude-code');
+    sandbox.exec.mockResolvedValueOnce({
+      exitCode: 1,
+      stdout: '',
+      stderr: 'Docker command timed out after 120 seconds.',
+    });
+    sessionModel.updateOne.mockClear();
+
+    await expect(service.runTurn('u1', session.id, { instruction: 'Build it' }))
+      .rejects.toThrow('The résumé could not be finished in time. Try again.');
+
+    expect(sessionModel.updateOne).toHaveBeenCalledWith(
+      { _id: session.id, userId: 'u1' },
+      {
+        $push: {
+          failures: {
+            $each: [{
+              at: expect.any(Date),
+              kind: 'turn',
+              message: expect.stringContaining('exited 1 (timed out)'),
+            }],
+            $slice: -20,
+          },
+        },
+      },
+    );
+  });
+
+  it('records the exit code but never the résumé text the harness printed', async () => {
+    const session = await start('claude-code');
+    sandbox.exec.mockResolvedValueOnce({
+      exitCode: 1,
+      stdout: 'Jane Candidate jane@example.com built payments',
+      stderr: '',
+    });
+    sessionModel.updateOne.mockClear();
+
+    await expect(service.runTurn('u1', session.id, { instruction: 'Build it' }))
+      .rejects.toThrow('Jane Candidate jane@example.com built payments');
+
+    const push = sessionModel.updateOne.mock.calls
+      .map(([, update]: any[]) => update?.$push?.failures?.$each?.[0])
+      .find(Boolean);
+    expect(push.message).toContain('exited 1');
+    expect(push.message).not.toContain('jane@example.com');
+    expect(push.message).not.toContain('Jane Candidate');
+  });
+
+  it('records a failed turn when the sandbox rejects the pre-turn file write', async () => {
+    const session = await start('claude-code');
+    sandbox.writeFiles.mockRejectedValueOnce(new Error('gateway timeout'));
+    sessionModel.updateOne.mockClear();
+
+    await expect(service.runTurn('u1', session.id, { instruction: 'Build it' }))
+      .rejects.toThrow('gateway timeout');
+
+    expect(sessionModel.updateOne).toHaveBeenCalledWith(
+      { _id: session.id, userId: 'u1' },
+      { $push: { failures: { $each: [expect.objectContaining({ kind: 'turn' })], $slice: -20 } } },
+    );
+  });
+
   it('fails the turn when the harness command exits non-zero instead of compiling stale output', async () => {
     const session = await start('opencode');
     sandbox.exec.mockResolvedValueOnce({

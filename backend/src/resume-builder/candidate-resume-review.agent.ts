@@ -1,4 +1,4 @@
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { HttpException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { createHash, randomUUID } from 'crypto';
 import { Model } from 'mongoose';
@@ -74,6 +74,8 @@ type DetailedReview = {
  */
 @Injectable()
 export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgent {
+  private readonly logger = new Logger(LiteLlmCandidateResumeReviewAgent.name);
+
   constructor(
     @InjectModel(CandidateAtsReviewSession.name)
     private readonly sessionModel: Model<CandidateAtsReviewSessionDocument>,
@@ -325,6 +327,9 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
         : failure.includes('returned no review') ? 'EMPTY_HARNESS_REVIEW'
         : failure.includes('review session failed') ? 'HARNESS_EXECUTION_FAILED'
         : 'CANDIDATE_ATS_AGENT_SESSION_FAILED';
+      const detail = this.failureDetail(error);
+      session.failureDetail = detail;
+      this.logger.warn(`Compare review ${sessionId} failed (${session.failureReason}) after ${reviewTurns.count} review turn(s): ${detail}`);
       try { await session.save(); } catch { /* preserve the execution error */ }
       throw error;
     } finally {
@@ -334,6 +339,24 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
         try { await session.save(); } catch { /* terminal result already decided */ }
       }
     }
+  }
+
+  /** Error class, optional HTTP error code, and message; no résumé or job text. */
+  private failureDetail(error: unknown): string {
+    let text = String(error);
+    if (error instanceof Error) {
+      const response = error instanceof HttpException ? error.getResponse() : undefined;
+      const code = response && typeof response === 'object' && 'code' in response ? (response as { code?: unknown }).code : undefined;
+      const label = code ? `${error.constructor.name}[${String(code)}]` : error.constructor.name;
+      const diagnostic = (error as { diagnostic?: unknown }).diagnostic;
+      text = `${label}: ${error.message}${typeof diagnostic === 'string' ? ` (${diagnostic})` : ''}`;
+    }
+    return text
+      .replace(/\s+/g, ' ')
+      .replace(/\bsk-[A-Za-z0-9_-]{8,}/g, 'sk-[redacted]')
+      .replace(/Bearer\s+\S+/gi, 'Bearer [redacted]')
+      .trim()
+      .slice(0, 500);
   }
 
   private result(
@@ -517,7 +540,11 @@ export class LiteLlmCandidateResumeReviewAgent extends CandidateResumeReviewAgen
     );
     const parsed = adapter.parseOutput?.(executed.stdout || '');
     if (executed.exitCode !== 0 || parsed?.error) {
-      throw new ServiceUnavailableException(`${adapter.displayName} ATS review session failed.`);
+      // The diagnostic tells a timeout from a crash without saving raw harness output.
+      const timedOut = /timed out|timeout/i.test(`${executed.stderr || ''} ${parsed?.error || ''}`) ? ' (timed out)' : '';
+      throw Object.assign(new ServiceUnavailableException(`${adapter.displayName} ATS review session failed.`), {
+        diagnostic: executed.exitCode !== 0 ? `${adapter.id} exited ${executed.exitCode}${timedOut}` : `${adapter.id} reported a review error${timedOut}`,
+      });
     }
     // A structured harness stream without a final assistant result is not a
     // textual review; parsing the stream envelope would mislabel this failure.

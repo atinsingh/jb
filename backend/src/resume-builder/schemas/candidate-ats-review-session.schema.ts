@@ -55,6 +55,9 @@ export class CandidateAtsReviewSession {
   @Prop()
   failureReason?: string;
 
+  @Prop({ maxlength: 500 })
+  failureDetail?: string;
+
   @Prop()
   completedAt?: Date;
 }
