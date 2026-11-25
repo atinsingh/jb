@@ -246,3 +246,22 @@ test('backend production template uses the Supabase S3 bucket', () => {
     assert.match(text, new RegExp(`^${key}=.+$`, 'm'));
   }
 });
+
+test('AI manifest pre-pulls the pinned sandbox image on every node outside the sandbox quota (JOB-161)', () => {
+  const manifest = readFileSync(join(root, 'deploy/kubernetes/ai.template.yaml'), 'utf8');
+  const docs = manifest.split(/^---$/m);
+  const prepull = docs.find((doc) => /^kind: DaemonSet$/m.test(doc) && /__SANDBOX_IMAGE__/.test(doc));
+  assert.ok(prepull, 'a DaemonSet pulls __SANDBOX_IMAGE__ onto each node');
+  // The sandbox namespace quota allows 6 pods; one pre-pull pod per node must not consume it.
+  assert.match(prepull, /^  namespace: __NAMESPACE__$/m);
+  assert.doesNotMatch(prepull, /namespace: __NAMESPACE__-sandboxes/);
+  assert.match(prepull, /initContainers:[\s\S]*image: __SANDBOX_IMAGE__/);
+  assert.match(prepull, /imagePullSecrets: \[\{name: registry-__REGISTRY__\}\]/);
+  assert.match(prepull, /runAsNonRoot: true/);
+
+  const script = readFileSync(join(root, 'scripts/deploy-ai-production.cjs'), 'utf8');
+  assert.match(script, /'__SANDBOX_IMAGE__':\s*sandboxImage/, 'the deploy script renders the pinned sandbox digest');
+  const waits = script.indexOf("'daemonset/jobocate-sandbox-image-prepull'");
+  const cutover = script.indexOf("secret('jobocate-agent-platform'");
+  assert.ok(waits > 0 && waits < cutover, 'the pre-pull finishes before the gateway is pointed at the new sandbox image');
+});

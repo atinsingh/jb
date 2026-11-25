@@ -1778,10 +1778,8 @@ export class ResumeHarnessService {
     if (onEvent && streamBuffer.trim()) consumeLine(streamBuffer);
     const parsed = adapter.parseOutput?.(result.stdout || '');
     if (result.exitCode !== 0) {
-      this.logger.warn(
-        `${adapter.id} exited ${result.exitCode}: ${result.stderr?.slice(0, 400)}`,
-      );
       const detail = [result.stderr, parsed?.error, streamError, result.stdout].filter(Boolean).join('\n');
+      // recordTurnFailure logs the raw-output-free diagnostic with the session id.
       throw turnFailure(adapter.id, detail, `exited ${result.exitCode}`);
     }
     if (parsed) {
@@ -2132,7 +2130,7 @@ export class ResumeHarnessService {
 }
 
 /** The user sees publicTurnFailure(detail); the diagnostic carries no raw harness output. */
-function turnFailure(adapterId: string, detail: string, what: string): ServiceUnavailableException {
+function turnFailure(adapterId: string, detail: string, what: string): ServiceUnavailableException & { diagnostic: string } {
   const timedOut = /timed out|timeout/i.test(detail) ? ' (timed out)' : '';
   return Object.assign(new ServiceUnavailableException(publicTurnFailure(detail)), {
     diagnostic: `${adapterId} ${what}${timedOut}`,

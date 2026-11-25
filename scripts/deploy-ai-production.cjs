@@ -46,17 +46,23 @@ function main(){
     sandboxImage=image('jobocate-resume-harness','infra/agent-platform/harness.Dockerfile','infra/agent-platform',option('--sandbox-image',currentSandbox));
     gatewayImage=image('jobocate-agent-platform','infra/agent-platform/gateway.Dockerfile','infra/agent-platform',option('--gateway-image',null));
   }
-  const replacements={'__NAMESPACE__':namespace,'__REGISTRY__':registry,'__HOST__':domain,'__GATEWAY_IMAGE__':gatewayImage,
+  const replacements={'__NAMESPACE__':namespace,'__REGISTRY__':registry,'__HOST__':domain,'__GATEWAY_IMAGE__':gatewayImage,'__SANDBOX_IMAGE__':sandboxImage,
     '__LITELLM_IMAGE__':'ghcr.io/berriai/litellm@sha256:a53a7d3ffebede1925bd3ee8a21e4a7b9b63e2e68ec883af136edcccb6eeb82c'};
-  let manifest=fs.readFileSync(path.join(root,'deploy/kubernetes/ai.template.yaml'),'utf8');
+  let manifest=fs.readFileSync(path.join(root,'deploy/kubernetes/ai.template.yaml'),'utf8').replace(/\r\n/g,'\n');
   for(const [key,value]of Object.entries(replacements))manifest=manifest.replaceAll(key,value);
+  if(/__[A-Z_]+__/.test(manifest))throw Error('The rendered AI manifest still contains template tokens.');
   if(gatewayOnly)manifest=manifest.split(/^---$/m).filter(doc=>!/^  name: jobocate-litellm$/m.test(doc)).join('\n---\n');
+  // Cache the sandbox image on every node before the gateway switches to it: a cold 4.86 GB pull outlasts its 240 s pod-ready wait.
+  const prepull=manifest.split(/^---$/m).filter(doc=>/^kind: DaemonSet$/m.test(doc)&&/^  name: jobocate-sandbox-image-prepull$/m.test(doc));
+  if(prepull.length!==1)throw Error('The AI manifest must define the sandbox image pre-pull DaemonSet once');
   fs.mkdirSync(path.join(root,'.deploy-state/rendered'),{recursive:true});
   fs.writeFileSync(path.join(root,'.deploy-state/rendered/ai.yaml'),manifest);
   if(validateOnly){run('kubectl',['apply','--dry-run=client','-f','-'],manifest);console.log('AI manifest valid; no MongoDB or Postgres workloads.');return;}
   apply({apiVersion:'v1',kind:'Namespace',metadata:{name:`${namespace}-sandboxes`,labels:{'pod-security.kubernetes.io/enforce':'restricted','pod-security.kubernetes.io/enforce-version':'v1.34'}}});
   const pullSecret=JSON.parse(run('kubectl',['get','secret',`registry-${registry}`,'-n',namespace,'-o','json'],undefined,{quiet:true}));
   apply({apiVersion:'v1',kind:'Secret',metadata:{name:`registry-${registry}`,namespace:`${namespace}-sandboxes`},type:pullSecret.type,data:pullSecret.data});
+  apply(prepull[0]);
+  run('kubectl',['rollout','status','daemonset/jobocate-sandbox-image-prepull','-n',namespace,'--timeout=20m']);
   values.RESUME_SANDBOX_IMAGE=sandboxImage;
   secret('jobocate-agent-platform',['AGENT_PLATFORM_API_KEY','RESUME_SANDBOX_IMAGE']);
   if(!gatewayOnly){

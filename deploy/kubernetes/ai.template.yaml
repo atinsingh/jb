@@ -218,3 +218,45 @@ spec:
               service:
                 name: jobocate-agent-platform
                 port: {number: 4100}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: jobocate-sandbox-image-prepull
+  namespace: __NAMESPACE__
+spec:
+  selector:
+    matchLabels: {app: jobocate-sandbox-image-prepull}
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate: {maxUnavailable: 100%}
+  template:
+    metadata:
+      labels: {app: jobocate-sandbox-image-prepull}
+    spec:
+      automountServiceAccountToken: false
+      imagePullSecrets: [{name: registry-__REGISTRY__}]
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile: {type: RuntimeDefault}
+      terminationGracePeriodSeconds: 1
+      initContainers:
+        - name: pull
+          image: __SANDBOX_IMAGE__
+          command: ["true"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          resources:
+            requests: {cpu: 1m, memory: 8Mi}
+            limits: {cpu: 100m, memory: 64Mi}
+      containers:
+        - name: hold
+          image: registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          resources:
+            requests: {cpu: 1m, memory: 4Mi}
+            limits: {cpu: 10m, memory: 16Mi}
